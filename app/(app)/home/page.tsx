@@ -1,17 +1,25 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { CharacterAvatar } from "@/components/character-avatar"
-import { ProgressCard } from "@/components/progress-card"
-import { StatsCard } from "@/components/stats-card"
-import { AreaActivityChart } from "@/components/area-activity-chart"
-import { LoopComparisonChart } from "@/components/loop-comparison-chart"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ChevronRight, Star, TrendingUp, Calendar, Clock, Award, Target } from "lucide-react"
-import Link from "next/link"
-import { Badge } from "@/components/ui/badge"
+import { useState } from "react";
+import { CharacterAvatar } from "@/components/character-avatar";
+import { ProgressCard } from "@/components/progress-card";
+import { StatsCard } from "@/components/stats-card";
+import { AreaActivityChart } from "@/components/area-activity-chart";
+import { LoopComparisonChart } from "@/components/loop-comparison-chart";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  ChevronRight,
+  Star,
+  TrendingUp,
+  Calendar,
+  Clock,
+  Award,
+  Target,
+} from "lucide-react";
+import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 
 export default function HomePage() {
   // 샘플 데이터
@@ -24,7 +32,7 @@ export default function HomePage() {
     changeRate: 18,
     daysLeft: 12,
     startDate: "2025년 5월 1일",
-  }
+  };
 
   const projects = [
     {
@@ -59,7 +67,7 @@ export default function HomePage() {
       area: "커리어",
       addedMidway: true,
     },
-  ]
+  ];
 
   const stats = {
     completionRate: 65,
@@ -70,25 +78,25 @@ export default function HomePage() {
     totalFocusTime: 42,
     previousFocusTime: 35,
     focusTimeChange: 20,
-  }
+  };
 
   const areaActivityData = [
     { name: "건강", value: 45 },
     { name: "개발", value: 30 },
     { name: "마음", value: 15 },
     { name: "기타", value: 10 },
-  ]
+  ];
 
   const loopComparisonData = [
     { name: "3월", completion: 40, focusHours: 25 },
     { name: "4월", completion: 55, focusHours: 35 },
     { name: "5월", completion: 65, focusHours: 42 },
-  ]
+  ];
 
   // 프로젝트 표시 개수 제한 (정책: 3개 이하면 모두 표시, 4개 이상이면 3개만 표시 + 더보기 버튼)
-  const [showAllProjects, setShowAllProjects] = useState(false)
-  const displayedProjects = showAllProjects ? projects : projects.slice(0, 3)
-  const hasMoreProjects = projects.length > 3
+  const [showAllProjects, setShowAllProjects] = useState(false);
+  const displayedProjects = showAllProjects ? projects : projects.slice(0, 3);
+  const hasMoreProjects = projects.length > 3;
 
   return (
     <div className="container max-w-md px-4 py-6">
@@ -112,12 +120,8 @@ export default function HomePage() {
 
         <TabsContent value="summary" className="mt-4 space-y-6">
           <section>
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex items-center">
               <h2 className="text-xl font-bold">현재 루프</h2>
-              <Link href="/loop" className="flex items-center text-sm text-primary">
-                전체 보기
-                <ChevronRight size={16} />
-              </Link>
             </div>
 
             <Card className="relative overflow-hidden border-2 border-primary/20 p-4">
@@ -136,7 +140,10 @@ export default function HomePage() {
                 </span>
               </div>
               <div className="progress-bar">
-                <div className="progress-value" style={{ width: `${currentLoop.progress}%` }}></div>
+                <div
+                  className="progress-value"
+                  style={{ width: `${currentLoop.progress}%` }}
+                ></div>
               </div>
               <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                 <Calendar className="h-3 w-3" />
@@ -152,25 +159,34 @@ export default function HomePage() {
           </section>
 
           <section>
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex items-center">
               <h2 className="text-xl font-bold">현재 루프 프로젝트</h2>
-              <Link href="/project" className="flex items-center text-sm text-primary">
-                프로젝트 전체 보기
-                <ChevronRight size={16} />
-              </Link>
             </div>
 
             <div className="space-y-3">
               {displayedProjects.map((project) => (
-                <ProgressCard key={project.id} title={project.title} progress={project.progress} total={project.total}>
+                <ProgressCard
+                  key={project.id}
+                  title={project.title}
+                  progress={project.progress}
+                  total={project.total}
+                >
                   <div className="mt-2 flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Area: {project.area}</span>
+                    <span className="text-xs text-muted-foreground">
+                      Area: {project.area}
+                    </span>
                     {project.addedMidway ? (
-                      <Badge variant="outline" className="bg-amber-100 text-amber-800 text-xs">
+                      <Badge
+                        variant="outline"
+                        className="bg-amber-100 text-amber-800 text-xs"
+                      >
                         🔥 루프 중 추가됨
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="bg-primary/10 text-xs">
+                      <Badge
+                        variant="outline"
+                        className="bg-primary/10 text-xs"
+                      >
                         현재 루프 연결됨
                       </Badge>
                     )}
@@ -179,7 +195,11 @@ export default function HomePage() {
               ))}
 
               {!showAllProjects && hasMoreProjects && (
-                <Button variant="outline" className="mt-2 w-full" onClick={() => setShowAllProjects(true)}>
+                <Button
+                  variant="outline"
+                  className="mt-2 w-full"
+                  onClick={() => setShowAllProjects(true)}
+                >
                   더보기 ({projects.length - 3}개)
                 </Button>
               )}
@@ -246,5 +266,5 @@ export default function HomePage() {
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }

@@ -1,10 +1,18 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { ChevronRight, Clock, Star, Target, CalendarDays, Edit, Calendar } from "lucide-react"
-import Link from "next/link"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  ChevronRight,
+  Clock,
+  Star,
+  Target,
+  CalendarDays,
+  Edit,
+  Calendar,
+} from "lucide-react";
+import Link from "next/link";
 import {
   Dialog,
   DialogContent,
@@ -12,47 +20,52 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { useToast } from "@/hooks/use-toast"
-import { Badge } from "@/components/ui/badge"
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 export default function LoopPage() {
-  const { toast } = useToast()
-  const [showNewMonthDialog, setShowNewMonthDialog] = useState(false)
+  const { toast } = useToast();
+  const [showNewMonthDialog, setShowNewMonthDialog] = useState(false);
 
   // 현재 날짜 정보
-  const currentDate = new Date()
-  const currentMonth = currentDate.getMonth()
-  const currentYear = currentDate.getFullYear()
-  const isFirstDayOfMonth = currentDate.getDate() === 1
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
+  const isFirstDayOfMonth = currentDate.getDate() === 1;
 
   // 샘플 데이터 - 실제로는 API에서 가져와야 함
-  const hasCurrentLoop = true // 현재 루프 존재 여부
-  const hasNextLoop = true // 다음 루프 존재 여부
+  const hasCurrentLoop = true; // 현재 루프 존재 여부
+  const hasNextLoop = true; // 다음 루프 존재 여부
 
   // 다음 달 정보 계산
-  const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1
-  const nextMonthYear = currentMonth === 11 ? currentYear + 1 : currentYear
-  const nextMonthName = new Date(nextMonthYear, nextMonth, 1).toLocaleString("ko-KR", { month: "long" })
+  const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+  const nextMonthYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+  const nextMonthName = new Date(nextMonthYear, nextMonth, 1).toLocaleString(
+    "ko-KR",
+    { month: "long" }
+  );
 
   // 현재 달 정보
-  const currentMonthName = currentDate.toLocaleString("ko-KR", { month: "long" })
+  const currentMonthName = currentDate.toLocaleString("ko-KR", {
+    month: "long",
+  });
 
   // 자동 루프 생성 유도 팝업 표시 여부 확인
   useEffect(() => {
     // 오늘이 새 달의 1일이고, 현재 루프가 없는 경우 팝업 표시
     if (isFirstDayOfMonth && !hasCurrentLoop) {
       // 오늘 이미 표시했는지 확인 (localStorage 사용)
-      const lastShown = localStorage.getItem("loopReminderLastShown")
-      const today = currentDate.toISOString().split("T")[0]
+      const lastShown = localStorage.getItem("loopReminderLastShown");
+      const today = currentDate.toISOString().split("T")[0];
 
       if (lastShown !== today) {
-        setShowNewMonthDialog(true)
+        setShowNewMonthDialog(true);
         // 오늘 날짜 저장 (하루에 한 번만 표시)
-        localStorage.setItem("loopReminderLastShown", today)
+        localStorage.setItem("loopReminderLastShown", today);
       }
     }
-  }, [isFirstDayOfMonth, hasCurrentLoop])
+  }, [isFirstDayOfMonth, hasCurrentLoop]);
 
   // 샘플 데이터
   const currentLoop = hasCurrentLoop
@@ -71,7 +84,7 @@ export default function LoopPage() {
           { id: 3, title: "명상 습관 만들기", progress: 10, total: 20 },
         ],
       }
-    : null
+    : null;
 
   // 다음 루프 샘플 데이터
   const nextLoop = hasNextLoop
@@ -88,7 +101,7 @@ export default function LoopPage() {
           { id: 12, title: "도서관 정기 방문", progress: 0, total: 4 },
         ],
       }
-    : null
+    : null;
 
   const pastLoops = [
     {
@@ -105,7 +118,7 @@ export default function LoopPage() {
       completed: false,
       date: "2025년 3월",
     },
-  ]
+  ];
 
   // 루프 생성 버튼 클릭 핸들러
   const handleCreateLoop = () => {
@@ -113,18 +126,18 @@ export default function LoopPage() {
       toast({
         title: "다음 루프가 이미 준비되어 있어요",
         description: "현재 진행 중인 루프와 다음 달 루프가 모두 존재합니다.",
-      })
-      return
+      });
+      return;
     }
 
     // 루프 생성 페이지로 이동
     // 현재 루프 존재 여부에 따라 다른 파라미터 전달
     const startDate = hasCurrentLoop
       ? `${nextMonthYear}-${String(nextMonth + 1).padStart(2, "0")}-01` // 다음 달 1일
-      : `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01` // 현재 달 1일
+      : `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`; // 현재 달 1일
 
-    window.location.href = `/loop/new?startDate=${startDate}`
-  }
+    window.location.href = `/loop/new?startDate=${startDate}`;
+  };
 
   return (
     <div className="container max-w-md px-4 py-6">
@@ -136,7 +149,9 @@ export default function LoopPage() {
           <div className="flex flex-col items-end">
             <Button onClick={handleCreateLoop}>
               <Target className="mr-2 h-4 w-4" />
-              {!hasCurrentLoop ? "이번 달 루프 시작하기" : "다음 루프 미리 만들기"}
+              {!hasCurrentLoop
+                ? "이번 달 루프 시작하기"
+                : "다음 루프 미리 만들기"}
             </Button>
             <p className="mt-1 text-xs text-muted-foreground">
               {!hasCurrentLoop
@@ -151,15 +166,14 @@ export default function LoopPage() {
           <div className="flex items-center text-sm text-muted-foreground">
             <CalendarDays className="mr-1 h-4 w-4" />
             <span>다음 루프가 이미 준비되어 있어요</span>
-            <Button variant="link" size="sm" asChild className="ml-1 p-0">
-              <Link href={`/loop/edit?month=${nextMonthYear}-${String(nextMonth + 1).padStart(2, "0")}`}>수정</Link>
-            </Button>
           </div>
         )}
       </div>
 
       <section className="mb-8">
-        <h2 className="mb-4 text-xl font-bold">{currentLoop ? "현재 루프" : "진행 중인 루프가 없습니다"}</h2>
+        <h2 className="mb-4 text-xl font-bold">
+          {currentLoop ? "현재 루프" : "진행 중인 루프가 없습니다"}
+        </h2>
 
         {currentLoop ? (
           <Card className="border-2 border-primary/20 p-4">
@@ -185,7 +199,10 @@ export default function LoopPage() {
                 </span>
               </div>
               <div className="progress-bar">
-                <div className="progress-value" style={{ width: `${currentLoop.progress}%` }}></div>
+                <div
+                  className="progress-value"
+                  style={{ width: `${currentLoop.progress}%` }}
+                ></div>
               </div>
             </div>
 
@@ -200,7 +217,10 @@ export default function LoopPage() {
               <h4 className="mb-2 font-medium">중점 Areas</h4>
               <div className="flex flex-wrap gap-2">
                 {currentLoop.areas.map((area) => (
-                  <span key={area} className="rounded-full bg-primary/10 px-3 py-1 text-xs">
+                  <span
+                    key={area}
+                    className="rounded-full bg-primary/10 px-3 py-1 text-xs"
+                  >
                     {area}
                   </span>
                 ))}
@@ -211,7 +231,10 @@ export default function LoopPage() {
               <h4 className="mb-2 font-medium">프로젝트</h4>
               <div className="space-y-2">
                 {currentLoop.projects.map((project) => (
-                  <div key={project.id} className="rounded-lg bg-secondary p-3 text-sm">
+                  <div
+                    key={project.id}
+                    className="rounded-lg bg-secondary p-3 text-sm"
+                  >
                     <div className="mb-1 flex justify-between">
                       <span>{project.title}</span>
                       <span>
@@ -222,7 +245,9 @@ export default function LoopPage() {
                       <div
                         className="progress-value"
                         style={{
-                          width: `${Math.round((project.progress / project.total) * 100)}%`,
+                          width: `${Math.round(
+                            (project.progress / project.total) * 100
+                          )}%`,
                         }}
                       ></div>
                     </div>
@@ -251,7 +276,9 @@ export default function LoopPage() {
               <br />
               매월 새로운 도전을 시작할 수 있습니다.
             </p>
-            <Button onClick={handleCreateLoop}>{currentMonthName} 루프 시작하기</Button>
+            <Button onClick={handleCreateLoop}>
+              {currentMonthName} 루프 시작하기
+            </Button>
           </Card>
         )}
       </section>
@@ -263,7 +290,10 @@ export default function LoopPage() {
           <Card className="border-2 border-purple-200 bg-purple-50/50 p-4">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-lg font-bold">{nextLoop.title}</h3>
-              <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
+              <Badge
+                variant="outline"
+                className="bg-purple-100 text-purple-800 border-purple-200"
+              >
                 예약됨
               </Badge>
             </div>
@@ -282,7 +312,10 @@ export default function LoopPage() {
               <h4 className="mb-2 font-medium">중점 Areas</h4>
               <div className="flex flex-wrap gap-2">
                 {nextLoop.areas.map((area) => (
-                  <span key={area} className="rounded-full bg-purple-100 px-3 py-1 text-xs">
+                  <span
+                    key={area}
+                    className="rounded-full bg-purple-100 px-3 py-1 text-xs"
+                  >
                     {area}
                   </span>
                 ))}
@@ -291,12 +324,20 @@ export default function LoopPage() {
 
             <div>
               <h4 className="mb-2 font-medium">프로젝트</h4>
-              <p className="text-sm text-muted-foreground">🔗 프로젝트 {nextLoop.projects.length}개 연결됨</p>
+              <p className="text-sm text-muted-foreground">
+                🔗 프로젝트 {nextLoop.projects.length}개 연결됨
+              </p>
             </div>
 
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="outline" asChild>
-                <Link href={`/loop/edit?month=${nextMonthYear}-${String(nextMonth + 1).padStart(2, "0")}`}>✏️ 수정</Link>
+                <Link
+                  href={`/loop/edit?month=${nextMonthYear}-${String(
+                    nextMonth + 1
+                  ).padStart(2, "0")}`}
+                >
+                  ✏️ 수정
+                </Link>
               </Button>
               <Button variant="default" asChild>
                 <Link href={`/loop/${nextLoop.id}`}>상세 보기</Link>
@@ -311,7 +352,12 @@ export default function LoopPage() {
         {pastLoops.length > 0 ? (
           <div className="space-y-3">
             {pastLoops.map((loop) => (
-              <Card key={loop.id} className={`p-4 ${loop.completed ? "border-green-200" : "border-red-200"}`}>
+              <Card
+                key={loop.id}
+                className={`p-4 ${
+                  loop.completed ? "border-green-200" : "border-red-200"
+                }`}
+              >
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium">{loop.title}</h3>
@@ -321,8 +367,14 @@ export default function LoopPage() {
                     </div>
                   </div>
                   <div className="flex flex-col items-end">
-                    <span className="text-sm text-muted-foreground">{loop.date}</span>
-                    <span className={`text-xs ${loop.completed ? "text-green-600" : "text-red-600"}`}>
+                    <span className="text-sm text-muted-foreground">
+                      {loop.date}
+                    </span>
+                    <span
+                      className={`text-xs ${
+                        loop.completed ? "text-green-600" : "text-red-600"
+                      }`}
+                    >
                       {loop.completed ? "완료" : "미완료"}
                     </span>
                   </div>
@@ -339,7 +391,9 @@ export default function LoopPage() {
             ))}
           </div>
         ) : (
-          <Card className="border-dashed p-6 text-center text-muted-foreground">아직 완료된 루프가 없습니다.</Card>
+          <Card className="border-dashed p-6 text-center text-muted-foreground">
+            아직 완료된 루프가 없습니다.
+          </Card>
         )}
       </section>
 
@@ -348,11 +402,17 @@ export default function LoopPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>새로운 달이 시작되었습니다!</DialogTitle>
-            <DialogDescription>{currentMonthName} 루프를 생성하고 목표를 실행해 보세요.</DialogDescription>
+            <DialogDescription>
+              {currentMonthName} 루프를 생성하고 목표를 실행해 보세요.
+            </DialogDescription>
           </DialogHeader>
 
           <DialogFooter className="flex flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={() => setShowNewMonthDialog(false)} className="sm:order-1">
+            <Button
+              variant="outline"
+              onClick={() => setShowNewMonthDialog(false)}
+              className="sm:order-1"
+            >
               나중에
             </Button>
             <Button onClick={handleCreateLoop} className="sm:order-2">
@@ -362,5 +422,5 @@ export default function LoopPage() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

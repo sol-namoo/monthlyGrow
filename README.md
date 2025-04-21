@@ -1,6 +1,6 @@
 # 🌙 월간 루프 기반 자기계발 앱 – MonthlyGrow
 
-> 프린세스 메이커 같은 루프형 구조로, ‘나’를 키우듯 목표를 실행하는 자기계발 게임 앱
+> 육성 게임에서 차용한 루프형 구조로, ‘나’를 키우듯 목표를 실행하는 자기계발 게임 앱
 
 ---
 
@@ -33,14 +33,14 @@ PARA 시스템을 활용해 목표를 실행하며 성장해 나가는 **게임�
 
 ## 💻 기술 스택
 
-| 영역 | 기술 |
-|------|------|
-| Framework | [Next.js 15 (App Router)](https://nextjs.org/blog/next-15) |
-| UI | [React 19](https://react.dev), [Tailwind CSS](https://tailwindcss.com), [shadcn/ui](https://ui.shadcn.com) |
-| Auth | Firebase Auth (Google OAuth) |
-| DB | Firebase Firestore |
-| I18n | react-i18next |
-| AI 연동 예정 | GPT API + Model Context Protocol (MCP) |
+| 영역         | 기술                                                                                                       |
+| ------------ | ---------------------------------------------------------------------------------------------------------- |
+| Framework    | [Next.js 15 (App Router)](https://nextjs.org/blog/next-15)                                                 |
+| UI           | [React 19](https://react.dev), [Tailwind CSS](https://tailwindcss.com), [shadcn/ui](https://ui.shadcn.com) |
+| Auth         | Firebase Auth (Google OAuth)                                                                               |
+| DB           | Firebase Firestore                                                                                         |
+| I18n         | react-i18next                                                                                              |
+| AI 연동 예정 | GPT API + Model Context Protocol (MCP)                                                                     |
 
 ---
 
@@ -88,29 +88,6 @@ http://localhost:3000
 
 ---
 
-## 🙌 기여 방법
-
-1. 이슈를 확인하거나 새로 생성해주세요.
-2. `dev` 브랜치에서 기능 개발 후 PR 주세요.
-3. `commit` 메시지는 다음 포맷을 사용합니다:
-   ```
-   feat: 프로젝트 생성 기능 추가
-   fix: 루프 시작일 계산 오류 수정
-   ```
-
----
-
 ## 📜 라이선스
 
-MIT License © 2025-present [Your Name or Team Name]
-
----
-
-## ✨ 스크린샷 (예정)
-
-<img src="docs/screenshot1.png" width="300" />
-<img src="docs/screenshot2.png" width="300" />
-
----
-
-> "계획은 단지 시작일 뿐, 실행이 진짜 변화다."
+MIT License © 2025-present [Sol Lee]
