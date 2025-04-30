@@ -21,7 +21,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { signInWithPopup, User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
-import { auth, db, googleProvider } from "@/lib/firebase";
+import { auth, db, googleAuthProvider } from "@/lib/firebase";
 import Link from "next/link";
 
 export default function LoginPage() {
@@ -33,7 +33,7 @@ export default function LoginPage() {
   const handleLogin = async () => {
     setIsLoading(true);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleAuthProvider);
       const user = result.user;
       newUser = user;
 

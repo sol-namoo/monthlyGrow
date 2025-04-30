@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+
+import { Project, Snapshot, Loop } from '@/lib/types';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ChevronLeft, Clock, Star, Plus } from "lucide-react";
-import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -14,58 +16,34 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
+import Loading from '@/components/Loading'; // 로딩 컴포넌트
+import Error from '@/components/Error'; // 에러 컴포넌트
 
-export default function LoopDetailPage({ params }: { params: { id: string } }) {
+import { useToast } from "@/hooks/use-toast";
+import { usePageData } from '@/hooks/usePageData';
+
+
+
+interface LoopDetailPageProps {
+  params: {
+      id: string;
+  };
+}
+
+interface LoopDetailPageData {
+  loop?: Loop;
+  projects?: Project[];
+  snapshots?: Snapshot[];
+  isLoading: boolean;
+  error?: Error;
+}
+
+const LoopDetailPage = ({ params }: LoopDetailPageProps) => {
   const { toast } = useToast();
+  const { loop, projects, snapshots, isLoading, error } = usePageData('loopDetail', { loopId: params.id });
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
 
-  // 샘플 데이터 - 실제로는 ID를 기반으로 데이터를 가져와야 함
-  const loop = {
-    id: params.id,
-    title: "5월 루프: 건강 관리",
-    reward: "새 운동화 구매",
-    progress: 85,
-    total: 100,
-    startDate: "2025년 5월 1일",
-    endDate: "2025년 5월 31일",
-    areas: ["건강", "개발", "마음"],
-    projects: [
-      {
-        id: 1,
-        title: "아침 운동 습관화",
-        progress: 25,
-        total: 30,
-        addedMidway: false,
-      },
-      {
-        id: 2,
-        title: "식단 관리 앱 개발",
-        progress: 10,
-        total: 12,
-        addedMidway: false,
-      },
-      {
-        id: 3,
-        title: "명상 습관 만들기",
-        progress: 15,
-        total: 20,
-        addedMidway: false,
-      },
-      {
-        id: 4,
-        title: "건강 블로그 작성",
-        progress: 2,
-        total: 8,
-        addedMidway: true,
-      },
-    ],
-    completed: false,
-    reflection: null,
-  };
-
-  // 프로젝트 추가 가능 여부 확인 (최대 5개)
-  const canAddProject = loop.projects.length < 5;
+  const canAddProject = projects ? projects.length < 5 : false;
 
   // 프로젝트 추가 처리 함수
   const handleAddProject = () => {
@@ -82,6 +60,17 @@ export default function LoopDetailPage({ params }: { params: { id: string } }) {
     setShowAddProjectDialog(true);
   };
 
+
+  if (isLoading) {
+    return <Loading />;
+}
+
+if (error) {
+    return <Error message={error.message} />;
+}
+
+const progress = loop?.targetCount !== 0 ? Math.round(((loop?.doneCount || 0) / (loop?.targetCount || 0)) * 100) : 0;
+
   return (
     <div className="container max-w-md px-4 py-6">
       <div className="mb-6 flex items-center">
@@ -94,23 +83,23 @@ export default function LoopDetailPage({ params }: { params: { id: string } }) {
       </div>
 
       <Card className="mb-6 p-4">
-        <h2 className="mb-2 text-xl font-bold">{loop.title}</h2>
+        <h2 className="mb-2 text-xl font-bold">{loop?.title || '-'}</h2>
         <div className="mb-4 flex items-center gap-2 text-sm">
           <Star className="h-4 w-4 text-yellow-500" />
-          <span>보상: {loop.reward}</span>
+          <span>보상: {loop?.reward}</span>
         </div>
 
         <div className="mb-4">
           <div className="mb-1 flex justify-between text-sm">
-            <span>달성률: {loop.progress}%</span>
+            <span>달성률: {progress}%</span>
             <span>
-              {loop.progress}/{loop.total}
+             ({loop?.doneCount} / {loop?.targetCount} || '-' )
             </span>
           </div>
           <div className="progress-bar">
             <div
               className="progress-value"
-              style={{ width: `${loop.progress}%` }}
+              style={{ width: `${progress}%` }}
             ></div>
           </div>
         </div>
@@ -118,14 +107,14 @@ export default function LoopDetailPage({ params }: { params: { id: string } }) {
         <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
           <Clock className="h-4 w-4" />
           <span>
-            {loop.startDate} ~ {loop.endDate}
+            {loop?.startDate?.toLocaleDateString()|| '-'} ~ {loop?.endDate?.toLocaleDateString()|| '-'}
           </span>
         </div>
 
         <div className="mb-4">
           <h3 className="mb-2 font-medium">중점 Areas</h3>
           <div className="flex flex-wrap gap-2">
-            {loop.areas.map((area) => (
+            {loop?.areas?.map((area) => (
               <span
                 key={area}
                 className="rounded-full bg-primary/10 px-3 py-1 text-xs"
@@ -138,8 +127,8 @@ export default function LoopDetailPage({ params }: { params: { id: string } }) {
 
         <div className="mb-4">
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="font-medium">프로젝트 ({loop.projects.length}/5)</h3>
-            {!loop.completed && (
+            <h3 className="font-medium">프로젝트 ({projects?.length}/5)</h3>
+            {!loop?.completed && (
               <Button
                 variant="outline"
                 size="sm"
@@ -152,7 +141,7 @@ export default function LoopDetailPage({ params }: { params: { id: string } }) {
             )}
           </div>
           <div className="space-y-2">
-            {loop.projects.map((project) => (
+            {projects?.map((project) => (
               <div
                 key={project.id}
                 className="rounded-lg bg-secondary p-3 text-sm"
@@ -184,21 +173,24 @@ export default function LoopDetailPage({ params }: { params: { id: string } }) {
                   ></div>
                 </div>
               </div>
-            ))}
+            ))?? <div>No Projects</div>}
+             {snapshots?.map((snapshot: Snapshot) => (
+                <div key={snapshot.id}>{snapshot.doneCount} / {snapshot.targetCount}</div>
+            )) ?? <div>No Snapshots</div>}
           </div>
         </div>
 
-        {loop.reflection && (
+        {loop?.reflection && (
           <div className="mb-4">
             <h3 className="mb-2 font-medium">회고</h3>
             <div className="rounded-lg bg-secondary p-3 text-sm">
-              <p>{loop.reflection}</p>
+              <p>{loop?.reflection}</p>
             </div>
           </div>
         )}
 
         <div className="mt-4 flex justify-end gap-2">
-          {!loop.completed && (
+          {!loop?.completed && (
             <Button variant="outline" asChild>
               <Link href="/loop/summary">회고 작성</Link>
             </Button>
