@@ -1,28 +1,36 @@
-import { useQuery } from "@tanstack/react-query";
-import { db, fetchAllLoopsByUserId } from "./firebase";
-import { getAuth } from "firebase/auth";
-import { useRouter } from "next/navigation";
-import { Loop, LoopDocument } from "./types";
+    import { useQuery } from "react-query";
+    import { fetchAllLoopsByUserId } from "./firebase";
+    import { getAuth } from "firebase/auth";
+    import { useRouter } from "next/navigation";
+    import { Loop } from "./types";
+    import { useEffect } from "react";
+    import { useAuthState } from "react-firebase-hooks/auth";
 
-const auth = getAuth();
+    const auth = getAuth();
 
-const useLoops = () => {
-  const router = useRouter();
-  const user = auth.currentUser;
+    const useLoops = () => {
+        const [user, loading] = useAuthState(auth);
+        const router = useRouter();
 
-  return useQuery<Loop[]>({
-    queryKey: ["loops"],
-    queryFn: async () => {
-      if (!user) {
-        localStorage.clear();
-        router.push("/login");
-        return [];
-      }
-      const loops = await fetchAllLoopsByUserId(db, user.uid);
-      return loops.map(({ id, createdAt, ...loop }) => ({ // Destructure to remove id and createdAt
-        ...loop
-      }));
-    },
-  });
-};
-export { useLoops };
+        useEffect(() => {
+            if (!user && !loading) {
+                router.push("/login");
+            }
+        }, [user, loading, router]);
+
+        const queryResult = useQuery<Loop[], Error>(
+            ["loops", user?.uid],
+            async () => {
+                if (!user) {
+                    return [];
+                }
+                return await fetchAllLoopsByUserId(user.uid);
+            },
+            {
+                enabled: !!user,
+            },
+        );
+        return queryResult;
+    };
+
+    export default useLoops;
