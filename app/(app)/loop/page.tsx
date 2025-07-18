@@ -1,5 +1,5 @@
-'use client';
-import { useLoops } from "../../../lib/query";
+"use client";
+import useLoops from "../../../lib/query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -20,13 +20,16 @@ export default function Loops() {
     setIsFirstDayOfMonth(now.toDateString() === firstDayOfMonth.toDateString());
 
     if (loops) {
-      const now = Timestamp.fromDate(new Date());
-      const current = loops.find(
-        (loop) =>
-          now.toMillis() >= loop.startDate.toMillis() && now.toMillis() <= loop.endDate.toMillis()
-      ) || null;
-      const next = loops.find((loop) => now.toMillis() < loop.startDate.toMillis()) || null;
-      const past = loops.filter((loop) => now.toMillis() > loop.endDate.toMillis()) || [];
+      const current =
+        loops.find(
+          (loop) =>
+            now.getTime() >= loop.startDate.getTime() &&
+            now.getTime() <= loop.endDate.getTime()
+        ) || null;
+      const next =
+        loops.find((loop) => now.getTime() < loop.startDate.getTime()) || null;
+      const past =
+        loops.filter((loop) => now.getTime() > loop.endDate.getTime()) || [];
       setCurrentLoop(current);
       setNextLoop(next);
       setPastLoops(past);
@@ -42,7 +45,7 @@ export default function Loops() {
     const nextMonthYear = nextMonth === 0 ? currentYear + 1 : currentYear;
 
     if (currentLoop && nextLoop) {
-      toast( "다음 루프가 이미 준비되어 있어요");
+      toast("다음 루프가 이미 준비되어 있어요");
       return;
     }
 

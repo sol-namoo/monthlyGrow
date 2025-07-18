@@ -2,8 +2,8 @@ import type React from "react";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { QueryClientProvider } from 'react-query';
-import { queryClient } from '@/lib/queryClient';
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { ThemeProvider } from "@/components/theme-provider";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -26,15 +26,16 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning>
       <body className={inter.className}>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider></QueryClientProvider>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="light"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+          </ThemeProvider>
+        </QueryClientProvider>
       </body>
     </html>
   );
