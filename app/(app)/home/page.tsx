@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { CharacterAvatar } from "@/components/character-avatar";
-import { ProgressCard } from "@/components/progress-card";
-import { StatsCard } from "@/components/stats-card";
-import { AreaActivityChart } from "@/components/area-activity-chart";
-import { LoopComparisonChart } from "@/components/loop-comparison-chart";
+import { ProgressCard } from "@/components/widgets/progress-card";
+import { StatsCard } from "@/components/widgets/stats-card";
+import { AreaActivityChart } from "@/components/widgets/area-activity-chart";
+import { LoopComparisonChart } from "@/components/widgets/loop-comparison-chart";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -210,11 +210,13 @@ export default function HomePage() {
         </TabsContent>
 
         <TabsContent value="dashboard" className="mt-4 space-y-6">
-        <div className="rounded-lg border bg-muted/20 p-4 mb-4">
+          <div className="rounded-lg border bg-muted/20 p-4 mb-4">
             <h2 className="text-lg font-bold mb-2">📊 연간 활동 통계</h2>
-            <p className="text-sm text-muted-foreground">올해 설정한 목표와 달성한 성과를 확인하세요.</p>
+            <p className="text-sm text-muted-foreground">
+              올해 설정한 목표와 달성한 성과를 확인하세요.
+            </p>
           </div>
-         
+
           <div className="grid grid-cols-2 gap-4">
             <StatsCard
               title="집중 시간"

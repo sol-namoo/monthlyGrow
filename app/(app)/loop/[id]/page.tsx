@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 
-import { Project, Snapshot, Loop } from '@/lib/types';
+import { Project, Snapshot, Loop } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ChevronLeft, Clock, Star, Plus } from "lucide-react";
@@ -16,17 +16,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import Loading from '@/components/Loading'; // 로딩 컴포넌트
-import Error from '@/components/Error'; // 에러 컴포넌트
+import Loading from "@/components/feedback/Loading"; // 로딩 컴포넌트
+import Error from "@/components/feedback/Error"; // 에러 컴포넌트
 
 import { useToast } from "@/hooks/use-toast";
-import { usePageData } from '@/hooks/usePageData';
-
-
+import { usePageData } from "@/hooks/usePageData";
 
 interface LoopDetailPageProps {
   params: {
-      id: string;
+    id: string;
   };
 }
 
@@ -40,7 +38,10 @@ interface LoopDetailPageData {
 
 const LoopDetailPage = ({ params }: LoopDetailPageProps) => {
   const { toast } = useToast();
-  const { loop, projects, snapshots, isLoading, error } = usePageData('loopDetail', { loopId: params.id });
+  const { loop, projects, snapshots, isLoading, error } = usePageData(
+    "loopDetail",
+    { loopId: params.id }
+  );
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
 
   const canAddProject = projects ? projects.length < 5 : false;
@@ -60,16 +61,18 @@ const LoopDetailPage = ({ params }: LoopDetailPageProps) => {
     setShowAddProjectDialog(true);
   };
 
-
   if (isLoading) {
     return <Loading />;
-}
+  }
 
-if (error) {
+  if (error) {
     return <Error message={error.message} />;
-}
+  }
 
-const progress = loop?.targetCount !== 0 ? Math.round(((loop?.doneCount || 0) / (loop?.targetCount || 0)) * 100) : 0;
+  const progress =
+    loop?.targetCount !== 0
+      ? Math.round(((loop?.doneCount || 0) / (loop?.targetCount || 0)) * 100)
+      : 0;
 
   return (
     <div className="container max-w-md px-4 py-6">
@@ -83,7 +86,7 @@ const progress = loop?.targetCount !== 0 ? Math.round(((loop?.doneCount || 0) / 
       </div>
 
       <Card className="mb-6 p-4">
-        <h2 className="mb-2 text-xl font-bold">{loop?.title || '-'}</h2>
+        <h2 className="mb-2 text-xl font-bold">{loop?.title || "-"}</h2>
         <div className="mb-4 flex items-center gap-2 text-sm">
           <Star className="h-4 w-4 text-yellow-500" />
           <span>보상: {loop?.reward}</span>
@@ -93,7 +96,7 @@ const progress = loop?.targetCount !== 0 ? Math.round(((loop?.doneCount || 0) / 
           <div className="mb-1 flex justify-between text-sm">
             <span>달성률: {progress}%</span>
             <span>
-             ({loop?.doneCount} / {loop?.targetCount} || '-' )
+              ({loop?.doneCount} / {loop?.targetCount} || '-' )
             </span>
           </div>
           <div className="progress-bar">
@@ -107,7 +110,8 @@ const progress = loop?.targetCount !== 0 ? Math.round(((loop?.doneCount || 0) / 
         <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
           <Clock className="h-4 w-4" />
           <span>
-            {loop?.startDate?.toLocaleDateString()|| '-'} ~ {loop?.endDate?.toLocaleDateString()|| '-'}
+            {loop?.startDate?.toLocaleDateString() || "-"} ~{" "}
+            {loop?.endDate?.toLocaleDateString() || "-"}
           </span>
         </div>
 
@@ -173,9 +177,11 @@ const progress = loop?.targetCount !== 0 ? Math.round(((loop?.doneCount || 0) / 
                   ></div>
                 </div>
               </div>
-            ))?? <div>No Projects</div>}
-             {snapshots?.map((snapshot: Snapshot) => (
-                <div key={snapshot.id}>{snapshot.doneCount} / {snapshot.targetCount}</div>
+            )) ?? <div>No Projects</div>}
+            {snapshots?.map((snapshot: Snapshot) => (
+              <div key={snapshot.id}>
+                {snapshot.doneCount} / {snapshot.targetCount}
+              </div>
             )) ?? <div>No Snapshots</div>}
           </div>
         </div>
@@ -240,4 +246,4 @@ const progress = loop?.targetCount !== 0 ? Math.round(((loop?.doneCount || 0) / 
       </Dialog>
     </div>
   );
-}
+};

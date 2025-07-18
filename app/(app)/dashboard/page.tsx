@@ -1,13 +1,20 @@
-import { Card } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CharacterAvatar } from "@/components/character-avatar"
-import { StatsCard } from "@/components/stats-card"
-import { AreaActivityChart } from "@/components/area-activity-chart"
-import { LoopComparisonChart } from "@/components/loop-comparison-chart"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { ArrowUpRight, Award, Calendar, Clock, Target, TrendingUp } from "lucide-react"
-import Link from "next/link"
+import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CharacterAvatar } from "@/components/character-avatar";
+import { StatsCard } from "@/components/widgets/stats-card";
+import { AreaActivityChart } from "@/components/widgets/area-activity-chart";
+import { LoopComparisonChart } from "@/components/widgets/loop-comparison-chart";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  ArrowUpRight,
+  Award,
+  Calendar,
+  Clock,
+  Target,
+  TrendingUp,
+} from "lucide-react";
+import Link from "next/link";
 
 export default function DashboardPage() {
   // 샘플 데이터
@@ -18,7 +25,7 @@ export default function DashboardPage() {
     daysLeft: 12,
     startDate: "2025년 5월 1일",
     endDate: "2025년 5월 31일",
-  }
+  };
 
   const stats = {
     completionRate: 65,
@@ -29,20 +36,20 @@ export default function DashboardPage() {
     totalFocusTime: 42,
     previousFocusTime: 35,
     focusTimeChange: 20,
-  }
+  };
 
   const areaActivityData = [
     { name: "건강", value: 45 },
     { name: "개발", value: 30 },
     { name: "마음", value: 15 },
     { name: "기타", value: 10 },
-  ]
+  ];
 
   const loopComparisonData = [
     { name: "3월", completion: 40, focusHours: 25 },
     { name: "4월", completion: 55, focusHours: 35 },
     { name: "5월", completion: 65, focusHours: 42 },
-  ]
+  ];
 
   return (
     <div className="container max-w-md px-4 py-6">
@@ -53,7 +60,8 @@ export default function DashboardPage() {
         <div>
           <h2 className="text-lg font-bold">안녕하세요, 루퍼님!</h2>
           <p className="text-sm text-muted-foreground">
-            이번 루프 달성률이 <span className="font-medium text-primary">65%</span>에 도달했어요.
+            이번 루프 달성률이{" "}
+            <span className="font-medium text-primary">65%</span>에 도달했어요.
           </p>
           <div className="mt-1 flex items-center gap-1 text-xs text-green-600">
             <TrendingUp className="h-3 w-3" />
@@ -83,7 +91,10 @@ export default function DashboardPage() {
                 </span>
               </div>
               <div className="progress-bar">
-                <div className="progress-value" style={{ width: `${stats.completionRate}%` }}></div>
+                <div
+                  className="progress-value"
+                  style={{ width: `${stats.completionRate}%` }}
+                ></div>
               </div>
             </div>
 
@@ -124,9 +135,13 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm">6월 루프 시작까지</p>
-                <p className="text-xs text-muted-foreground">예정 프로젝트 2개</p>
+                <p className="text-xs text-muted-foreground">
+                  예정 프로젝트 2개
+                </p>
               </div>
-              <div className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium">D-{currentLoop.daysLeft}</div>
+              <div className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium">
+                D-{currentLoop.daysLeft}
+              </div>
             </div>
             <div className="mt-3 flex justify-end">
               <Button variant="outline" size="sm" asChild>
@@ -178,5 +193,5 @@ export default function DashboardPage() {
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }
