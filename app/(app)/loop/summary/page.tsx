@@ -1,43 +1,46 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { ChevronLeft, Star } from "lucide-react"
-import Link from "next/link"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { ChevronLeft, Star } from "lucide-react";
+import Link from "next/link";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "@/lib/firebase";
+import { usePageData } from "@/hooks/usePageData";
 
 export default function LoopSummaryPage() {
-  const [reflection, setReflection] = useState("")
-  const [rewardClaimed, setRewardClaimed] = useState(false)
+  const [reflection, setReflection] = useState("");
+  const [rewardClaimed, setRewardClaimed] = useState(false);
+  const [selectedLoopId, setSelectedLoopId] = useState<string | undefined>(
+    undefined
+  );
 
-  // 샘플 데이터
-  const loopData = {
-    title: "5월 루프: 건강 관리",
-    reward: "새 운동화 구매",
-    progress: 85,
-    total: 100,
-    startDate: "2025년 5월 1일",
-    endDate: "2025년 5월 31일",
-    projects: [
-      { title: "아침 운동 습관화", completed: 25, total: 30 },
-      { title: "식단 관리 앱 개발", completed: 10, total: 12 },
-      { title: "명상 습관 만들기", completed: 15, total: 20 },
-    ],
-    previousReflections: [
-      {
-        date: "2025년 5월 15일",
-        content:
-          "중간 회고: 아침 운동은 꾸준히 진행 중이지만, 식단 관리가 어려움을 겪고 있다. 앞으로 2주 동안은 식단 관리에 더 집중해야겠다.",
-      },
-      {
-        date: "2025년 5월 8일",
-        content:
-          "첫 주 회고: 아침에 일어나는 것이 가장 어려운 부분이었다. 알람을 침대에서 멀리 두는 방법을 시도해봐야겠다.",
-      },
-    ],
-  }
+  const [user, loading] = useAuthState(auth);
+  const { loops, isLoading: isLoadingLoops } = usePageData("home", {
+    userId: user?.uid,
+  });
+  // 최근 루프 id 선택
+  useEffect(() => {
+    if (loops && loops.length > 0) {
+      setSelectedLoopId(loops[0].id);
+    }
+  }, [loops]);
+  const { loop, projects, isLoading, error } = usePageData("loopDetail", {
+    loopId: selectedLoopId,
+  });
+
+  if (loading || isLoadingLoops || isLoading) return <div>로딩 중...</div>;
+  if (!user) return <div>로그인이 필요합니다.</div>;
+  if (error) return <div>에러 발생: {error.message}</div>;
+  if (!loop) return <div>루프 데이터가 없습니다.</div>;
+
+  const progress =
+    loop.targetCount > 0
+      ? Math.round((loop.doneCount / loop.targetCount) * 100)
+      : 0;
+  const total = loop.targetCount;
 
   return (
     <div className="container max-w-md px-4 py-6">
@@ -51,21 +54,23 @@ export default function LoopSummaryPage() {
       </div>
 
       <Card className="mb-6 p-4">
-        <h2 className="mb-4 text-xl font-bold">{loopData.title}</h2>
+        <h2 className="mb-4 text-xl font-bold">{loop.title}</h2>
         <div className="mb-4 flex items-center gap-2 text-sm">
           <Star className="h-4 w-4 text-yellow-500" />
-          <span>보상: {loopData.reward}</span>
+          <span>보상: {loop.reward}</span>
         </div>
-
         <div className="mb-4">
           <div className="mb-1 flex justify-between text-sm">
-            <span>달성률: {loopData.progress}%</span>
+            <span>달성률: {progress}%</span>
             <span>
-              {loopData.progress}/{loopData.total}
+              {loop.doneCount}/{total}
             </span>
           </div>
           <div className="progress-bar">
-            <div className="progress-value" style={{ width: `${loopData.progress}%` }}></div>
+            <div
+              className="progress-value"
+              style={{ width: `${progress}%` }}
+            ></div>
           </div>
         </div>
       </Card>
@@ -73,60 +78,43 @@ export default function LoopSummaryPage() {
       <section className="mb-6">
         <h2 className="mb-4 text-xl font-bold">프로젝트 달성 현황</h2>
         <div className="space-y-3">
-          {loopData.projects.map((project, index) => (
-            <Card key={index} className="p-4">
-              <h3 className="mb-2 font-medium">{project.title}</h3>
-              <div className="mb-1 flex justify-between text-sm">
-                <span>달성률: {Math.round((project.completed / project.total) * 100)}%</span>
-                <span>
-                  {project.completed}/{project.total}
-                </span>
-              </div>
-              <div className="progress-bar">
-                <div
-                  className="progress-value"
-                  style={{
-                    width: `${Math.round((project.completed / project.total) * 100)}%`,
-                  }}
-                ></div>
-              </div>
-            </Card>
-          ))}
+          {projects && projects.length > 0 ? (
+            projects.map((project, index) => {
+              const projProgress =
+                project.total > 0
+                  ? Math.round((project.progress / project.total) * 100)
+                  : 0;
+              return (
+                <Card key={project.id} className="p-4">
+                  <h3 className="mb-2 font-medium">{project.title}</h3>
+                  <div className="mb-1 flex justify-between text-sm">
+                    <span>달성률: {projProgress}%</span>
+                    <span>
+                      {project.progress}/{project.total}
+                    </span>
+                  </div>
+                  <div className="progress-bar">
+                    <div
+                      className="progress-value"
+                      style={{ width: `${projProgress}%` }}
+                    ></div>
+                  </div>
+                </Card>
+              );
+            })
+          ) : (
+            <div>프로젝트가 없습니다.</div>
+          )}
         </div>
       </section>
 
       <section className="mb-6">
-        <h2 className="mb-4 text-xl font-bold">이전 회고</h2>
-        <Accordion type="single" collapsible className="w-full">
-          {loopData.previousReflections.map((reflection, index) => (
-            <AccordionItem key={index} value={`reflection-${index}`}>
-              <AccordionTrigger className="text-sm font-medium">{reflection.date}</AccordionTrigger>
-              <AccordionContent>
-                <p className="text-sm text-muted-foreground">{reflection.content}</p>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-      </section>
-
-      <section className="mb-6">
-        <h2 className="mb-4 text-xl font-bold">활동 분석</h2>
-        <Card className="p-4">
-          <div className="flex justify-center">
-            <div className="h-64 w-full rounded-lg bg-secondary p-4 text-center flex items-center justify-center">
-              <p className="text-muted-foreground">활동 분석 차트가 표시됩니다</p>
-            </div>
-          </div>
-        </Card>
-      </section>
-
-      <section className="mb-6">
-        <h2 className="mb-4 text-xl font-bold">자유 회고</h2>
+        <h2 className="mb-4 text-xl font-bold">회고</h2>
         <Card className="p-4">
           <Textarea
             placeholder="이번 루프에서 배운 점, 어려웠던 점, 다음 루프에 적용할 점 등을 자유롭게 작성해보세요."
             className="min-h-32"
-            value={reflection}
+            value={reflection || loop.reflection || ""}
             onChange={(e) => setReflection(e.target.value)}
           />
         </Card>
@@ -137,10 +125,15 @@ export default function LoopSummaryPage() {
         <Card className="p-4">
           <div className="flex items-center gap-4">
             <div className="flex-1">
-              <h3 className="font-medium">{loopData.reward}</h3>
-              <p className="text-sm text-muted-foreground">달성률 {loopData.progress}%로 보상을 받을 수 있습니다.</p>
+              <h3 className="font-medium">{loop.reward}</h3>
+              <p className="text-sm text-muted-foreground">
+                달성률 {progress}%로 보상을 받을 수 있습니다.
+              </p>
             </div>
-            <Button onClick={() => setRewardClaimed(true)} disabled={rewardClaimed}>
+            <Button
+              onClick={() => setRewardClaimed(true)}
+              disabled={rewardClaimed}
+            >
               {rewardClaimed ? "받음" : "받기"}
             </Button>
           </div>
@@ -153,5 +146,5 @@ export default function LoopSummaryPage() {
         </Button>
       </div>
     </div>
-  )
+  );
 }

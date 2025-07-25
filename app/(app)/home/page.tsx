@@ -20,83 +20,72 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "@/lib/firebase";
+import { usePageData } from "@/hooks/usePageData";
+import { useQuery } from "@tanstack/react-query";
+import { fetchAllAreasByUserId } from "@/lib/firebase";
 
 export default function HomePage() {
-  // 샘플 데이터
-  const currentLoop = {
-    title: "5월 루프: 건강 관리",
-    reward: "새 운동화 구매",
-    progress: 65,
-    total: 100,
-    endDate: "2025년 5월 31일",
-    changeRate: 18,
-    daysLeft: 12,
-    startDate: "2025년 5월 1일",
-  };
+  const [user, loading] = useAuthState(auth);
+  const [showAllProjects, setShowAllProjects] = useState(false);
 
-  const projects = [
-    {
-      id: 1,
-      title: "아침 운동 습관화",
-      progress: 18,
-      total: 30,
-      area: "건강",
-      addedMidway: false,
-    },
-    {
-      id: 2,
-      title: "식단 관리 앱 개발",
-      progress: 7,
-      total: 12,
-      area: "개발",
-      addedMidway: false,
-    },
-    {
-      id: 3,
-      title: "명상 습관 만들기",
-      progress: 10,
-      total: 20,
-      area: "마음",
-      addedMidway: false,
-    },
-    {
-      id: 4,
-      title: "건강 블로그 작성",
-      progress: 2,
-      total: 8,
-      area: "커리어",
-      addedMidway: true,
-    },
-  ];
+  const { projects, loops, isLoading, error } = usePageData("home", {
+    userId: user?.uid,
+  });
+  const { data: areas = [] } = useQuery({
+    queryKey: ["areas", user?.uid],
+    queryFn: () => (user ? fetchAllAreasByUserId(user.uid) : []),
+    enabled: !!user,
+  });
 
-  const stats = {
-    completionRate: 65,
-    previousLoopCompletion: 55,
-    changeRate: 18,
-    totalLoops: 5,
-    rewardsReceived: 4,
-    totalFocusTime: 42,
-    previousFocusTime: 35,
-    focusTimeChange: 20,
-  };
+  if (loading || isLoading) return <div>로딩 중...</div>;
+  if (!user) return <div>로그인이 필요합니다.</div>;
+  if (error) return <div>에러 발생: {error.message}</div>;
 
-  const areaActivityData = [
-    { name: "건강", value: 45 },
-    { name: "개발", value: 30 },
-    { name: "마음", value: 15 },
-    { name: "기타", value: 10 },
-  ];
+  // 가장 최근 루프(예: 진행 중인 루프)를 선택
+  const currentLoop = loops && loops.length > 0 ? loops[0] : null;
+  // 현재 루프에 연결된 프로젝트만 필터링
+  const currentLoopProjects =
+    currentLoop && projects
+      ? projects.filter((p) => currentLoop.projectIds?.includes(p.id))
+      : [];
 
-  const loopComparisonData = [
-    { name: "3월", completion: 40, focusHours: 25 },
-    { name: "4월", completion: 55, focusHours: 35 },
-    { name: "5월", completion: 65, focusHours: 42 },
-  ];
+  // progress, total, daysLeft, changeRate 등 계산
+  const progress =
+    currentLoop && currentLoop.targetCount > 0
+      ? Math.round((currentLoop.doneCount / currentLoop.targetCount) * 100)
+      : 0;
+  const total = currentLoop?.targetCount || 0;
+  const startDate = currentLoop?.startDate
+    ? new Date(currentLoop.startDate).toLocaleDateString()
+    : "-";
+  const endDate = currentLoop?.endDate
+    ? new Date(currentLoop.endDate).toLocaleDateString()
+    : "-";
+  const today = new Date();
+  const daysLeft = currentLoop?.endDate
+    ? Math.max(
+        0,
+        Math.ceil(
+          (new Date(currentLoop.endDate).getTime() - today.getTime()) /
+            (1000 * 60 * 60 * 24)
+        )
+      )
+    : 0;
+  const changeRate = 0; // 추후 통계 fetch로 대체
+
+  // stats, areaActivityData, loopComparisonData 등은 추후 Firestore 통계 데이터 fetch로 대체 가능
 
   // 프로젝트 표시 개수 제한 (정책: 3개 이하면 모두 표시, 4개 이상이면 3개만 표시 + 더보기 버튼)
-  const [showAllProjects, setShowAllProjects] = useState(false);
-  const displayedProjects = showAllProjects ? projects : projects.slice(0, 3);
-  const hasMoreProjects = projects.length > 3;
+  const displayedProjects = showAllProjects
+    ? currentLoopProjects
+    : currentLoopProjects.slice(0, 3);
+  const hasMoreProjects = currentLoopProjects.length > 3;
+
+  // areaId → area명 매핑 함수
+  const getAreaName = (areaId: string) =>
+    areas.find((a) => a.id === areaId)?.name || "-";
 
   return (
     <div className="container max-w-md px-4 py-6">
@@ -107,7 +96,7 @@ export default function HomePage() {
           <p className="text-muted-foreground">오늘도 성장하는 하루 되세요.</p>
           <div className="mt-1 flex items-center gap-1 text-xs text-green-600">
             <TrendingUp className="h-3 w-3" />
-            <span>전월 대비 {stats.changeRate}% 향상</span>
+            <span>전월 대비 {changeRate}% 향상</span>
           </div>
         </div>
       </div>
@@ -126,34 +115,36 @@ export default function HomePage() {
 
             <Card className="relative overflow-hidden border-2 border-primary/20 p-4">
               <div className="absolute right-0 top-0 rounded-bl-lg bg-primary/10 px-2 py-1 text-xs">
-                D-{currentLoop.daysLeft}
+                D-{daysLeft}
               </div>
-              <h3 className="mb-2 text-lg font-bold">{currentLoop.title}</h3>
+              <h3 className="mb-2 text-lg font-bold">
+                {currentLoop?.title || "루프 없음"}
+              </h3>
               <div className="mb-4 flex items-center gap-2 text-sm">
                 <Star className="h-4 w-4 text-yellow-500" />
-                <span>보상: {currentLoop.reward}</span>
+                <span>보상: {currentLoop?.reward || "없음"}</span>
               </div>
               <div className="mb-1 flex justify-between text-sm">
-                <span>진행률: {currentLoop.progress}%</span>
+                <span>진행률: {progress}%</span>
                 <span>
-                  {currentLoop.progress}/{currentLoop.total}
+                  {currentLoop?.doneCount || 0}/{total}
                 </span>
               </div>
               <div className="progress-bar">
                 <div
                   className="progress-value"
-                  style={{ width: `${currentLoop.progress}%` }}
+                  style={{ width: `${progress}%` }}
                 ></div>
               </div>
               <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                 <Calendar className="h-3 w-3" />
                 <span>
-                  {currentLoop.startDate} ~ {currentLoop.endDate}
+                  {startDate} ~ {endDate}
                 </span>
               </div>
               <div className="mt-2 flex items-center gap-1 text-xs text-green-600">
                 <TrendingUp className="h-3 w-3" />
-                <span>전월 대비 {currentLoop.changeRate}% 향상</span>
+                <span>전월 대비 {changeRate}% 향상</span>
               </div>
             </Card>
           </section>
@@ -173,7 +164,7 @@ export default function HomePage() {
                 >
                   <div className="mt-2 flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">
-                      Area: {project.area}
+                      Area: {getAreaName(project.areaId)}
                     </span>
                     {project.addedMidway ? (
                       <Badge
@@ -200,7 +191,7 @@ export default function HomePage() {
                   className="mt-2 w-full"
                   onClick={() => setShowAllProjects(true)}
                 >
-                  더보기 ({projects.length - 3}개)
+                  더보기 ({currentLoopProjects.length - 3}개)
                 </Button>
               )}
 
@@ -220,22 +211,22 @@ export default function HomePage() {
           <div className="grid grid-cols-2 gap-4">
             <StatsCard
               title="집중 시간"
-              value={`${stats.totalFocusTime}시간`}
+              value={`0시간`}
               description={
                 <div className="flex items-center gap-1 text-green-600">
                   <TrendingUp className="h-3 w-3" />
-                  <span>{stats.focusTimeChange}% ↑</span>
+                  <span>0% ↑</span>
                 </div>
               }
               icon={<Clock className="h-4 w-4 text-muted-foreground" />}
             />
             <StatsCard
               title="완료율"
-              value={`${stats.completionRate}%`}
+              value={`0%`}
               description={
                 <div className="flex items-center gap-1 text-green-600">
                   <TrendingUp className="h-3 w-3" />
-                  <span>{stats.changeRate}% ↑</span>
+                  <span>0% ↑</span>
                 </div>
               }
               icon={<Target className="h-4 w-4 text-muted-foreground" />}
@@ -245,13 +236,13 @@ export default function HomePage() {
           <div className="grid grid-cols-2 gap-4">
             <StatsCard
               title="누적 루프"
-              value={stats.totalLoops}
+              value={0}
               description="완료한 루프 수"
               icon={<Target className="h-4 w-4 text-muted-foreground" />}
             />
             <StatsCard
               title="받은 보상"
-              value={stats.rewardsReceived}
+              value={0}
               description="달성한 보상 수"
               icon={<Award className="h-4 w-4 text-muted-foreground" />}
             />
@@ -260,14 +251,14 @@ export default function HomePage() {
           <Card className="p-4">
             <h3 className="mb-4 font-bold">Area 활동 비중</h3>
             <div className="h-64">
-              <AreaActivityChart data={areaActivityData} />
+              <AreaActivityChart data={[]} />
             </div>
           </Card>
 
           <Card className="p-4">
             <h3 className="mb-4 font-bold">루프 비교</h3>
             <div className="h-64">
-              <LoopComparisonChart data={loopComparisonData} />
+              <LoopComparisonChart data={[]} />
             </div>
           </Card>
         </TabsContent>

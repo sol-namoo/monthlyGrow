@@ -1,179 +1,310 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Archive, Briefcase, ChevronRight, Compass, Folder, Plus } from "lucide-react"
-import Link from "next/link"
-import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { ChevronRight, Plus, Star, Bookmark, Clock } from "lucide-react";
+import Link from "next/link";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { useSearchParams, useRouter } from "next/navigation";
 
 export default function ParaPage() {
-  // 상태 변수 추가 (useState 부분에 추가)
-  const [projectStatusFilter, setProjectStatusFilter] = useState("all")
-  const [showOnlyInProgress, setShowOnlyInProgress] = useState(false)
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab") || "projects";
 
-  // 샘플 데이터 수정 (프로젝트 데이터)
+  const handleTabChange = (value: string) => {
+    router.push(`/para?tab=${value}`, { scroll: false });
+  };
+
+  // 샘플 데이터
   const projects = [
     {
-      id: 1,
+      id: "1",
       title: "아침 운동 습관화",
-      progress: 18,
-      total: 30,
+      description:
+        "매일 아침 30분씩 운동하는 습관을 만들어 건강한 라이프스타일을 구축하기",
       area: "건강",
-      status: "in_progress" as const,
+      status: "completed",
+      progress: 30,
+      total: 30,
+      startDate: "2025.05.01",
+      endDate: "2025.05.31",
       loopConnection: "5월 루프: 건강 관리",
-      nextLoopScheduled: false,
     },
     {
-      id: 2,
+      id: "2",
       title: "식단 관리 앱 개발",
+      description: "개인 맞춤형 식단 추천 및 기록 앱 개발",
+      area: "개발",
+      status: "in_progress",
       progress: 7,
       total: 12,
+      startDate: "2025.06.01",
+      endDate: "2025.06.30",
+      loopConnection: "6월 루프: 건강한 개발자 되기",
+    },
+    {
+      id: "3",
+      title: "주간 회고 자동화 스크립트",
+      description: "매주 회고 내용을 자동으로 정리하고 분석하는 스크립트 개발",
+      area: "생산성",
+      status: "in_progress",
+      progress: 5,
+      total: 10,
+      startDate: "2025.07.01",
+      endDate: "2025.07.31",
+      loopConnection: "7월 루프: 독서 습관 만들기",
+    },
+    {
+      id: "4",
+      title: "새로운 기술 스택 학습",
+      description: "Next.js 15 및 React Server Components 심화 학습",
       area: "개발",
-      status: "in_progress" as const,
-      loopConnection: "5월 루프: 건강 관리",
-      nextLoopScheduled: false,
+      status: "in_progress",
+      progress: 1,
+      total: 5,
+      startDate: "2025.07.05",
+      endDate: "2025.07.25",
+      loopConnection: "7월 루프: 독서 습관 만들기",
     },
-    {
-      id: 3,
-      title: "명상 습관 만들기",
-      progress: 10,
-      total: 20,
-      area: "마음",
-      status: "in_progress" as const,
-      loopConnection: "5월 루프: 건강 관리",
-      nextLoopScheduled: false,
-    },
-    {
-      id: 4,
-      title: "블로그 글 작성",
-      progress: 3,
-      total: 8,
-      area: "커리어",
-      status: "planned" as const,
-      loopConnection: null,
-      nextLoopScheduled: true,
-    },
-  ]
-
-  // 필터링된 프로젝트 계산 로직 수정
-  const filteredProjects = showOnlyInProgress
-    ? projects.filter((project) => project.status === "in_progress")
-    : projects
+  ];
 
   const areas = [
-    { id: 1, title: "건강", items: 5 },
-    { id: 2, title: "개발", items: 8 },
-    { id: 3, title: "마음", items: 3 },
-    { id: 4, title: "커리어", items: 6 },
-    { id: 5, title: "재정", items: 2 },
-    { id: 6, title: "관계", items: 4 },
-    { id: 7, title: "취미", items: 3 },
-    { id: 8, title: "학습", items: 5 },
-  ]
+    {
+      id: "1",
+      name: "건강",
+      description: "신체적, 정신적 건강을 관리하고 증진하는 활동",
+      projectsCount: 1,
+      resourcesCount: 2,
+    },
+    {
+      id: "2",
+      name: "개발",
+      description: "프로그래밍 스킬 향상 및 프로젝트 개발",
+      projectsCount: 3,
+      resourcesCount: 5,
+    },
+    {
+      id: "3",
+      name: "생산성",
+      description: "업무 효율성 증대 및 시간 관리",
+      projectsCount: 1,
+      resourcesCount: 3,
+    },
+    {
+      id: "4",
+      name: "자기계발",
+      description: "개인의 성장과 역량 강화를 위한 학습 및 경험",
+      projectsCount: 0,
+      resourcesCount: 4,
+    },
+    {
+      id: "5",
+      name: "재정",
+      description: "개인 재정 관리 및 투자 학습",
+      projectsCount: 0,
+      resourcesCount: 1,
+    },
+  ];
 
   const resources = [
-    { id: 1, title: "운동 루틴 아이디어", type: "노트", date: "2025.05.10" },
-    { id: 2, title: "개발 참고 자료", type: "링크 모음", date: "2025.05.08" },
-    { id: 3, title: "명상 가이드", type: "PDF", date: "2025.05.05" },
-    { id: 4, title: "건강식 레시피", type: "노트", date: "2025.05.03" },
-    { id: 5, title: "프로그래밍 강의", type: "동영상", date: "2025.05.01" },
-    { id: 6, title: "독서 목록", type: "노트", date: "2025.04.28" },
-  ]
+    {
+      id: "1",
+      title: "클린 코드 (책)",
+      type: "book",
+      area: "개발",
+      link: "https://example.com/clean-code",
+      notes: "소프트웨어 장인정신을 위한 필수 지침서",
+    },
+    {
+      id: "2",
+      title: "생활 코딩 (온라인 강의)",
+      type: "online_course",
+      area: "개발",
+      link: "https://opentutorials.org/course/1",
+      notes: "웹 개발 기초를 다지기 좋은 강의",
+    },
+    {
+      id: "3",
+      title: "명상 앱 (Calm)",
+      type: "app",
+      area: "건강",
+      link: "https://www.calm.com/",
+      notes: "매일 10분 명상으로 스트레스 관리",
+    },
+    {
+      id: "4",
+      title: "Notion 템플릿 (생산성)",
+      type: "template",
+      area: "생산성",
+      link: "https://www.notion.so/templates",
+      notes: "프로젝트 관리 및 노트 정리용",
+    },
+    {
+      id: "5",
+      title: "운동 루틴 (YouTube)",
+      type: "video",
+      area: "건강",
+      link: "https://www.youtube.com/watch?v=example",
+      notes: "집에서 따라하기 좋은 전신 운동",
+    },
+  ];
 
   const archives = [
     {
-      id: 1,
-      title: "4월 루프: 독서 습관",
-      type: "루프",
-      date: "2025.04.30",
-      completed: true,
+      id: "loop-retro-current",
+      loopId: "1",
+      userId: "user-123",
+      createdAt: "2025-07-01T09:00:00Z",
+      type: "loop",
+      title: "6월 루프: 건강한 개발자 되기 회고",
+      summary: "매일 아침 운동 습관 성공, 클린 코드 작성 연습 시작",
+      userRating: 4,
+      bookmarked: true,
     },
     {
-      id: 2,
-      title: "블로그 리뉴얼",
-      type: "프로젝트",
-      date: "2025.04.15",
-      completed: true,
+      id: "project-retro-1",
+      projectId: "1",
+      userId: "user-123",
+      createdAt: "2025-05-31T09:00:00Z",
+      type: "project",
+      title: "아침 운동 습관화 프로젝트 회고",
+      summary: "운동 습관 성공, 꾸준함의 중요성 깨달음",
+      userRating: 4,
+      bookmarked: true,
     },
     {
-      id: 3,
-      title: "3월 루프: 코딩 스킬",
-      type: "루프",
-      date: "2025.03.31",
-      completed: false,
+      id: "loop-retro-101",
+      loopId: "101",
+      userId: "user-123",
+      createdAt: "2025-05-31T00:00:00Z",
+      type: "loop",
+      title: "5월 루프: 독서 습관 만들기 회고",
+      summary: "매일 30분 독서 목표 달성, 지식 확장 및 스트레스 해소에 도움",
+      userRating: 5,
+      bookmarked: true,
     },
     {
-      id: 4,
-      title: "포트폴리오 업데이트",
-      type: "프로젝트",
-      date: "2025.03.15",
-      completed: true,
+      id: "project-retro-102",
+      projectId: "102",
+      userId: "user-123",
+      createdAt: "2025-04-20T00:00:00Z",
+      type: "project",
+      title: "블로그 리뉴얼 프로젝트 회고",
+      summary: "새로운 디자인 적용 성공, 사용자 피드백 긍정적",
+      userRating: 5,
+      bookmarked: false,
     },
-  ]
+    {
+      id: "loop-retro-103",
+      loopId: "103",
+      userId: "user-123",
+      createdAt: "2025-03-31T00:00:00Z",
+      type: "loop",
+      title: "3월 루프: 코딩 스킬 향상 회고",
+      summary: "목표 미달성, 시간 관리 부족",
+      userRating: 2,
+      bookmarked: false,
+    },
+  ];
 
-  // 각 탭별 표시 항목 수 제한
-  const [projectsLimit, setProjectsLimit] = useState(3)
-  const [areasLimit, setAreasLimit] = useState(4)
-  const [resourcesLimit, setResourcesLimit] = useState(3)
-  const [archivesLimit, setArchivesLimit] = useState(3)
+  const [filterType, setFilterType] = useState("all"); // 'all', 'loop', 'project'
+  const [sortBy, setSortBy] = useState("latest"); // 'latest', 'rating'
 
-  // 체크박스 상태 변경 핸들러
-  const handleInProgressFilterChange = (checked: boolean) => {
-    setShowOnlyInProgress(checked)
-  }
+  const filteredArchives = archives
+    .filter((archive) => {
+      if (filterType === "all") return true;
+      return archive.type === filterType;
+    })
+    .sort((a, b) => {
+      if (sortBy === "latest") {
+        return (
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      } else if (sortBy === "rating") {
+        return (b.userRating || 0) - (a.userRating || 0);
+      }
+      return 0;
+    });
+
+  const renderStars = (rating: number | undefined) => {
+    if (rating === undefined) return null;
+    return (
+      <div className="flex items-center">
+        {[...Array(5)].map((_, i) => (
+          <Star
+            key={i}
+            className={`h-4 w-4 ${
+              i < rating ? "text-yellow-500 fill-yellow-500" : "text-gray-300"
+            }`}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat("ko-KR", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }).format(date);
+  };
 
   return (
-    <div className="container max-w-md px-4 py-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">PARA 시스템</h1>
-        <Button variant="outline" size="sm">
-          <Plus className="mr-2 h-4 w-4" />새 항목
-        </Button>
-      </div>
+    <div className="container max-w-md px-4 py-6 pb-20">
+      <h1 className="text-2xl font-bold mb-6">PARA</h1>
 
-      <Tabs defaultValue="projects" className="mb-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-6">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="projects">Projects</TabsTrigger>
+          <TabsTrigger value="projects">프로젝트</TabsTrigger>
           <TabsTrigger value="areas">Areas</TabsTrigger>
           <TabsTrigger value="resources">Resources</TabsTrigger>
           <TabsTrigger value="archives">Archives</TabsTrigger>
         </TabsList>
 
         <TabsContent value="projects" className="mt-4">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Briefcase className="h-4 w-4" />
-              <span>현재 진행 중인 프로젝트</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="show-in-progress"
-                  checked={showOnlyInProgress}
-                  onCheckedChange={handleInProgressFilterChange}
-                />
-                <Label htmlFor="show-in-progress" className="text-sm cursor-pointer">
-                  실행 중만 보기
-                </Label>
-              </div>
-            </div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold">프로젝트</h2>
+            <Button size="sm" asChild>
+              <Link href="/para/projects/new">
+                <Plus className="mr-2 h-4 w-4" />새 프로젝트
+              </Link>
+            </Button>
           </div>
-
-          <div className="space-y-3">
-            {filteredProjects.slice(0, projectsLimit).map((project) => (
+          <div className="space-y-4">
+            {projects.map((project) => (
               <Card key={project.id} className="p-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <h3 className="font-medium">{project.title}</h3>
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs">{project.area}</span>
-                </div>
-
-                <div className="mb-2">
-                  <div className="mb-1 flex justify-between text-xs">
-                    <span>진행률: {Math.round((project.progress / project.total) * 100)}%</span>
+                <Link href={`/para/projects/${project.id}`} className="block">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-lg font-bold">{project.title}</h3>
+                    <Badge
+                      className={`${
+                        project.status === "in_progress"
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-green-100 text-green-800"
+                      }`}
+                    >
+                      {project.status === "in_progress" ? "진행 중" : "완료됨"}
+                    </Badge>
+                  </div>
+                  <p className="text-muted-foreground text-sm mb-2 line-clamp-2">
+                    {project.description}
+                  </p>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                    <Clock className="h-4 w-4" />
+                    <span>
+                      {project.startDate} ~ {project.endDate}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>
+                      달성률:{" "}
+                      {Math.round((project.progress / project.total) * 100)}%
+                    </span>
                     <span>
                       {project.progress}/{project.total}
                     </span>
@@ -182,170 +313,197 @@ export default function ParaPage() {
                     <div
                       className="progress-value"
                       style={{
-                        width: `${Math.round((project.progress / project.total) * 100)}%`,
+                        width: `${Math.round(
+                          (project.progress / project.total) * 100
+                        )}%`,
                       }}
                     ></div>
                   </div>
-                </div>
-
-                <div className="mb-2 flex flex-wrap gap-2">
-                  {project.status === "in_progress" ? (
-                    <Badge className="bg-primary/20 text-xs">실행 중</Badge>
-                  ) : project.status === "planned" ? (
-                    <Badge variant="outline" className="text-xs">
-                      계획 중
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary" className="text-xs">
-                      완료됨
-                    </Badge>
-                  )}
-
-                  {project.loopConnection ? (
-                    <Badge className="bg-primary/10 text-xs">{project.loopConnection}</Badge>
-                  ) : project.nextLoopScheduled ? (
-                    <Badge variant="outline" className="border-dashed text-xs">
-                      다음 루프 예약됨
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-xs">
-                      루프 미연결
-                    </Badge>
-                  )}
-                </div>
-
-                <div className="flex justify-end">
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href={`/project/${project.id}`}>
-                      상세 보기
-                      <ChevronRight className="ml-1 h-4 w-4" />
-                    </Link>
-                  </Button>
-                </div>
+                  <div className="flex justify-end mt-2">
+                    <Button variant="ghost" size="sm">
+                      자세히 보기
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </Link>
               </Card>
             ))}
-
-            {filteredProjects.length > projectsLimit && (
-              <Button variant="outline" className="w-full" onClick={() => setProjectsLimit(filteredProjects.length)}>
-                {filteredProjects.length - projectsLimit}개 더보기
-              </Button>
-            )}
-
-            <Button variant="outline" className="mt-2 w-full border-dashed" asChild>
-              <Link href="/project/new">
-                <Plus className="mr-2 h-4 w-4" />새 프로젝트 추가
-              </Link>
-            </Button>
           </div>
         </TabsContent>
 
         <TabsContent value="areas" className="mt-4">
-          <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
-            <Compass className="h-4 w-4" />
-            <span>장기적 관심 영역</span>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold">Areas</h2>
+            <Button size="sm" asChild>
+              <Link href="/para/areas/new">
+                <Plus className="mr-2 h-4 w-4" />새 Area
+              </Link>
+            </Button>
           </div>
-
-          <div className="space-y-3">
-            {areas.slice(0, areasLimit).map((area) => (
+          <div className="space-y-4">
+            {areas.map((area) => (
               <Card key={area.id} className="p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-medium">{area.title}</h3>
-                  <span className="text-sm text-muted-foreground">{area.items}개 항목</span>
-                </div>
-                <div className="flex justify-end mt-2">
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href={`/para/areas/${area.id}`}>
-                      상세 보기
-                      <ChevronRight className="ml-1 h-4 w-4" />
-                    </Link>
-                  </Button>
-                </div>
+                <Link href={`/para/areas/${area.id}`} className="block">
+                  <h3 className="text-lg font-bold mb-2">{area.name}</h3>
+                  <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
+                    {area.description}
+                  </p>
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>프로젝트: {area.projectsCount}개</span>
+                    <span>리소스: {area.resourcesCount}개</span>
+                  </div>
+                  <div className="flex justify-end mt-2">
+                    <Button variant="ghost" size="sm">
+                      자세히 보기
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </Link>
               </Card>
             ))}
-
-            {areas.length > areasLimit && (
-              <Button variant="outline" className="w-full" onClick={() => setAreasLimit(areas.length)}>
-                {areas.length - areasLimit}개 더보기
-              </Button>
-            )}
           </div>
         </TabsContent>
 
         <TabsContent value="resources" className="mt-4">
-          <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
-            <Folder className="h-4 w-4" />
-            <span>아이디어와 참고 자료</span>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold">Resources</h2>
+            <Button size="sm" asChild>
+              <Link href="/para/resources/new">
+                <Plus className="mr-2 h-4 w-4" />새 Resource
+              </Link>
+            </Button>
           </div>
-
-          <div className="space-y-3">
-            {resources.slice(0, resourcesLimit).map((resource) => (
+          <div className="space-y-4">
+            {resources.map((resource) => (
               <Card key={resource.id} className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium">{resource.title}</h3>
-                    <span className="text-xs text-muted-foreground">{resource.type}</span>
+                <Link href={`/para/resources/${resource.id}`} className="block">
+                  <h3 className="text-lg font-bold mb-2">{resource.title}</h3>
+                  <Badge variant="secondary" className="mb-2">
+                    {resource.type}
+                  </Badge>
+                  <p className="text-muted-foreground text-sm mb-2 line-clamp-2">
+                    {resource.notes}
+                  </p>
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>Area: {resource.area}</span>
+                    {resource.link && (
+                      <a
+                        href={resource.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        링크 보기
+                      </a>
+                    )}
                   </div>
-                  <span className="text-xs text-muted-foreground">{resource.date}</span>
-                </div>
-                <div className="flex justify-end mt-2">
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href={`/para/resources/${resource.id}`}>
-                      열기
-                      <ChevronRight className="ml-1 h-4 w-4" />
-                    </Link>
-                  </Button>
-                </div>
+                  <div className="flex justify-end mt-2">
+                    <Button variant="ghost" size="sm">
+                      자세히 보기
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </Link>
               </Card>
             ))}
-
-            {resources.length > resourcesLimit && (
-              <Button variant="outline" className="w-full" onClick={() => setResourcesLimit(resources.length)}>
-                {resources.length - resourcesLimit}개 더보기
-              </Button>
-            )}
           </div>
         </TabsContent>
 
         <TabsContent value="archives" className="mt-4">
-          <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
-            <Archive className="h-4 w-4" />
-            <span>완료된 항목</span>
-          </div>
-
-          <div className="space-y-3">
-            {archives.slice(0, archivesLimit).map((archive) => (
-              <Card key={archive.id} className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium">{archive.title}</h3>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">{archive.type}</span>
-                      <span className={`text-xs ${archive.completed ? "text-green-600" : "text-red-600"}`}>
-                        {archive.completed ? "완료" : "미완료"}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-xs text-muted-foreground">{archive.date}</span>
-                </div>
-                <div className="flex justify-end mt-2">
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href={`/para/archives/${archive.id}`}>
-                      열기
-                      <ChevronRight className="ml-1 h-4 w-4" />
-                    </Link>
-                  </Button>
-                </div>
-              </Card>
-            ))}
-
-            {archives.length > archivesLimit && (
-              <Button variant="outline" className="w-full" onClick={() => setArchivesLimit(archives.length)}>
-                {archives.length - archivesLimit}개 더보기
+          <h2 className="text-xl font-bold mb-4">Archives</h2>
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex gap-2">
+              <Button
+                variant={filterType === "all" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterType("all")}
+              >
+                전체
               </Button>
-            )}
+              <Button
+                variant={filterType === "loop" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterType("loop")}
+              >
+                루프 회고
+              </Button>
+              <Button
+                variant={filterType === "project" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterType("project")}
+              >
+                프로젝트 회고
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={sortBy === "latest" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSortBy("latest")}
+              >
+                최신순
+              </Button>
+              <Button
+                variant={sortBy === "rating" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSortBy("rating")}
+              >
+                별점순
+              </Button>
+            </div>
           </div>
+          {filteredArchives.length === 0 ? (
+            <Card className="p-6 text-center border-dashed">
+              <p className="text-muted-foreground">
+                아직 보관된 회고가 없어요.
+              </p>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {filteredArchives.map((archive) => (
+                <Card key={archive.id} className="p-4">
+                  <Link href={`/para/archives/${archive.id}`} className="block">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-lg font-bold">{archive.title}</h3>
+                      <div className="flex items-center gap-2">
+                        {archive.bookmarked && (
+                          <Bookmark className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                        )}
+                        {renderStars(archive.userRating)}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                      <Clock className="h-4 w-4" />
+                      <span>{formatDate(archive.createdAt)}</span>
+                      <Badge
+                        className={`text-xs ${
+                          archive.type === "loop"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-purple-100 text-purple-800"
+                        }`}
+                      >
+                        {archive.type === "loop"
+                          ? "루프 회고"
+                          : "프로젝트 회고"}
+                      </Badge>
+                    </div>
+                    <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
+                      {archive.summary}
+                    </p>
+                    <div className="flex justify-end">
+                      <Button variant="ghost" size="sm">
+                        자세히 보기
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
+                  </Link>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }

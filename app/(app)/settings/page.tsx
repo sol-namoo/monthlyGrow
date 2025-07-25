@@ -1,13 +1,13 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
-import { CharacterAvatar } from "@/components/character-avatar"
-import { useState } from "react"
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { CharacterAvatar } from "@/components/character-avatar";
+import { useState } from "react";
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState({
@@ -17,11 +17,11 @@ export default function SettingsPage() {
     carryOver: true,
     aiRecommendations: true,
     notifications: true,
-  })
+  });
 
   const updateSetting = (key: keyof typeof settings, value: any) => {
-    setSettings({ ...settings, [key]: value })
-  }
+    setSettings({ ...settings, [key]: value });
+  };
 
   return (
     <div className="container max-w-md px-4 py-6">
@@ -53,8 +53,9 @@ export default function SettingsPage() {
               id="email"
               type="email"
               value={settings.email}
-              onChange={(e) => updateSetting("email", e.target.value)}
               className="mt-1"
+              readOnly
+              disabled
             />
           </div>
         </Card>
@@ -72,13 +73,17 @@ export default function SettingsPage() {
               className="mt-1"
               placeholder="루프 완료 시 기본 보상을 입력하세요"
             />
-            <p className="mt-1 text-xs text-muted-foreground">새 루프 생성 시 기본으로 설정될 보상입니다.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              새 루프 생성 시 기본으로 설정될 보상입니다.
+            </p>
           </div>
 
           <div className="flex items-center justify-between">
             <div>
               <Label htmlFor="carry-over">미완료 항목 이월</Label>
-              <p className="text-xs text-muted-foreground">완료하지 못한 항목을 다음 루프로 이월합니다.</p>
+              <p className="text-xs text-muted-foreground">
+                완료하지 못한 항목을 다음 루프로 이월합니다.
+              </p>
             </div>
             <Switch
               id="carry-over"
@@ -95,12 +100,16 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <Label htmlFor="ai-recommendations">AI 추천 허용</Label>
-              <p className="text-xs text-muted-foreground">AI가 루프와 프로젝트에 대한 추천을 제공합니다.</p>
+              <p className="text-xs text-muted-foreground">
+                AI가 루프와 프로젝트에 대한 추천을 제공합니다.
+              </p>
             </div>
             <Switch
               id="ai-recommendations"
               checked={settings.aiRecommendations}
-              onCheckedChange={(checked) => updateSetting("aiRecommendations", checked)}
+              onCheckedChange={(checked) =>
+                updateSetting("aiRecommendations", checked)
+              }
             />
           </div>
         </Card>
@@ -112,12 +121,16 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <Label htmlFor="notifications">알림 허용</Label>
-              <p className="text-xs text-muted-foreground">루프와 프로젝트 관련 알림을 받습니다.</p>
+              <p className="text-xs text-muted-foreground">
+                루프와 프로젝트 관련 알림을 받습니다.
+              </p>
             </div>
             <Switch
               id="notifications"
               checked={settings.notifications}
-              onCheckedChange={(checked) => updateSetting("notifications", checked)}
+              onCheckedChange={(checked) =>
+                updateSetting("notifications", checked)
+              }
             />
           </div>
         </Card>
@@ -127,5 +140,5 @@ export default function SettingsPage() {
         <Button>저장</Button>
       </div>
     </div>
-  )
+  );
 }

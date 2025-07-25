@@ -14,6 +14,15 @@ import {
   getLoopsByUserId,
 } from "../api/data"; // api/data.ts를 import
 
+interface Options {
+  userId?: string;
+  loopId?: string;
+  projectId?: string;
+  areaId?: string;
+  resourceId?: string;
+  archiveId?: string;
+}
+
 // 각 페이지에서 사용할 데이터들의 묶음.
 export const usePageData = (
   page:
@@ -24,26 +33,26 @@ export const usePageData = (
     | "area"
     | "resource"
     | "archive",
-  options?: any
+  options: Options
 ) => {
   if (page === "home") {
-    // TODO: implement home data fetching
+    const { userId = "" } = options;
     const {
       data: projects,
       isLoading: projectsLoading,
       error: projectsError,
     } = useQuery({
       queryKey: ["projects"],
-      queryFn: () => getProjectsByUserId("user1"),
-    }); // user1은 임시 유저입니다.
+      queryFn: () => getProjectsByUserId(userId),
+    });
     const {
       data: loops,
       isLoading: loopsLoading,
       error: loopsError,
     } = useQuery({
       queryKey: ["loops"],
-      queryFn: () => getLoopsByUserId("user1"),
-    }); // user1은 임시 유저입니다.
+      queryFn: () => getLoopsByUserId(userId),
+    });
     return {
       projects,
       loops,
@@ -53,7 +62,7 @@ export const usePageData = (
   }
 
   if (page === "loopDetail") {
-    const { loopId } = options;
+    const { loopId = "" } = options;
     const {
       data: loop,
       isLoading: loopLoading,
@@ -88,7 +97,7 @@ export const usePageData = (
   }
 
   if (page === "projectDetail") {
-    const { projectId } = options;
+    const { projectId = "" } = options;
     const {
       data: project,
       isLoading: projectLoading,
@@ -121,11 +130,11 @@ export const usePageData = (
     } = useQuery({
       queryKey: ["projects"],
       queryFn: () => getProjectsByUserId("user1"),
-    }); // user1은 임시 유저입니다.
+    });
     return { projects, isLoading: projectsLoading, error: projectsError };
   }
   if (page === "area") {
-    const { areaId } = options;
+    const { areaId = "" } = options;
     const { data, isLoading, error } = useQuery({
       queryKey: ["areas", areaId],
       queryFn: () => getArea(areaId),
@@ -133,7 +142,7 @@ export const usePageData = (
     return { data, isLoading, error };
   }
   if (page === "resource") {
-    const { resourceId } = options;
+    const { resourceId = "" } = options;
     const { data, isLoading, error } = useQuery({
       queryKey: ["resources", resourceId],
       queryFn: () => getResource(resourceId),
@@ -141,7 +150,7 @@ export const usePageData = (
     return { data, isLoading, error };
   }
   if (page === "archive") {
-    const { archiveId } = options;
+    const { archiveId = "" } = options;
     const { data, isLoading, error } = useQuery({
       queryKey: ["archives", archiveId],
       queryFn: () => getArchive(archiveId),
