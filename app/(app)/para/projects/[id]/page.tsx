@@ -24,7 +24,7 @@ import { useParams } from "next/navigation";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import type { OfficialRetrospective } from "@/types/retrospective";
+import type { OfficialRetrospective } from "@/lib/types";
 import {
   Dialog,
   DialogContent,
@@ -340,9 +340,7 @@ export default function ProjectDetailPage() {
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">개요</TabsTrigger>
           <TabsTrigger value="tasks">태스크</TabsTrigger>
-          {project.status === "completed" && (
-            <TabsTrigger value="retrospective-notes">회고·노트</TabsTrigger>
-          )}
+          <TabsTrigger value="retrospective-notes">회고·노트</TabsTrigger>
         </TabsList>
 
         {/* 개요 탭 */}
@@ -459,95 +457,93 @@ export default function ProjectDetailPage() {
           </div>
         </TabsContent>
 
-        {/* 회고·노트 탭 (완료 프로젝트만) */}
-        {project.status === "completed" && (
-          <TabsContent value="retrospective-notes" className="mt-4">
-            <h2 className="mb-4 text-xl font-bold">프로젝트 회고</h2>
-            {project.reflection ? (
-              <Card className="p-4 mb-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium">
-                    {project.reflection.title || "회고 작성 완료"}
-                  </h3>
-                  <div className="flex items-center gap-2 text-lg font-bold text-primary">
-                    {project.reflection.bookmarked && (
-                      <Bookmark className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                    )}
-                    {renderStarRating(project.reflection.userRating)}
-                  </div>
+        {/* 회고·노트 탭  */}
+        <TabsContent value="retrospective-notes" className="mt-4">
+          <h2 className="mb-4 text-xl font-bold">프로젝트 회고</h2>
+          {project.reflection ? (
+            <Card className="p-4 mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-medium">
+                  {project.reflection.title || "회고 작성 완료"}
+                </h3>
+                <div className="flex items-center gap-2 text-lg font-bold text-primary">
+                  {project.reflection.bookmarked && (
+                    <Bookmark className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                  )}
+                  {renderStarRating(project.reflection.userRating)}
                 </div>
-                <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
-                  {project.reflection.summary ||
-                    project.reflection.content ||
-                    project.reflection.goalAchieved ||
-                    "작성된 회고 요약이 없습니다."}
-                </p>
-                <div className="flex justify-end">
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={`/para/archives/${project.reflection.id}`}>
-                      회고 상세 보기
-                    </Link>
-                  </Button>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
+                {project.reflection.summary ||
+                  project.reflection.content ||
+                  project.reflection.goalAchieved ||
+                  "작성된 회고 요약이 없습니다."}
+              </p>
+              <div className="flex justify-end">
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/para/archives/${project.reflection.id}`}>
+                    회고 상세 보기
+                  </Link>
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            <Card className="p-4 text-center mb-6">
+              <h3 className="font-medium mb-4">
+                이 프로젝트를 회고하고, 다음 단계를 계획하세요.
+              </h3>
+              <Button onClick={() => setShowRetrospectiveDialog(true)}>
+                회고 작성
+              </Button>
+            </Card>
+          )}
+
+          <section>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-semibold">노트</h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddNoteDialog(true)}
+              >
+                {project.notes && project.notes.length > 0 ? (
+                  <>
+                    <Edit className="mr-1 h-4 w-4" />
+                    노트 수정
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-1 h-4 w-4" />
+                    노트 작성
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {project.notes && project.notes.length > 0 ? (
+              <Card className="p-4">
+                <p className="text-sm mb-2">{project.notes[0].content}</p>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  <span>{formatDate(project.notes[0].createdAt)}</span>
                 </div>
               </Card>
             ) : (
-              <Card className="p-4 text-center mb-6">
-                <h3 className="font-medium mb-4">
-                  이 프로젝트를 회고하고, 다음 단계를 계획하세요.
-                </h3>
-                <Button onClick={() => setShowRetrospectiveDialog(true)}>
-                  회고 작성
-                </Button>
-              </Card>
-            )}
-
-            <section>
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="font-semibold">노트</h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowAddNoteDialog(true)}
-                >
-                  {project.notes && project.notes.length > 0 ? (
-                    <>
-                      <Edit className="mr-1 h-4 w-4" />
-                      노트 수정
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="mr-1 h-4 w-4" />
-                      노트 작성
-                    </>
-                  )}
+              <div className="rounded-lg border border-dashed p-8 text-center">
+                <p className="text-muted-foreground mb-2">
+                  작성된 노트가 없습니다.
+                </p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  프로젝트 진행 과정을 기록해보세요.
+                </p>
+                <Button onClick={() => setShowAddNoteDialog(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  노트 작성하기
                 </Button>
               </div>
-
-              {project.notes && project.notes.length > 0 ? (
-                <Card className="p-4">
-                  <p className="text-sm mb-2">{project.notes[0].content}</p>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    <span>{formatDate(project.notes[0].createdAt)}</span>
-                  </div>
-                </Card>
-              ) : (
-                <div className="rounded-lg border border-dashed p-8 text-center">
-                  <p className="text-muted-foreground mb-2">
-                    작성된 노트가 없습니다.
-                  </p>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    프로젝트 진행 과정을 기록해보세요.
-                  </p>
-                  <Button onClick={() => setShowAddNoteDialog(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    노트 작성하기
-                  </Button>
-                </div>
-              )}
-            </section>
-          </TabsContent>
-        )}
+            )}
+          </section>
+        </TabsContent>
       </Tabs>
 
       {/* 회고 노트 추가/수정 다이얼로그 (프로젝트 노트용) */}

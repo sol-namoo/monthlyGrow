@@ -22,7 +22,7 @@ export default function ResourceDetailPage() {
       content:
         "월: 전신 운동, 화: 유산소, 수: 휴식, 목: 상체, 금: 하체, 주말: 가벼운 활동",
       area: { id: "1", name: "건강" },
-      tags: ["운동", "루틴", "건강"],
+
       createdAt: "2025.05.10",
     },
     {
@@ -31,7 +31,7 @@ export default function ResourceDetailPage() {
       type: "link",
       content: "https://react.dev/learn",
       area: { id: "2", name: "개발" },
-      tags: ["React", "프론트엔드", "문서"],
+
       createdAt: "2025.05.08",
     },
     {
@@ -40,7 +40,7 @@ export default function ResourceDetailPage() {
       type: "file",
       content: "/files/meditation_guide.pdf",
       area: { id: "3", name: "마음" },
-      tags: ["명상", "마음챙김", "PDF"],
+
       createdAt: "2025.05.05",
     },
   ];
@@ -92,18 +92,11 @@ export default function ResourceDetailPage() {
 
       <Card className="mb-6 p-4">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-muted rounded-full">
+          {/* <div className="p-2 bg-muted rounded-full">
             {getTypeIcon(resource.type)}
-          </div>
+          </div> */}
           <div>
-            <h2 className="text-xl font-bold mb-1">
-              유형:{" "}
-              {resource.type === "note"
-                ? "노트"
-                : resource.type === "link"
-                ? "링크"
-                : "파일"}
-            </h2>
+            <h2 className="text-xl font-bold mb-1">{resource.title}</h2>
             <p className="text-sm text-muted-foreground">
               생성일: {resource.createdAt}
             </p>
@@ -111,26 +104,27 @@ export default function ResourceDetailPage() {
         </div>
 
         <div className="mb-4">
-          <h3 className="font-semibold text-lg mb-2">내용</h3>
-          {resource.type === "link" ? (
+          <h3 className="font-semibold text-lg mb-2">설명</h3>
+          <p className="text-muted-foreground whitespace-pre-wrap">
+            {resource.content}
+          </p>
+        </div>
+
+        {resource.link ? (
+          <div className="mb-4">
+            <h3 className="font-semibold text-lg mb-2">url</h3>
             <a
               href={resource.content}
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-600 hover:underline break-all"
             >
-              {resource.content}
+              {resource.link}
             </a>
-          ) : resource.type === "file" ? (
-            <p className="text-muted-foreground break-all">
-              파일 경로: {resource.content}
-            </p>
-          ) : (
-            <p className="text-muted-foreground whitespace-pre-wrap">
-              {resource.content}
-            </p>
-          )}
-        </div>
+          </div>
+        ) : (
+          <></>
+        )}
 
         {resource.area && (
           <div className="mb-4">

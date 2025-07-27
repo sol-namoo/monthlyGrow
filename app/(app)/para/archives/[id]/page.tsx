@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { ChevronLeft, Star, Bookmark } from "lucide-react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { OfficialRetrospective } from "@/types/retrospective";
+import type { OfficialRetrospective } from "@/lib/types";
 
 export default function ArchiveDetailPage({
   params,

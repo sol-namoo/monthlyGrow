@@ -3,7 +3,17 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ChevronRight, Plus, Star, Bookmark, Clock } from "lucide-react";
+import {
+  ChevronRight,
+  Plus,
+  Star,
+  Bookmark,
+  Clock,
+  Briefcase,
+  Compass,
+  Folder,
+  Archive,
+} from "lucide-react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -112,43 +122,31 @@ export default function ParaPage() {
   const resources = [
     {
       id: "1",
-      title: "클린 코드 (책)",
-      type: "book",
-      area: "개발",
-      link: "https://example.com/clean-code",
-      notes: "소프트웨어 장인정신을 위한 필수 지침서",
+      title: "운동 루틴 아이디어",
+      type: "note",
+      content:
+        "월: 전신 운동, 화: 유산소, 수: 휴식, 목: 상체, 금: 하체, 주말: 가벼운 활동",
+      area: { id: "1", name: "건강" },
+
+      createdAt: "2025.05.10",
     },
     {
       id: "2",
-      title: "생활 코딩 (온라인 강의)",
-      type: "online_course",
-      area: "개발",
-      link: "https://opentutorials.org/course/1",
-      notes: "웹 개발 기초를 다지기 좋은 강의",
+      title: "개발 참고 자료",
+      type: "link",
+      content: "https://react.dev/learn",
+      area: { id: "2", name: "개발" },
+
+      createdAt: "2025.05.08",
     },
     {
       id: "3",
-      title: "명상 앱 (Calm)",
-      type: "app",
-      area: "건강",
-      link: "https://www.calm.com/",
-      notes: "매일 10분 명상으로 스트레스 관리",
-    },
-    {
-      id: "4",
-      title: "Notion 템플릿 (생산성)",
-      type: "template",
-      area: "생산성",
-      link: "https://www.notion.so/templates",
-      notes: "프로젝트 관리 및 노트 정리용",
-    },
-    {
-      id: "5",
-      title: "운동 루틴 (YouTube)",
-      type: "video",
-      area: "건강",
-      link: "https://www.youtube.com/watch?v=example",
-      notes: "집에서 따라하기 좋은 전신 운동",
+      title: "명상 가이드",
+      type: "file",
+      content: "/files/meditation_guide.pdf",
+      area: { id: "3", name: "마음" },
+
+      createdAt: "2025.05.05",
     },
   ];
 
@@ -260,7 +258,7 @@ export default function ParaPage() {
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-6">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="projects">프로젝트</TabsTrigger>
+          <TabsTrigger value="projects">Projects</TabsTrigger>
           <TabsTrigger value="areas">Areas</TabsTrigger>
           <TabsTrigger value="resources">Resources</TabsTrigger>
           <TabsTrigger value="archives">Archives</TabsTrigger>
@@ -268,7 +266,10 @@ export default function ParaPage() {
 
         <TabsContent value="projects" className="mt-4">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold">프로젝트</h2>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Briefcase className="h-4 w-4" />
+              <span>현재 진행 중인 프로젝트</span>
+            </div>
             <Button size="sm" asChild>
               <Link href="/para/projects/new">
                 <Plus className="mr-2 h-4 w-4" />새 프로젝트
@@ -284,8 +285,8 @@ export default function ParaPage() {
                     <Badge
                       className={`${
                         project.status === "in_progress"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-green-100 text-green-800"
+                          ? "bg-primary"
+                          : "bg-primary/30"
                       }`}
                     >
                       {project.status === "in_progress" ? "진행 중" : "완료됨"}
@@ -333,10 +334,13 @@ export default function ParaPage() {
 
         <TabsContent value="areas" className="mt-4">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold">Areas</h2>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Compass className="h-4 w-4" />
+              <span>장기적 관심 영역</span>
+            </div>
             <Button size="sm" asChild>
               <Link href="/para/areas/new">
-                <Plus className="mr-2 h-4 w-4" />새 Area
+                <Plus className="mr-2 h-4 w-4" />새 영역
               </Link>
             </Button>
           </div>
@@ -348,9 +352,10 @@ export default function ParaPage() {
                   <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
                     {area.description}
                   </p>
-                  <div className="flex justify-between text-sm text-muted-foreground">
+                  <div className="flex gap-2 text-sm text-muted-foreground">
                     <span>프로젝트: {area.projectsCount}개</span>
-                    <span>리소스: {area.resourcesCount}개</span>
+                    <span>|</span>
+                    <span>자료: {area.resourcesCount}개</span>
                   </div>
                   <div className="flex justify-end mt-2">
                     <Button variant="ghost" size="sm">
@@ -366,10 +371,13 @@ export default function ParaPage() {
 
         <TabsContent value="resources" className="mt-4">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold">Resources</h2>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Folder className="h-4 w-4" />
+              <span>아이디어와 참고 자료</span>
+            </div>
             <Button size="sm" asChild>
               <Link href="/para/resources/new">
-                <Plus className="mr-2 h-4 w-4" />새 Resource
+                <Plus className="mr-2 h-4 w-4" />새 자료
               </Link>
             </Button>
           </div>
@@ -378,26 +386,18 @@ export default function ParaPage() {
               <Card key={resource.id} className="p-4">
                 <Link href={`/para/resources/${resource.id}`} className="block">
                   <h3 className="text-lg font-bold mb-2">{resource.title}</h3>
-                  <Badge variant="secondary" className="mb-2">
-                    {resource.type}
-                  </Badge>
-                  <p className="text-muted-foreground text-sm mb-2 line-clamp-2">
-                    {resource.notes}
-                  </p>
-                  <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>Area: {resource.area}</span>
-                    {resource.link && (
-                      <a
-                        href={resource.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        링크 보기
-                      </a>
+                  <div>
+                    {resource.area ? (
+                      <Badge variant="secondary" className="mb-2">
+                        {resource.area.name}
+                      </Badge>
+                    ) : (
+                      <></>
                     )}
                   </div>
+                  <p className="text-muted-foreground text-sm mb-2 line-clamp-2">
+                    {resource.content}
+                  </p>
                   <div className="flex justify-end mt-2">
                     <Button variant="ghost" size="sm">
                       자세히 보기
@@ -411,7 +411,12 @@ export default function ParaPage() {
         </TabsContent>
 
         <TabsContent value="archives" className="mt-4">
-          <h2 className="text-xl font-bold mb-4">Archives</h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground h-9">
+              <Archive className="h-4 w-4" />
+              <span>완료된 항목에 대한 회고</span>
+            </div>
+          </div>
           <div className="flex justify-between items-center mb-4">
             <div className="flex gap-2">
               <Button

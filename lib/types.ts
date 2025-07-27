@@ -83,6 +83,7 @@ export interface Snapshot {
 
 export interface OfficialRetrospective {
   id: string;
+  type: "loop" | "project";
   loopId?: string;
   projectId?: string;
   userId: string;
