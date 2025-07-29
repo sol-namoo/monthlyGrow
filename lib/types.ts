@@ -39,19 +39,10 @@ export interface Project {
   createdAt: Date;
   updatedAt: Date;
   loopId?: string; // 현재 연결된 루프 ID (legacy)
-  connectedLoops?: ConnectedLoop[]; // 연결된 루프 정보 배열
   addedMidway?: boolean; // 루프 중간에 추가된 프로젝트 여부
-  tasks: Task[];
   retrospective?: Retrospective;
   notes: Note[];
-}
-
-// 연결된 루프 정보
-export interface ConnectedLoop {
-  id: string;
-  title: string;
-  startDate: Date;
-  endDate: Date;
+  // tasks는 서브컬렉션으로 관리: projects/{projectId}/tasks/{taskId}
 }
 
 export interface Task {

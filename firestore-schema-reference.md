@@ -17,7 +17,7 @@ interface Area {
   description: string; // 영역 설명
   icon?: string; // 아이콘 ID (Lucide React)
   color?: string; // 색상 코드 (hex)
-  status: "active" | "archived"; // 활성/보관 상태
+
   createdAt: Date; // 생성일시
   updatedAt: Date; // 수정일시
 }
@@ -78,20 +78,15 @@ interface Project {
   createdAt: Date; // 생성일시
   updatedAt: Date; // 수정일시
   loopId?: string; // 현재 연결된 루프 ID (legacy)
-  connectedLoops?: ConnectedLoop[]; // 연결된 루프 정보 배열
   addedMidway?: boolean; // 루프 중간 추가 여부
-  tasks: Task[]; // 세부 작업들 (서브컬렉션)
   retrospective?: Retrospective; // 프로젝트 회고
   notes: Note[]; // 프로젝트 노트들
 }
-
-interface ConnectedLoop {
-  id: string; // 루프 ID
-  title: string; // 루프 제목
-  startDate: Date; // 루프 시작일
-  endDate: Date; // 루프 종료일
-}
 ```
+
+**서브컬렉션:**
+
+- `tasks`: 프로젝트의 세부 작업들 (projects/{projectId}/tasks/{taskId})
 
 **인덱스:**
 
@@ -223,6 +218,32 @@ interface Note {
 
 ---
 
+### 🔹 Snapshots 컬렉션
+
+월별 진척률 요약을 저장합니다.
+
+```typescript
+interface Snapshot {
+  id: string; // 문서 ID (자동 생성)
+  loopId: string; // 루프 ID
+  projectId: string; // 프로젝트 ID
+  year: number; // 년도
+  month: number; // 월
+  snapshotDate: Date; // 스냅샷 생성일
+  doneCount: number; // 완료된 횟수
+  targetCount: number; // 목표 횟수
+  reward: string; // 보상
+}
+```
+
+**인덱스:**
+
+- `loopId` (단일)
+- `projectId` (단일)
+- `year` + `month` (복합)
+
+---
+
 ## 🔗 관계 정의
 
 ### 1. User → Areas (1:N)
@@ -243,12 +264,14 @@ interface Note {
 ### 4. Project → Tasks (1:N)
 
 - 프로젝트 하나가 여러 작업을 가질 수 있음
+- 서브컬렉션으로 관리: `projects/{projectId}/tasks/{taskId}`
 - `projectId`로 연결
 
-### 5. Loop ↔ Projects (N:M)
+### 5. Loop → Projects (1:N)
 
-- 루프와 프로젝트는 다대다 관계
-- Loop의 `projectIds[]`와 Project의 `connectedLoops[]`로 양방향 연결
+- 루프 하나가 여러 프로젝트를 가질 수 있음
+- Loop의 `projectIds[]`로 연결
+- Project에서 Loop 정보가 필요한 경우 쿼리 시 조인
 
 ### 6. Loop → Retrospective (1:1)
 
@@ -340,54 +363,4 @@ match /loops/{loopId} {
 ### 2. 인덱싱 전략
 
 - **사용자별 조회**: `userId` 단일 인덱스
-- **상태별 조회**: `userId` + `status` 복합 인덱스
-- **날짜별 조회**: `userId` + `createdAt` 복합 인덱스
-
-### 3. 쿼리 최적화
-
-- **페이지네이션**: `limit()` + `startAfter()` 사용
-- **필터링**: `where()` 절을 인덱스와 일치하도록 구성
-- **정렬**: `orderBy()`를 인덱스와 일치하도록 구성
-
----
-
-## 🔄 데이터 마이그레이션
-
-### 1. 기존 데이터 호환성
-
-- `loopId` (string) → `connectedLoops[]` (array) 마이그레이션
-- `areaId` (string) → `area` (string) denormalization
-- `reflection` → `retrospective` 필드명 변경
-
-### 2. 새 필드 추가
-
-- `icon`, `color` 필드를 Areas에 추가
-- `text`, `link` 필드를 Resources에 추가
-- `addedMidway` 필드를 Projects에 추가
-
-### 3. 인덱스 생성
-
-- 새로운 복합 인덱스 생성
-- 기존 인덱스 유지 (하위 호환성)
-
----
-
-## 📋 데이터 검증 규칙
-
-### 1. 클라이언트 검증
-
-- 필수 필드 누락 체크
-- 데이터 타입 검증
-- 값 범위 검증
-
-### 2. 서버 검증 (Firebase Functions)
-
-- 사용자 권한 검증
-- 관계 무결성 검증
-- 비즈니스 로직 검증
-
-### 3. 데이터 정합성
-
-- 양방향 관계 동기화
-- Denormalized 데이터 일관성
-- 상태 변경 시 연관 데이터 업데이트
+- **상태별 조회**: `

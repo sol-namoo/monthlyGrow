@@ -21,7 +21,7 @@
 User (개인화된 데이터)
 ├── Areas (생활 영역)
 │   ├── Projects (해당 영역의 프로젝트들)
-│   │   ├── Tasks (세부 작업들)
+│   │   ├── Tasks (서브컬렉션: projects/{projectId}/tasks/{taskId})
 │   │   ├── Retrospective (프로젝트 회고)
 │   │   └── Notes (프로젝트 노트들)
 │   └── Resources (해당 영역의 참고 자료들)
@@ -30,12 +30,15 @@ User (개인화된 데이터)
 │   ├── projectIds[] (연결된 프로젝트들)
 │   ├── retrospective (루프 회고)
 │   └── note (루프 노트)
-└── Projects (행동 단위)
-    ├── areaId (소속 영역)
-    ├── connectedLoops[] (연결된 루프들)
-    ├── tasks[] (세부 작업들)
-    ├── retrospective (프로젝트 회고)
-    └── notes[] (프로젝트 노트들)
+├── Projects (행동 단위)
+│   ├── areaId (소속 영역)
+│   ├── loopId (연결된 루프 - legacy)
+│   ├── tasks (서브컬렉션)
+│   ├── retrospective (프로젝트 회고)
+│   └── notes[] (프로젝트 노트들)
+└── Snapshots (월별 진척률 요약)
+    ├── loopId (루프 참조)
+    └── projectId (프로젝트 참조)
 
 ※ 모든 데이터는 사용자별로 완전히 격리됨
 ※ 다른 사용자가 동일한 데이터를 생성해도 서로 접근 불가
@@ -177,13 +180,33 @@ User (개인화된 데이터)
 
 ### 7. Notes 컬렉션
 
+자유 메모를 저장합니다.
+
 ```typescript
 {
-  id: string;
-  userId: string;
+  id: string; // 문서 ID (자동 생성)
+  userId: string; // 사용자 ID
   content: string; // 노트 내용
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date; // 생성일시
+  updatedAt: Date; // 수정일시
+}
+```
+
+### 8. Snapshots 컬렉션
+
+월별 진척률 요약을 저장합니다.
+
+```typescript
+{
+  id: string; // 문서 ID (자동 생성)
+  loopId: string; // 루프 ID
+  projectId: string; // 프로젝트 ID
+  year: number; // 년도
+  month: number; // 월
+  snapshotDate: Date; // 스냅샷 생성일
+  doneCount: number; // 완료된 횟수
+  targetCount: number; // 목표 횟수
+  reward: string; // 보상
 }
 ```
 
@@ -191,10 +214,10 @@ User (개인화된 데이터)
 
 ### 1. Project-Loop 연결
 
-- **양방향 관계**: Project의 `connectedLoops[]`와 Loop의 `projectIds[]`
+- **단방향 관계**: Loop의 `projectIds[]`로 Project 참조
 - **루프 생성 시**: 선택된 프로젝트들을 Loop의 `projectIds[]`에 추가
-- **프로젝트 생성 시**: Loop ID를 Project의 `connectedLoops[]`에 추가
-- **데이터 정합성**: 양쪽 모두 업데이트하여 일관성 유지
+- **프로젝트 생성 시**: Loop ID를 Project의 `loopId`에 저장 (legacy)
+- **데이터 정합성**: Loop에서 Project 목록 관리, 필요시 쿼리로 조인
 
 ### 2. Area-Project 연결
 
@@ -204,7 +227,7 @@ User (개인화된 데이터)
 
 ### 3. Project-Task 연결
 
-- **1:N 관계**: 하나의 프로젝트에 여러 작업
+- **서브컬렉션 관계**: `projects/{projectId}/tasks/{taskId}` 구조
 - **자동 생성**: 프로젝트 생성 시 기본 작업들 자동 생성
 - **수동 추가**: 사용자가 직접 작업 추가/수정 가능
 
