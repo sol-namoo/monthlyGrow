@@ -6,38 +6,36 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  ArrowLeft,
+  ChevronLeft,
   Calendar,
   CheckCircle2,
   Circle,
   Edit,
-  MoreVertical,
   Plus,
   Target,
   Clock,
   RotateCcw,
   Star,
   Bookmark,
+  Trash2,
+  AlertCircle,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import type { OfficialRetrospective } from "@/lib/types";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import type { Retrospective } from "@/lib/types";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function ProjectDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const projectId = params.id;
   const { toast } = useToast();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // 샘플 프로젝트 데이터
   const projectData = [
@@ -52,14 +50,13 @@ export default function ProjectDetailPage() {
       total: 30,
       startDate: "2025.05.01",
       endDate: "2025.05.31",
-      loopConnection: "5월 루프: 건강 관리",
       createdAt: "2025.05.01",
       updatedAt: "2025.05.31",
       reflection: {
         id: "project-retro-1",
         projectId: "1",
         userId: "user-123",
-        createdAt: "2025-05-31T09:00:00Z",
+        createdAt: new Date("2025-05-31T09:00:00Z"),
         type: "project",
         title: "아침 운동 습관화 프로젝트 회고",
         summary: "운동 습관 성공, 꾸준함의 중요성 깨달음",
@@ -75,7 +72,7 @@ export default function ProjectDetailPage() {
           "전반적으로 만족스러운 프로젝트였습니다. 건강이 많이 좋아진 것을 느낍니다.",
         userRating: 4,
         bookmarked: true,
-      } as OfficialRetrospective,
+      } as Retrospective,
       notes: [
         {
           id: 1,
@@ -84,6 +81,7 @@ export default function ProjectDetailPage() {
           createdAt: "2025-05-07T10:00:00Z",
         },
       ], // 단일 노트로 변경
+      connectedLoops: ["loop-1", "loop-2", "loop-3"], // 연결된 루프 ID 배열
     },
     {
       id: "2",
@@ -95,11 +93,31 @@ export default function ProjectDetailPage() {
       total: 12,
       startDate: "2025.06.01",
       endDate: "2025.06.30",
-      loopConnection: "6월 루프: 건강한 개발자 되기",
+
       createdAt: "2025.06.01",
       updatedAt: "2025.06.10",
       reflection: null, // 이 프로젝트는 회고가 없는 상태
       notes: [], // 단일 노트로 변경
+      connectedLoops: [
+        {
+          id: "loop-1",
+          title: "5월 루프: 건강 관리",
+          startDate: new Date("2025-05-01"),
+          endDate: new Date("2025-05-31"),
+        },
+        {
+          id: "loop-2",
+          title: "6월 루프: 건강한 개발자 되기",
+          startDate: new Date("2025-06-01"),
+          endDate: new Date("2025-06-30"),
+        },
+        {
+          id: "loop-3",
+          title: "7월 루프: 건강한 개발자 되기",
+          startDate: new Date("2025-07-01"),
+          endDate: new Date("2025-07-31"),
+        },
+      ],
     },
   ];
 
@@ -180,7 +198,7 @@ export default function ProjectDetailPage() {
     }
 
     // TODO: 실제 DB 저장 로직 구현
-    const newRetrospective: OfficialRetrospective = {
+    const newRetrospective: Retrospective = {
       id: project.reflection?.id || `new-project-retro-${Date.now()}`,
       projectId: project.id,
       userId: "user-123",
@@ -258,24 +276,36 @@ export default function ProjectDetailPage() {
     );
   };
 
+  const getLoopTitle = (loopId: string) => {
+    const loop = projectData.find((p) => p.id === loopId);
+    return loop ? loop.title : loopId;
+  };
+
+  const getLoopPeriod = (loopId: string) => {
+    const loop = projectData.find((p) => p.id === loopId);
+    if (!loop) return "";
+    return `${loop.startDate} ~ ${loop.endDate}`;
+  };
+
   return (
     <div className="container max-w-md px-4 py-6 pb-20">
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-6">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/para/projects">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            프로젝트 목록
-          </Link>
+        <Button variant="ghost" size="sm" onClick={() => router.back()}>
+          <ChevronLeft className="h-4 w-4" />
         </Button>
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" asChild>
-            <Link href={`/para/projects/${projectId}/edit`}>
+            <Link href={`/para/projects/edit/${projectId}`}>
               <Edit className="h-4 w-4" />
             </Link>
           </Button>
-          <Button variant="ghost" size="sm">
-            <MoreVertical className="h-4 w-4" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowDeleteDialog(true)}
+          >
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -283,18 +313,47 @@ export default function ProjectDetailPage() {
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-2">
           <h1 className="text-2xl font-bold">{project.title}</h1>
-          <Badge className="bg-primary/10 text-primary">{project.area}</Badge>
+          <Badge variant="secondary">{project.area}</Badge>
         </div>
 
         <p className="text-muted-foreground mb-4">{project.description}</p>
 
         {/* 상태 및 진행률 */}
         <div className="space-y-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-sm font-medium">기간</span>
+            <div className="flex items-center gap-1">
+              <Calendar className="h-4 w-4" />
+              <span>
+                {project.startDate} ~ {project.endDate}
+              </span>
+            </div>
+          </div>
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">진행 상태</span>
-            <Badge className="bg-green-100 text-green-800">
-              {project.status === "in_progress" ? "실행 중" : "완료됨"}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge
+                variant={
+                  project.status === "planned"
+                    ? "secondary"
+                    : project.status === "in_progress"
+                    ? "default"
+                    : "outline"
+                }
+              >
+                {project.status === "planned"
+                  ? "예정"
+                  : project.status === "in_progress"
+                  ? "진행 중"
+                  : "완료됨"}
+              </Badge>
+              {project.status === "in_progress" &&
+                new Date(project.endDate) < new Date() && (
+                  <Badge variant="destructive" className="text-xs">
+                    기한 초과
+                  </Badge>
+                )}
+            </div>
           </div>
 
           <div className="flex items-center justify-between">
@@ -316,25 +375,58 @@ export default function ProjectDetailPage() {
             ></div>
           </div>
 
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-1">
-              <Calendar className="h-4 w-4" />
-              <span>
-                {project.startDate} ~ {project.endDate}
-              </span>
+          {/* 연결된 루프 */}
+          <div>
+            <span className="text-sm font-medium ">연결된 루프</span>
+            <div className="mt-2 space-y-2">
+              {project.connectedLoops.map((loop, index) => (
+                <div
+                  key={loop.id}
+                  className="flex items-center gap-3 p-2 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors"
+                >
+                  <RotateCcw className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                  <div className="flex flex-row justify-between flex-1 min-w-0">
+                    <Link
+                      href={`/loop/${loop.id}`}
+                      className="flex items-center gap-2 group"
+                    >
+                      <span className="text-sm text-blue-600 font-medium group-hover:text-blue-700 transition-colors">
+                        {loop.title}
+                      </span>
+                      <ExternalLink className="h-3 w-3 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </Link>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-
-          {project.loopConnection && (
-            <div className="flex items-center gap-2">
-              <RotateCcw className="h-4 w-4 text-blue-600" />
-              <span className="text-sm text-blue-600">
-                {project.loopConnection}
-              </span>
+          {project.connectedLoops && project.connectedLoops.length > 0 ? (
+            <div className="space-y-3">
+              {project.connectedLoops.length >= 3 &&
+                project.status === "in_progress" && (
+                  <Alert className="mb-4 bg-amber-50 border-amber-200">
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                    <AlertTitle className="text-amber-800">
+                      장기 프로젝트 안내
+                    </AlertTitle>
+                    <AlertDescription className="text-amber-700">
+                      이 프로젝트는 {project.connectedLoops.length}개의 루프에
+                      연결되어 있습니다. 정리하거나 회고를 작성해보는 건
+                      어떨까요?
+                    </AlertDescription>
+                  </Alert>
+                )}
             </div>
+          ) : (
+            <Card className="p-4 text-center">
+              <p className="text-muted-foreground">
+                아직 연결된 루프가 없습니다.
+              </p>
+            </Card>
           )}
         </div>
       </div>
+
       {/* 탭 영역 */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
         <TabsList className="grid w-full grid-cols-3">
@@ -490,11 +582,20 @@ export default function ProjectDetailPage() {
           ) : (
             <Card className="p-4 text-center mb-6">
               <h3 className="font-medium mb-4">
-                이 프로젝트를 회고하고, 다음 단계를 계획하세요.
+                {project.status === "completed"
+                  ? "이 프로젝트를 회고하고, 다음 단계를 계획하세요."
+                  : "프로젝트가 완료되면 회고를 작성할 수 있습니다."}
               </h3>
-              <Button onClick={() => setShowRetrospectiveDialog(true)}>
-                회고 작성
-              </Button>
+              {project.status === "completed" ? (
+                <Button onClick={() => setShowRetrospectiveDialog(true)}>
+                  회고 작성
+                </Button>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  진행률: {Math.round((project.progress / project.total) * 100)}
+                  %
+                </div>
+              )}
             </Card>
           )}
 
@@ -546,173 +647,25 @@ export default function ProjectDetailPage() {
         </TabsContent>
       </Tabs>
 
+      {/* 삭제 확인 다이얼로그 */}
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="프로젝트 삭제"
+        type="delete"
+        description="이 프로젝트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+        onConfirm={() => {
+          toast({
+            title: "프로젝트 삭제 완료",
+            description: "프로젝트가 삭제되었습니다.",
+          });
+          router.push("/para?tab=projects");
+        }}
+      />
+
       {/* 회고 노트 추가/수정 다이얼로그 (프로젝트 노트용) */}
-      <Dialog open={showAddNoteDialog} onOpenChange={setShowAddNoteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              프로젝트 노트{" "}
-              {project.notes && project.notes.length > 0 ? "수정" : "작성"}
-            </DialogTitle>
-            <DialogDescription>
-              프로젝트 진행 중 느낀 점이나 배운 점을 자유롭게 기록하세요.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-4">
-            <Textarea
-              placeholder="오늘의 노트를 작성해보세요..."
-              value={noteContent}
-              onChange={(e) => setNoteContent(e.target.value)}
-              className="min-h-[150px]"
-            />
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="secondary"
-              onClick={() => setShowAddNoteDialog(false)}
-            >
-              취소
-            </Button>
-            <Button onClick={handleSaveNote}>저장하기</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 프로젝트 회고 작성 다이얼로그 (모달) */}
-      <Dialog
-        open={showRetrospectiveDialog}
-        onOpenChange={setShowRetrospectiveDialog}
-      >
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>프로젝트 회고 작성</DialogTitle>
-            <DialogDescription>
-              이 프로젝트를 돌아보고 다음 단계를 계획하세요.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div>
-              <label
-                htmlFor="goalAchieved"
-                className="block text-sm font-medium text-gray-700"
-              >
-                목표를 달성했나요?
-              </label>
-              <Input
-                type="text"
-                id="goalAchieved"
-                className="mt-1"
-                value={goalAchieved}
-                onChange={(e) => setGoalAchieved(e.target.value)}
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="memorableTask"
-                className="block text-sm font-medium text-gray-700"
-              >
-                가장 인상 깊었던 작업은?
-              </label>
-              <Textarea
-                id="memorableTask"
-                className="mt-1"
-                rows={2}
-                value={memorableTask}
-                onChange={(e) => setMemorableTask(e.target.value)}
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="stuckPoints"
-                className="block text-sm font-medium text-gray-700"
-              >
-                막혔던 지점은 있었나요?
-              </label>
-              <Textarea
-                id="stuckPoints"
-                className="mt-1"
-                rows={2}
-                value={stuckPoints}
-                onChange={(e) => setStuckPoints(e.target.value)}
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="newLearnings"
-                className="block text-sm font-medium text-gray-700"
-              >
-                새롭게 배운 점은?
-              </label>
-              <Textarea
-                id="newLearnings"
-                className="mt-1"
-                rows={2}
-                value={newLearnings}
-                onChange={(e) => setNewLearnings(e.target.value)}
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="nextProjectImprovements"
-                className="block text-sm font-medium text-gray-700"
-              >
-                다음 프로젝트에서 개선할 점은?
-              </label>
-              <Textarea
-                id="nextProjectImprovements"
-                className="mt-1"
-                rows={2}
-                value={nextProjectImprovements}
-                onChange={(e) => setNextProjectImprovements(e.target.value)}
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="freeformContent"
-                className="block text-sm font-medium text-gray-700"
-              >
-                자유 노트 (선택)
-              </label>
-              <Textarea
-                id="freeformContent"
-                className="mt-1"
-                rows={3}
-                value={freeformContent}
-                onChange={(e) => setFreeformContent(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                이 회고는 스스로에게 도움이 되었나요?
-              </label>
-              {renderStarRating(userRating, setUserRating)}
-            </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="bookmarked"
-                className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                checked={bookmarked}
-                onChange={(e) => setBookmarked(e.target.checked)}
-              />
-              <label htmlFor="bookmarked" className="text-gray-900">
-                다시 읽고 싶은 회고로 표시
-              </label>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="secondary"
-              onClick={() => setShowRetrospectiveDialog(false)}
-            >
-              취소
-            </Button>
-            <Button onClick={handleSaveRetrospective}>회고 저장</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Dialog 관련 import는 회고/노트 다이얼로그에서만 사용 */}
+      {/* 삭제 다이얼로그는 ConfirmDialog만 사용 */}
     </div>
   );
 }

@@ -17,6 +17,15 @@ import {
   DollarSign,
   Users,
   Gamepad2,
+  Dumbbell,
+  BookOpen as BookOpenIcon,
+  Home,
+  Car,
+  Plane,
+  Camera,
+  Music,
+  Palette,
+  Utensils,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -106,6 +115,15 @@ export default function NewAreaPage() {
     { id: "dollarSign", icon: DollarSign, name: "달러" },
     { id: "users", icon: Users, name: "사람들" },
     { id: "gamepad2", icon: Gamepad2, name: "게임패드" },
+    { id: "dumbbell", icon: Dumbbell, name: "운동" },
+    { id: "bookOpen", icon: BookOpenIcon, name: "독서" },
+    { id: "home", icon: Home, name: "가정" },
+    { id: "car", icon: Car, name: "교통" },
+    { id: "plane", icon: Plane, name: "여행" },
+    { id: "camera", icon: Camera, name: "사진" },
+    { id: "music", icon: Music, name: "음악" },
+    { id: "palette", icon: Palette, name: "예술" },
+    { id: "utensils", icon: Utensils, name: "요리" },
   ];
 
   const applyTemplate = (template: (typeof areaTemplates)[0]) => {
@@ -124,13 +142,28 @@ export default function NewAreaPage() {
 
   const SelectedIcon = getIconComponent(formData.icon);
 
+  // 디자인 톤에 맞는 색상 팔레트
+  const colorPalette = [
+    { name: "보라", value: "#8b5cf6" },
+    { name: "파랑", value: "#3b82f6" },
+    { name: "초록", value: "#10b981" },
+    { name: "청록", value: "#06b6d4" },
+    { name: "주황", value: "#f59e0b" },
+    { name: "빨강", value: "#ef4444" },
+    { name: "핑크", value: "#ec4899" },
+    { name: "회색", value: "#6b7280" },
+  ];
+
   return (
     <div className="container max-w-md px-4 py-6">
       <div className="mb-6 flex items-center">
-        <Button variant="ghost" size="icon" asChild className="mr-2">
-          <Link href="/para/areas">
-            <ChevronLeft className="h-5 w-5" />
-          </Link>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => router.back()}
+          className="mr-2"
+        >
+          <ChevronLeft className="h-5 w-5" />
         </Button>
         <h1 className="text-2xl font-bold">새 Area 만들기</h1>
       </div>
@@ -199,18 +232,25 @@ export default function NewAreaPage() {
           </div>
 
           <div className="mb-4">
-            <Label htmlFor="color">색상</Label>
-            <div className="mt-2 flex items-center gap-3">
-              <input
-                type="color"
-                id="color"
-                value={formData.color}
-                onChange={(e) => handleChange("color", e.target.value)}
-                className="h-10 w-16 rounded border border-input"
-              />
-              <span className="text-sm text-muted-foreground">
-                Area를 구분할 색상을 선택하세요
-              </span>
+            <Label>색상 선택</Label>
+            <div className="mt-2 grid grid-cols-8 gap-1">
+              {colorPalette.map((color) => (
+                <button
+                  key={color.value}
+                  type="button"
+                  onClick={() => handleChange("color", color.value)}
+                  className={`flex items-center justify-center rounded-lg border p-2 transition-colors hover:bg-secondary ${
+                    formData.color === color.value
+                      ? "border-primary bg-primary/10"
+                      : ""
+                  }`}
+                >
+                  <div
+                    className="h-5 w-5 rounded-full border border-white shadow-sm"
+                    style={{ backgroundColor: color.value }}
+                  />
+                </button>
+              ))}
             </div>
           </div>
         </Card>

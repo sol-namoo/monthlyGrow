@@ -1,7 +1,8 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   ChevronLeft,
   MapPin,
@@ -9,18 +10,42 @@ import {
   BookOpen,
   Edit,
   ExternalLink,
+  Compass,
+  Heart,
+  Brain,
+  Briefcase,
+  DollarSign,
+  Users,
+  Gamepad2,
+  Dumbbell,
+  BookOpen as BookOpenIcon,
+  Home,
+  Car,
+  Plane,
+  Camera,
+  Music,
+  Palette,
+  Utensils,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { useRouter } from "next/navigation";
 
 export default function AreaDetailPage({ params }: { params: { id: string } }) {
+  const router = useRouter();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteWithItems, setDeleteWithItems] = useState(false);
+
   // 샘플 데이터 로드 (실제 앱에서는 params.id를 사용하여 데이터베이스에서 가져옴)
   const areaData = {
     id: params.id,
     name: "개인 성장",
     description:
       "자기 계발 및 학습 관련 활동을 관리하는 영역입니다. 독서, 온라인 강의 수강, 새로운 기술 습득 등 다양한 프로젝트와 자료가 이 영역에 포함됩니다.",
-    tags: ["자기계발", "학습", "성장"],
+    icon: "brain",
+    color: "#8b5cf6",
+    // tags: ["자기계발", "학습", "성장"], // 태그 기능 제거
     associatedProjects: [
       {
         id: "p1",
@@ -65,38 +90,68 @@ export default function AreaDetailPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="container max-w-md px-4 py-6">
-      <div className="mb-6 flex items-center justify-between">
-        <Button variant="ghost" size="icon" asChild className="mr-2">
-          <Link href="/para/areas">
-            <ChevronLeft className="h-5 w-5" />
-          </Link>
+      {/* 헤더 */}
+      <div className="flex items-center justify-between mb-6">
+        <Button variant="ghost" size="sm" onClick={() => router.back()}>
+          <ChevronLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-2xl font-bold flex-grow">영역 상세</h1>
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`/para/areas/edit/${areaData.id}`}>
-            <Edit className="mr-2 h-4 w-4" />
-            영역 수정
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={`/para/areas/edit/${areaData.id}`}>
+              <Edit className="h-4 w-4" />
+            </Link>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowDeleteDialog(true)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
-      <div className="mb-6 text-center">
-        <div className="mb-4 flex justify-center">
-          <div className="rounded-full bg-primary/10 p-4">
-            <MapPin className="h-8 w-8 text-primary" />
+      {/* Area 기본 정보 */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-3">
+          <div
+            className="rounded-full p-3"
+            style={{ backgroundColor: `${areaData.color}20` }}
+          >
+            {(() => {
+              const getIconComponent = (iconId: string) => {
+                const iconMap: { [key: string]: any } = {
+                  compass: Compass,
+                  heart: Heart,
+                  brain: Brain,
+                  briefcase: Briefcase,
+                  dollarSign: DollarSign,
+                  users: Users,
+                  gamepad2: Gamepad2,
+                  dumbbell: Dumbbell,
+                  bookOpen: BookOpenIcon,
+                  home: Home,
+                  car: Car,
+                  plane: Plane,
+                  camera: Camera,
+                  music: Music,
+                  palette: Palette,
+                  utensils: Utensils,
+                };
+                return iconMap[iconId] || Compass;
+              };
+              const AreaIcon = getIconComponent(areaData.icon);
+              return (
+                <AreaIcon
+                  className="h-6 w-6"
+                  style={{ color: areaData.color }}
+                />
+              );
+            })()}
           </div>
+          <h1 className="text-2xl font-bold">{areaData.name}</h1>
         </div>
-        <h2 className="text-lg font-bold mb-2">{areaData.name}</h2>
-        <p className="text-sm text-muted-foreground">{areaData.description}</p>
-        {areaData.tags && areaData.tags.length > 0 && (
-          <div className="mt-3 flex flex-wrap justify-center gap-2">
-            {areaData.tags.map((tag, index) => (
-              <Badge key={index} variant="secondary">
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        )}
+        <p className="text-muted-foreground mb-4">{areaData.description}</p>
       </div>
 
       {/* 연결된 프로젝트 목록 */}
@@ -173,6 +228,81 @@ export default function AreaDetailPage({ params }: { params: { id: string } }) {
           )}
         </CardContent>
       </Card>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={(open) => {
+          setShowDeleteDialog(open);
+          if (!open) setDeleteWithItems(false);
+        }}
+        title="Area 삭제"
+        type="delete"
+        showCheckbox={
+          areaData.associatedProjects.length > 0 ||
+          areaData.associatedResources.length > 0
+        }
+        checkboxLabel="이 Area와 연결된 모든 항목을 함께 삭제하시겠습니까?"
+        checkboxChecked={deleteWithItems}
+        onCheckboxChange={setDeleteWithItems}
+        warningMessage={
+          deleteWithItems
+            ? "이 작업은 되돌릴 수 없습니다. 연결된 모든 프로젝트와 자료가 영구적으로 삭제됩니다."
+            : undefined
+        }
+        onConfirm={() => {
+          if (deleteWithItems) {
+            alert(
+              `Area와 연결된 모든 항목(${areaData.associatedProjects.length}개 프로젝트, ${areaData.associatedResources.length}개 자료)이 함께 삭제되었습니다.`
+            );
+          } else {
+            alert("Area가 삭제되었습니다.");
+          }
+          router.push("/para?tab=areas");
+        }}
+        confirmDisabled={
+          (areaData.associatedProjects.length > 0 ||
+            areaData.associatedResources.length > 0) &&
+          !deleteWithItems
+        }
+      >
+        {areaData.associatedProjects.length > 0 ||
+        areaData.associatedResources.length > 0 ? (
+          <>
+            <p className="text-red-600 font-medium">
+              연결된 항목이 있어서 삭제할 수 없습니다.
+            </p>
+            <div className="space-y-2">
+              {areaData.associatedProjects.length > 0 && (
+                <div>
+                  <p className="font-medium text-sm">
+                    연결된 프로젝트 ({areaData.associatedProjects.length}개):
+                  </p>
+                  <ul className="text-sm text-muted-foreground ml-4">
+                    {areaData.associatedProjects.map((project) => (
+                      <li key={project.id}>• {project.name}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {areaData.associatedResources.length > 0 && (
+                <div>
+                  <p className="font-medium text-sm">
+                    연결된 자료 ({areaData.associatedResources.length}개):
+                  </p>
+                  <ul className="text-sm text-muted-foreground ml-4">
+                    {areaData.associatedResources.map((resource) => (
+                      <li key={resource.id}>• {resource.name}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <p>이 Area를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.</p>
+        )}
+      </ConfirmDialog>
     </div>
   );
 }

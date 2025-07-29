@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -14,6 +14,8 @@ import {
   Zap,
   ChevronRight,
   BookOpen,
+  Gift,
+  Bookmark,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -33,10 +35,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { OfficialRetrospective } from "@/types/retrospective";
+import type { Retrospective } from "@/lib/types";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+import Loading from "@/components/feedback/Loading";
+import { useInfiniteQuery } from "@tanstack/react-query";
 
-export default function LoopPage() {
+function LoopPageContent() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -44,7 +49,9 @@ export default function LoopPage() {
 
   const [showNewMonthDialog, setShowNewMonthDialog] = useState(false);
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [sortBy, setSortBy] = useState<"latest" | "userRating">("latest");
+  const [sortBy, setSortBy] = useState<"latest" | "oldest" | "completionRate">(
+    "latest"
+  );
 
   const [currentLoop, setCurrentLoop] = useState(null);
   const [nextLoop, setNextLoop] = useState(null);
@@ -113,26 +120,172 @@ export default function LoopPage() {
       startDate: "2025년 2월 1일",
       endDate: "2025년 2월 28일",
     },
+    // 추가 샘플 데이터 (무한 스크롤 테스트용)
+    {
+      id: 105,
+      title: "1월 루프: 새해 다짐",
+      type: "loop",
+      date: "2025.01.31",
+      summary: "새해 계획 수립 및 목표 설정",
+      userRating: 3,
+      bookmarked: false,
+      createdAt: "2025-01-31T00:00:00Z",
+      completionRate: 60,
+      projectCount: 2,
+      areas: ["자기계발"],
+      reward: "새 다이어리",
+      startDate: "2025년 1월 1일",
+      endDate: "2025년 1월 31일",
+    },
+    {
+      id: 106,
+      title: "12월 루프: 연말 정리",
+      type: "loop",
+      date: "2024.12.31",
+      summary: "한 해 마무리 및 다음 해 계획",
+      userRating: 4,
+      bookmarked: true,
+      createdAt: "2024-12-31T00:00:00Z",
+      completionRate: 85,
+      projectCount: 3,
+      areas: ["자기계발", "커리어"],
+      reward: "연말 휴가",
+      startDate: "2024년 12월 1일",
+      endDate: "2024년 12월 31일",
+    },
+    {
+      id: 107,
+      title: "11월 루프: 건강 관리",
+      type: "loop",
+      date: "2024.11.30",
+      summary: "규칙적인 운동과 식단 관리",
+      userRating: 4,
+      bookmarked: false,
+      createdAt: "2024-11-30T00:00:00Z",
+      completionRate: 75,
+      projectCount: 2,
+      areas: ["건강"],
+      reward: "새 운동화",
+      startDate: "2024년 11월 1일",
+      endDate: "2024년 11월 30일",
+    },
+    {
+      id: 108,
+      title: "10월 루프: 독서 습관",
+      type: "loop",
+      date: "2024.10.31",
+      summary: "매일 30분 독서하기",
+      userRating: 5,
+      bookmarked: true,
+      createdAt: "2024-10-31T00:00:00Z",
+      completionRate: 90,
+      projectCount: 1,
+      areas: ["자기계발"],
+      reward: "새 책 3권",
+      startDate: "2024년 10월 1일",
+      endDate: "2024년 10월 31일",
+    },
+    {
+      id: 109,
+      title: "9월 루프: 코딩 연습",
+      type: "loop",
+      date: "2024.09.30",
+      summary: "매일 코딩 문제 풀기",
+      userRating: 3,
+      bookmarked: false,
+      createdAt: "2024-09-30T00:00:00Z",
+      completionRate: 65,
+      projectCount: 2,
+      areas: ["커리어"],
+      reward: "새 키보드",
+      startDate: "2024년 9월 1일",
+      endDate: "2024년 9월 30일",
+    },
+    {
+      id: 110,
+      title: "8월 루프: 여행 계획",
+      type: "loop",
+      date: "2024.08.31",
+      summary: "가족과 함께하는 여행 준비",
+      userRating: 4,
+      bookmarked: true,
+      createdAt: "2024-08-31T00:00:00Z",
+      completionRate: 80,
+      projectCount: 1,
+      areas: ["가족"],
+      reward: "여행 경비",
+      startDate: "2024년 8월 1일",
+      endDate: "2024년 8월 31일",
+    },
   ]);
-
-  const [sortedPastLoops, setSortedPastLoops] = useState([]);
 
   useEffect(() => {
     setActiveTab(searchParams.get("tab") || "current");
   }, [searchParams]);
 
-  useEffect(() => {
-    setSortedPastLoops(
-      [...pastLoops].sort((a, b) => {
+  // TanStack Query를 사용한 무한 스크롤
+  const {
+    data: infiniteData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+  } = useInfiniteQuery({
+    queryKey: ["pastLoops", sortBy],
+    queryFn: async ({ pageParam = 0 }) => {
+      // 실제 구현에서는 API 호출
+      await new Promise((resolve) => setTimeout(resolve, 500)); // 로딩 시뮬레이션
+
+      const sortedLoops = [...pastLoops].sort((a, b) => {
         if (sortBy === "latest") {
           return new Date(b.date).getTime() - new Date(a.date).getTime();
-        } else if (sortBy === "userRating") {
-          return (b.userRating || 0) - (a.userRating || 0);
+        } else if (sortBy === "oldest") {
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
+        } else if (sortBy === "completionRate") {
+          return (b.completionRate || 0) - (a.completionRate || 0);
         }
         return 0;
-      })
+      });
+
+      const pageSize = 10;
+      const start = pageParam * pageSize;
+      const end = start + pageSize;
+      const pageData = sortedLoops.slice(start, end);
+
+      return {
+        data: pageData,
+        nextPage: end < sortedLoops.length ? pageParam + 1 : undefined,
+        hasNextPage: end < sortedLoops.length,
+      };
+    },
+    getNextPageParam: (lastPage) => lastPage.nextPage,
+    initialPageParam: 0,
+  });
+
+  // 모든 페이지의 데이터를 평탄화
+  const allPastLoops = infiniteData?.pages.flatMap((page) => page.data) || [];
+
+  // Intersection Observer 설정 (TanStack Query와 함께)
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 }
     );
-  }, [sortBy, pastLoops]);
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -191,7 +344,7 @@ export default function LoopPage() {
       bookmarked: true,
       title: `${currentMonthName} 루프: 건강한 개발자 되기 회고`,
       summary: "아침 운동 습관 성공, 출장 중 식단 관리 어려움",
-    } as OfficialRetrospective,
+    } as Retrospective,
     notes: [],
   };
 
@@ -282,12 +435,17 @@ export default function LoopPage() {
           <section>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xl font-bold">현재 루프</h2>
-              {currentLoop && (
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  <span>{currentLoop.completed ? "완료됨" : "진행 중"}</span>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                {currentLoop && (
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    <span>{currentLoop.completed ? "완료됨" : "진행 중"}</span>
+                  </div>
+                )}
+                <span className="text-sm text-muted-foreground">
+                  {currentLoop ? "1개" : "0개"}
+                </span>
+              </div>
             </div>
             {currentLoop ? (
               <Card className="border-2 border-primary/20 p-4 mb-6">
@@ -297,7 +455,7 @@ export default function LoopPage() {
                     {currentLoop.completed ? (
                       <Badge variant="default">완료</Badge>
                     ) : (
-                      <Badge variant="outline" className="bg-primary/10">
+                      <Badge variant="secondary">
                         D-{currentLoop.daysLeft}
                       </Badge>
                     )}
@@ -316,7 +474,7 @@ export default function LoopPage() {
                 </div>
 
                 <div className="mb-4 flex items-center gap-2 text-sm">
-                  <Star className="h-4 w-4 text-yellow-500" />
+                  <Gift className="h-4 w-4 text-purple-500" />
                   <span>보상: {currentLoop.reward}</span>
                 </div>
 
@@ -348,7 +506,7 @@ export default function LoopPage() {
                     {currentLoop.areas.map((area) => (
                       <span
                         key={area}
-                        className="rounded-full bg-primary/10 px-3 py-1 text-xs"
+                        className="rounded-full bg-secondary px-3 py-1 text-xs"
                       >
                         {area}
                       </span>
@@ -422,12 +580,17 @@ export default function LoopPage() {
           <section>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xl font-bold">다음 루프</h2>
-              {nextLoop && (
-                <div className="flex items-center gap-1 text-sm text-purple-600">
-                  <Calendar className="h-4 w-4" />
-                  <span>예약됨</span>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                {nextLoop && (
+                  <div className="flex items-center gap-1 text-sm text-purple-600">
+                    <Calendar className="h-4 w-4" />
+                    <span>예약됨</span>
+                  </div>
+                )}
+                <span className="text-sm text-muted-foreground">
+                  {nextLoop ? "1개" : "0개"}
+                </span>
+              </div>
             </div>
             {nextLoop ? (
               <Card className="border-2 border-purple-200 bg-purple-50/50 p-4">
@@ -534,13 +697,24 @@ export default function LoopPage() {
               </span>
             </div>
 
-            {pastLoops.length > 0 ? (
+            {allPastLoops.length > 0 ? (
               <>
                 <div className="flex justify-end mb-4">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm">
-                        정렬: {sortBy === "latest" ? "최신순" : "별점순"}
+                        {sortBy === "latest" ? (
+                          <CalendarDays className="mr-2 h-4 w-4" />
+                        ) : sortBy === "oldest" ? (
+                          <Calendar className="mr-2 h-4 w-4" />
+                        ) : (
+                          <Target className="mr-2 h-4 w-4" />
+                        )}
+                        {sortBy === "latest"
+                          ? "최신순"
+                          : sortBy === "oldest"
+                          ? "생성순"
+                          : "달성률순"}
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -548,15 +722,21 @@ export default function LoopPage() {
                         <CalendarDays className="mr-2 h-4 w-4" />
                         최신순
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setSortBy("userRating")}>
-                        <Star className="mr-2 h-4 w-4" />
-                        별점순
+                      <DropdownMenuItem onClick={() => setSortBy("oldest")}>
+                        <Calendar className="mr-2 h-4 w-4" />
+                        생성순
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setSortBy("completionRate")}
+                      >
+                        <Target className="mr-2 h-4 w-4" />
+                        달성률순
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
                 <div className="space-y-3">
-                  {sortedPastLoops.map((loop) => (
+                  {allPastLoops.map((loop) => (
                     <Card
                       key={loop.id}
                       className={`p-4 ${
@@ -569,7 +749,7 @@ export default function LoopPage() {
                         <div className="flex-1">
                           <h3 className="font-medium mb-1">{loop.title}</h3>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                            <Star className="h-3 w-3 text-yellow-500" />
+                            <Gift className="h-3 w-3 text-purple-500" />
                             <span>보상: {loop.reward || "없음"}</span>
                           </div>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -579,88 +759,86 @@ export default function LoopPage() {
                             </span>
                           </div>
                         </div>
-                        <div className="flex flex-col items-end">
+                        <div className="flex items-center gap-2">
                           <Badge
-                            variant={
+                            variant="outline"
+                            className={`text-xs ${
                               loop.completionRate >= 80
-                                ? "default"
-                                : "destructive"
-                            }
-                            className="mb-1"
-                          >
-                            {loop.completionRate >= 80 ? "완료" : "미완료"}
-                          </Badge>
-                          <span className="text-sm font-medium">
-                            {loop.completionRate}%
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="mb-3">
-                        <div className="mb-1 flex justify-between text-xs">
-                          <span>달성률: {loop.completionRate}%</span>
-                          <span>프로젝트 {loop.projectCount}개</span>
-                        </div>
-                        <div className="progress-bar">
-                          <div
-                            className={`progress-value ${
-                              loop.completionRate >= 80
-                                ? "bg-green-500"
-                                : "bg-red-400"
+                                ? "border-green-300 text-green-700"
+                                : "border-red-300 text-red-700"
                             }`}
-                            style={{ width: `${loop.completionRate}%` }}
-                          ></div>
+                          >
+                            {loop.completionRate}%
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            className="h-8 w-8 p-0"
+                          >
+                            <Link href={`/loop/${loop.id}`}>
+                              <ChevronRight className="h-4 w-4" />
+                              <span className="sr-only">루프 상세 보기</span>
+                            </Link>
+                          </Button>
                         </div>
                       </div>
 
-                      <div className="mb-3">
-                        <div className="flex flex-wrap gap-1">
-                          {loop.areas.map((area) => (
-                            <span
-                              key={area}
-                              className="rounded-full bg-secondary px-2 py-0.5 text-xs"
-                            >
-                              {area}
+                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                        {loop.summary}
+                      </p>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            {renderStars(loop.userRating)}
+                            <span className="text-xs text-muted-foreground">
+                              {loop.userRating}/5
                             </span>
-                          ))}
+                          </div>
+                          {loop.bookmarked && (
+                            <Bookmark className="h-3 w-3 text-yellow-500 fill-yellow-500" />
+                          )}
                         </div>
-                      </div>
-
-                      {loop.summary && (
-                        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                          회고 요약: {loop.summary}
-                        </p>
-                      )}
-
-                      <div className="flex justify-end">
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/loop/${loop.id}`}>
-                            상세 보기
-                            <ChevronRight className="ml-1 h-4 w-4" />
-                          </Link>
-                        </Button>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>프로젝트 {loop.projectCount}개</span>
+                          <span>•</span>
+                          <span>{loop.date}</span>
+                        </div>
                       </div>
                     </Card>
                   ))}
+
+                  {/* 무한 스크롤 로딩 상태 */}
+                  {isLoading && (
+                    <div className="text-center py-6">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                        <span className="text-sm text-muted-foreground">
+                          더 많은 루프를 불러오는 중...
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 무한 스크롤 트리거 */}
+                  {hasNextPage && <div ref={loadMoreRef} className="h-4" />}
+
+                  {/* 더 이상 로드할 데이터가 없을 때 */}
+                  {!hasNextPage && allPastLoops.length > 0 && (
+                    <div className="text-center py-6">
+                      <p className="text-sm text-muted-foreground">
+                        모든 루프를 불러왔습니다.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
-              <Card className="border-dashed p-8 text-center text-muted-foreground">
-                <div className="mb-4 flex justify-center">
-                  <div className="rounded-full bg-muted/50 p-4">
-                    <BookOpen className="h-8 w-8 text-muted-foreground/50" />
-                  </div>
-                </div>
-                <h3 className="text-lg font-medium mb-2">
-                  아직 완료된 루프가 없습니다
-                </h3>
-                <p className="text-sm mb-4">
-                  첫 루프를 완료하면 여기에 회고와 함께 기록됩니다.
+              <Card className="p-6 text-center border-dashed">
+                <p className="text-muted-foreground">
+                  아직 지난 루프가 없어요.
                 </p>
-                <div className="space-y-2 text-xs">
-                  <p>💡 루프를 완료하면 성장 기록을 확인할 수 있어요</p>
-                  <p>📊 달성률과 회고를 통해 지속적인 개선이 가능해요</p>
-                </div>
               </Card>
             )}
           </section>
@@ -691,5 +869,13 @@ export default function LoopPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function LoopPage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <LoopPageContent />
+    </Suspense>
   );
 }

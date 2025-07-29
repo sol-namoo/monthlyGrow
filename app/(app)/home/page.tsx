@@ -17,6 +17,7 @@ import {
   Clock,
   Award,
   Target,
+  Plus,
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -122,7 +123,7 @@ export default function HomePage() {
               </h3>
               <div className="mb-4 flex items-center gap-2 text-sm">
                 <Star className="h-4 w-4 text-yellow-500" />
-                <span>보상: {currentLoop?.reward || "없음"}</span>
+                <span>🎁 보상: {currentLoop?.reward || "없음"}</span>
               </div>
               <div className="mb-1 flex justify-between text-sm">
                 <span>진행률: {progress}%</span>
@@ -155,47 +156,73 @@ export default function HomePage() {
             </div>
 
             <div className="space-y-3">
-              {displayedProjects.map((project) => (
-                <ProgressCard
-                  key={project.id}
-                  title={project.title}
-                  progress={project.progress}
-                  total={project.total}
-                >
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">
-                      Area: {getAreaName(project.areaId)}
-                    </span>
-                    {project.addedMidway ? (
-                      <Badge
-                        variant="outline"
-                        className="bg-amber-100 text-amber-800 text-xs"
-                      >
-                        🔥 루프 중 추가됨
-                      </Badge>
-                    ) : (
-                      <Badge
-                        variant="outline"
-                        className="bg-primary/10 text-xs"
-                      >
-                        현재 루프 연결됨
-                      </Badge>
-                    )}
+              {currentLoopProjects.length === 0 ? (
+                <Card className="p-4 border-dashed">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-bold text-muted-foreground">
+                      프로젝트 없음
+                    </h3>
+                    <Badge variant="outline" className="text-xs">
+                      {currentLoop ? "루프 연결됨" : "루프 없음"}
+                    </Badge>
                   </div>
-                </ProgressCard>
-              ))}
+                  <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
+                    {currentLoop
+                      ? "현재 루프에 연결된 프로젝트가 없습니다."
+                      : "현재 진행 중인 루프가 없습니다."}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>Area: -</span>
+                      <span>•</span>
+                      <span>-</span>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </Card>
+              ) : (
+                <>
+                  {displayedProjects.map((project) => (
+                    <ProgressCard
+                      key={project.id}
+                      title={project.title}
+                      progress={project.progress}
+                      total={project.total}
+                    >
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">
+                          Area: {getAreaName(project.areaId)}
+                        </span>
+                        {project.addedMidway ? (
+                          <Badge
+                            variant="outline"
+                            className="bg-amber-100 text-amber-800 text-xs"
+                          >
+                            🔥 루프 중 추가됨
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className="bg-primary/10 text-xs"
+                          >
+                            현재 루프 연결됨
+                          </Badge>
+                        )}
+                      </div>
+                    </ProgressCard>
+                  ))}
 
-              {!showAllProjects && hasMoreProjects && (
-                <Button
-                  variant="outline"
-                  className="mt-2 w-full"
-                  onClick={() => setShowAllProjects(true)}
-                >
-                  더보기 ({currentLoopProjects.length - 3}개)
-                </Button>
+                  {!showAllProjects && hasMoreProjects && (
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full"
+                      onClick={() => setShowAllProjects(true)}
+                    >
+                      더보기 ({currentLoopProjects.length - 3}개)
+                    </Button>
+                  )}
+                </>
               )}
-
-              {/* 홈 화면에서는 프로젝트 생성 버튼 제거 (정책에 따라) */}
             </div>
           </section>
         </TabsContent>

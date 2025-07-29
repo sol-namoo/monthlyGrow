@@ -2,16 +2,26 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ChevronLeft, Tag, LinkIcon, FileText, File } from "lucide-react";
+import {
+  ChevronLeft,
+  LinkIcon,
+  FileText,
+  File,
+  Edit,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function ResourceDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const { id } = params;
   const [resource, setResource] = useState<any>(null); // 실제 데이터 타입으로 교체 필요
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // 샘플 데이터 (실제로는 ID에 따라 DB에서 데이터를 불러와야 함)
   const sampleResources = [
@@ -22,7 +32,6 @@ export default function ResourceDetailPage() {
       content:
         "월: 전신 운동, 화: 유산소, 수: 휴식, 목: 상체, 금: 하체, 주말: 가벼운 활동",
       area: { id: "1", name: "건강" },
-
       createdAt: "2025.05.10",
     },
     {
@@ -31,7 +40,6 @@ export default function ResourceDetailPage() {
       type: "link",
       content: "https://react.dev/learn",
       area: { id: "2", name: "개발" },
-
       createdAt: "2025.05.08",
     },
     {
@@ -40,7 +48,6 @@ export default function ResourceDetailPage() {
       type: "file",
       content: "/files/meditation_guide.pdf",
       area: { id: "3", name: "마음" },
-
       createdAt: "2025.05.05",
     },
   ];
@@ -76,85 +83,74 @@ export default function ResourceDetailPage() {
 
   return (
     <div className="container max-w-md px-4 py-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center">
-          <Button variant="ghost" size="icon" asChild className="mr-2">
-            <Link href="/para?tab=resources">
-              <ChevronLeft className="h-5 w-5" />
+      {/* 헤더 */}
+      <div className="flex items-center justify-between mb-6">
+        <Button variant="ghost" size="sm" onClick={() => router.back()}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={`/para/resources/edit/${resource.id}`}>
+              <Edit className="h-4 w-4" />
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold">{resource.title}</h1>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowDeleteDialog(true)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`/para/resources/edit/${resource.id}`}>자료 수정</Link>
-        </Button>
+      </div>
+
+      {/* Resource 기본 정보 */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold mb-3">{resource.title}</h1>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
+          <span>생성일: {resource.createdAt}</span>
+        </div>
       </div>
 
       <Card className="mb-6 p-4">
-        <div className="flex items-center gap-3 mb-4">
-          {/* <div className="p-2 bg-muted rounded-full">
-            {getTypeIcon(resource.type)}
-          </div> */}
-          <div>
-            <h2 className="text-xl font-bold mb-1">{resource.title}</h2>
-            <p className="text-sm text-muted-foreground">
-              생성일: {resource.createdAt}
-            </p>
-          </div>
-        </div>
-
         <div className="mb-4">
-          <h3 className="font-semibold text-lg mb-2">설명</h3>
-          <p className="text-muted-foreground whitespace-pre-wrap">
-            {resource.content}
-          </p>
-        </div>
-
-        {resource.link ? (
-          <div className="mb-4">
-            <h3 className="font-semibold text-lg mb-2">url</h3>
+          <h3 className="font-semibold text-lg mb-2">내용</h3>
+          {resource.type === "link" ? (
             <a
               href={resource.content}
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-600 hover:underline break-all"
             >
-              {resource.link}
+              {resource.content}
             </a>
-          </div>
-        ) : (
-          <></>
-        )}
+          ) : (
+            <p className="text-muted-foreground whitespace-pre-wrap">
+              {resource.content}
+            </p>
+          )}
+        </div>
 
         {resource.area && (
           <div className="mb-4">
             <h3 className="font-semibold text-lg mb-2">연결된 Area</h3>
-            <Badge
-              variant="secondary"
-              className="flex items-center gap-1 w-fit"
-            >
-              <Tag className="h-3 w-3" />
+            <Badge variant="secondary" className="w-fit">
               {resource.area.name}
             </Badge>
           </div>
         )}
-
-        <div>
-          <h3 className="font-semibold text-lg mb-2">태그</h3>
-          <div className="flex flex-wrap gap-2">
-            {resource.tags.map((tag: string, index: number) => (
-              <Badge
-                key={index}
-                variant="outline"
-                className="flex items-center gap-1"
-              >
-                <Tag className="h-3 w-3" />
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        </div>
       </Card>
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="Resource 삭제"
+        type="delete"
+        description="이 자료를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+        onConfirm={() => {
+          alert("Resource가 삭제되었습니다.");
+          router.push("/para?tab=resources");
+        }}
+      />
     </div>
   );
 }

@@ -3,20 +3,23 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ChevronLeft, Star, Bookmark } from "lucide-react";
+import { ChevronLeft, Star, Bookmark, Edit } from "lucide-react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { OfficialRetrospective } from "@/lib/types";
+import type { Retrospective } from "@/lib/types";
+import { useRouter } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
 
 export default function ArchiveDetailPage({
   params,
 }: {
   params: { id: string };
 }) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("official");
 
   // 샘플 데이터 - 실제로는 ID를 기반으로 데이터를 가져와야 함
-  const retrospectiveData: OfficialRetrospective[] = [
+  const retrospectiveData: Retrospective[] = [
     {
       id: "official-retro-1",
       loopId: "1",
@@ -88,34 +91,37 @@ export default function ArchiveDetailPage({
 
   return (
     <div className="container max-w-md px-4 py-6 pb-20">
-      <div className="mb-6 flex items-center">
-        <Button variant="ghost" size="icon" asChild className="mr-2">
-          <Link href="/para">
-            <ChevronLeft className="h-5 w-5" />
-          </Link>
+      {/* 헤더 */}
+      <div className="flex items-center justify-between mb-6">
+        <Button variant="ghost" size="sm" onClick={() => router.back()}>
+          <ChevronLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-2xl font-bold">회고 상세</h1>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={`/para/archives/edit/${params.id}`}>
+              <Edit className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      {/* 제목 + 요약 */}
-      <Card className="mb-6 p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xl font-bold">{retrospective.title}</h2>
-          <div className="flex items-center gap-2 text-lg font-bold text-primary">
+      {/* 회고 기본 정보 */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold mb-3">{retrospective.title}</h1>
+        <p className="text-muted-foreground mb-4">{retrospective.summary}</p>
+        <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
+          <span>
+            작성일:{" "}
+            {new Date(retrospective.createdAt).toLocaleDateString("ko-KR")}
+          </span>
+          <div className="flex items-center gap-2">
             {retrospective.bookmarked && (
               <Bookmark className="h-4 w-4 text-yellow-500 fill-yellow-500" />
             )}
             {renderStarRating(retrospective.userRating)}
           </div>
         </div>
-        <p className="text-sm text-muted-foreground mb-4">
-          {retrospective.summary}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          작성일:{" "}
-          {new Date(retrospective.createdAt).toLocaleDateString("ko-KR")}
-        </p>
-      </Card>
+      </div>
 
       {/* 탭 영역 */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
@@ -218,11 +224,12 @@ export default function ArchiveDetailPage({
         </TabsContent>
       </Tabs>
 
-      <div className="mt-4 flex justify-end gap-2">
-        <Button variant="outline" asChild>
-          <Link href="/para">돌아가기</Link>
-        </Button>
-      </div>
+      {/* 연결된 프로젝트들 */}
+      <section className="mb-6">
+        <h2 className="mb-4 text-xl font-bold">연결된 프로젝트</h2>
+        {/* 루프 시작 시점 프로젝트들 */}
+        {/* 루프 도중 추가된 프로젝트들 */}
+      </section>
     </div>
   );
 }

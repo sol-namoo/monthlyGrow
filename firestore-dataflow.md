@@ -1,162 +1,299 @@
 # 🌱 Monthly Grow - Firebase 데이터 구조 및 흐름도
 
-이 문서는 Monthly Grow 앱의 Firebase Firestore 구조와 주요 데이터 흐름을 시각화 및 문서화한 내용입니다.
+이 문서는 Monthly Grow 앱의 Firebase Firestore 구조와 주요 데이터 흐름을 시각화 및
+문서화한 내용입니다.
 
----
+## 📊 데이터 모델 개요
 
-## 🔑 전제 사항
+### 핵심 엔티티
 
-- 사용자는 소셜 로그인(Firebase Auth, 구글)으로 인증됨
-- 사용자 UID를 기준으로 모든 컬렉션의 데이터는 격리됨 (`userId`)
-- 현재 Firestore를 사용하며 NoSQL 구조에 적합하게 데이터가 분산 저장됨
-- 모든 UI는 **모바일 우선**, 추후 반응형 확장 가능
+- **Loop**: 월간 성장 사이클 (1-2개월)
+- **Project**: 구체적인 행동 단위 (2-8주 권장)
+- **Area**: 삶의 영역 분류 (건강, 자기계발, 가족 등)
+- **Resource**: 참고 자료 및 링크
+- **Task**: 프로젝트 내 세부 작업
+- **Retrospective**: 루프/프로젝트 회고
+- **Note**: 자유 메모
 
----
+## 🔄 데이터 관계도
 
-## 🧱 주요 컬렉션 정의
+```
+User (개인화된 데이터)
+├── Areas (생활 영역)
+│   ├── Projects (해당 영역의 프로젝트들)
+│   │   ├── Tasks (세부 작업들)
+│   │   ├── Retrospective (프로젝트 회고)
+│   │   └── Notes (프로젝트 노트들)
+│   └── Resources (해당 영역의 참고 자료들)
+├── Loops (월간 루프)
+│   ├── focusAreas[] (중점 영역들)
+│   ├── projectIds[] (연결된 프로젝트들)
+│   ├── retrospective (루프 회고)
+│   └── note (루프 노트)
+└── Projects (행동 단위)
+    ├── areaId (소속 영역)
+    ├── connectedLoops[] (연결된 루프들)
+    ├── tasks[] (세부 작업들)
+    ├── retrospective (프로젝트 회고)
+    └── notes[] (프로젝트 노트들)
 
-### 🔹 users
-
-```ts
-{
-  id: string; // uid
-  displayName: string;
-  email: string;
-  createdAt: ISODate;
-}
+※ 모든 데이터는 사용자별로 완전히 격리됨
+※ 다른 사용자가 동일한 데이터를 생성해도 서로 접근 불가
+※ Archive는 완료된 Loop/Project의 필터링된 뷰
 ```
 
-### 🔹 areas
+## 📝 컬렉션별 상세 구조
 
-```ts
+### 1. Areas 컬렉션
+
+```typescript
 {
   id: string;
   userId: string;
-  title: string; // 예: "건강", "마음"
-  description?: string;
-  createdAt: ISODate;
-}
-```
-
-### 🔹 loops
-
-```ts
-{
-  id: string; // 예: "loop_2025_04"
-  userId: string;
-  title: string; // "4월 루프: 건강 관리"
-  reward: string; // 예: "새 운동화 구매"
-  startDate: YYYY-MM-DD;
-  endDate: YYYY-MM-DD;
-  status: "active" | "completed" | "failed";
-  areaIds: string[]; // 연관 area
-  projectIds: string[];
-  goal?: number;
-  done?: number;
-  progress?: { completed: number; total: number; };
-  improvement?: { value: number; direction: "up" | "down"; };
-}
-```
-
-### 🔹 projects
-
-```ts
-{
-  id: string;
-  userId: string;
-  title: string;
-  description?: string;
-  targetCount: number;
-  doneCount: number;
-  areaId: string;
-  loopIds: string[];
-  addedDuringLoop?: boolean;
+  name: string;           // "건강", "자기계발", "가족"
+  description: string;    // 영역 설명
+  icon?: string;          // 아이콘 ID
+  color?: string;         // 색상 코드
   status: "active" | "archived";
-  dueDate?: YYYY-MM-DD;
-  createdAt: ISODate;
+  createdAt: Date;
+  updatedAt: Date;
 }
 ```
 
-### 🔹 tasks
+### 2. Resources 컬렉션
 
-```ts
+```typescript
 {
   id: string;
   userId: string;
-  projectId: string;
-  title: string;
-  date: YYYY - MM - DD;
-  duration: number; // 분 단위
-  done: boolean;
+  name: string;           // 리소스 제목
+  areaId?: string;        // 소속 영역 ID
+  area?: string;          // 영역 이름 (denormalized)
+  areaColor?: string;     // 영역 색상 (denormalized)
+  description: string;    // 리소스 설명
+  text?: string;          // 텍스트 내용
+  link?: string;          // 외부 링크
+  status: "active" | "archived";
+  createdAt: Date;
+  updatedAt: Date;
 }
 ```
 
----
+### 3. Projects 컬렉션
 
-## 🔄 데이터 흐름도 요약 (텍스트 기반)
-
-```mermaid
-graph TD;
-  user[User 로그인] --> authState[onAuthStateChanged];
-  authState -->|uid 전달| fetchLoops;
-  authState --> fetchAreas;
-  fetchLoops --> currentLoop;
-  currentLoop --> loadProjects;
-  loadProjects --> fetchTasks;
-  fetchProjects --> showDashboard;
-  fetchAreas --> mapAreaNames;
-  fetchTasks --> showProgress;
-```
-
----
-
-## 📌 화면별 데이터 요구
-
-### 🏠 홈
-
-- 현재 루프 요약 (루프 ID, 진행률, 보상 등)
-- 루프에 연결된 프로젝트 요약
-- 대시보드 (이달의 활동 요약: 완료 프로젝트 수, 집중 시간 등)
-
-### 🌀 루프 페이지
-
-- 현재/다음/지난 루프 목록
-- 루프 생성 & 편집 UI → area + 프로젝트 연결
-
-### 📁 프로젝트 페이지
-
-- 전체 프로젝트 목록
-- 필터링 (area, 루프 연결 여부)
-- 프로젝트 상세 → 해당 태스크 목록, 달력 뷰
-
-### 🧘‍♀️ 활동 뷰어 (대시보드)
-
-- 루프 달성률, 프로젝트 수행률
-- 집중 시간, 일일 태스크 수 등 통계 차트
-- 전월 대비 증감률 계산 (루프/프로젝트 단위)
-
----
-
-## 🔐 보안 규칙 요약
-
-```ts
-match /{collection}/{docId} {
-  allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+```typescript
+{
+  id: string;
+  userId: string;
+  title: string;          // 프로젝트 제목
+  description: string;    // 프로젝트 설명
+  areaId?: string;        // 소속 영역 ID
+  area?: string;          // 영역 이름 (denormalized)
+  status: "planned" | "in_progress" | "completed";
+  progress: number;       // 현재 진행률
+  total: number;          // 목표 진행률
+  startDate: Date;        // 시작일
+  dueDate: Date;          // 마감일
+  createdAt: Date;
+  updatedAt: Date;
+  loopId?: string;        // 현재 연결된 루프 ID (legacy)
+  connectedLoops?: ConnectedLoop[]; // 연결된 루프 정보
+  addedMidway?: boolean;  // 루프 중간 추가 여부
+  tasks: Task[];          // 세부 작업들
+  retrospective?: Retrospective; // 프로젝트 회고
+  notes: Note[];          // 프로젝트 노트들
 }
 ```
 
----
+### 4. Loops 컬렉션
 
-## 🔁 캐싱/동기화
+```typescript
+{
+  id: string;
+  userId: string;
+  title: string;          // 루프 제목
+  startDate: Date;        // 시작일
+  endDate: Date;          // 종료일
+  status: "in_progress" | "ended";
+  focusAreas: string[];   // 중점 영역 ID 배열
+  projectIds: string[];   // 연결된 프로젝트 ID 배열
+  reward?: string;        // 보상
+  createdAt: Date;
+  updatedAt: Date;
+  doneCount: number;      // 완료된 횟수
+  targetCount: number;    // 목표 횟수
+  retrospective?: Retrospective; // 루프 회고
+  note?: Note;            // 루프 노트
+}
+```
 
-- 사용자 로그인 시 → areas / loops / projects / tasks 불러오기
-- 상태 관리: jotai로 캐싱
-- 새로고침 시 → Firebase Auth 재인증 + Firestore fetch로 복구
+### 5. Tasks 컬렉션
 
----
+```typescript
+{
+  id: string;
+  userId: string;
+  projectId: string;      // 소속 프로젝트 ID
+  title: string;          // 작업 제목
+  date: Date;             // 작업 날짜
+  duration: number;       // 소요일수
+  done: boolean;          // 완료 여부
+  status?: "active" | "archived";
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
 
-## 🔧 향후 확장 고려
+### 6. Retrospectives 컬렉션
 
-- `notes`, `reflections`, `inventory` 등 컬렉션 확장
-- AI 추천 목표, 자동 태스크 분해 기능
-- Model Context Protocol 적용 구조 고려 중
+```typescript
+{
+  id: string;
+  userId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  content?: string;       // 자유 회고 내용
+
+  // 루프용 필드
+  bestMoment?: string;
+  routineAdherence?: string;
+  unexpectedObstacles?: string;
+  nextLoopApplication?: string;
+
+  // 프로젝트용 필드
+  goalAchieved?: string;
+  memorableTask?: string;
+  stuckPoints?: string;
+  newLearnings?: string;
+  nextProjectImprovements?: string;
+
+  // 공통 필드
+  userRating?: number;    // 별점 (1~5)
+  bookmarked?: boolean;   // 북마크 여부
+  title?: string;         // 회고 제목
+  summary?: string;       // 요약
+}
+```
+
+### 7. Notes 컬렉션
+
+```typescript
+{
+  id: string;
+  userId: string;
+  content: string; // 노트 내용
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+## 🔗 관계 관리
+
+### 1. Project-Loop 연결
+
+- **양방향 관계**: Project의 `connectedLoops[]`와 Loop의 `projectIds[]`
+- **루프 생성 시**: 선택된 프로젝트들을 Loop의 `projectIds[]`에 추가
+- **프로젝트 생성 시**: Loop ID를 Project의 `connectedLoops[]`에 추가
+- **데이터 정합성**: 양쪽 모두 업데이트하여 일관성 유지
+
+### 2. Area-Project 연결
+
+- **단방향 관계**: Project의 `areaId`로 Area 참조
+- **Denormalization**: 성능을 위해 Area 이름을 Project에 저장
+- **색상 정보**: Area 색상을 Resource에도 저장하여 UI 렌더링 최적화
+
+### 3. Project-Task 연결
+
+- **1:N 관계**: 하나의 프로젝트에 여러 작업
+- **자동 생성**: 프로젝트 생성 시 기본 작업들 자동 생성
+- **수동 추가**: 사용자가 직접 작업 추가/수정 가능
+
+## 📊 데이터 플로우
+
+### 1. 루프 생성 플로우
+
+```
+1. 사용자가 루프 정보 입력
+2. 기존 프로젝트 선택 (선택사항)
+3. 중점 영역 선택 (최대 4개, 권장 2개)
+4. 루프 생성
+5. 선택된 프로젝트들의 connectedLoops[] 업데이트
+6. 루프의 projectIds[] 업데이트
+```
+
+### 2. 프로젝트 생성 플로우
+
+```
+1. 사용자가 프로젝트 정보 입력
+2. Area 선택
+3. 프로젝트 생성
+4. 선택된 Area 정보 denormalize하여 저장
+5. 루프 연결 시 connectedLoops[] 업데이트
+```
+
+### 3. 루프 완료 플로우
+
+```
+1. 루프 상태를 "ended"로 변경
+2. 연결된 프로젝트들의 진행률 업데이트
+3. 회고 작성 가능 상태로 변경
+4. Archive 뷰에서 조회 가능
+```
+
+## ⚡ 성능 최적화
+
+### 1. Denormalization
+
+- **Area 정보**: Project, Resource에 Area 이름/색상 저장
+- **Loop 정보**: Project에 연결된 Loop 제목/기간 저장
+- **이유**: 조인 없이 UI 렌더링 가능
+
+### 2. 인덱싱 전략
+
+- `userId` + `status`: 사용자별 활성 상태 조회
+- `userId` + `areaId`: 영역별 조회
+- `userId` + `createdAt`: 최신순 정렬
+
+### 3. 쿼리 최적화
+
+- **복합 쿼리**: 여러 조건을 한 번에 처리
+- **페이지네이션**: 무한 스크롤 지원
+- **캐싱**: TanStack Query로 클라이언트 캐싱
+
+## 🔒 보안 규칙
+
+### 1. 사용자별 데이터 격리
+
+```javascript
+// 모든 컬렉션에 userId 필드 필수
+match /{document=**} {
+  allow read, write: if request.auth != null &&
+    request.auth.uid == resource.data.userId;
+}
+```
+
+### 2. 데이터 무결성
+
+- **필수 필드**: userId, createdAt, updatedAt
+- **상태 검증**: status 필드 유효성 검사
+- **관계 검증**: 외래키 참조 무결성
+
+## 📈 확장성 고려사항
+
+### 1. 데이터 크기
+
+- **프로젝트당 작업**: 평균 10-20개
+- **루프당 프로젝트**: 평균 2-3개 (최대 5개)
+- **사용자당 영역**: 평균 5-8개
+
+### 2. 쿼리 패턴
+
+- **자주 조회**: 사용자별 활성 프로젝트/루프
+- **가끔 조회**: Archive, 통계 데이터
+- **드물게 조회**: 전체 히스토리, 백업
+
+### 3. 미래 확장
+
+- **태그 시스템**: 프로젝트 분류 개선
+- **협업 기능**: 팀 프로젝트 지원
+- **AI 통합**: 자동 회고 생성, 추천 시스템

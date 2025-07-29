@@ -19,9 +19,17 @@ import {
   AlertCircle,
   Calendar,
   Compass,
+  Heart,
+  Briefcase,
+  Users,
+  DollarSign,
+  Brain,
+  Gamepad2,
+  Palette,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -32,10 +40,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import Loading from "@/components/feedback/Loading";
+import { useToast } from "@/components/ui/use-toast";
+import { Separator } from "@/components/ui/separator";
 
-export default function NewLoopPage() {
+// 아이콘 컴포넌트 매핑 함수
+const getIconComponent = (iconName: string) => {
+  const iconMap: { [key: string]: React.ComponentType<any> } = {
+    heart: Heart,
+    briefcase: Briefcase,
+    users: Users,
+    dollarSign: DollarSign,
+    brain: Brain,
+    gamepad2: Gamepad2,
+    bookOpen: BookOpen,
+    palette: Palette,
+  };
+  return iconMap[iconName] || Compass;
+};
+
+function NewLoopPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
 
   // URL에서 시작 날짜 파라미터 가져오기
   const startDateParam = searchParams.get("startDate");
@@ -47,10 +74,9 @@ export default function NewLoopPage() {
   const [selectedExistingProjects, setSelectedExistingProjects] = useState<
     number[]
   >([]);
-  const [activeTab, setActiveTab] = useState<"new" | "existing">("new");
+  const [activeTab, setActiveTab] = useState<"new" | "existing">("existing");
   const [showOnlyUnconnected, setShowOnlyUnconnected] = useState(false);
   const [showNoAreasDialog, setShowNoAreasDialog] = useState(false);
-  const [showNoProjectsDialog, setShowNoProjectsDialog] = useState(false);
 
   // 루프 제목과 날짜 상태
   const [loopTitle, setLoopTitle] = useState("");
@@ -61,6 +87,89 @@ export default function NewLoopPage() {
   // 샘플 데이터 - 테스트를 위해 변경 가능
   const hasAreas = true; // false로 변경하여 Area 없는 상태 테스트
   const hasProjects = false; // false로 변경하여 프로젝트 없는 상태 테스트
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "new" || tab === "existing") {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  // URL 파라미터로 상태 복원
+  useEffect(() => {
+    const loopTitle = searchParams.get("loopTitle");
+    const loopReward = searchParams.get("loopReward");
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
+    const selectedAreasParam = searchParams.get("selectedAreas");
+    const activeTabParam = searchParams.get("activeTab");
+    const showOnlyUnconnectedParam = searchParams.get("showOnlyUnconnected");
+
+    // 루프 기본 정보 복원
+    if (loopTitle) {
+      setLoopTitle(loopTitle);
+    }
+    if (loopReward) {
+      setLoopReward(loopReward);
+    }
+    if (startDate) {
+      setStartDate(startDate);
+    }
+    if (endDate) {
+      setEndDate(endDate);
+    }
+
+    // 선택된 Areas 복원
+    if (selectedAreasParam) {
+      setSelectedAreas(selectedAreasParam.split(","));
+    }
+
+    // 새 프로젝트 데이터 복원
+    const restoredNewProjects: { title: string; goal: string }[] = [];
+    for (let i = 0; i < 10; i++) {
+      // 최대 10개까지 확인
+      const title = searchParams.get(`newProject_${i}_title`);
+      const goal = searchParams.get(`newProject_${i}_goal`);
+      if (title && goal) {
+        restoredNewProjects.push({ title, goal });
+      }
+    }
+    if (restoredNewProjects.length > 0) {
+      setNewProjects(restoredNewProjects);
+    }
+
+    // 선택된 기존 프로젝트 복원
+    const selectedExistingProjectsParam = searchParams.get(
+      "selectedExistingProjects"
+    );
+    if (selectedExistingProjectsParam) {
+      setSelectedExistingProjects(
+        selectedExistingProjectsParam.split(",").map(Number)
+      );
+    }
+
+    // 탭 정보 복원
+    if (
+      activeTabParam &&
+      (activeTabParam === "new" || activeTabParam === "existing")
+    ) {
+      setActiveTab(activeTabParam as "new" | "existing");
+    }
+
+    // 필터 설정 복원
+    if (showOnlyUnconnectedParam) {
+      setShowOnlyUnconnected(showOnlyUnconnectedParam === "true");
+    }
+
+    // 프로젝트 생성 완료 표시
+    const projectCreated = searchParams.get("projectCreated");
+    if (projectCreated === "true") {
+      toast({
+        title: "프로젝트 생성 완료",
+        description: "새 프로젝트가 루프에 연결되었습니다.",
+      });
+    }
+  }, [searchParams, toast]);
 
   // 시작 날짜에 따라 루프 제목 자동 생성
   useEffect(() => {
@@ -103,21 +212,125 @@ export default function NewLoopPage() {
   // 프로젝트 없음 체크 (기존 프로젝트 탭 선택 시)
   useEffect(() => {
     if (activeTab === "existing" && !hasProjects) {
-      setShowNoProjectsDialog(true);
+      // setShowNoProjectsDialog(true); // 이 변수는 제거되었으므로 이 부분도 제거
     }
   }, [activeTab, hasProjects]);
 
-  // 샘플 데이터 - 영역(Areas)
+  // 프로젝트 목록 최신화 보장 (임시로 샘플 데이터 사용)
+  const projects = [
+    {
+      id: 1,
+      title: "아침 운동 습관화",
+      description:
+        "매일 아침 30분씩 운동하는 습관을 만들어 건강한 라이프스타일을 구축하기",
+      area: "건강",
+      status: "in_progress",
+      progress: 15,
+      total: 30,
+      startDate: "2025.05.01",
+      endDate: "2025.05.31",
+      loopConnection: null,
+    },
+    {
+      id: 2,
+      title: "식단 관리 앱 개발",
+      description: "개인 맞춤형 식단 추천 및 기록 앱 개발",
+      area: "개발",
+      status: "in_progress",
+      progress: 7,
+      total: 12,
+      startDate: "2025.06.01",
+      endDate: "2025.06.30",
+      loopConnection: null,
+    },
+  ];
+
+  // 프로젝트 생성 완료 시 목록 새로고침 (실제 구현에서는 refetch 사용)
+  useEffect(() => {
+    const projectCreated = searchParams.get("projectCreated");
+    if (projectCreated === "true") {
+      // 실제 구현에서는 refetchProjects() 호출
+      console.log("프로젝트 목록 새로고침 필요");
+    }
+  }, [searchParams]);
+
+  // 임시 저장된 프로젝트 목록
+  const [tempProjects, setTempProjects] = useState<
+    Array<{
+      id: string;
+      title: string;
+      description: string;
+      area: string;
+      startDate: string;
+      dueDate: string;
+      targetCount: string;
+      status: string;
+    }>
+  >([]);
+
+  // 프로젝트 생성 완료 시 임시 목록에 추가
+  useEffect(() => {
+    const projectCreated = searchParams.get("projectCreated");
+    const projectId = searchParams.get("projectId");
+
+    if (projectCreated === "true" && projectId) {
+      // 실제 구현에서는 생성된 프로젝트 정보를 가져와야 함
+      const newTempProject = {
+        id: projectId,
+        title: "새로 생성된 프로젝트", // 실제로는 생성된 프로젝트 정보
+        description: "프로젝트 설명",
+        area: "건강",
+        startDate: "2025.05.01",
+        dueDate: "2025.05.31",
+        targetCount: "30",
+        status: "planned",
+      };
+
+      setTempProjects((prev) => [...prev, newTempProject]);
+
+      toast({
+        title: "프로젝트 생성 완료",
+        description: "루프 생성 완료 시 자동으로 연결됩니다.",
+      });
+    }
+  }, [searchParams, toast]);
+
+  // 사용자 등록 Areas 데이터 - 실제 구현 시 Firestore에서 불러옴
+  // TODO: 실제 구현 시에는 다음과 같이 변경
+  // const [areas, setAreas] = useState<Area[]>([]);
+  // const [areasLoading, setAreasLoading] = useState(true);
+  //
+  // useEffect(() => {
+  //   const fetchAreas = async () => {
+  //     try {
+  //       const areasData = await getAreas(); // Firestore에서 Areas 불러오기
+  //       setAreas(areasData);
+  //     } catch (error) {
+  //       console.error('Areas 불러오기 실패:', error);
+  //     } finally {
+  //       setAreasLoading(false);
+  //     }
+  //   };
+  //
+  //   fetchAreas();
+  // }, []);
+
+  // 샘플 데이터 - 영역(Areas) - 실제 구현 시 위의 주석 처리된 코드로 대체
   const areas = hasAreas
     ? [
-        { id: "health", name: "건강" },
-        { id: "career", name: "커리어" },
-        { id: "relationships", name: "인간관계" },
-        { id: "finance", name: "재정" },
-        { id: "personal", name: "자기계발" },
-        { id: "fun", name: "취미/여가" },
-        { id: "knowledge", name: "지식" },
-        { id: "creativity", name: "창의성" },
+        { id: "health", name: "건강", color: "#10b981", icon: "heart" },
+        { id: "career", name: "커리어", color: "#3b82f6", icon: "briefcase" },
+        {
+          id: "relationships",
+          name: "인간관계",
+          color: "#f59e0b",
+          icon: "users",
+        },
+        { id: "finance", name: "재정", color: "#059669", icon: "dollarSign" },
+        { id: "personal", name: "자기계발", color: "#8b5cf6", icon: "brain" },
+        { id: "fun", name: "취미/여가", color: "#ec4899", icon: "gamepad2" },
+        { id: "knowledge", name: "지식", color: "#06b6d4", icon: "bookOpen" },
+        { id: "creativity", name: "창의성", color: "#ef4444", icon: "palette" },
       ]
     : [];
 
@@ -220,8 +433,59 @@ export default function NewLoopPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // 여기서 데이터 처리 로직 구현
-    router.push("/loop");
+
+    if (isProjectLimitExceeded) {
+      toast({
+        title: "프로젝트 수 초과",
+        description: "최대 5개의 프로젝트만 연결할 수 있습니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (totalProjectCount === 0) {
+      // 프로젝트 없이도 루프 생성 가능하도록 제한 제거
+      // setShowNoProjectsDialog(true);
+      // return;
+    }
+
+    // 루프 생성 로직
+    const loopData = {
+      title: loopTitle,
+      reward: loopReward,
+      startDate,
+      endDate,
+      selectedAreas,
+      createdAt: new Date(),
+    };
+
+    console.log("루프 생성:", loopData);
+
+    // 선택된 프로젝트들을 루프에 연결
+    const projectsToConnect = [
+      ...selectedExistingProjects.map((id) => ({ id, type: "existing" })),
+      ...newProjects
+        .filter((p) => p.title.trim())
+        .map((_, index) => ({
+          id: `new_${index}`,
+          type: "new",
+          data: newProjects[index],
+        })),
+    ];
+
+    console.log("연결할 프로젝트들:", projectsToConnect);
+
+    // 실제 구현에서는:
+    // 1. 루프 생성 API 호출 → loopId 획득
+    // 2. 기존 프로젝트들 업데이트:
+    //    - 각 프로젝트의 loopId 필드 업데이트
+    // 3. 새 프로젝트들 생성:
+    //    - 새 프로젝트 생성 시 loopId 설정
+    // 4. 루프 업데이트:
+    //    - 루프의 projectIds 배열에 모든 프로젝트 ID 추가
+
+    // 루프 생성 완료 후 홈으로 이동
+    router.push("/home");
   };
 
   // 상태 관리 부분에 totalProjectCount 계산 로직 추가
@@ -265,6 +529,52 @@ export default function NewLoopPage() {
       "0"
     )}-01`;
     window.location.href = `/loop/new?startDate=${startDate}`;
+  };
+
+  const handleCreateProject = () => {
+    const params = new URLSearchParams();
+
+    // 루프 기본 정보
+    params.set("loopTitle", loopTitle);
+    params.set("loopReward", loopReward);
+    params.set("startDate", startDate);
+    params.set("endDate", endDate);
+
+    // 선택된 Areas
+    if (selectedAreas.length > 0) {
+      params.set("selectedAreas", selectedAreas.join(","));
+    }
+
+    // 새 프로젝트 데이터
+    newProjects.forEach((project, index) => {
+      if (project.title.trim()) {
+        params.set(`newProject_${index}_title`, project.title);
+        params.set(`newProject_${index}_goal`, project.goal);
+      }
+    });
+
+    // 선택된 기존 프로젝트
+    if (selectedExistingProjects.length > 0) {
+      params.set(
+        "selectedExistingProjects",
+        selectedExistingProjects.join(",")
+      );
+    }
+
+    // 현재 탭 정보
+    params.set("activeTab", activeTab);
+
+    // 필터 설정
+    params.set("showOnlyUnconnected", showOnlyUnconnected.toString());
+
+    // returnUrl 설정
+    params.set(
+      "returnUrl",
+      `/loop/new${startDateParam ? `?startDate=${startDateParam}` : ""}`
+    );
+    params.set("addedMidway", "true");
+
+    router.push(`/para/projects/new?${params.toString()}`);
   };
 
   // Area가 없는 경우 전체 페이지를 다르게 렌더링
@@ -362,14 +672,21 @@ export default function NewLoopPage() {
         <h1 className="text-2xl font-bold">{monthName} 루프 생성</h1>
       </div>
 
+      <div className="mb-6 text-center">
+        <div className="mb-4 flex justify-center">
+          <div className="rounded-full bg-primary/10 p-4">
+            <Target className="h-8 w-8 text-primary" />
+          </div>
+        </div>
+        <h2 className="text-lg font-bold mb-2">새로운 루프를 만들어보세요</h2>
+        <p className="text-sm text-muted-foreground">
+          루프는 한 달 동안 집중적으로 달성하고 싶은 목표들을 설정하는
+          기간입니다. 중점 Areas를 선택하고 프로젝트를 계획해보세요.
+        </p>
+      </div>
+
       <form onSubmit={handleSubmit}>
         <Card className="mb-6 p-4">
-          <div className="mb-6 flex justify-center">
-            <div className="rounded-full bg-primary/10 p-4">
-              <Target className="h-8 w-8 text-primary" />
-            </div>
-          </div>
-
           <div className="mb-4">
             <Label htmlFor="title">루프 제목</Label>
             <Input
@@ -413,29 +730,82 @@ export default function NewLoopPage() {
         </Card>
 
         <Card className="mb-6 p-4">
-          <h2 className="mb-4 text-lg font-semibold">중점 Areas (최대 3개)</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {areas.map((area) => (
-              <div
-                key={area.id}
-                className={`flex cursor-pointer items-center justify-center rounded-lg border p-3 text-center transition-colors ${
-                  selectedAreas.includes(area.id)
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border hover:border-primary/50"
-                }`}
-                onClick={() => toggleArea(area.id)}
-              >
-                <span className="text-sm">{area.name}</span>
+          <h2 className="mb-4 text-lg font-semibold">중점 Areas (최대 4개)</h2>
+          <p className="mb-4 text-sm text-muted-foreground">
+            권장 2개 영역에 집중하면 루프의 효과를 높일 수 있어요.
+            {selectedAreas.length > 2 && (
+              <span className="block text-amber-600 font-medium mt-1">
+                💡 많은 영역을 선택하면 집중도가 떨어질 수 있습니다.
+              </span>
+            )}
+          </p>
+          {areas.length > 0 ? (
+            <>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                {areas.map((area) => {
+                  const IconComponent = getIconComponent(area.icon);
+
+                  return (
+                    <div
+                      key={area.id}
+                      className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border p-2 text-center transition-colors ${
+                        selectedAreas.includes(area.id)
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                      onClick={() => toggleArea(area.id)}
+                    >
+                      <div
+                        className="mb-1 rounded-full p-1"
+                        style={{ backgroundColor: `${area.color}20` }}
+                      >
+                        <IconComponent
+                          className="h-3 w-3"
+                          style={{ color: area.color }}
+                        />
+                      </div>
+                      <span className="text-xs">{area.name}</span>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {selectedAreas.map((areaId) => (
-              <Badge key={areaId} variant="secondary">
-                {areas.find((a) => a.id === areaId)?.name}
-              </Badge>
-            ))}
-          </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {selectedAreas.map((areaId) => {
+                  const area = areas.find((a) => a.id === areaId);
+                  const IconComponent = getIconComponent(
+                    area?.icon || "compass"
+                  );
+
+                  return (
+                    <Badge
+                      key={areaId}
+                      variant="secondary"
+                      className="flex items-center gap-1"
+                    >
+                      <IconComponent className="h-3 w-3" />
+                      {area?.name}
+                    </Badge>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-6">
+              <div className="mb-3 flex justify-center">
+                <div className="rounded-full bg-muted/50 p-3">
+                  <Compass className="h-6 w-6 text-muted-foreground" />
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">
+                등록된 활동 영역이 없습니다.
+              </p>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/para/areas/new?returnUrl=/loop/new">
+                  Area 만들기
+                </Link>
+              </Button>
+            </div>
+          )}
         </Card>
 
         <Card className="mb-6 p-4">
@@ -478,240 +848,319 @@ export default function NewLoopPage() {
           )}
 
           <Tabs
-            defaultValue="new"
+            defaultValue="existing"
             className="mb-4"
             onValueChange={(value) => setActiveTab(value as "new" | "existing")}
           >
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="new">새 프로젝트 생성</TabsTrigger>
               <TabsTrigger value="existing">기존 프로젝트 불러오기</TabsTrigger>
+              <TabsTrigger value="new">새 프로젝트 생성</TabsTrigger>
             </TabsList>
 
             <TabsContent value="new" className="mt-4 space-y-4">
-              {newProjects.map((project, index) => (
-                <Card key={index} className="p-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium">프로젝트 {index + 1}</h3>
-                    {newProjects.length > 1 && (
+              {/* 새 프로젝트 생성 안내 */}
+              <div className="text-center py-8">
+                <div className="mb-4 flex justify-center">
+                  <div className="rounded-full bg-muted/50 p-6">
+                    <Plus className="h-12 w-12 text-muted-foreground/50" />
+                  </div>
+                </div>
+                <h3 className="text-lg font-bold mb-2">
+                  새 프로젝트를 만들어보세요
+                </h3>
+                <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+                  루프에 연결할 새로운 프로젝트를 만들어보세요. 프로젝트 생성 후
+                  자동으로 이 루프에 연결됩니다.
+                </p>
+                <Button onClick={handleCreateProject}>
+                  <Plus className="mr-2 h-4 w-4" />새 프로젝트 만들기
+                </Button>
+              </div>
+
+              {/* 기존 새 프로젝트 입력 폼 (선택적) */}
+              {newProjects.length > 0 && newProjects[0].title && (
+                <>
+                  <Separator />
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium text-muted-foreground">
+                      또는 직접 입력하기
+                    </h4>
+                    {newProjects.map((project, index) => (
+                      <Card key={index} className="p-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-medium">프로젝트 {index + 1}</h3>
+                          {newProjects.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeNewProject(index)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
+
+                        <div className="mb-3 mt-2">
+                          <Label htmlFor={`project-title-${index}`}>
+                            프로젝트 제목
+                          </Label>
+                          <Input
+                            id={`project-title-${index}`}
+                            value={project.title}
+                            onChange={(e) =>
+                              updateNewProject(index, "title", e.target.value)
+                            }
+                            placeholder="예: 아침 운동 습관화"
+                            className="mt-1"
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor={`project-goal-${index}`}>
+                            목표 설정
+                          </Label>
+                          <Textarea
+                            id={`project-goal-${index}`}
+                            value={project.goal}
+                            onChange={(e) =>
+                              updateNewProject(index, "goal", e.target.value)
+                            }
+                            placeholder="예: 매일 아침 30분 운동하기"
+                            className="mt-1"
+                          />
+                        </div>
+                      </Card>
+                    ))}
+
+                    {totalProjectCount < 5 && (
                       <Button
                         type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeNewProject(index)}
+                        variant="outline"
+                        className="w-full border-dashed bg-transparent"
+                        onClick={addNewProject}
                       >
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                        <Plus className="mr-2 h-4 w-4" />
+                        프로젝트 추가
                       </Button>
                     )}
-                  </div>
 
-                  <div className="mb-3 mt-2">
-                    <Label htmlFor={`project-title-${index}`}>
-                      프로젝트 제목
-                    </Label>
-                    <Input
-                      id={`project-title-${index}`}
-                      value={project.title}
-                      onChange={(e) =>
-                        updateNewProject(index, "title", e.target.value)
-                      }
-                      placeholder="예: 아침 운동 습관화"
-                      className="mt-1"
-                      required={activeTab === "new"}
-                    />
+                    <div className="mt-3 flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        새 프로젝트:{" "}
+                        <span
+                          className={
+                            newProjects.length > 3
+                              ? "text-amber-600 font-medium"
+                              : ""
+                          }
+                        >
+                          {newProjects.length}/5
+                        </span>
+                      </span>
+                      <span className="text-muted-foreground">
+                        권장: 2~3개 (많은 프로젝트를 동시에 진행하면 루프
+                        집중도가 떨어질 수 있어요)
+                      </span>
+                    </div>
                   </div>
+                </>
+              )}
+            </TabsContent>
 
-                  <div>
-                    <Label htmlFor={`project-goal-${index}`}>목표 설정</Label>
-                    <Textarea
-                      id={`project-goal-${index}`}
-                      value={project.goal}
-                      onChange={(e) =>
-                        updateNewProject(index, "goal", e.target.value)
-                      }
-                      placeholder="예: 매일 아침 30분 운동하기"
-                      className="mt-1"
-                      required={activeTab === "new"}
-                    />
+            <TabsContent value="existing" className="space-y-4">
+              {/* 연결된 프로젝트 섹션 */}
+              {projects.filter((p) => p.loopConnection).length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">연결된 프로젝트</h3>
+                    <Badge variant="secondary" className="text-xs">
+                      {projects.filter((p) => p.loopConnection).length}개
+                    </Badge>
                   </div>
-                </Card>
-              ))}
-
-              {totalProjectCount < 5 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full border-dashed bg-transparent"
-                  onClick={addNewProject}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  프로젝트 추가
-                </Button>
+                  <div className="space-y-2">
+                    {projects
+                      .filter((project) => project.loopConnection)
+                      .map((project) => (
+                        <Card key={project.id} className="p-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-medium">{project.title}</h4>
+                              <p className="text-sm text-muted-foreground">
+                                {project.description}
+                              </p>
+                              <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                                <span>Area: {project.area}</span>
+                                <span>•</span>
+                                <span>
+                                  {project.startDate} ~ {project.endDate}
+                                </span>
+                              </div>
+                            </div>
+                            <Badge variant="default" className="text-xs">
+                              연결됨
+                            </Badge>
+                          </div>
+                        </Card>
+                      ))}
+                  </div>
+                  <Separator />
+                </div>
               )}
 
-              <div className="mt-3 flex items-center justify-between text-sm">
+              {/* 기존 프로젝트 섹션 */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">기존 프로젝트</h3>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="showOnlyUnconnected"
+                    checked={showOnlyUnconnected}
+                    onCheckedChange={(checked) =>
+                      setShowOnlyUnconnected(checked as boolean)
+                    }
+                  />
+                  <Label
+                    htmlFor="showOnlyUnconnected"
+                    className="text-sm text-muted-foreground"
+                  >
+                    루프에 연결되지 않은 프로젝트만
+                  </Label>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {filteredExistingProjects.map((project) => (
+                  <div
+                    key={project.id}
+                    className={`cursor-pointer rounded-lg border p-3 transition-all ${
+                      selectedExistingProjects.includes(project.id)
+                        ? "border-primary bg-primary/5"
+                        : "hover:border-primary/50"
+                    } ${
+                      totalProjectCount >= 5 &&
+                      !selectedExistingProjects.includes(project.id)
+                        ? "opacity-50 pointer-events-none"
+                        : ""
+                    }`}
+                    onClick={() => toggleExistingProject(project.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Checkbox
+                          checked={selectedExistingProjects.includes(
+                            project.id
+                          )}
+                          onCheckedChange={() =>
+                            toggleExistingProject(project.id)
+                          }
+                          disabled={
+                            totalProjectCount >= 5 &&
+                            !selectedExistingProjects.includes(project.id)
+                          }
+                        />
+                        <div>
+                          <h3 className="font-medium">{project.title}</h3>
+                          <p className="text-xs text-muted-foreground">
+                            {project.description}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant="outline">{project.area}</Badge>
+                    </div>
+
+                    <div className="mt-2">
+                      <div className="mb-1 flex justify-between text-xs">
+                        <span>진행률: {project.progress}%</span>
+                      </div>
+                      <div className="progress-bar">
+                        <div
+                          className="progress-value"
+                          style={{ width: `${project.progress}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {project.connectedLoop ? (
+                        <Badge className="bg-primary/20 text-xs">
+                          {project.connectedLoop}에 연결됨
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className="border-dashed text-xs"
+                        >
+                          루프 미연결
+                        </Badge>
+                      )}
+
+                      {project.recentlyUsed && (
+                        <Badge variant="secondary" className="text-xs">
+                          최근 사용됨
+                        </Badge>
+                      )}
+
+                      {/* 장기 프로젝트 경고 */}
+                      {project.connectedLoop &&
+                        project.connectedLoop.includes("루프") && (
+                          <Badge
+                            variant="outline"
+                            className="bg-amber-100 text-amber-800 text-xs"
+                          >
+                            ⚠️ 장기 프로젝트
+                          </Badge>
+                        )}
+                    </div>
+                  </div>
+                ))}
+
+                {filteredExistingProjects.length === 0 && (
+                  <div className="text-center py-8">
+                    <div className="mb-4 flex justify-center">
+                      <div className="rounded-full bg-muted/50 p-6">
+                        <BookOpen className="h-12 w-12 text-muted-foreground/50" />
+                      </div>
+                    </div>
+                    <h3 className="text-lg font-bold mb-2">
+                      연결할 프로젝트가 없어요
+                    </h3>
+                    <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+                      프로젝트는 루프 생성 후 언제든 연결할 수 있어요. 지금
+                      루프를 시작하고 나중에 프로젝트를 추가해보세요.
+                    </p>
+                    <div className="space-y-3">
+                      <Button
+                        onClick={handleCreateProject}
+                        className="w-full max-w-xs"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />새 프로젝트 만들기
+                      </Button>
+                      <Button variant="outline" className="w-full max-w-xs">
+                        루프만 시작하기
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">
-                  새 프로젝트:{" "}
+                  선택된 프로젝트:{" "}
                   <span
                     className={
-                      newProjects.length > 3 ? "text-amber-600 font-medium" : ""
+                      selectedExistingProjects.length > 3
+                        ? "text-amber-600 font-medium"
+                        : ""
                     }
                   >
-                    {newProjects.length}/5
+                    {selectedExistingProjects.length}/5
                   </span>
                 </span>
                 <span className="text-muted-foreground">
-                  권장 프로젝트: 2-3개
+                  권장: 2~3개 (많은 프로젝트를 동시에 진행하면 루프 집중도가
+                  떨어질 수 있어요)
                 </span>
               </div>
-            </TabsContent>
-
-            <TabsContent value="existing" className="mt-4">
-              {hasProjects ? (
-                <>
-                  <div className="mb-4 flex items-center justify-between">
-                    <h3 className="text-sm font-medium">기존 프로젝트 선택</h3>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        setShowOnlyUnconnected(!showOnlyUnconnected)
-                      }
-                      className="text-xs"
-                    >
-                      {showOnlyUnconnected
-                        ? "모든 프로젝트 보기"
-                        : "루프 미연결만 보기"}
-                    </Button>
-                  </div>
-
-                  <div className="space-y-3">
-                    {filteredExistingProjects.map((project) => (
-                      <div
-                        key={project.id}
-                        className={`cursor-pointer rounded-lg border p-3 transition-all ${
-                          selectedExistingProjects.includes(project.id)
-                            ? "border-primary bg-primary/5"
-                            : "hover:border-primary/50"
-                        } ${
-                          totalProjectCount >= 5 &&
-                          !selectedExistingProjects.includes(project.id)
-                            ? "opacity-50 pointer-events-none"
-                            : ""
-                        }`}
-                        onClick={() => toggleExistingProject(project.id)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <Checkbox
-                              checked={selectedExistingProjects.includes(
-                                project.id
-                              )}
-                              onCheckedChange={() =>
-                                toggleExistingProject(project.id)
-                              }
-                              disabled={
-                                totalProjectCount >= 5 &&
-                                !selectedExistingProjects.includes(project.id)
-                              }
-                            />
-                            <div>
-                              <h3 className="font-medium">{project.title}</h3>
-                              <p className="text-xs text-muted-foreground">
-                                {project.description}
-                              </p>
-                            </div>
-                          </div>
-                          <Badge variant="outline">{project.area}</Badge>
-                        </div>
-
-                        <div className="mt-2">
-                          <div className="mb-1 flex justify-between text-xs">
-                            <span>진행률: {project.progress}%</span>
-                          </div>
-                          <div className="progress-bar">
-                            <div
-                              className="progress-value"
-                              style={{ width: `${project.progress}%` }}
-                            ></div>
-                          </div>
-                        </div>
-
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {project.connectedLoop ? (
-                            <Badge className="bg-primary/20 text-xs">
-                              {project.connectedLoop}에 연결됨
-                            </Badge>
-                          ) : (
-                            <Badge
-                              variant="outline"
-                              className="border-dashed text-xs"
-                            >
-                              루프 미연결
-                            </Badge>
-                          )}
-
-                          {project.recentlyUsed && (
-                            <Badge variant="secondary" className="text-xs">
-                              최근 사용됨
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-
-                    {filteredExistingProjects.length === 0 && (
-                      <div className="rounded-lg border border-dashed p-6 text-center">
-                        <BookOpen className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
-                        <p className="text-muted-foreground">
-                          {showOnlyUnconnected
-                            ? "루프에 연결되지 않은 프로젝트가 없습니다"
-                            : "기존 프로젝트를 선택하여 이 루프에 연결하세요"}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      선택된 프로젝트:{" "}
-                      <span
-                        className={
-                          selectedExistingProjects.length > 3
-                            ? "text-amber-600 font-medium"
-                            : ""
-                        }
-                      >
-                        {selectedExistingProjects.length}/5
-                      </span>
-                    </span>
-                    <span className="text-muted-foreground">
-                      권장 프로젝트: 2-3개
-                    </span>
-                  </div>
-                </>
-              ) : (
-                // 프로젝트가 없는 상태
-                <div className="text-center py-8">
-                  <div className="mb-4 flex justify-center">
-                    <div className="rounded-full bg-muted/50 p-6">
-                      <BookOpen className="h-12 w-12 text-muted-foreground/50" />
-                    </div>
-                  </div>
-                  <h3 className="text-lg font-bold mb-2">
-                    진행 중인 프로젝트가 없어요
-                  </h3>
-                  <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
-                    루프에 연결할 프로젝트가 필요합니다. 먼저 프로젝트를
-                    만들어보세요.
-                  </p>
-                  <Button asChild>
-                    <Link href="/para/projects/new">
-                      <Plus className="mr-2 h-4 w-4" />
-                      프로젝트 만들기
-                    </Link>
-                  </Button>
-                </div>
-              )}
             </TabsContent>
           </Tabs>
         </Card>
@@ -719,41 +1168,19 @@ export default function NewLoopPage() {
         <Button
           type="submit"
           className="w-full"
-          disabled={isProjectLimitExceeded || totalProjectCount === 0}
+          disabled={isProjectLimitExceeded}
         >
           {monthName} 루프 시작하기
         </Button>
       </form>
-
-      {/* 프로젝트 없음 다이얼로그 */}
-      <Dialog
-        open={showNoProjectsDialog}
-        onOpenChange={setShowNoProjectsDialog}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>연결할 프로젝트가 없어요</DialogTitle>
-            <DialogDescription>
-              기존 프로젝트를 루프에 연결하려면 먼저 프로젝트를 만들어 주세요.
-              새 프로젝트 탭에서 직접 만들거나, 프로젝트 페이지에서 미리 만들 수
-              있습니다.
-            </DialogDescription>
-          </DialogHeader>
-
-          <DialogFooter className="flex flex-col sm:flex-row gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowNoProjectsDialog(false)}
-              className="sm:order-2"
-            >
-              닫기
-            </Button>
-            <Button asChild className="sm:order-1">
-              <Link href="/para/projects/new">프로젝트 만들기</Link>
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
+  );
+}
+
+export default function NewLoopPage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <NewLoopPageContent />
+    </Suspense>
   );
 }

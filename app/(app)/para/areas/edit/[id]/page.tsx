@@ -7,7 +7,30 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronLeft, MapPin, Folder, BookOpen, Plus, X } from "lucide-react";
+import {
+  ChevronLeft,
+  MapPin,
+  Folder,
+  BookOpen,
+  Plus,
+  X,
+  Compass,
+  Heart,
+  Brain,
+  Briefcase,
+  DollarSign,
+  Users,
+  Gamepad2,
+  Dumbbell,
+  BookOpen as BookOpenIcon,
+  Home,
+  Car,
+  Plane,
+  Camera,
+  Music,
+  Palette,
+  Utensils,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -35,7 +58,8 @@ export default function EditAreaPage({ params }: { params: { id: string } }) {
   const initialAreaData = {
     name: "개인 성장",
     description: "자기 계발 및 학습 관련 활동을 관리하는 영역입니다.",
-    tags: "자기계발, 학습, 성장",
+    color: "#8b5cf6",
+    icon: "brain",
     associatedProjects: [
       { id: "p1", name: "Next.js 학습 프로젝트", status: "진행 중" },
       { id: "p2", name: "TypeScript 마스터하기", status: "완료" },
@@ -64,6 +88,45 @@ export default function EditAreaPage({ params }: { params: { id: string } }) {
   const [formData, setFormData] = useState(initialAreaData);
   const [isProjectSelectOpen, setIsProjectSelectOpen] = useState(false);
   const [isResourceSelectOpen, setIsResourceSelectOpen] = useState(false);
+
+  // 아이콘 선택 옵션
+  const iconOptions = [
+    { id: "compass", icon: Compass, name: "나침반" },
+    { id: "heart", icon: Heart, name: "하트" },
+    { id: "brain", icon: Brain, name: "뇌" },
+    { id: "briefcase", icon: Briefcase, name: "브리프케이스" },
+    { id: "dollarSign", icon: DollarSign, name: "달러" },
+    { id: "users", icon: Users, name: "사람들" },
+    { id: "gamepad2", icon: Gamepad2, name: "게임패드" },
+    { id: "dumbbell", icon: Dumbbell, name: "운동" },
+    { id: "bookOpen", icon: BookOpenIcon, name: "독서" },
+    { id: "home", icon: Home, name: "가정" },
+    { id: "car", icon: Car, name: "교통" },
+    { id: "plane", icon: Plane, name: "여행" },
+    { id: "camera", icon: Camera, name: "사진" },
+    { id: "music", icon: Music, name: "음악" },
+    { id: "palette", icon: Palette, name: "예술" },
+    { id: "utensils", icon: Utensils, name: "요리" },
+  ];
+
+  const getIconComponent = (iconId: string) => {
+    const iconOption = iconOptions.find((option) => option.id === iconId);
+    return iconOption ? iconOption.icon : Compass;
+  };
+
+  const SelectedIcon = getIconComponent(formData.icon);
+
+  // 디자인 톤에 맞는 색상 팔레트
+  const colorPalette = [
+    { name: "보라", value: "#8b5cf6" },
+    { name: "파랑", value: "#3b82f6" },
+    { name: "초록", value: "#10b981" },
+    { name: "청록", value: "#06b6d4" },
+    { name: "주황", value: "#f59e0b" },
+    { name: "빨강", value: "#ef4444" },
+    { name: "핑크", value: "#ec4899" },
+    { name: "회색", value: "#6b7280" },
+  ];
 
   useEffect(() => {
     // 실제 앱에서는 여기서 params.id를 사용하여 데이터를 불러와 setFormData
@@ -160,8 +223,14 @@ export default function EditAreaPage({ params }: { params: { id: string } }) {
 
       <div className="mb-6 text-center">
         <div className="mb-4 flex justify-center">
-          <div className="rounded-full bg-primary/10 p-4">
-            <MapPin className="h-8 w-8 text-primary" />
+          <div
+            className="rounded-full p-4"
+            style={{ backgroundColor: `${formData.color}20` }}
+          >
+            <SelectedIcon
+              className="h-8 w-8"
+              style={{ color: formData.color }}
+            />
           </div>
         </div>
         <h2 className="text-lg font-bold mb-2">영역 정보를 수정하세요</h2>
@@ -197,17 +266,50 @@ export default function EditAreaPage({ params }: { params: { id: string } }) {
           </div>
 
           <div className="mb-4">
-            <Label htmlFor="tags">태그</Label>
-            <Input
-              id="tags"
-              value={formData.tags}
-              onChange={(e) => handleChange("tags", e.target.value)}
-              placeholder="태그를 쉼표로 구분해서 입력하세요 (예: 자기계발, 학습)"
-              className="mt-1"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              태그를 사용하면 영역을 쉽게 분류할 수 있습니다.
-            </p>
+            <Label>아이콘 선택</Label>
+            <div className="mt-2 grid grid-cols-4 gap-2">
+              {iconOptions.map((option) => {
+                const IconComponent = option.icon;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => handleChange("icon", option.id)}
+                    className={`flex flex-col items-center gap-1 rounded-lg border p-3 transition-colors hover:bg-secondary ${
+                      formData.icon === option.id
+                        ? "border-primary bg-primary/10"
+                        : ""
+                    }`}
+                  >
+                    <IconComponent className="h-5 w-5" />
+                    <span className="text-xs">{option.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <Label>색상 선택</Label>
+            <div className="mt-2 grid grid-cols-8 gap-1">
+              {colorPalette.map((color) => (
+                <button
+                  key={color.value}
+                  type="button"
+                  onClick={() => handleChange("color", color.value)}
+                  className={`flex items-center justify-center rounded-lg border p-2 transition-colors hover:bg-secondary ${
+                    formData.color === color.value
+                      ? "border-primary bg-primary/10"
+                      : ""
+                  }`}
+                >
+                  <div
+                    className="h-5 w-5 rounded-full border border-white shadow-sm"
+                    style={{ backgroundColor: color.value }}
+                  />
+                </button>
+              ))}
+            </div>
           </div>
         </Card>
 

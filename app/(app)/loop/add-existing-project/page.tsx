@@ -1,30 +1,32 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Badge } from "@/components/ui/badge"
-import { ChevronLeft } from "lucide-react"
-import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle } from "lucide-react"
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { ChevronLeft } from "lucide-react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import Loading from "@/components/feedback/Loading";
 
-export default function AddExistingProjectPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const loopId = searchParams.get("loopId")
+function AddExistingProjectPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const loopId = searchParams.get("loopId");
 
-  const [selectedProjects, setSelectedProjects] = useState<number[]>([])
-  const [showOnlyUnconnected, setShowOnlyUnconnected] = useState(true)
+  const [selectedProjects, setSelectedProjects] = useState<number[]>([]);
+  const [showOnlyUnconnected, setShowOnlyUnconnected] = useState(true);
 
   // 샘플 데이터 - 현재 루프 정보
   const currentLoop = {
     id: loopId || "1",
     title: "5월 루프: 건강 관리",
     projectCount: 4, // 현재 루프에 연결된 프로젝트 수
-  }
+  };
 
   // 샘플 데이터 - 기존 프로젝트
   const existingProjects = [
@@ -55,34 +57,35 @@ export default function AddExistingProjectPage() {
       total: 100,
       connectedLoop: "4월 루프: 생활 습관 개선",
     },
-  ]
+  ];
 
   // 필터링된 프로젝트 계산 로직
   const filteredProjects = showOnlyUnconnected
     ? existingProjects.filter((project) => !project.connectedLoop)
-    : existingProjects
+    : existingProjects;
 
   // 프로젝트 선택 토글 함수
   const toggleProject = (projectId: number) => {
     if (selectedProjects.includes(projectId)) {
-      setSelectedProjects(selectedProjects.filter((id) => id !== projectId))
+      setSelectedProjects(selectedProjects.filter((id) => id !== projectId));
     } else {
       // 프로젝트 개수 제한 확인 (현재 루프 프로젝트 + 선택된 프로젝트 <= 5)
       if (currentLoop.projectCount + selectedProjects.length < 5) {
-        setSelectedProjects([...selectedProjects, projectId])
+        setSelectedProjects([...selectedProjects, projectId]);
       }
     }
-  }
+  };
 
   // 프로젝트 추가 가능 여부 확인
-  const canAddMoreProjects = currentLoop.projectCount + selectedProjects.length < 5
+  const canAddMoreProjects =
+    currentLoop.projectCount + selectedProjects.length < 5;
 
   // 프로젝트 추가 처리 함수
   const handleAddProjects = () => {
     // 여기서 선택된 프로젝트를 루프에 추가하는 로직 구현
     // 추가 후 루프 상세 페이지로 이동
-    router.push(`/loop/${loopId}`)
-  }
+    router.push(`/loop/${loopId}`);
+  };
 
   return (
     <div className="container max-w-md px-4 py-6">
@@ -97,7 +100,9 @@ export default function AddExistingProjectPage() {
 
       <Card className="mb-6 p-4">
         <h2 className="mb-2 text-lg font-bold">{currentLoop.title}</h2>
-        <p className="text-sm text-muted-foreground">현재 루프에 연결된 프로젝트: {currentLoop.projectCount}/5</p>
+        <p className="text-sm text-muted-foreground">
+          현재 루프에 연결된 프로젝트: {currentLoop.projectCount}/5
+        </p>
         <p className="mt-2 text-sm text-muted-foreground">
           추가 가능한 프로젝트: {Math.max(0, 5 - currentLoop.projectCount)}개
         </p>
@@ -115,7 +120,11 @@ export default function AddExistingProjectPage() {
 
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-bold">프로젝트 선택</h2>
-        <Button variant="outline" size="sm" onClick={() => setShowOnlyUnconnected(!showOnlyUnconnected)}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowOnlyUnconnected(!showOnlyUnconnected)}
+        >
           {showOnlyUnconnected ? "모든 프로젝트 보기" : "루프 미연결만 보기"}
         </Button>
       </div>
@@ -126,8 +135,14 @@ export default function AddExistingProjectPage() {
             <div
               key={project.id}
               className={`cursor-pointer rounded-lg border p-3 transition-all ${
-                selectedProjects.includes(project.id) ? "border-primary bg-primary/5" : "hover:border-primary/50"
-              } ${!canAddMoreProjects && !selectedProjects.includes(project.id) ? "opacity-50 pointer-events-none" : ""}`}
+                selectedProjects.includes(project.id)
+                  ? "border-primary bg-primary/5"
+                  : "hover:border-primary/50"
+              } ${
+                !canAddMoreProjects && !selectedProjects.includes(project.id)
+                  ? "opacity-50 pointer-events-none"
+                  : ""
+              }`}
               onClick={() => toggleProject(project.id)}
             >
               <div className="flex items-center justify-between">
@@ -135,11 +150,16 @@ export default function AddExistingProjectPage() {
                   <Checkbox
                     checked={selectedProjects.includes(project.id)}
                     onCheckedChange={() => toggleProject(project.id)}
-                    disabled={!canAddMoreProjects && !selectedProjects.includes(project.id)}
+                    disabled={
+                      !canAddMoreProjects &&
+                      !selectedProjects.includes(project.id)
+                    }
                   />
                   <div>
                     <h3 className="font-medium">{project.title}</h3>
-                    <p className="text-xs text-muted-foreground">{project.description}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {project.description}
+                    </p>
                   </div>
                 </div>
                 <Badge variant="outline">{project.area}</Badge>
@@ -150,13 +170,18 @@ export default function AddExistingProjectPage() {
                   <span>진행률: {project.progress}%</span>
                 </div>
                 <div className="progress-bar">
-                  <div className="progress-value" style={{ width: `${project.progress}%` }}></div>
+                  <div
+                    className="progress-value"
+                    style={{ width: `${project.progress}%` }}
+                  ></div>
                 </div>
               </div>
 
               {project.connectedLoop && (
                 <div className="mt-2">
-                  <Badge className="bg-primary/20 text-xs">{project.connectedLoop}에 연결됨</Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    {project.connectedLoop}에 연결됨
+                  </Badge>
                 </div>
               )}
             </div>
@@ -164,14 +189,20 @@ export default function AddExistingProjectPage() {
         ) : (
           <div className="rounded-lg border border-dashed p-6 text-center">
             <p className="text-muted-foreground">
-              {showOnlyUnconnected ? "루프에 연결되지 않은 프로젝트가 없습니다" : "추가할 수 있는 프로젝트가 없습니다"}
+              {showOnlyUnconnected
+                ? "루프에 연결되지 않은 프로젝트가 없습니다"
+                : "추가할 수 있는 프로젝트가 없습니다"}
             </p>
           </div>
         )}
       </div>
 
       <div className="flex gap-3">
-        <Button className="flex-1" onClick={handleAddProjects} disabled={selectedProjects.length === 0}>
+        <Button
+          className="flex-1"
+          onClick={handleAddProjects}
+          disabled={selectedProjects.length === 0}
+        >
           {selectedProjects.length}개 프로젝트 추가
         </Button>
         <Button variant="outline" asChild className="flex-1">
@@ -179,5 +210,13 @@ export default function AddExistingProjectPage() {
         </Button>
       </div>
     </div>
-  )
+  );
+}
+
+export default function AddExistingProjectPage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <AddExistingProjectPageContent />
+    </Suspense>
+  );
 }

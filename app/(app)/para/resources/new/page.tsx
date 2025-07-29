@@ -58,10 +58,13 @@ export default function NewResourcePage() {
   return (
     <div className="container max-w-md px-4 py-6">
       <div className="mb-6 flex items-center">
-        <Button variant="ghost" size="icon" asChild className="mr-2">
-          <Link href="/para/resources">
-            <ChevronLeft className="h-5 w-5" />
-          </Link>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => router.back()}
+          className="mr-2"
+        >
+          <ChevronLeft className="h-5 w-5" />
         </Button>
         <h1 className="text-2xl font-bold">새 자료</h1>
       </div>

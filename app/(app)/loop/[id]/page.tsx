@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Bookmark,
   Edit,
+  Gift,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -23,11 +24,13 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import type { OfficialRetrospective } from "@/types/retrospective";
+import type { Retrospective } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useParams } from "next/navigation";
 
-export default function LoopDetailPage({ params }: { params: { id: string } }) {
+export function LoopDetailPage() {
+  const params = useParams();
   const { toast } = useToast();
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
@@ -94,7 +97,7 @@ export default function LoopDetailPage({ params }: { params: { id: string } }) {
         bookmarked: true,
         title: "6월 루프: 건강한 개발자 되기 회고",
         summary: "아침 운동 습관 성공, 출장 중 식단 관리 어려움",
-      } as OfficialRetrospective,
+      } as Retrospective,
       notes: [
         {
           id: 1,
@@ -195,7 +198,7 @@ export default function LoopDetailPage({ params }: { params: { id: string } }) {
     }
 
     // TODO: 실제 DB 저장 로직 구현
-    const newRetrospective: OfficialRetrospective = {
+    const newRetrospective: Retrospective = {
       id: loop?.reflection?.id || `new-retro-${Date.now()}`, // 새 ID 생성 또는 기존 ID 사용
       loopId: loop?.id || "",
       userId: "user-123", // 실제 사용자 ID로 대체
@@ -283,20 +286,30 @@ export default function LoopDetailPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="container max-w-md px-4 py-6 pb-20">
-      <div className="mb-6 flex items-center">
-        <Button variant="ghost" size="icon" asChild className="mr-2">
-          <Link href="/loop">
-            <ChevronLeft className="h-5 w-5" />
-          </Link>
-        </Button>
-        <h1 className="text-2xl font-bold">루프 상세</h1>
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center">
+          <Button variant="ghost" size="icon" asChild className="mr-2">
+            <Link href="/loop">
+              <ChevronLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <h1 className="text-2xl font-bold">루프 상세</h1>
+        </div>
+        {!loop.completed && (
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/loop/edit/${loop.id}`}>
+              <Edit className="mr-2 h-4 w-4" />
+              루프 수정
+            </Link>
+          </Button>
+        )}
       </div>
 
       {/* 루프 정보 요약 */}
       <Card className="mb-6 p-4">
         <h2 className="mb-2 text-xl font-bold">{loop.title}</h2>
         <div className="mb-4 flex items-center gap-2 text-sm">
-          <Star className="h-4 w-4 text-yellow-500" />
+          <Gift className="h-4 w-4 text-purple-500" />
           <span>보상: {loop.reward}</span>
         </div>
 
@@ -334,7 +347,7 @@ export default function LoopDetailPage({ params }: { params: { id: string } }) {
             {loop.areas.map((area) => (
               <span
                 key={area}
-                className="rounded-full bg-primary/10 px-3 py-1 text-xs"
+                className="rounded-full bg-secondary px-3 py-1 text-xs"
               >
                 {area}
               </span>
@@ -411,6 +424,23 @@ export default function LoopDetailPage({ params }: { params: { id: string } }) {
                     }}
                   ></div>
                 </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    Area: 미분류
+                  </span>
+                  {project.addedMidway ? (
+                    <Badge
+                      variant="outline"
+                      className="bg-amber-100 text-amber-800 text-xs"
+                    >
+                      💡 루프 도중 추가됨
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-primary/10 text-xs">
+                      현재 루프 연결됨
+                    </Badge>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -452,9 +482,15 @@ export default function LoopDetailPage({ params }: { params: { id: string } }) {
             <h3 className="font-medium mb-4">
               이번 루프를 회고하��, 다음 단계를 계획하세요.
             </h3>
-            <Button onClick={() => setShowRetrospectiveDialog(true)}>
-              회고 작성
-            </Button>
+            {loop.completed ? (
+              <Button onClick={() => setShowRetrospectiveDialog(true)}>
+                회고 작성
+              </Button>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                진행률: {loop.progress}%
+              </div>
+            )}
           </Card>
         )}
       </section>
@@ -503,11 +539,6 @@ export default function LoopDetailPage({ params }: { params: { id: string } }) {
         )}
       </section>
 
-      <div className="mt-4 flex justify-end gap-2">
-        <Button variant="outline" asChild>
-          <Link href="/loop">돌아가기</Link>
-        </Button>
-      </div>
       {/* 프로젝트 추가 다이얼로그 */}
       <Dialog
         open={showAddProjectDialog}
@@ -697,5 +728,13 @@ export default function LoopDetailPage({ params }: { params: { id: string } }) {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <LoopDetailPage />
+    </Suspense>
   );
 }
