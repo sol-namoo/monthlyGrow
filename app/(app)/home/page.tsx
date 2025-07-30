@@ -23,27 +23,41 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
-import { usePageData } from "@/hooks/usePageData";
 import { useQuery } from "@tanstack/react-query";
-import { fetchAllAreasByUserId } from "@/lib/firebase";
+import {
+  fetchAllAreasByUserId,
+  fetchAllProjectsByUserId,
+  fetchAllLoopsByUserId,
+} from "@/lib/firebase";
 import { getLoopStatus } from "@/lib/utils";
 
 export default function HomePage() {
   const [user, loading] = useAuthState(auth);
   const [showAllProjects, setShowAllProjects] = useState(false);
 
-  const { projects, loops, isLoading, error } = usePageData("home", {
-    userId: user?.uid,
-  });
+  // Firestore에서 직접 데이터 가져오기
   const { data: areas = [] } = useQuery({
     queryKey: ["areas", user?.uid],
     queryFn: () => (user ? fetchAllAreasByUserId(user.uid) : []),
     enabled: !!user,
   });
 
+  const { data: projects = [], isLoading: projectsLoading } = useQuery({
+    queryKey: ["projects", user?.uid],
+    queryFn: () => (user ? fetchAllProjectsByUserId(user.uid) : []),
+    enabled: !!user,
+  });
+
+  const { data: loops = [], isLoading: loopsLoading } = useQuery({
+    queryKey: ["loops", user?.uid],
+    queryFn: () => (user ? fetchAllLoopsByUserId(user.uid) : []),
+    enabled: !!user,
+  });
+
+  const isLoading = loading || projectsLoading || loopsLoading;
+
   if (loading || isLoading) return <div>로딩 중...</div>;
   if (!user) return <div>로그인이 필요합니다.</div>;
-  if (error) return <div>에러 발생: {error.message}</div>;
 
   // 현재 진행 중인 루프를 날짜 기반으로 선택
   const currentLoop =
@@ -97,7 +111,10 @@ export default function HomePage() {
       <div className="mb-6 flex items-center gap-4">
         <CharacterAvatar level={5} />
         <div>
-          <h1 className="text-2xl font-bold">안녕하세요, 루퍼님!</h1>
+          <h1 className="text-2xl font-bold">
+            안녕하세요,{" "}
+            {user?.displayName || user?.email?.split("@")[0] || "루퍼"}님!
+          </h1>
           <p className="text-muted-foreground">오늘도 성장하는 하루 되세요.</p>
           <div className="mt-1 flex items-center gap-1 text-xs text-green-600">
             <TrendingUp className="h-3 w-3" />
