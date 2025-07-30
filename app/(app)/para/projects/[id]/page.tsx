@@ -29,6 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Retrospective } from "@/lib/types";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { getProjectStatus } from "@/lib/utils";
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -36,6 +37,16 @@ export default function ProjectDetailPage() {
   const projectId = params.id;
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  // 현재 프로젝트 데이터 (실제로는 params.id로 조회)
+  const currentProject =
+    projectData.find((p) => p.id === projectId) || projectData[0];
+
+  // 프로젝트 상태를 미리 계산하여 객체에 추가
+  const projectWithStatus = {
+    ...currentProject,
+    status: getProjectStatus(currentProject),
+  };
 
   // 샘플 프로젝트 데이터
   const projectData = [
@@ -45,7 +56,7 @@ export default function ProjectDetailPage() {
       description:
         "매일 아침 30분씩 운동하는 습관을 만들어 건강한 라이프스타일을 구축하기",
       area: "건강",
-      status: "completed" as const, // 완료된 프로젝트로 가정
+      // status 필드 제거됨 - getProjectStatus()로 계산
       progress: 30,
       total: 30,
       startDate: "2025.05.01",
@@ -88,7 +99,7 @@ export default function ProjectDetailPage() {
       title: "식단 관리 앱 개발",
       description: "개인 맞춤형 식단 추천 및 기록 앱 개발",
       area: "개발",
-      status: "in_progress" as const, // 진행 중인 프로젝트로 가정
+      // status 필드 제거됨 - getProjectStatus()로 계산
       progress: 7,
       total: 12,
       startDate: "2025.06.01",
@@ -291,7 +302,7 @@ export default function ProjectDetailPage() {
     <div className="container max-w-md px-4 py-6 pb-20">
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-6">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
+        <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <div className="flex gap-2">
@@ -334,20 +345,20 @@ export default function ProjectDetailPage() {
             <div className="flex items-center gap-2">
               <Badge
                 variant={
-                  project.status === "planned"
+                  projectWithStatus.status === "planned"
                     ? "secondary"
-                    : project.status === "in_progress"
+                    : projectWithStatus.status === "in_progress"
                     ? "default"
                     : "outline"
                 }
               >
-                {project.status === "planned"
+                {projectWithStatus.status === "planned"
                   ? "예정"
-                  : project.status === "in_progress"
+                  : projectWithStatus.status === "in_progress"
                   ? "진행 중"
                   : "완료됨"}
               </Badge>
-              {project.status === "in_progress" &&
+              {projectWithStatus.status === "in_progress" &&
                 new Date(project.endDate) < new Date() && (
                   <Badge variant="destructive" className="text-xs">
                     기한 초과

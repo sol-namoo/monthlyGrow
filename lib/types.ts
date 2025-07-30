@@ -31,11 +31,10 @@ export interface Project {
   description: string;
   areaId?: string;
   area?: string; // Area 이름 (denormalized - DB에 저장되지 않고 쿼리 시 함께 제공)
-  status: "planned" | "in_progress" | "completed";
   progress: number;
   total: number;
   startDate: Date;
-  dueDate: Date;
+  endDate: Date;
   createdAt: Date;
   updatedAt: Date;
   loopId?: string; // 현재 연결된 루프 ID (legacy)
@@ -43,6 +42,9 @@ export interface Project {
   retrospective?: Retrospective;
   notes: Note[];
   // tasks는 서브컬렉션으로 관리: projects/{projectId}/tasks/{taskId}
+
+  // 로컬 계산 필드 (DB에 저장되지 않음)
+  status?: "planned" | "in_progress" | "completed"; // startDate와 endDate를 기반으로 클라이언트에서 계산
 }
 
 export interface Task {

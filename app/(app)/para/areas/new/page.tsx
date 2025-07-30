@@ -1,13 +1,22 @@
 "use client";
 
 import type React from "react";
-
-import { useState } from "react";
+import { useState, Suspense } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   ChevronLeft,
   Compass,
@@ -30,41 +39,34 @@ import {
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
+import { RecommendationBadge } from "@/components/ui/recommendation-badge";
+import Loading from "@/components/feedback/Loading";
 
-export default function NewAreaPage() {
+// 폼 스키마 정의
+const areaFormSchema = z.object({
+  title: z.string().min(1, "영역 이름을 입력해주세요"),
+  description: z.string().min(1, "영역 설명을 입력해주세요"),
+  color: z.string().min(1, "색상을 선택해주세요"),
+  icon: z.string().min(1, "아이콘을 선택해주세요"),
+});
+
+type AreaFormData = z.infer<typeof areaFormSchema>;
+
+function NewAreaPageContent() {
   const router = useRouter();
   const { toast } = useToast();
   const searchParams = useSearchParams();
 
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    color: "#8b5cf6", // 기본 색상
-    icon: "compass", // 기본 아이콘
+  // react-hook-form 설정
+  const form = useForm<AreaFormData>({
+    resolver: zodResolver(areaFormSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      color: "#8b5cf6", // 기본 색상
+      icon: "compass", // 기본 아이콘
+    },
   });
-
-  const handleChange = (field: string, value: string) => {
-    setFormData({ ...formData, [field]: value });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // 여기서 Area 생성 로직 구현
-    toast({
-      title: "Area 생성 완료",
-      description: `${formData.title} 영역이 생성되었습니다.`,
-    });
-
-    // 루프 생성 페이지에서 왔다면 다시 루프 생성 페이지로 돌아가기
-    const returnUrl = searchParams.get("returnUrl");
-    if (returnUrl) {
-      router.push(returnUrl);
-    } else {
-      // 일반적인 경우는 PARA areas 페이지로 이동
-      router.push("/para/areas");
-    }
-  };
 
   // 추천 Area 템플릿
   const areaTemplates = [
@@ -127,32 +129,33 @@ export default function NewAreaPage() {
   ];
 
   const applyTemplate = (template: (typeof areaTemplates)[0]) => {
-    setFormData({
-      title: template.title,
-      description: template.description,
-      color: template.color,
-      icon: template.icon,
-    });
+    form.setValue("title", template.title);
+    form.setValue("description", template.description);
+    form.setValue("color", template.color);
+    form.setValue("icon", template.icon);
   };
 
   const getIconComponent = (iconId: string) => {
-    const iconOption = iconOptions.find((option) => option.id === iconId);
-    return iconOption ? iconOption.icon : Compass;
+    const option = iconOptions.find((opt) => opt.id === iconId);
+    return option ? option.icon : Compass;
   };
 
-  const SelectedIcon = getIconComponent(formData.icon);
+  const onSubmit = (data: AreaFormData) => {
+    // 여기서 Area 생성 로직 구현
+    toast({
+      title: "Area 생성 완료",
+      description: `${data.title} 영역이 생성되었습니다.`,
+    });
 
-  // 디자인 톤에 맞는 색상 팔레트
-  const colorPalette = [
-    { name: "보라", value: "#8b5cf6" },
-    { name: "파랑", value: "#3b82f6" },
-    { name: "초록", value: "#10b981" },
-    { name: "청록", value: "#06b6d4" },
-    { name: "주황", value: "#f59e0b" },
-    { name: "빨강", value: "#ef4444" },
-    { name: "핑크", value: "#ec4899" },
-    { name: "회색", value: "#6b7280" },
-  ];
+    // 루프 생성 페이지에서 왔다면 다시 루프 생성 페이지로 돌아가기
+    const returnUrl = searchParams.get("returnUrl");
+    if (returnUrl) {
+      router.push(returnUrl);
+    } else {
+      // 일반적인 경우는 PARA areas 페이지로 이동
+      router.push("/para/areas");
+    }
+  };
 
   return (
     <div className="container max-w-md px-4 py-6">
@@ -160,172 +163,206 @@ export default function NewAreaPage() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => router.back()}
+          onClick={() => window.history.back()}
           className="mr-2"
         >
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <h1 className="text-2xl font-bold">새 Area 만들기</h1>
+        <h1 className="text-2xl font-bold">영역 만들기</h1>
       </div>
 
       <div className="mb-6 text-center">
         <div className="mb-4 flex justify-center">
           <div className="rounded-full bg-primary/10 p-4">
-            <SelectedIcon className="h-8 w-8 text-primary" />
+            <Brain className="h-8 w-8 text-primary" />
           </div>
         </div>
-        <h2 className="text-lg font-bold mb-2">행동 영역을 만들어보세요</h2>
+        <h2 className="text-lg font-bold mb-2">새로운 영역을 만들어보세요</h2>
         <p className="text-sm text-muted-foreground">
-          Area는 지속적으로 관심을 가져야 할 생활의 영역입니다. 건강, 커리어,
-          자기계발 등이 될 수 있어요.
+          영역은 프로젝트와 자료를 체계적으로 분류하고 관리하는 기준입니다.
+          자신만의 영역을 만들어보세요.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <Card className="mb-6 p-4">
-          <div className="mb-4">
-            <Label htmlFor="title">Area 이름 *</Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) => handleChange("title", e.target.value)}
-              placeholder="예: 건강, 커리어, 자기계발"
-              className="mt-1"
-              required
-            />
-          </div>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <Card className="p-6">
+          <h2 className="mb-4 text-lg font-semibold">기본 정보</h2>
 
-          <div className="mb-4">
-            <Label htmlFor="description">설명</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => handleChange("description", e.target.value)}
-              placeholder="이 영역에 대한 간단한 설명을 입력하세요."
-              className="mt-1"
-              rows={3}
-            />
-          </div>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="title">영역 이름</Label>
+              <Input
+                id="title"
+                {...form.register("title")}
+                placeholder="예: 건강, 커리어, 자기계발"
+              />
+              {form.formState.errors.title && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.title.message}
+                </p>
+              )}
+            </div>
 
-          <div className="mb-4">
-            <Label>아이콘 선택</Label>
-            <div className="mt-2 grid grid-cols-4 gap-2">
-              {iconOptions.map((option) => {
-                const IconComponent = option.icon;
-                return (
+            <div>
+              <Label htmlFor="description">영역 설명</Label>
+              <Textarea
+                id="description"
+                {...form.register("description")}
+                placeholder="이 영역에서 관리하고 싶은 내용을 설명해주세요"
+                rows={3}
+              />
+              {form.formState.errors.description && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.description.message}
+                </p>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <h2 className="mb-4 text-lg font-semibold">시각적 설정</h2>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="color">색상</Label>
+              <div className="mt-2 grid grid-cols-6 gap-2">
+                {[
+                  "#8b5cf6",
+                  "#3b82f6",
+                  "#10b981",
+                  "#f59e0b",
+                  "#ef4444",
+                  "#ec4899",
+                  "#6366f1",
+                  "#06b6d4",
+                  "#84cc16",
+                  "#f97316",
+                  "#8b5a2b",
+                  "#64748b",
+                ].map((color) => (
                   <button
-                    key={option.id}
+                    key={color}
                     type="button"
-                    onClick={() => handleChange("icon", option.id)}
-                    className={`flex flex-col items-center gap-1 rounded-lg border p-3 transition-colors hover:bg-secondary ${
-                      formData.icon === option.id
-                        ? "border-primary bg-primary/10"
-                        : ""
+                    className={`h-8 w-8 rounded-full border-2 transition-all ${
+                      form.watch("color") === color
+                        ? "border-gray-900 scale-110"
+                        : "border-gray-300 hover:scale-105"
                     }`}
-                  >
-                    <IconComponent className="h-5 w-5" />
-                    <span className="text-xs">{option.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <Label>색상 선택</Label>
-            <div className="mt-2 grid grid-cols-8 gap-1">
-              {colorPalette.map((color) => (
-                <button
-                  key={color.value}
-                  type="button"
-                  onClick={() => handleChange("color", color.value)}
-                  className={`flex items-center justify-center rounded-lg border p-2 transition-colors hover:bg-secondary ${
-                    formData.color === color.value
-                      ? "border-primary bg-primary/10"
-                      : ""
-                  }`}
-                >
-                  <div
-                    className="h-5 w-5 rounded-full border border-white shadow-sm"
-                    style={{ backgroundColor: color.value }}
+                    style={{ backgroundColor: color }}
+                    onClick={() => form.setValue("color", color)}
                   />
-                </button>
-              ))}
+                ))}
+              </div>
+              {form.formState.errors.color && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.color.message}
+                </p>
+              )}
             </div>
-          </div>
-        </Card>
 
-        <Card className="mb-6 p-4">
-          <h3 className="mb-4 font-semibold">추천 템플릿</h3>
-          <p className="mb-4 text-sm text-muted-foreground">
-            일반적인 생활 영역들을 빠르게 선택할 수 있습니다.
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            {areaTemplates.map((template, index) => {
-              const TemplateIcon = getIconComponent(template.icon);
-              return (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => applyTemplate(template)}
-                  className="rounded-lg border p-3 text-left transition-colors hover:bg-secondary"
+            <div>
+              <Label htmlFor="icon">아이콘</Label>
+              <Select onValueChange={(value) => form.setValue("icon", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="아이콘을 선택해주세요" />
+                </SelectTrigger>
+                <SelectContent>
+                  {iconOptions.map((option) => {
+                    const IconComponent = option.icon;
+                    return (
+                      <SelectItem key={option.id} value={option.id}>
+                        <div className="flex items-center gap-2">
+                          <IconComponent className="h-4 w-4" />
+                          <span>{option.name}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.icon && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.icon.message}
+                </p>
+              )}
+            </div>
+
+            {/* 선택된 아이콘 미리보기 */}
+            {form.watch("icon") && (
+              <div className="flex items-center gap-2 p-3 rounded-lg border">
+                <div
+                  className="flex h-8 w-8 items-center justify-center rounded-full"
+                  style={{ backgroundColor: form.watch("color") }}
                 >
-                  <div className="flex items-center gap-2 mb-1">
-                    <div
-                      className="flex h-6 w-6 items-center justify-center rounded-full"
-                      style={{ backgroundColor: template.color + "20" }}
-                    >
-                      <TemplateIcon
-                        className="h-3 w-3"
-                        style={{ color: template.color }}
-                      />
-                    </div>
-                    <span className="font-medium text-sm">
-                      {template.title}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {template.description}
-                  </p>
-                </button>
-              );
-            })}
+                  {(() => {
+                    const IconComponent = getIconComponent(form.watch("icon"));
+                    return <IconComponent className="h-4 w-4 text-white" />;
+                  })()}
+                </div>
+                <span className="text-sm font-medium">
+                  {form.watch("title") || "영역 이름"}
+                </span>
+              </div>
+            )}
           </div>
         </Card>
 
-        <div className="mb-4">
-          <Card className="p-4 border-dashed border-primary/30 bg-primary/5">
-            <h4 className="font-medium text-sm mb-2">미리보기</h4>
-            <div className="flex items-center gap-3">
-              <div
-                className="flex h-10 w-10 items-center justify-center rounded-full"
-                style={{ backgroundColor: formData.color + "20" }}
-              >
-                <SelectedIcon
-                  className="h-5 w-5"
-                  style={{ color: formData.color }}
-                />
-              </div>
-              <div>
-                <div className="font-medium">
-                  {formData.title || "Area 이름"}
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  {formData.description || "설명이 여기에 표시됩니다"}
-                </div>
-              </div>
-            </div>
-          </Card>
-        </div>
+        <Card className="p-6">
+          <h2 className="mb-4 text-lg font-semibold">추천 템플릿</h2>
 
-        <Button
-          type="submit"
-          className="w-full"
-          disabled={!formData.title.trim()}
-        >
-          Area 만들기
-        </Button>
+          <div className="mb-4 space-y-2">
+            <RecommendationBadge
+              type="info"
+              message="자주 사용되는 영역 템플릿을 선택하여 빠르게 설정할 수 있어요"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {areaTemplates.map((template) => (
+              <button
+                key={template.title}
+                type="button"
+                className="flex items-center gap-3 rounded-lg border p-3 text-left transition-all hover:border-primary hover:bg-primary/5"
+                onClick={() => applyTemplate(template)}
+              >
+                <div
+                  className="flex h-8 w-8 items-center justify-center rounded-full"
+                  style={{ backgroundColor: template.color }}
+                >
+                  {(() => {
+                    const IconComponent = getIconComponent(template.icon);
+                    return <IconComponent className="h-4 w-4 text-white" />;
+                  })()}
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium">{template.title}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {template.description}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        <div className="flex gap-3">
+          <Button type="submit" className="flex-1">
+            영역 생성
+          </Button>
+          <Button type="button" variant="outline" onClick={() => router.back()}>
+            취소
+          </Button>
+        </div>
       </form>
     </div>
+  );
+}
+
+export default function NewAreaPage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <NewAreaPageContent />
+    </Suspense>
   );
 }

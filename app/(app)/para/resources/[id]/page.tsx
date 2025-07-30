@@ -85,7 +85,7 @@ export default function ResourceDetailPage() {
     <div className="container max-w-md px-4 py-6">
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-6">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
+        <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <div className="flex gap-2">

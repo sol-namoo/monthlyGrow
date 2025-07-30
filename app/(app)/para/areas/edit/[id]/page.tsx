@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { SelectItemsDialog } from "@/components/widgets/select-items-dialog";
 import { Badge } from "@/components/ui/badge";
+import Loading from "@/components/feedback/Loading";
 
 interface Project {
   id: string;
@@ -49,7 +50,7 @@ interface Resource {
   type: string;
 }
 
-export default function EditAreaPage({ params }: { params: { id: string } }) {
+function EditAreaPageContent({ params }: { params: { id: string } }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -440,5 +441,13 @@ export default function EditAreaPage({ params }: { params: { id: string } }) {
         searchPlaceholder="자료 검색..."
       />
     </div>
+  );
+}
+
+export default function EditAreaPage({ params }: { params: { id: string } }) {
+  return (
+    <Suspense fallback={<Loading />}>
+      <EditAreaPageContent params={params} />
+    </Suspense>
   );
 }

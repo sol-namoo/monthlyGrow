@@ -1,20 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { useToast } from "@/hooks/use-toast";
+import Loading from "@/components/feedback/Loading";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-import Loading from "@/components/feedback/Loading";
 
 function AddExistingProjectPageContent() {
   const router = useRouter();
+  const { toast } = useToast();
   const searchParams = useSearchParams();
   const loopId = searchParams.get("loopId");
 

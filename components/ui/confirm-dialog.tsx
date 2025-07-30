@@ -93,7 +93,7 @@ export function ConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="w-full max-w-none max-h-none rounded-none border-0 m-0 p-2 sm:max-w-lg sm:max-h-[90vh] sm:rounded-lg sm:border sm:mx-2 sm:my-4">
         <DialogHeader>
           <DialogTitle>
             <div className="flex items-center gap-2">

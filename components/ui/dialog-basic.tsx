@@ -29,7 +29,9 @@ export function BasicDialog({
 }: BasicDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={className}>
+      <DialogContent
+        className={`${className} w-full h-full max-w-none max-h-none rounded-none border-0 p-0 m-0 sm:max-w-lg sm:max-h-[90vh] sm:rounded-lg sm:border sm:mx-2 sm:my-8`}
+      >
         {(title || description) && (
           <DialogHeader>
             {title && <DialogTitle>{title}</DialogTitle>}

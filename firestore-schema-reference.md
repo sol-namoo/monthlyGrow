@@ -70,18 +70,25 @@ interface Project {
   description: string; // 프로젝트 설명
   areaId?: string; // 소속 영역 ID
   area?: string; // 영역 이름 (denormalized - DB에 저장되지 않고 쿼리 시 함께 제공)
-  status: "planned" | "in_progress" | "completed"; // 프로젝트 상태
   progress: number; // 현재 진행률 (0-100)
   total: number; // 목표 진행률 (0-100)
   startDate: Date; // 시작일
-  dueDate: Date; // 마감일
+  endDate: Date; // 마감일
   createdAt: Date; // 생성일시
   updatedAt: Date; // 수정일시
   loopId?: string; // 현재 연결된 루프 ID (legacy)
   addedMidway?: boolean; // 루프 중간 추가 여부
   retrospective?: Retrospective; // 프로젝트 회고
   notes: Note[]; // 프로젝트 노트들
+
+  // 로컬 계산 필드 (DB에 저장되지 않음)
+  status?: "planned" | "in_progress" | "completed"; // startDate와 endDate를 기반으로 클라이언트에서 계산
 }
+
+// 프로젝트 상태 계산 로직:
+// - planned: 오늘 < 시작일
+// - in_progress: 시작일 <= 오늘 <= 마감일
+// - completed: 오늘 > 마감일
 ```
 
 **서브컬렉션:**

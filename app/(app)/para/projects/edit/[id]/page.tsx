@@ -15,9 +15,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ChevronLeft, Briefcase, Plus, X, Calendar, Clock } from "lucide-react";
+import { RecommendationBadge } from "@/components/ui/recommendation-badge";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
+import dayjs from "dayjs";
+import { getProjectStatus } from "@/lib/utils";
 
 export default function EditProjectPage({
   params,
@@ -31,15 +34,21 @@ export default function EditProjectPage({
   const initialProjectData = {
     title: "새로운 웹사이트 개발",
     description: "반응형 디자인과 최신 기술 스택을 활용한 웹사이트 구축",
-    status: "completed", // 테스트를 위해 완료 상태로 설정
     area: "개인 성장", // 예시 Area
     startDate: "2025-01-01",
-    dueDate: "2025-12-31",
+    endDate: "2025-12-31",
     targetCount: 10,
     loopIds: ["1"],
   };
 
   const [formData, setFormData] = useState(initialProjectData);
+
+  // 프로젝트 상태를 미리 계산하여 객체에 추가
+  const formDataWithStatus = {
+    ...formData,
+    status: getProjectStatus(formData),
+  };
+
   const [tasks, setTasks] = useState([
     { id: 1, title: "기획 단계", date: "2025-01-01", duration: 2, done: false },
     {
@@ -74,11 +83,7 @@ export default function EditProjectPage({
     router.push(`/para/projects/${params.id}`);
   };
 
-  const projectStatuses = [
-    { value: "planned", label: "예정" },
-    { value: "in_progress", label: "진행 중" },
-    { value: "completed", label: "완료" },
-  ];
+  // projectStatuses 제거됨 - getProjectStatus()로 계산
 
   // 예시 Area 목록 (실제 앱에서는 데이터베이스에서 가져옴)
   const areas = [
@@ -106,7 +111,7 @@ export default function EditProjectPage({
         </div>
         <h2 className="text-lg font-bold mb-2">프로젝트 정보를 수정하세요</h2>
         <p className="text-sm text-muted-foreground">
-          {formData.status === "completed"
+          {formDataWithStatus.status === "completed"
             ? "완료된 프로젝트는 마감일만 수정할 수 있습니다."
             : "프로젝트의 이름, 설명, 상태 등을 업데이트할 수 있습니다."}
         </p>
@@ -123,7 +128,7 @@ export default function EditProjectPage({
               placeholder="예: 새로운 웹사이트 개발, 독서 목표 달성"
               className="mt-1"
               required
-              disabled={formData.status === "completed"}
+              disabled={getProjectStatus(formData) === "completed"}
             />
           </div>
 
@@ -140,25 +145,7 @@ export default function EditProjectPage({
             />
           </div>
 
-          <div className="mb-4">
-            <Label htmlFor="status">상태</Label>
-            <Select
-              value={formData.status}
-              onValueChange={(value) => handleChange("status", value)}
-              disabled={formData.status === "completed"}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="프로젝트 상태를 선택하세요" />
-              </SelectTrigger>
-              <SelectContent>
-                {projectStatuses.map((status) => (
-                  <SelectItem key={status.value} value={status.value}>
-                    {status.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* 상태 선택 제거됨 - getProjectStatus()로 계산 */}
 
           <div className="mb-4">
             <Label htmlFor="area">연결된 영역 (Area)</Label>
@@ -181,13 +168,64 @@ export default function EditProjectPage({
           </div>
 
           <div className="mb-4">
+            <Label htmlFor="startDate">시작일</Label>
+            <Input
+              id="startDate"
+              type="date"
+              value={formData.startDate}
+              onChange={(e) => {
+                const startDate = e.target.value;
+                const dueDate = formData.dueDate;
+                if (
+                  startDate &&
+                  dueDate &&
+                  dayjs(startDate).isAfter(dayjs(dueDate))
+                ) {
+                  handleChange("dueDate", startDate);
+                }
+                handleChange("startDate", startDate);
+              }}
+              disabled={formData.status !== "planned"}
+              className="mt-1"
+            />
+            {formData.loopIds && formData.loopIds.length > 0 && (
+              <p className="mt-1 text-xs text-amber-600">
+                ⚠️ 연결된 루프와 기간이 맞지 않을 수 있습니다
+              </p>
+            )}
+            {getProjectStatus(formData) !== "planned" && (
+              <p className="mt-1 text-xs text-blue-600">
+                ℹ️ 진행 중이거나 완료된 프로젝트의 시작일은 수정할 수 없습니다
+              </p>
+            )}
+          </div>
+
+          <div className="mb-4">
             <Label htmlFor="dueDate">마감일</Label>
             <Input
               id="dueDate"
               type="date"
               value={formData.dueDate}
-              onChange={(e) => handleChange("dueDate", e.target.value)}
+              onChange={(e) => {
+                const dueDate = e.target.value;
+                const startDate = formData.startDate;
+                if (
+                  startDate &&
+                  dueDate &&
+                  dayjs(dueDate).isBefore(dayjs(startDate))
+                ) {
+                  handleChange("dueDate", startDate);
+                } else {
+                  handleChange("dueDate", dueDate);
+                }
+              }}
+              min={formData.startDate || undefined}
               className="mt-1"
+            />
+            <RecommendationBadge
+              type="info"
+              message="권장 기간: 3개월 이내로 설정하면 효과적으로 관리할 수 있어요"
+              className="mt-2"
             />
           </div>
         </Card>
@@ -304,6 +342,8 @@ export default function EditProjectPage({
                           newTasks[index].date = e.target.value;
                           setTasks(newTasks);
                         }}
+                        min={formData.startDate || undefined}
+                        max={formData.dueDate || undefined}
                         className="flex-1"
                         disabled={formData.status === "completed"}
                       />

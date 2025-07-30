@@ -69,7 +69,7 @@ export function SelectItemsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] max-h-[80vh] flex flex-col">
+      <DialogContent className="w-full max-w-none max-h-none rounded-none border-0 m-0 p-2 sm:max-w-[425px] sm:max-h-[90vh] sm:rounded-lg sm:border sm:mx-2 sm:my-4 flex flex-col">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>

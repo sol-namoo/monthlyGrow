@@ -1,23 +1,35 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
-  Clock,
-  Star,
-  Target,
-  CalendarDays,
-  Edit,
-  Calendar,
-  Sparkles,
-  Zap,
   ChevronRight,
-  BookOpen,
-  Gift,
+  Star,
   Bookmark,
+  Clock,
+  CalendarDays,
+  Target,
+  AlertCircle,
+  Calendar,
+  Zap,
+  Gift,
+  Edit,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useRouter, useSearchParams } from "next/navigation";
+import Loading from "@/components/feedback/Loading";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { Loop, Retrospective } from "@/lib/types";
 import {
   Dialog,
   DialogContent,
@@ -26,23 +38,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import type { Retrospective } from "@/lib/types";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
-import Loading from "@/components/feedback/Loading";
-import { useInfiniteQuery } from "@tanstack/react-query";
 
 function LoopPageContent() {
-  const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") || "current";
@@ -53,171 +50,193 @@ function LoopPageContent() {
     "latest"
   );
 
-  const [currentLoop, setCurrentLoop] = useState(null);
-  const [nextLoop, setNextLoop] = useState(null);
-  const [pastLoops, setPastLoops] = useState([
+  const [currentLoop, setCurrentLoop] = useState<Loop | null>(null);
+  const [nextLoop, setNextLoop] = useState<Loop | null>(null);
+  const [pastLoops, setPastLoops] = useState<Loop[]>([
     {
-      id: 101,
+      id: "101",
+      userId: "user1",
       title: "5월 루프: 독서 습관 만들기",
-      type: "loop",
-      date: "2025.05.31",
-      summary: "매일 30분 독서 목표 달성, 지식 확장 및 스트레스 해소에 도움",
-      userRating: 5,
-      bookmarked: true,
-      createdAt: "2025-05-31T00:00:00Z",
-      completionRate: 95,
-      projectCount: 3,
-      areas: ["자기계발", "지식"],
+      startDate: new Date("2025-05-01"),
+      endDate: new Date("2025-05-31"),
+      status: "ended",
+      focusAreas: ["area1", "area2"],
+      projectIds: ["project1", "project2", "project3"],
       reward: "새로운 책 5권 구매",
-      startDate: "2025년 5월 1일",
-      endDate: "2025년 5월 31일",
+      createdAt: new Date("2025-05-01"),
+      updatedAt: new Date("2025-05-31"),
+      doneCount: 28,
+      targetCount: 30,
+      retrospective: {
+        id: "retro1",
+        userId: "user1",
+        createdAt: new Date("2025-05-31"),
+        updatedAt: new Date("2025-05-31"),
+        content: "매일 30분 독서 목표 달성, 지식 확장 및 스트레스 해소에 도움",
+        userRating: 5,
+        bookmarked: true,
+        title: "5월 루프: 독서 습관 만들기",
+        summary: "매일 30분 독서 목표 달성, 지식 확장 및 스트레스 해소에 도움",
+      },
     },
     {
-      id: 102,
+      id: "102",
+      userId: "user1",
       title: "4월 루프: 운동 루틴 정착",
-      type: "loop",
-      date: "2025.04.30",
-      summary: "주 3회 운동 목표 달성, 체력 향상 및 활력 증진",
-      userRating: 4,
-      bookmarked: false,
-      createdAt: "2025-04-30T00:00:00Z",
-      completionRate: 80,
-      projectCount: 2,
-      areas: ["건강"],
+      startDate: new Date("2025-04-01"),
+      endDate: new Date("2025-04-30"),
+      status: "ended",
+      focusAreas: ["area3"],
+      projectIds: ["project4", "project5"],
       reward: "새 운동복 구매",
-      startDate: "2025년 4월 1일",
-      endDate: "2025년 4월 30일",
+      createdAt: new Date("2025-04-01"),
+      updatedAt: new Date("2025-04-30"),
+      doneCount: 12,
+      targetCount: 15,
+      retrospective: {
+        id: "retro2",
+        userId: "user1",
+        createdAt: new Date("2025-04-30"),
+        updatedAt: new Date("2025-04-30"),
+        content: "주 3회 운동 목표 달성, 체력 향상 및 활력 증진",
+        userRating: 4,
+        bookmarked: false,
+        title: "4월 루프: 운동 루틴 정착",
+        summary: "주 3회 운동 목표 달성, 체력 향상 및 활력 증진",
+      },
     },
     {
-      id: 103,
+      id: "103",
+      userId: "user1",
       title: "3월 루프: 재테크 공부",
-      type: "loop",
-      date: "2025.03.31",
-      summary: "기본 개념 학습 성공, 투자 계획 수립 시작",
-      userRating: 3,
-      bookmarked: true,
-      createdAt: "2025-03-31T00:00:00Z",
-      completionRate: 70,
-      projectCount: 4,
-      areas: ["재정"],
+      startDate: new Date("2025-03-01"),
+      endDate: new Date("2025-03-31"),
+      status: "ended",
+      focusAreas: ["area4"],
+      projectIds: ["project6", "project7", "project8", "project9"],
       reward: "주식 투자 시드머니",
-      startDate: "2025년 3월 1일",
-      endDate: "2025년 3월 31일",
+      createdAt: new Date("2025-03-01"),
+      updatedAt: new Date("2025-03-31"),
+      doneCount: 21,
+      targetCount: 30,
+      retrospective: {
+        id: "retro3",
+        userId: "user1",
+        createdAt: new Date("2025-03-31"),
+        updatedAt: new Date("2025-03-31"),
+        content: "기본 개념 학습 성공, 투자 계획 수립 시작",
+        userRating: 3,
+        bookmarked: true,
+        title: "3월 루프: 재테크 공부",
+        summary: "기본 개념 학습 성공, 투자 계획 수립 시작",
+      },
     },
     {
-      id: 104,
+      id: "104",
+      userId: "user1",
       title: "2월 루프: 글쓰기 연습",
-      type: "loop",
-      date: "2025.02.28",
-      summary: "주 1회 블로그 글 작성 목표 미달성, 꾸준함 부족",
-      userRating: 2,
-      bookmarked: false,
-      createdAt: "2025-02-28T00:00:00Z",
-      completionRate: 40,
-      projectCount: 1,
-      areas: ["커리어"],
+      startDate: new Date("2025-02-01"),
+      endDate: new Date("2025-02-28"),
+      status: "ended",
+      focusAreas: ["area5"],
+      projectIds: ["project10"],
       reward: "새 노트북",
-      startDate: "2025년 2월 1일",
-      endDate: "2025년 2월 28일",
+      createdAt: new Date("2025-02-01"),
+      updatedAt: new Date("2025-02-28"),
+      doneCount: 4,
+      targetCount: 10,
+      retrospective: {
+        id: "retro4",
+        userId: "user1",
+        createdAt: new Date("2025-02-28"),
+        updatedAt: new Date("2025-02-28"),
+        content: "주 1회 블로그 글 작성 목표 미달성, 꾸준함 부족",
+        userRating: 2,
+        bookmarked: false,
+        title: "2월 루프: 글쓰기 연습",
+        summary: "주 1회 블로그 글 작성 목표 미달성, 꾸준함 부족",
+      },
     },
-    // 추가 샘플 데이터 (무한 스크롤 테스트용)
     {
-      id: 105,
+      id: "105",
+      userId: "user1",
       title: "1월 루프: 새해 다짐",
-      type: "loop",
-      date: "2025.01.31",
-      summary: "새해 계획 수립 및 목표 설정",
-      userRating: 3,
-      bookmarked: false,
-      createdAt: "2025-01-31T00:00:00Z",
-      completionRate: 60,
-      projectCount: 2,
-      areas: ["자기계발"],
+      startDate: new Date("2025-01-01"),
+      endDate: new Date("2025-01-31"),
+      status: "ended",
+      focusAreas: ["area1"],
+      projectIds: ["project11", "project12"],
       reward: "새 다이어리",
-      startDate: "2025년 1월 1일",
-      endDate: "2025년 1월 31일",
+      createdAt: new Date("2025-01-01"),
+      updatedAt: new Date("2025-01-31"),
+      doneCount: 18,
+      targetCount: 30,
+      retrospective: {
+        id: "retro5",
+        userId: "user1",
+        createdAt: new Date("2025-01-31"),
+        updatedAt: new Date("2025-01-31"),
+        content: "새해 계획 수립 및 목표 설정",
+        userRating: 3,
+        bookmarked: false,
+        title: "1월 루프: 새해 다짐",
+        summary: "새해 계획 수립 및 목표 설정",
+      },
     },
     {
-      id: 106,
+      id: "106",
+      userId: "user1",
       title: "12월 루프: 연말 정리",
-      type: "loop",
-      date: "2024.12.31",
-      summary: "한 해 마무리 및 다음 해 계획",
-      userRating: 4,
-      bookmarked: true,
-      createdAt: "2024-12-31T00:00:00Z",
-      completionRate: 85,
-      projectCount: 3,
-      areas: ["자기계발", "커리어"],
-      reward: "연말 휴가",
-      startDate: "2024년 12월 1일",
-      endDate: "2024년 12월 31일",
-    },
-    {
-      id: 107,
-      title: "11월 루프: 건강 관리",
-      type: "loop",
-      date: "2024.11.30",
-      summary: "규칙적인 운동과 식단 관리",
-      userRating: 4,
-      bookmarked: false,
-      createdAt: "2024-11-30T00:00:00Z",
-      completionRate: 75,
-      projectCount: 2,
-      areas: ["건강"],
-      reward: "새 운동화",
-      startDate: "2024년 11월 1일",
-      endDate: "2024년 11월 30일",
-    },
-    {
-      id: 108,
-      title: "10월 루프: 독서 습관",
-      type: "loop",
-      date: "2024.10.31",
-      summary: "매일 30분 독서하기",
-      userRating: 5,
-      bookmarked: true,
-      createdAt: "2024-10-31T00:00:00Z",
-      completionRate: 90,
-      projectCount: 1,
-      areas: ["자기계발"],
-      reward: "새 책 3권",
-      startDate: "2024년 10월 1일",
-      endDate: "2024년 10월 31일",
-    },
-    {
-      id: 109,
-      title: "9월 루프: 코딩 연습",
-      type: "loop",
-      date: "2024.09.30",
-      summary: "매일 코딩 문제 풀기",
-      userRating: 3,
-      bookmarked: false,
-      createdAt: "2024-09-30T00:00:00Z",
-      completionRate: 65,
-      projectCount: 2,
-      areas: ["커리어"],
-      reward: "새 키보드",
-      startDate: "2024년 9월 1일",
-      endDate: "2024년 9월 30일",
-    },
-    {
-      id: 110,
-      title: "8월 루프: 여행 계획",
-      type: "loop",
-      date: "2024.08.31",
-      summary: "가족과 함께하는 여행 준비",
-      userRating: 4,
-      bookmarked: true,
-      createdAt: "2024-08-31T00:00:00Z",
-      completionRate: 80,
-      projectCount: 1,
-      areas: ["가족"],
-      reward: "여행 경비",
-      startDate: "2024년 8월 1일",
-      endDate: "2024년 8월 31일",
+      startDate: new Date("2024-12-01"),
+      endDate: new Date("2024-12-31"),
+      status: "ended",
+      focusAreas: ["area1", "area6"],
+      projectIds: ["project13", "project14", "project15"],
+      reward: "연말 여행",
+      createdAt: new Date("2024-12-01"),
+      updatedAt: new Date("2024-12-31"),
+      doneCount: 25,
+      targetCount: 30,
+      retrospective: {
+        id: "retro6",
+        userId: "user1",
+        createdAt: new Date("2024-12-31"),
+        updatedAt: new Date("2024-12-31"),
+        content: "한 해 마무리 및 다음 해 계획",
+        userRating: 4,
+        bookmarked: true,
+        title: "12월 루프: 연말 정리",
+        summary: "한 해 마무리 및 다음 해 계획",
+      },
     },
   ]);
+
+  // 계산된 값들을 위한 헬퍼 함수들
+  const getCompletionRate = (loop: Loop) => {
+    return loop.targetCount > 0
+      ? Math.round((loop.doneCount / loop.targetCount) * 100)
+      : 0;
+  };
+
+  const getProjectCount = (loop: Loop) => {
+    return loop.projectIds.length;
+  };
+
+  const getFormattedDate = (date: Date) => {
+    return date.toLocaleDateString("ko-KR", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const getFormattedDateShort = (date: Date) => {
+    return date.toLocaleDateString("ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+  };
 
   useEffect(() => {
     setActiveTab(searchParams.get("tab") || "current");
@@ -238,11 +257,11 @@ function LoopPageContent() {
 
       const sortedLoops = [...pastLoops].sort((a, b) => {
         if (sortBy === "latest") {
-          return new Date(b.date).getTime() - new Date(a.date).getTime();
+          return b.endDate.getTime() - a.endDate.getTime();
         } else if (sortBy === "oldest") {
-          return new Date(a.date).getTime() - new Date(b.date).getTime();
+          return a.endDate.getTime() - b.endDate.getTime();
         } else if (sortBy === "completionRate") {
-          return (b.completionRate || 0) - (a.completionRate || 0);
+          return getCompletionRate(b) - getCompletionRate(a);
         }
         return 0;
       });
@@ -311,42 +330,37 @@ function LoopPageContent() {
 
   // 샘플 데이터 - 현재 월 루프는 완료된 상태, 다음 월 루프는 계획 중인 상태
   // currentLoop를 null로 설정하여 "이번 달 루프 시작하기" 버튼이 보이도록 테스트 가능
-  const sampleCurrentLoop = {
-    id: 1,
-    title: `${currentMonthName} 루프: 건강한 개발자 되기`,
-    reward: "새로운 기계식 키보드 구매",
-    progress: 90, // 완료된 루프이므로 높은 진행률
-    total: 100,
-    startDate: `${currentYear}년 ${currentMonth + 1}월 1일`,
-    endDate: `${currentYear}년 ${currentMonth + 1}월 30일`,
-    daysLeft: 0, // 완료되었으므로 0
-    areas: ["건강", "개발", "마음"],
-    projects: [
-      { id: 1, title: "매일 아침 30분 운동", progress: 28, total: 30 },
-      { id: 2, title: "클린 코드 작성 연습", progress: 11, total: 12 },
-      { id: 3, title: "주 2회 명상", progress: 19, total: 20 },
-    ],
-    completed: true, // 현재 루프는 완료된 상태
-    reflection: {
-      id: "loop-retro-current",
-      loopId: "1",
-      userId: "user-123",
-      createdAt: new Date().toISOString(),
-      bestMoment: "매일 아침 운동을 꾸준히 했던 순간",
-      routineAdherence:
-        "계획한 루틴의 90%를 지켰습니다. 특히 아침 운동은 꾸준히 했습니다.",
-      unexpectedObstacles: "갑작스러운 출장으로 식단 관리가 어려웠습니다.",
-      nextLoopApplication:
-        "다음 루프에서는 출장 시에도 식단을 유지할 수 있는 계획을 세울 것입니다.",
-      content:
-        "전반적으로 만족스러운 루프였습니다. 건강이 많이 좋아진 것을 느낍니다.",
-      userRating: 4,
-      bookmarked: true,
-      title: `${currentMonthName} 루프: 건강한 개발자 되기 회고`,
-      summary: "아침 운동 습관 성공, 출장 중 식단 관리 어려움",
-    } as Retrospective,
-    notes: [],
-  };
+  const sampleCurrentLoop: Loop | null = null;
+  // const sampleCurrentLoop: Loop = {
+  //   id: "current-1",
+  //   userId: "user1",
+  //   title: `${currentMonthName} 루프: 건강한 개발자 되기`,
+  //   startDate: new Date(currentYear, currentMonth, 1),
+  //   endDate: new Date(currentYear, currentMonth, 30),
+  //   status: "ended",
+  //   focusAreas: ["area1", "area2", "area3"],
+  //   projectIds: ["project1", "project2", "project3"],
+  //   reward: "새로운 기계식 키보드 구매",
+  //   createdAt: new Date(currentYear, currentMonth, 1),
+  //   updatedAt: new Date(currentYear, currentMonth, 30),
+  //   doneCount: 27,
+  //   targetCount: 30,
+  //   retrospective: {
+  //     id: "retro-current",
+  //     userId: "user1",
+  //     createdAt: new Date(),
+  //     updatedAt: new Date(),
+  //     content: "전반적으로 만족스러운 루프였습니다. 건강이 많이 좋아진 것을 느낍니다.",
+  //     bestMoment: "매일 아침 운동을 꾸준히 했던 순간",
+  //     routineAdherence: "계획한 루틴의 90%를 지켰습니다. 특히 아침 운동은 꾸준히 했습니다.",
+  //     unexpectedObstacles: "갑작스러운 출장으로 식단 관리가 어려웠습니다.",
+  //     nextLoopApplication: "다음 루프에서는 출장 시에도 식단을 유지할 수 있는 계획을 세울 것입니다.",
+  //     userRating: 4,
+  //     bookmarked: true,
+  //     title: `${currentMonthName} 루프: 건강한 개발자 되기 회고`,
+  //     summary: "아침 운동 습관 성공, 출장 중 식단 관리 어려움",
+  //   },
+  // };
 
   // nextLoop를 null로 설정하여 "다음 루프 미리 만들기" 버튼이 보이도록 테스트 가능
   const sampleNextLoop = null;
@@ -370,7 +384,7 @@ function LoopPageContent() {
 
   useEffect(() => {
     // 현재 루프가 없거나, 현재 루프가 있지만 아직 회고가 없는 경우에만 팝업 띄우기
-    if (isFirstDayOfMonth && (!currentLoop || !currentLoop.reflection)) {
+    if (isFirstDayOfMonth && (!currentLoop || !currentLoop.retrospective)) {
       const lastShown = localStorage.getItem("loopReminderLastShown");
       const today = currentDate.toISOString().split("T")[0];
 
@@ -435,28 +449,33 @@ function LoopPageContent() {
           <section>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xl font-bold">현재 루프</h2>
-              <div className="flex items-center gap-2">
-                {currentLoop && (
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    <span>{currentLoop.completed ? "완료됨" : "진행 중"}</span>
-                  </div>
-                )}
-                <span className="text-sm text-muted-foreground">
-                  {currentLoop ? "1개" : "0개"}
-                </span>
-              </div>
+              {currentLoop && (
+                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <Clock className="h-4 w-4" />
+                  <span>
+                    {currentLoop.status === "ended" ? "완료됨" : "진행 중"}
+                  </span>
+                </div>
+              )}
             </div>
             {currentLoop ? (
               <Card className="border-2 border-primary/20 p-4 mb-6">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold">{currentLoop.title}</h3>
                   <div className="flex items-center gap-2">
-                    {currentLoop.completed ? (
+                    {currentLoop.status === "ended" ? (
                       <Badge variant="default">완료</Badge>
                     ) : (
                       <Badge variant="secondary">
-                        D-{currentLoop.daysLeft}
+                        D-
+                        {Math.max(
+                          0,
+                          Math.ceil(
+                            (currentLoop.endDate.getTime() -
+                              new Date().getTime()) /
+                              (1000 * 60 * 60 * 24)
+                          )
+                        )}
                       </Badge>
                     )}
                     <Button
@@ -480,15 +499,15 @@ function LoopPageContent() {
 
                 <div className="mb-4">
                   <div className="mb-1 flex justify-between text-sm">
-                    <span>달성률: {currentLoop.progress}%</span>
+                    <span>달성률: {getCompletionRate(currentLoop)}%</span>
                     <span>
-                      {currentLoop.progress}/{currentLoop.total}
+                      {currentLoop.doneCount}/{currentLoop.targetCount}
                     </span>
                   </div>
                   <div className="progress-bar">
                     <div
                       className="progress-value"
-                      style={{ width: `${currentLoop.progress}%` }}
+                      style={{ width: `${getCompletionRate(currentLoop)}%` }}
                     ></div>
                   </div>
                 </div>
@@ -496,19 +515,20 @@ function LoopPageContent() {
                 <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
                   <Clock className="h-4 w-4" />
                   <span>
-                    {currentLoop.startDate} ~ {currentLoop.endDate}
+                    {getFormattedDateShort(currentLoop.startDate)} ~{" "}
+                    {getFormattedDateShort(currentLoop.endDate)}
                   </span>
                 </div>
 
                 <div className="mb-4">
                   <h4 className="mb-2 font-medium">중점 Areas</h4>
                   <div className="flex flex-wrap gap-2">
-                    {currentLoop.areas.map((area) => (
+                    {currentLoop.focusAreas.map((areaId) => (
                       <span
-                        key={area}
+                        key={areaId}
                         className="rounded-full bg-secondary px-3 py-1 text-xs"
                       >
-                        {area}
+                        {areaId}
                       </span>
                     ))}
                   </div>
@@ -516,27 +536,23 @@ function LoopPageContent() {
 
                 <div>
                   <h4 className="mb-2 font-medium">
-                    프로젝트 ({currentLoop.projects.length}개)
+                    프로젝트 ({currentLoop.projectIds.length}개)
                   </h4>
                   <div className="space-y-2">
-                    {currentLoop.projects.map((project) => (
+                    {currentLoop.projectIds.map((projectId) => (
                       <div
-                        key={project.id}
+                        key={projectId}
                         className="rounded-lg bg-secondary p-3 text-sm"
                       >
                         <div className="mb-1 flex justify-between">
-                          <span>{project.title}</span>
-                          <span>
-                            {project.progress}/{project.total}
-                          </span>
+                          <span>프로젝트 {projectId}</span>
+                          <span>진행 중</span>
                         </div>
                         <div className="progress-bar">
                           <div
                             className="progress-value"
                             style={{
-                              width: `${Math.round(
-                                (project.progress / project.total) * 100
-                              )}%`,
+                              width: `60%`,
                             }}
                           ></div>
                         </div>
@@ -580,17 +596,12 @@ function LoopPageContent() {
           <section>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xl font-bold">다음 루프</h2>
-              <div className="flex items-center gap-2">
-                {nextLoop && (
-                  <div className="flex items-center gap-1 text-sm text-purple-600">
-                    <Calendar className="h-4 w-4" />
-                    <span>예약됨</span>
-                  </div>
-                )}
-                <span className="text-sm text-muted-foreground">
-                  {nextLoop ? "1개" : "0개"}
-                </span>
-              </div>
+              {nextLoop && (
+                <div className="flex items-center gap-1 text-sm text-purple-600">
+                  <Calendar className="h-4 w-4" />
+                  <span>예약됨</span>
+                </div>
+              )}
             </div>
             {nextLoop ? (
               <Card className="border-2 border-purple-200 bg-purple-50/50 p-4">
@@ -625,19 +636,20 @@ function LoopPageContent() {
                 <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
                   <Calendar className="h-4 w-4" />
                   <span>
-                    📅 시작 예정: {nextLoop.startDate} ~ {nextLoop.endDate}
+                    📅 시작 예정: {getFormattedDateShort(nextLoop.startDate)} ~{" "}
+                    {getFormattedDateShort(nextLoop.endDate)}
                   </span>
                 </div>
 
                 <div className="mb-4">
                   <h4 className="mb-2 font-medium">중점 Areas</h4>
                   <div className="flex flex-wrap gap-2">
-                    {nextLoop.areas.map((area) => (
+                    {nextLoop.focusAreas.map((areaId) => (
                       <span
-                        key={area}
+                        key={areaId}
                         className="rounded-full bg-purple-100 px-3 py-1 text-xs"
                       >
-                        {area}
+                        {areaId}
                       </span>
                     ))}
                   </div>
@@ -645,10 +657,10 @@ function LoopPageContent() {
 
                 <div>
                   <h4 className="mb-2 font-medium">
-                    프로젝트 ({nextLoop.projects.length}개)
+                    프로젝트 ({nextLoop.projectIds.length}개)
                   </h4>
                   <p className="text-sm text-muted-foreground">
-                    🔗 프로젝트 {nextLoop.projects.length}개 연결됨
+                    🔗 프로젝트 {nextLoop.projectIds.length}개 연결됨
                   </p>
                 </div>
 
@@ -740,7 +752,7 @@ function LoopPageContent() {
                     <Card
                       key={loop.id}
                       className={`p-4 ${
-                        loop.completionRate >= 80
+                        getCompletionRate(loop) >= 80
                           ? "border-green-200 bg-green-50/30"
                           : "border-red-200 bg-red-50/30"
                       }`}
@@ -755,7 +767,8 @@ function LoopPageContent() {
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <Calendar className="h-3 w-3" />
                             <span>
-                              {loop.startDate} ~ {loop.endDate}
+                              {getFormattedDateShort(loop.startDate)} ~{" "}
+                              {getFormattedDateShort(loop.endDate)}
                             </span>
                           </div>
                         </div>
@@ -763,12 +776,12 @@ function LoopPageContent() {
                           <Badge
                             variant="outline"
                             className={`text-xs ${
-                              loop.completionRate >= 80
+                              getCompletionRate(loop) >= 80
                                 ? "border-green-300 text-green-700"
                                 : "border-red-300 text-red-700"
                             }`}
                           >
-                            {loop.completionRate}%
+                            {getCompletionRate(loop)}%
                           </Badge>
                           <Button
                             variant="ghost"
@@ -785,25 +798,25 @@ function LoopPageContent() {
                       </div>
 
                       <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                        {loop.summary}
+                        {loop.retrospective?.summary || "회고가 없습니다."}
                       </p>
 
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1">
-                            {renderStars(loop.userRating)}
+                            {renderStars(loop.retrospective?.userRating)}
                             <span className="text-xs text-muted-foreground">
-                              {loop.userRating}/5
+                              {loop.retrospective?.userRating || 0}/5
                             </span>
                           </div>
-                          {loop.bookmarked && (
+                          {loop.retrospective?.bookmarked && (
                             <Bookmark className="h-3 w-3 text-yellow-500 fill-yellow-500" />
                           )}
                         </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>프로젝트 {loop.projectCount}개</span>
+                          <span>프로젝트 {getProjectCount(loop)}개</span>
                           <span>•</span>
-                          <span>{loop.date}</span>
+                          <span>{getFormattedDateShort(loop.endDate)}</span>
                         </div>
                       </div>
                     </Card>
@@ -846,7 +859,7 @@ function LoopPageContent() {
       </Tabs>
       {/* 새 달 시작 시 자동 루프 생성 유도 다이얼로그 */}
       <Dialog open={showNewMonthDialog} onOpenChange={setShowNewMonthDialog}>
-        <DialogContent>
+        <DialogContent className="w-full max-w-none max-h-none rounded-none border-0 m-0 p-2 sm:max-w-lg sm:max-h-[90vh] sm:rounded-lg sm:border sm:mx-2 sm:my-4">
           <DialogHeader>
             <DialogTitle>새로운 달이 시작되었습니다!</DialogTitle>
             <DialogDescription>

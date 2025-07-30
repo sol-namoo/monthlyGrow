@@ -92,11 +92,10 @@ User (개인화된 데이터)
   description: string;    // 프로젝트 설명
   areaId?: string;        // 소속 영역 ID
   area?: string;          // 영역 이름 (denormalized)
-  status: "planned" | "in_progress" | "completed";
   progress: number;       // 현재 진행률
   total: number;          // 목표 진행률
   startDate: Date;        // 시작일
-  dueDate: Date;          // 마감일
+  endDate: Date;          // 마감일
   createdAt: Date;
   updatedAt: Date;
   loopId?: string;        // 현재 연결된 루프 ID (legacy)
@@ -105,7 +104,15 @@ User (개인화된 데이터)
   tasks: Task[];          // 세부 작업들
   retrospective?: Retrospective; // 프로젝트 회고
   notes: Note[];          // 프로젝트 노트들
+
+  // 로컬 계산 필드 (DB에 저장되지 않음)
+  status?: "planned" | "in_progress" | "completed"; // startDate와 endDate를 기반으로 클라이언트에서 계산
 }
+
+// 프로젝트 상태 계산 로직:
+// - planned: 오늘 < 시작일
+// - in_progress: 시작일 <= 오늘 <= 마감일
+// - completed: 오늘 > 마감일
 ```
 
 ### 4. Loops 컬렉션

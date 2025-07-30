@@ -14,7 +14,6 @@ import {
   Folder,
   Archive,
   Filter,
-  SortAsc,
   CalendarDays,
   Heart,
   Brain,
@@ -55,6 +54,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getProjectStatus } from "@/lib/utils";
 
 function ParaPageContent() {
   const router = useRouter();
@@ -68,13 +68,6 @@ function ParaPageContent() {
   // 필터링 상태
   const [projectFilter, setProjectFilter] = useState("all");
 
-  // 무한 스크롤 관련 상태
-  const [displayedProjects, setDisplayedProjects] = useState<any[]>([]);
-  const [hasMoreProjects, setHasMoreProjects] = useState(true);
-  const [isLoadingMoreProjects, setIsLoadingMoreProjects] = useState(false);
-  const observerRef = useRef<IntersectionObserver | null>(null);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-
   // 샘플 데이터
   const projects = [
     {
@@ -83,7 +76,7 @@ function ParaPageContent() {
       description:
         "매일 아침 30분씩 운동하는 습관을 만들어 건강한 라이프스타일을 구축하기",
       area: "건강",
-      status: "completed",
+      // status 필드 제거됨 - getProjectStatus()로 계산
       progress: 30,
       total: 30,
       startDate: "2025.05.01",
@@ -96,7 +89,7 @@ function ParaPageContent() {
       title: "식단 관리 앱 개발",
       description: "개인 맞춤형 식단 추천 및 기록 앱 개발",
       area: "개발",
-      status: "in_progress",
+      // status 필드 제거됨 - getProjectStatus()로 계산
       progress: 7,
       total: 12,
       startDate: "2025.06.01",
@@ -109,7 +102,7 @@ function ParaPageContent() {
       title: "주간 회고 자동화 스크립트",
       description: "매주 회고 내용을 자동으로 정리하고 분석하는 스크립트 개발",
       area: "생산성",
-      status: "in_progress",
+      // status 필드 제거됨 - getProjectStatus()로 계산
       progress: 5,
       total: 10,
       startDate: "2025.07.01",
@@ -122,7 +115,7 @@ function ParaPageContent() {
       title: "새로운 기술 스택 학습",
       description: "Next.js 15 및 React Server Components 심화 학습",
       area: "개발",
-      status: "in_progress",
+      // status 필드 제거됨 - getProjectStatus()로 계산
       progress: 1,
       total: 5,
       startDate: "2025.07.05",
@@ -135,7 +128,7 @@ function ParaPageContent() {
       title: "블로그 글 작성",
       description: "개인 블로그에 주 1회 글 작성",
       area: "커리어",
-      status: "planned",
+      // status 필드 제거됨 - getProjectStatus()로 계산
       progress: 0,
       total: 100,
       startDate: "2025.08.01",
@@ -155,7 +148,7 @@ function ParaPageContent() {
       title: "재테크 공부",
       description: "투자 관련 지식 습득",
       area: "재정",
-      status: "planned",
+      // status 필드 제거됨 - getProjectStatus()로 계산
       progress: 0,
       total: 100,
       startDate: "2025.08.01",
@@ -168,409 +161,22 @@ function ParaPageContent() {
         "loop-4",
         "loop-5",
         "loop-6",
-        "loop-7",
-      ],
-    },
-    {
-      id: "7",
-      title: "외국어 학습",
-      description: "매일 30분 영어 공부",
-      area: "자기계발",
-      status: "in_progress",
-      progress: 20,
-      total: 100,
-      startDate: "2025.07.01",
-      endDate: "2025.07.31",
-      loopConnection: "7월 루프: 독서 습관 만들기",
-      connectedLoops: [
-        "loop-1",
-        "loop-2",
-        "loop-3",
-        "loop-4",
-        "loop-5",
-        "loop-6",
-        "loop-7",
-        "loop-8",
-      ],
-    },
-    {
-      id: "8",
-      title: "명상 습관 만들기",
-      description: "매일 아침 10분 명상하기",
-      area: "건강",
-      status: "completed",
-      progress: 100,
-      total: 100,
-      startDate: "2025.06.01",
-      endDate: "2025.06.30",
-      loopConnection: "6월 루프: 건강한 개발자 되기",
-      connectedLoops: [
-        "loop-1",
-        "loop-2",
-        "loop-3",
-        "loop-4",
-        "loop-5",
-        "loop-6",
-        "loop-7",
-        "loop-8",
-        "loop-9",
-      ],
-    },
-    {
-      id: "9",
-      title: "독서 습관 만들기",
-      description: "매일 30분 독서하기",
-      area: "자기계발",
-      status: "in_progress",
-      progress: 15,
-      total: 100,
-      startDate: "2025.07.01",
-      endDate: "2025.07.31",
-      loopConnection: "7월 루프: 독서 습관 만들기",
-      connectedLoops: [
-        "loop-1",
-        "loop-2",
-        "loop-3",
-        "loop-4",
-        "loop-5",
-        "loop-6",
-        "loop-7",
-        "loop-8",
-        "loop-9",
-        "loop-10",
-      ],
-    },
-    {
-      id: "10",
-      title: "가족 여행 계획",
-      description: "가족과 함께하는 여행 준비",
-      area: "가족",
-      status: "planned",
-      progress: 0,
-      total: 100,
-      startDate: "2025.09.01",
-      endDate: "2025.09.30",
-      loopConnection: null,
-      connectedLoops: [
-        "loop-1",
-        "loop-2",
-        "loop-3",
-        "loop-4",
-        "loop-5",
-        "loop-6",
-        "loop-7",
-        "loop-8",
-        "loop-9",
-        "loop-10",
-        "loop-11",
-      ],
-    },
-    {
-      id: "11",
-      title: "집 정리 정리",
-      description: "미니멀 라이프를 위한 집 정리",
-      area: "생활",
-      status: "in_progress",
-      progress: 30,
-      total: 100,
-      startDate: "2025.07.01",
-      endDate: "2025.07.31",
-      loopConnection: "7월 루프: 독서 습관 만들기",
-      connectedLoops: [
-        "loop-1",
-        "loop-2",
-        "loop-3",
-        "loop-4",
-        "loop-5",
-        "loop-6",
-        "loop-7",
-        "loop-8",
-        "loop-9",
-        "loop-10",
-        "loop-11",
-        "loop-12",
-      ],
-    },
-    {
-      id: "12",
-      title: "취미 개발",
-      description: "새로운 취미 찾기",
-      area: "여가",
-      status: "planned",
-      progress: 0,
-      total: 100,
-      startDate: "2025.08.01",
-      endDate: "2025.08.31",
-      loopConnection: null,
-      connectedLoops: [
-        "loop-1",
-        "loop-2",
-        "loop-3",
-        "loop-4",
-        "loop-5",
-        "loop-6",
-        "loop-7",
-        "loop-8",
-        "loop-9",
-        "loop-10",
-        "loop-11",
-        "loop-12",
-        "loop-13",
-      ],
-    },
-    {
-      id: "13",
-      title: "네트워킹 활동",
-      description: "업계 사람들과 네트워킹",
-      area: "커리어",
-      status: "in_progress",
-      progress: 25,
-      total: 100,
-      startDate: "2025.07.01",
-      endDate: "2025.07.31",
-      loopConnection: "7월 루프: 독서 습관 만들기",
-      connectedLoops: [
-        "loop-1",
-        "loop-2",
-        "loop-3",
-        "loop-4",
-        "loop-5",
-        "loop-6",
-        "loop-7",
-        "loop-8",
-        "loop-9",
-        "loop-10",
-        "loop-11",
-        "loop-12",
-        "loop-13",
-        "loop-14",
-      ],
-    },
-    {
-      id: "14",
-      title: "재정 계획 수립",
-      description: "개인 재정 계획 및 예산 관리",
-      area: "재정",
-      status: "completed",
-      progress: 100,
-      total: 100,
-      startDate: "2025.06.01",
-      endDate: "2025.06.30",
-      loopConnection: "6월 루프: 건강한 개발자 되기",
-      connectedLoops: [
-        "loop-1",
-        "loop-2",
-        "loop-3",
-        "loop-4",
-        "loop-5",
-        "loop-6",
-        "loop-7",
-        "loop-8",
-        "loop-9",
-        "loop-10",
-        "loop-11",
-        "loop-12",
-        "loop-13",
-        "loop-14",
-        "loop-15",
-      ],
-    },
-    {
-      id: "15",
-      title: "건강 검진",
-      description: "정기 건강 검진 받기",
-      area: "건강",
-      status: "in_progress",
-      progress: 50,
-      total: 100,
-      startDate: "2025.07.01",
-      endDate: "2025.07.31",
-      loopConnection: "7월 루프: 독서 습관 만들기",
-      connectedLoops: [
-        "loop-1",
-        "loop-2",
-        "loop-3",
-        "loop-4",
-        "loop-5",
-        "loop-6",
-        "loop-7",
-        "loop-8",
-        "loop-9",
-        "loop-10",
-        "loop-11",
-        "loop-12",
-        "loop-13",
-        "loop-14",
-        "loop-15",
-        "loop-16",
-      ],
-    },
-    {
-      id: "16",
-      title: "언어 학습 앱 개발",
-      description: "개인용 언어 학습 앱 개발",
-      area: "개발",
-      status: "planned",
-      progress: 0,
-      total: 100,
-      startDate: "2025.08.01",
-      endDate: "2025.08.31",
-      loopConnection: null,
-      connectedLoops: [
-        "loop-1",
-        "loop-2",
-        "loop-3",
-        "loop-4",
-        "loop-5",
-        "loop-6",
-        "loop-7",
-        "loop-8",
-        "loop-9",
-        "loop-10",
-        "loop-11",
-        "loop-12",
-        "loop-13",
-        "loop-14",
-        "loop-15",
-        "loop-16",
-        "loop-17",
-      ],
-    },
-    {
-      id: "17",
-      title: "요리 실력 향상",
-      description: "새로운 요리법 배우기",
-      area: "생활",
-      status: "in_progress",
-      progress: 40,
-      total: 100,
-      startDate: "2025.07.01",
-      endDate: "2025.07.31",
-      loopConnection: "7월 루프: 독서 습관 만들기",
-      connectedLoops: [
-        "loop-1",
-        "loop-2",
-        "loop-3",
-        "loop-4",
-        "loop-5",
-        "loop-6",
-        "loop-7",
-        "loop-8",
-        "loop-9",
-        "loop-10",
-        "loop-11",
-        "loop-12",
-        "loop-13",
-        "loop-14",
-        "loop-15",
-        "loop-16",
-        "loop-17",
-        "loop-18",
-      ],
-    },
-    {
-      id: "18",
-      title: "운동 루틴 개선",
-      description: "더 효과적인 운동 루틴 만들기",
-      area: "건강",
-      status: "planned",
-      progress: 0,
-      total: 100,
-      startDate: "2025.08.01",
-      endDate: "2025.08.31",
-      loopConnection: null,
-      connectedLoops: [
-        "loop-1",
-        "loop-2",
-        "loop-3",
-        "loop-4",
-        "loop-5",
-        "loop-6",
-        "loop-7",
-        "loop-8",
-        "loop-9",
-        "loop-10",
-        "loop-11",
-        "loop-12",
-        "loop-13",
-        "loop-14",
-        "loop-15",
-        "loop-16",
-        "loop-17",
-        "loop-18",
-        "loop-19",
-      ],
-    },
-    {
-      id: "19",
-      title: "독서 목록 정리",
-      description: "읽고 싶은 책 목록 정리",
-      area: "자기계발",
-      status: "completed",
-      progress: 100,
-      total: 100,
-      startDate: "2025.06.01",
-      endDate: "2025.06.30",
-      loopConnection: "6월 루프: 건강한 개발자 되기",
-      connectedLoops: [
-        "loop-1",
-        "loop-2",
-        "loop-3",
-        "loop-4",
-        "loop-5",
-        "loop-6",
-        "loop-7",
-        "loop-8",
-        "loop-9",
-        "loop-10",
-        "loop-11",
-        "loop-12",
-        "loop-13",
-        "loop-14",
-        "loop-15",
-        "loop-16",
-        "loop-17",
-        "loop-18",
-        "loop-19",
-        "loop-20",
-      ],
-    },
-    {
-      id: "20",
-      title: "투자 포트폴리오 분석",
-      description: "현재 투자 포트폴리오 분석 및 개선",
-      area: "재정",
-      status: "in_progress",
-      progress: 35,
-      total: 100,
-      startDate: "2025.07.01",
-      endDate: "2025.07.31",
-      loopConnection: "7월 루프: 독서 습관 만들기",
-      connectedLoops: [
-        "loop-1",
-        "loop-2",
-        "loop-3",
-        "loop-4",
-        "loop-5",
-        "loop-6",
-        "loop-7",
-        "loop-8",
-        "loop-9",
-        "loop-10",
-        "loop-11",
-        "loop-12",
-        "loop-13",
-        "loop-14",
-        "loop-15",
-        "loop-16",
-        "loop-17",
-        "loop-18",
-        "loop-19",
-        "loop-20",
-        "loop-21",
       ],
     },
   ];
+
+  // 프로젝트 상태를 미리 계산하여 객체에 추가
+  const projectsWithStatus = projects.map((project) => ({
+    ...project,
+    status: getProjectStatus(project),
+  }));
+
+  // 무한 스크롤 관련 상태
+  const [displayedProjects, setDisplayedProjects] = useState<any[]>([]);
+  const [hasMoreProjects, setHasMoreProjects] = useState(true);
+  const [isLoadingMoreProjects, setIsLoadingMoreProjects] = useState(false);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const areas = [
     {
@@ -782,15 +388,19 @@ function ParaPageContent() {
                     ? `전체 (${projects.length}개)`
                     : projectFilter === "planned"
                     ? `예정 (${
-                        projects.filter((p) => p.status === "planned").length
+                        projectsWithStatus.filter((p) => p.status === "planned")
+                          .length
                       }개)`
                     : projectFilter === "in_progress"
                     ? `진행 중 (${
-                        projects.filter((p) => p.status === "in_progress")
-                          .length
+                        projectsWithStatus.filter(
+                          (p) => p.status === "in_progress"
+                        ).length
                       }개)`
                     : `완료됨 (${
-                        projects.filter((p) => p.status === "completed").length
+                        projectsWithStatus.filter(
+                          (p) => p.status === "completed"
+                        ).length
                       }개)`}
                 </Button>
               </DropdownMenuTrigger>
@@ -833,7 +443,7 @@ function ParaPageContent() {
               </Card>
             ) : (
               <>
-                {projects.map((project) => (
+                {projectsWithStatus.map((project) => (
                   <Card
                     key={project.id}
                     className="cursor-pointer transition-all hover:shadow-md"
