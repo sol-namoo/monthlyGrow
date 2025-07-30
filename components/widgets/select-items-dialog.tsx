@@ -69,7 +69,7 @@ export function SelectItemsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-full max-w-none max-h-none rounded-none border-0 m-0 p-2 sm:max-w-[425px] sm:max-h-[90vh] sm:rounded-lg sm:border sm:mx-2 sm:my-4 flex flex-col">
+      <DialogContent className="sm:max-w-[425px] flex flex-col">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -83,7 +83,7 @@ export function SelectItemsDialog({
             className="pl-8"
           />
         </div>
-        <ScrollArea className="flex-grow pr-4 -mr-4">
+        <ScrollArea className="flex-grow max-h-[50vh] pr-4">
           <div className="grid gap-3">
             {filteredItems.length > 0 ? (
               filteredItems.map((item) => (

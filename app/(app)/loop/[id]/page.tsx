@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, use } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -8,157 +8,274 @@ import {
   Clock,
   Star,
   Plus,
+  AlertCircle,
   Bookmark,
   Edit,
   Gift,
 } from "lucide-react";
 import Link from "next/link";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import type { Retrospective } from "@/lib/types";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useParams } from "next/navigation";
-import type { Loop } from "@/lib/types";
-import { RetrospectiveForm } from "@/components/RetrospectiveForm";
-import { NoteForm } from "@/components/NoteForm";
+import { useQuery } from "@tanstack/react-query";
+import { fetchLoopById, fetchAllTasksByProjectId } from "@/lib/firebase";
+import { formatDate, getLoopStatus } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 
-export function LoopDetailPage() {
-  const params = useParams();
+// 로딩 스켈레톤 컴포넌트
+function LoopDetailSkeleton() {
+  return (
+    <div className="container max-w-md px-4 py-6">
+      <div className="flex items-center justify-between mb-6">
+        <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <div className="flex gap-2">
+          <Skeleton className="h-8 w-16" />
+          <Skeleton className="h-8 w-16" />
+        </div>
+      </div>
+
+      <Skeleton className="h-8 w-48 mb-4" />
+      <Skeleton className="h-4 w-full mb-2" />
+      <Skeleton className="h-4 w-3/4 mb-6" />
+
+      <Skeleton className="h-32 w-full mb-4" />
+      <Skeleton className="h-32 w-full mb-4" />
+    </div>
+  );
+}
+
+export function LoopDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
   const { toast } = useToast();
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
   const [showRetrospectiveDialog, setShowRetrospectiveDialog] = useState(false);
+  const [noteContent, setNoteContent] = useState("");
+  const [bestMoment, setBestMoment] = useState("");
+  const [routineAdherence, setRoutineAdherence] = useState("");
+  const [unexpectedObstacles, setUnexpectedObstacles] = useState("");
+  const [nextLoopApplication, setNextLoopApplication] = useState("");
+  const [userRating, setUserRating] = useState<number | undefined>(undefined);
+  const [bookmarked, setBookmarked] = useState(false);
+  const [hoverRating, setHoverRating] = useState<number | undefined>(undefined);
 
-  // 샘플 데이터 - 실제로는 ID를 기반으로 데이터를 가져와야 함
-  // ID가 '1'인 루프는 회고가 있는 완료된 루프, '2'인 루프는 회고가 없는 완료된 루프
-  const loopData: Loop[] = [
-    {
-      id: "1",
-      userId: "user1",
-      title: "6월 루프: 건강한 개발자 되기",
-      startDate: new Date("2025-06-01"),
-      endDate: new Date("2025-06-30"),
-      status: "ended",
-      focusAreas: ["area1", "area2"],
-      projectIds: ["project1", "project2", "project3"],
-      reward: "새로운 기계식 키보드 구매",
-      createdAt: new Date("2025-06-01"),
-      updatedAt: new Date("2025-06-30"),
-      doneCount: 27,
-      targetCount: 30,
-      retrospective: {
-        id: "retro-1",
-        userId: "user1",
-        createdAt: new Date("2025-07-01T09:00:00Z"),
-        updatedAt: new Date("2025-07-01T09:00:00Z"),
-        bestMoment: "매일 아침 운동을 꾸준히 했던 순간",
-        routineAdherence:
-          "계획한 루틴의 90%를 지켰습니다. 특히 아침 운동은 꾸준히 했습니다.",
-        unexpectedObstacles: "갑작스러운 출장으로 식단 관리가 어려웠습니다.",
-        nextLoopApplication:
-          "다음 루프에서는 출장 시에도 식단을 유지할 수 있는 계획을 세울 것입니다.",
-        content:
-          "전반적으로 만족스러운 루프였습니다. 건강이 많이 좋아진 것을 느낍니다.",
-        userRating: 4,
-        bookmarked: true,
-        title: "6월 루프: 건강한 개발자 되기 회고",
-        summary: "아침 운동 습관 성공, 출장 중 식단 관리 어려움",
-      },
-      note: {
-        id: "note-1",
-        userId: "user1",
-        content: "오늘 아침 운동 성공! 상쾌하다.",
-        createdAt: new Date("2025-06-05T10:30:00Z"),
-        updatedAt: new Date("2025-06-05T10:30:00Z"),
-      },
-    },
-    {
-      id: "2",
-      userId: "user1",
-      title: "7월 루프: 독서 습관 만들기",
-      startDate: new Date("2025-07-01"),
-      endDate: new Date("2025-07-31"),
-      status: "in_progress",
-      focusAreas: ["area3", "area4"],
-      projectIds: ["project4", "project5"],
-      reward: "새로운 책 5권 구매",
-      createdAt: new Date("2025-07-01"),
-      updatedAt: new Date("2025-07-01"),
-      doneCount: 0,
-      targetCount: 30,
-      retrospective: undefined, // 이 루프는 아직 회고 없음
-      note: undefined, // 이 루프는 아직 노트 없음
-    },
-  ];
+  // Firestore에서 실제 루프 데이터 가져오기
+  const {
+    data: loop,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["loop", id],
+    queryFn: () => fetchLoopById(id),
+    enabled: !!id,
+  });
 
-  // 계산된 값들을 위한 헬퍼 함수들
-  const getCompletionRate = (loop: Loop) => {
-    return loop.targetCount > 0
+  // 가상의 프로젝트 데이터 (실제로는 loop.projectIds를 통해 가져와야 함)
+  const projects =
+    loop?.projectIds?.map((projectId, index) => ({
+      id: projectId,
+      title: `프로젝트 ${index + 1}`,
+      progress: Math.floor(Math.random() * 30),
+      total: 30,
+      addedMidway: index > 0,
+    })) || [];
+
+  // 가상의 노트 데이터
+  const notes = loop?.note
+    ? [
+        {
+          id: 1,
+          content: loop.note.content || "루프 진행 중 작성된 노트입니다.",
+          createdAt: new Date(),
+        },
+      ]
+    : [];
+
+  // useEffect는 모든 조건부 return 이전에 위치해야 함
+  useEffect(() => {
+    // 회고 모달이 열릴 때만 기존 회고 데이터 로드
+    if (showRetrospectiveDialog && loop?.retrospective) {
+      setBestMoment(loop.retrospective.bestMoment || "");
+      setRoutineAdherence(loop.retrospective.routineAdherence || "");
+      setUnexpectedObstacles(loop.retrospective.unexpectedObstacles || "");
+      setNextLoopApplication(loop.retrospective.nextLoopApplication || "");
+      setUserRating(loop.retrospective.userRating);
+      setBookmarked(loop.retrospective.bookmarked || false);
+    } else if (!showRetrospectiveDialog) {
+      // 회고 모달이 닫힐 때 폼 초기화
+      setBestMoment("");
+      setRoutineAdherence("");
+      setUnexpectedObstacles("");
+      setNextLoopApplication("");
+      setUserRating(undefined);
+      setBookmarked(false);
+      setHoverRating(undefined);
+    }
+  }, [showRetrospectiveDialog, loop?.retrospective]);
+
+  // 노트 모달 상태 변경 시 데이터 로드/초기화
+  useEffect(() => {
+    if (showAddNoteDialog && notes && notes.length > 0) {
+      setNoteContent(notes[0].content || "");
+    } else if (!showAddNoteDialog) {
+      setNoteContent("");
+    }
+  }, [showAddNoteDialog, notes]);
+
+  // 로딩 상태
+  if (isLoading) {
+    return <LoopDetailSkeleton />;
+  }
+
+  // 에러 상태
+  if (error) {
+    return (
+      <div className="container max-w-md px-4 py-6">
+        <div className="flex items-center justify-between mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.history.back()}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <Alert>
+          <AlertDescription>
+            루프를 불러오는 중 오류가 발생했습니다. 다시 시도해주세요.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  // 데이터가 없는 경우
+  if (!loop) {
+    return (
+      <div className="container max-w-md px-4 py-6 pb-20 text-center">
+        <div className="flex items-center justify-between mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.history.back()}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        </div>
+        <p className="text-muted-foreground">루프를 찾을 수 없습니다.</p>
+      </div>
+    );
+  }
+
+  // 루프 상태 계산
+  const loopStatus = getLoopStatus(loop);
+  const isCompleted = loopStatus === "ended";
+
+  // 진행률 계산 (실제 데이터 기반)
+  const completionRate =
+    loop.targetCount > 0
       ? Math.round((loop.doneCount / loop.targetCount) * 100)
       : 0;
-  };
 
-  const getProjectCount = (loop: Loop) => {
-    return loop.projectIds.length;
-  };
+  // 프로젝트 추가 가능 여부 확인 (최대 5개)
+  const canAddProject = projects.length < 5;
 
-  const getFormattedDate = (date: Date) => {
-    return date.toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
-  const getFormattedDateShort = (date: Date) => {
-    return date.toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  };
-
+  // 프로젝트 추가 처리 함수
   const handleAddProject = () => {
+    if (!canAddProject) {
+      toast({
+        title: "프로젝트 추가 실패",
+        description: "한 루프에는 최대 5개의 프로젝트만 등록할 수 있습니다.",
+        variant: "destructive",
+      });
+      return;
+    }
     setShowAddProjectDialog(true);
   };
 
-  const handleSaveNote = (data: any) => {
-    // 노트 저장 로직
-    console.log("노트 저장:", data);
+  // 노트 추가/수정 처리 함수
+  const handleSaveNote = () => {
+    if (!noteContent.trim()) {
+      toast({
+        title: "노트 저장 실패",
+        description: "노트 내용을 입력해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     toast({
-      title: "노트 저장 완료",
-      description: "노트가 저장되었습니다.",
+      title: "노트 저장 성공",
+      description: "노트가 성공적으로 저장되었습니다.",
     });
-
     setShowAddNoteDialog(false);
   };
 
-  const formatDate = (date: Date | string) => {
-    if (typeof date === "string") {
-      return new Date(date).toLocaleDateString("ko-KR");
-    }
-    return date.toLocaleDateString("ko-KR");
+  // 날짜 포맷팅 함수
+  const formatDisplayDate = (date: Date) => {
+    return new Intl.DateTimeFormat("ko-KR", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
   };
 
-  const handleSaveRetrospective = (data: any) => {
-    // 회고 저장 로직
-    const retrospectiveData = {
-      ...data,
-      id: `retro-${Date.now()}`,
-      userId: "user1",
-      createdAt: new Date(),
+  const handleSaveRetrospective = () => {
+    // 유효성 검사 (최소한 별점은 선택해야 함)
+    if (!userRating) {
+      toast({
+        title: "회고 저장 실패",
+        description: "스스로에게 도움이 되었는지 별점을 선택해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newRetrospective: Retrospective = {
+      id: loop?.retrospective?.id || `new-retro-${Date.now()}`,
+      loopId: loop?.id || "",
+      userId: "user-123",
+      createdAt: loop?.retrospective?.createdAt || new Date(),
       updatedAt: new Date(),
-      title: `${loop?.title} 회고`,
-      summary: `${data.bestMoment} - ${data.unexpectedObstacles}`,
+      title: loop?.title || "",
+      summary:
+        bestMoment.substring(0, 100) + (bestMoment.length > 100 ? "..." : ""),
+      bestMoment,
+      routineAdherence,
+      unexpectedObstacles,
+      nextLoopApplication,
+      content: `가장 좋았던 순간: ${bestMoment}\n\n루틴 준수도: ${routineAdherence}\n\n방해 요소: ${unexpectedObstacles}\n\n다음 루프 적용점: ${nextLoopApplication}`,
+      userRating,
+      bookmarked,
     };
 
-    console.log("회고 저장:", retrospectiveData);
-
+    console.log("회고 저장:", newRetrospective);
     toast({
       title: "회고 저장 완료",
-      description: "회고가 저장되었습니다.",
+      description: "회고가 성공적으로 저장되었습니다.",
     });
-
     setShowRetrospectiveDialog(false);
   };
 
@@ -167,265 +284,495 @@ export function LoopDetailPage() {
     setRating?: (rating: number) => void
   ) => {
     return (
-      <div className="flex gap-1">
+      <div className="flex items-center gap-1">
         {[1, 2, 3, 4, 5].map((star) => (
-          <button
+          <Star
             key={star}
-            type="button"
-            onClick={() => setRating?.(star)}
-            className={`text-lg ${
-              rating && star <= rating ? "text-yellow-400" : "text-gray-300"
-            }`}
-          >
-            ★
-          </button>
+            className={`h-7 w-7 transition-all duration-200 ${
+              star <= ((hoverRating ?? rating) || 0)
+                ? "text-yellow-500 fill-yellow-500"
+                : "text-gray-300"
+            } ${setRating ? "cursor-pointer hover:scale-110" : ""}`}
+            onClick={() => {
+              if (setRating) {
+                console.log(`루프 별점 클릭: ${star}점`);
+                setRating(star);
+              }
+            }}
+            onMouseEnter={() => setRating && setHoverRating(star)}
+            onMouseLeave={() => setRating && setHoverRating(undefined)}
+          />
         ))}
+        {rating && (
+          <span className="ml-2 text-sm text-gray-600">{rating}점</span>
+        )}
       </div>
     );
   };
 
-  // 현재 루프 찾기
-  const loop = loopData.find((l) => l.id === params.id);
-
-  if (!loop) {
-    return (
-      <div className="container max-w-md px-4 py-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">루프를 찾을 수 없습니다</h1>
-          <p className="text-muted-foreground mt-2">
-            요청하신 루프가 존재하지 않습니다.
-          </p>
-          <Button asChild className="mt-4">
-            <Link href="/loop">루프 목록으로</Link>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  const canAddProject = getProjectCount(loop) < 5;
-  const canEdit = !loop.status.includes("ended");
-
   return (
-    <div className="container max-w-md px-4 py-6">
-      {/* 헤더 */}
+    <div className="container max-w-md px-4 py-6 pb-20">
       <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" asChild>
+        <div className="flex items-center">
+          <Button variant="ghost" size="icon" asChild className="mr-2">
             <Link href="/loop">
               <ChevronLeft className="h-5 w-5" />
             </Link>
           </Button>
-          <h1 className="text-xl font-bold">{loop.title}</h1>
+          <h1 className="text-2xl font-bold">루프 상세</h1>
         </div>
-        {canEdit && (
-          <Button variant="outline" size="sm">
-            <Edit className="mr-2 h-4 w-4" />
-            편집
+        {!isCompleted && (
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/loop/edit/${loop.id}`}>
+              <Edit className="mr-2 h-4 w-4" />
+              루프 수정
+            </Link>
           </Button>
         )}
       </div>
 
-      {/* 기본 정보 */}
+      {/* 루프 정보 요약 */}
       <Card className="mb-6 p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">기본 정보</h2>
-          <Badge variant={loop.status === "ended" ? "secondary" : "default"}>
-            {loop.status === "ended" ? "완료됨" : "진행 중"}
-          </Badge>
+        <h2 className="mb-2 text-xl font-bold">{loop.title}</h2>
+        <div className="mb-4 flex items-center gap-2 text-sm">
+          <Gift className="h-4 w-4 text-purple-500" />
+          <span>보상: {loop.reward || "보상 없음"}</span>
         </div>
 
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">
-              {getFormattedDate(loop.startDate)} ~{" "}
-              {getFormattedDate(loop.endDate)}
+        <div className="mb-4">
+          <div className="mb-1 flex justify-between text-sm">
+            <span>달성률: {completionRate}%</span>
+            <span>
+              {loop.doneCount}/{loop.targetCount}
             </span>
           </div>
-
-          <div className="flex items-center gap-2">
-            <Gift className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">{loop.reward}</span>
+          <div className="progress-bar">
+            <div
+              className="progress-value"
+              style={{ width: `${completionRate}%` }}
+            ></div>
           </div>
+          {projects.length === 0 && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-amber-600">
+              <AlertCircle className="h-3 w-3" />
+              <span>연결된 프로젝트가 없으면 달성률을 측정할 수 없어요</span>
+            </div>
+          )}
+        </div>
 
-          <div className="flex items-center gap-2">
-            <Star className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">
-              진행률: {getCompletionRate(loop)}% ({loop.doneCount}/
-              {loop.targetCount})
-            </span>
+        <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+          <Clock className="h-4 w-4" />
+          <span>
+            {formatDate(loop.startDate)} ~ {formatDate(loop.endDate)}
+          </span>
+        </div>
+
+        <div className="mb-4">
+          <h3 className="mb-2 font-medium">중점 Areas</h3>
+          <div className="flex flex-wrap gap-2">
+            {loop.focusAreas?.map((area) => (
+              <span
+                key={area}
+                className="rounded-full bg-secondary px-3 py-1 text-xs"
+              >
+                {area}
+              </span>
+            )) || (
+              <span className="text-xs text-muted-foreground">
+                중점 영역이 설정되지 않았습니다.
+              </span>
+            )}
           </div>
         </div>
       </Card>
 
-      {/* 프로젝트 목록 */}
-      <Card className="mb-6 p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">연결된 프로젝트</h2>
-          {canAddProject && (
-            <Button size="sm" onClick={handleAddProject}>
-              <Plus className="mr-2 h-4 w-4" />
+      {/* 연결된 프로젝트 리스트 */}
+      <section className="mb-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-medium">프로젝트 ({projects.length}/5)</h3>
+          {!isCompleted && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleAddProject}
+              disabled={!canAddProject}
+            >
+              <Plus className="mr-1 h-4 w-4" />
               프로젝트 추가
             </Button>
           )}
         </div>
 
-        <div className="space-y-2">
-          {loop.projectIds.map((projectId) => (
-            <div
-              key={projectId}
-              className="flex items-center justify-between p-2 rounded-lg border"
-            >
-              <span className="text-sm">프로젝트 {projectId}</span>
-              <Badge variant="outline">진행 중</Badge>
-            </div>
-          ))}
-          {loop.projectIds.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              연결된 프로젝트가 없습니다.
+        {projects.length === 0 ? (
+          <div className="rounded-lg border border-dashed p-8 text-center">
+            <p className="text-muted-foreground mb-2">
+              이 루프에 연결된 프로젝트가 없어요
             </p>
-          )}
-        </div>
-      </Card>
-
-      {/* 회고 섹션 */}
-      <Card className="mb-6 p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">회고</h2>
-          {loop.status === "ended" && !loop.retrospective && (
-            <Button size="sm" onClick={() => setShowRetrospectiveDialog(true)}>
-              회고 작성
-            </Button>
-          )}
-        </div>
-
-        {loop.retrospective ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Bookmark
-                className={`h-4 w-4 ${
-                  loop.retrospective.bookmarked
-                    ? "text-yellow-500"
-                    : "text-muted-foreground"
-                }`}
-              />
-              <span className="text-sm font-medium">
-                {loop.retrospective.title}
-              </span>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <h4 className="text-sm font-medium mb-1">가장 좋았던 순간</h4>
-                <p className="text-sm text-muted-foreground">
-                  {loop.retrospective.bestMoment}
-                </p>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-medium mb-1">루틴 준수율</h4>
-                <p className="text-sm text-muted-foreground">
-                  {loop.retrospective.routineAdherence}
-                </p>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-medium mb-1">예상치 못한 장애물</h4>
-                <p className="text-sm text-muted-foreground">
-                  {loop.retrospective.unexpectedObstacles}
-                </p>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-medium mb-1">
-                  다음 루프 적용 방안
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  {loop.retrospective.nextLoopApplication}
-                </p>
-              </div>
-
-              {loop.retrospective.content && (
-                <div>
-                  <h4 className="text-sm font-medium mb-1">자유 회고</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {loop.retrospective.content}
-                  </p>
-                </div>
-              )}
-
-              <div className="flex items-center gap-4">
-                <div>
-                  <h4 className="text-sm font-medium mb-1">평점</h4>
-                  {renderStarRating(loop.retrospective.userRating)}
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium mb-1">요약</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {loop.retrospective.summary}
-                  </p>
-                </div>
-              </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              연결된 프로젝트가 없으면 달성률을 측정할 수 없어요
+            </p>
+            <div className="flex flex-col gap-2">
+              <Button onClick={handleAddProject}>
+                <Plus className="mr-2 h-4 w-4" />
+                프로젝트 연결하기
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href={`/loop/edit/${loop.id}`}>루프 편집</Link>
+              </Button>
             </div>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            {loop.status === "ended"
-              ? "회고를 작성해보세요."
-              : "루프가 완료되면 회고를 작성할 수 있습니다."}
-          </p>
+          <div className="space-y-2">
+            {projects.map((project) => (
+              <div
+                key={project.id}
+                className="rounded-lg bg-secondary p-3 text-sm"
+              >
+                <div className="mb-1 flex justify-between">
+                  <div className="flex items-center gap-2">
+                    <span>{project.title}</span>
+                    {project.addedMidway && (
+                      <Badge
+                        variant="outline"
+                        className="bg-amber-100 text-amber-800 text-xs"
+                      >
+                        🔥 루프 중 추가됨
+                      </Badge>
+                    )}
+                  </div>
+                  <span>
+                    {project.progress}/{project.total}
+                  </span>
+                </div>
+                <div className="progress-bar">
+                  <div
+                    className="progress-value"
+                    style={{
+                      width: `${Math.round(
+                        (project.progress / project.total) * 100
+                      )}%`,
+                    }}
+                  ></div>
+                </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    Area: 미분류
+                  </span>
+                  {project.addedMidway ? (
+                    <Badge
+                      variant="outline"
+                      className="bg-amber-100 text-amber-800 text-xs"
+                    >
+                      💡 루프 도중 추가됨
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-primary/10 text-xs">
+                      현재 루프 연결됨
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
-      </Card>
+      </section>
 
-      {/* 노트 섹션 */}
-      <Card className="mb-6 p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">노트</h2>
-          <Button size="sm" onClick={() => setShowAddNoteDialog(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            노트 추가
+      {/* 공식 회고 1개 */}
+      <section className="mb-6">
+        <h2 className="mb-4 text-xl font-bold">월간 회고</h2>
+        {loop.retrospective ? (
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-medium">
+                {loop.retrospective.title || "회고 작성 완료"}
+              </h3>
+              <div className="flex items-center gap-2 text-lg font-bold text-primary">
+                {loop.retrospective.bookmarked && (
+                  <Bookmark className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                )}
+                {renderStarRating(loop.retrospective.userRating)}
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
+              {loop.retrospective.summary ||
+                loop.retrospective.content ||
+                loop.retrospective.bestMoment ||
+                "작성된 회고 요약이 없습니다."}
+            </p>
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/para/archives/${loop.retrospective.id}`}>
+                  회고 상세 보기
+                </Link>
+              </Button>
+            </div>
+          </Card>
+        ) : (
+          <Card className="p-4 text-center">
+            <h3 className="font-medium mb-4">
+              이번 루프를 회고하고, 다음 단계를 계획하세요.
+            </h3>
+            {isCompleted ? (
+              <Button onClick={() => setShowRetrospectiveDialog(true)}>
+                회고 작성
+              </Button>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                진행률: {completionRate}%
+              </div>
+            )}
+          </Card>
+        )}
+      </section>
+
+      {/* 노트 (단일 노트) */}
+      <section className="mb-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-medium">노트</h3>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAddNoteDialog(true)}
+          >
+            {notes && notes.length > 0 ? (
+              <>
+                <Edit className="mr-1 h-4 w-4" />
+                노트 수정
+              </>
+            ) : (
+              <>
+                <Plus className="mr-1 h-4 w-4" />
+                노트 작성
+              </>
+            )}
           </Button>
         </div>
 
-        {loop.note ? (
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">{loop.note.content}</p>
+        {notes && notes.length > 0 ? (
+          <Card className="p-3">
+            <p className="text-sm mb-2">{notes[0].content}</p>
             <p className="text-xs text-muted-foreground">
-              {formatDate(loop.note.createdAt)}
+              {formatDisplayDate(notes[0].createdAt)}
             </p>
-          </div>
+          </Card>
         ) : (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            노트가 없습니다.
-          </p>
+          <div className="rounded-lg border border-dashed p-8 text-center">
+            <p className="text-muted-foreground mb-2">작성된 노트가 없어요</p>
+            <p className="text-sm text-muted-foreground mb-4">
+              이번 루프에서 느낀 점을 기록해 보세요
+            </p>
+            <Button onClick={() => setShowAddNoteDialog(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              노트 작성하기
+            </Button>
+          </div>
         )}
-      </Card>
+      </section>
 
-      {/* 회고 작성 다이얼로그 */}
-      {showRetrospectiveDialog && (
-        <RetrospectiveForm
-          loopTitle={loop?.title || ""}
-          onClose={() => setShowRetrospectiveDialog(false)}
-          onSave={handleSaveRetrospective}
-        />
-      )}
+      {/* 프로젝트 추가 다이얼로그 */}
+      <Dialog
+        open={showAddProjectDialog}
+        onOpenChange={setShowAddProjectDialog}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>루프에 프로젝트 추가</DialogTitle>
+            <DialogDescription>
+              루프 중간에 추가된 프로젝트는 별도로 표시되며, 월말 리포트에서
+              '후속 투입 항목'으로 집계됩니다.
+            </DialogDescription>
+          </DialogHeader>
 
-      {/* 노트 작성 다이얼로그 */}
-      {showAddNoteDialog && (
-        <NoteForm
-          onClose={() => setShowAddNoteDialog(false)}
-          onSave={handleSaveNote}
-        />
-      )}
+          <div className="flex flex-col gap-4 py-4">
+            <Button asChild>
+              <Link
+                href={`/para/projects/new?loopId=${loop.id}&addedMidway=true`}
+              >
+                새 프로젝트 생성
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href={`/loop/add-existing-project?loopId=${loop.id}`}>
+                기존 프로젝트 연결
+              </Link>
+            </Button>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setShowAddProjectDialog(false)}
+            >
+              취소
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 회고 노트 추가/수정 다이얼로그 */}
+      <Dialog open={showAddNoteDialog} onOpenChange={setShowAddNoteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              루프 노트 {notes && notes.length > 0 ? "수정" : "작성"}
+            </DialogTitle>
+            <DialogDescription>
+              루프 진행 중 느낀 점이나 배운 점을 자유롭게 기록하세요.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <Textarea
+              placeholder="오늘의 노트를 작성해보세요..."
+              value={noteContent}
+              onChange={(e) => setNoteContent(e.target.value)}
+              className="min-h-[150px]"
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setShowAddNoteDialog(false)}
+            >
+              취소
+            </Button>
+            <Button onClick={handleSaveNote}>저장하기</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 회고 작성 다이얼로그 (모달) */}
+      <Dialog
+        open={showRetrospectiveDialog}
+        onOpenChange={setShowRetrospectiveDialog}
+      >
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>월간 회고 작성</DialogTitle>
+            <DialogDescription>
+              이번 루프를 돌아보고 다음 루프를 계획하세요.
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] pr-4">
+            <div className="grid gap-4 py-4">
+              <div>
+                <label
+                  htmlFor="bestMoment"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  이번 루프에서 가장 좋았던 순간은?
+                </label>
+                <Textarea
+                  id="bestMoment"
+                  className="mt-1"
+                  rows={2}
+                  value={bestMoment}
+                  onChange={(e) => setBestMoment(e.target.value)}
+                  placeholder="예: 운동 후 기분이 좋아지는 것을 느낀 순간"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="routineAdherence"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  계획한 루틴을 얼마나 지켰나요?
+                </label>
+                <Textarea
+                  id="routineAdherence"
+                  className="mt-1"
+                  rows={2}
+                  value={routineAdherence}
+                  onChange={(e) => setRoutineAdherence(e.target.value)}
+                  placeholder="예: 평일 80%, 주말 60% 정도로 유지"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="unexpectedObstacles"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  예기치 못한 방해 요소는 있었나요?
+                </label>
+                <Textarea
+                  id="unexpectedObstacles"
+                  className="mt-1"
+                  rows={2}
+                  value={unexpectedObstacles}
+                  onChange={(e) => setUnexpectedObstacles(e.target.value)}
+                  placeholder="예: 주말에 늦잠을 자는 습관"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="nextLoopApplication"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  다음 루프에 적용할 점은?
+                </label>
+                <Textarea
+                  id="nextLoopApplication"
+                  className="mt-1"
+                  rows={2}
+                  value={nextLoopApplication}
+                  onChange={(e) => setNextLoopApplication(e.target.value)}
+                  placeholder="예: 다음 루프에서는 주말 루틴도 포함해서 계획"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  이 회고는 스스로에게 도움이 되었나요?
+                </label>
+                {renderStarRating(userRating, setUserRating)}
+              </div>
+              <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                <Checkbox
+                  id="bookmarked"
+                  checked={bookmarked}
+                  onCheckedChange={(checked) => {
+                    console.log(`루프 북마크 상태 변경: ${checked}`);
+                    setBookmarked(checked as boolean);
+                  }}
+                />
+                <div className="flex-1">
+                  <label
+                    htmlFor="bookmarked"
+                    className="text-sm font-medium text-gray-900 cursor-pointer"
+                  >
+                    다시 읽고 싶은 회고로 표시
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    중요한 회고는 북마크하여 나중에 쉽게 찾을 수 있습니다
+                  </p>
+                </div>
+                {bookmarked && (
+                  <div className="text-yellow-500">
+                    <Bookmark className="h-5 w-5 fill-current" />
+                  </div>
+                )}
+              </div>
+            </div>
+          </ScrollArea>
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setShowRetrospectiveDialog(false)}
+            >
+              취소
+            </Button>
+            <Button onClick={handleSaveRetrospective}>회고 저장</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-export default function Page() {
+export default function Page({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <Suspense fallback={<div>로딩 중...</div>}>
-      <LoopDetailPage />
+    <Suspense fallback={<LoopDetailSkeleton />}>
+      <LoopDetailPage params={params} />
     </Suspense>
   );
 }

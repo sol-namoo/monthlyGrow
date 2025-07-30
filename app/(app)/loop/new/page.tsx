@@ -22,6 +22,7 @@ import {
   Gamepad2,
   BookOpen,
   Palette,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -38,6 +39,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 
 // 기본 폼 스키마 정의
@@ -309,8 +311,6 @@ function NewLoopPageContent() {
       ...data,
       createdAt: new Date(),
     };
-
-    console.log("루프 생성:", loopData);
 
     toast({
       title: "루프 생성 완료",
@@ -707,15 +707,15 @@ function NewLoopPageContent() {
         open={showNewProjectDialog}
         onOpenChange={setShowNewProjectDialog}
       >
-        <DialogContent className="w-full max-w-none max-h-none rounded-none border-0 m-0 p-2 sm:max-w-md sm:max-h-fit sm:rounded-lg sm:border sm:mx-2 sm:my-4">
-          <DialogHeader className="px-6 pt-4 pb-3">
+        <DialogContent>
+          <DialogHeader>
             <DialogTitle>새 프로젝트 만들기</DialogTitle>
             <DialogDescription>
               새 프로젝트를 만들어 루프에 연결하시겠습니까?
             </DialogDescription>
           </DialogHeader>
 
-          <div className="px-6 pb-4 space-y-3">
+          <div className="space-y-3">
             <div className="space-y-3">
               <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
                 <div className="rounded-full bg-blue-100 p-1 mt-0.5">
@@ -734,30 +734,21 @@ function NewLoopPageContent() {
 
               <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg">
                 <div className="rounded-full bg-amber-100 p-1 mt-0.5">
-                  <Briefcase className="h-4 w-4 text-amber-600" />
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
                 </div>
                 <div className="flex-1">
                   <h4 className="text-sm font-medium text-amber-900 mb-1">
-                    나중에 추가 가능
+                    참고 사항
                   </h4>
                   <p className="text-xs text-amber-700">
-                    지금 프로젝트를 만들지 않아도 괜찮습니다. 루프 생성 후
-                    편집에서 언제든지 프로젝트를 추가할 수 있습니다.
+                    현재 작성 중인 루프 정보는 저장되므로 안심하고 이동하세요.
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2 pt-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowNewProjectDialog(false)}
-                className="flex-1"
-              >
-                취소
-              </Button>
-              <Button type="button" asChild className="flex-1">
+            <div className="flex flex-col gap-2 pt-2">
+              <Button asChild>
                 <Link
                   href={`/para/projects/new?returnUrl=${encodeURIComponent(
                     currentUrl
@@ -766,8 +757,20 @@ function NewLoopPageContent() {
                   <Plus className="mr-2 h-4 w-4" />새 프로젝트 만들기
                 </Link>
               </Button>
+              <Button variant="outline" asChild>
+                <Link href="/para?tab=projects">기존 프로젝트 목록 보기</Link>
+              </Button>
             </div>
           </div>
+
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setShowNewProjectDialog(false)}
+            >
+              취소
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

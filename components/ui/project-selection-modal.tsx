@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { RecommendationBadge } from "@/components/ui/recommendation-badge";
 import {
   Dialog,
@@ -12,6 +13,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -54,8 +56,8 @@ export function ProjectSelectionModal({
   const [areaFilter, setAreaFilter] = useState<string>("all");
   const [showOnlyUnconnected, setShowOnlyUnconnected] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(8); // 모바일에서 한 번에 보여줄 프로젝트 수
-  const [refreshKey, setRefreshKey] = useState(0); // 리프레시를 위한 키
+  const [itemsPerPage] = useState(10);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const auth = getAuth();
   const user = auth.currentUser;
@@ -153,8 +155,8 @@ export function ProjectSelectionModal({
   if (projectsLoading || areasLoading) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-full max-w-none max-h-none rounded-none border-0 m-0 p-2 sm:max-w-2xl sm:max-h-[90vh] sm:rounded-lg sm:border sm:mx-2 sm:my-4 overflow-hidden flex flex-col">
-          <DialogHeader className="px-6 pt-6 pb-4">
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader>
             <DialogTitle>프로젝트 선택</DialogTitle>
             <DialogDescription>프로젝트를 불러오는 중...</DialogDescription>
           </DialogHeader>
@@ -165,8 +167,8 @@ export function ProjectSelectionModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-none max-h-none rounded-none border-0 m-0 p-2 sm:max-w-2xl sm:max-h-[90vh] sm:rounded-lg sm:border sm:mx-2 sm:my-4 overflow-hidden flex flex-col">
-        <DialogHeader className="px-6 pt-6 pb-4">
+      <DialogContent className="sm:max-w-4xl max-h-[95vh] flex flex-col">
+        <DialogHeader>
           <DialogTitle>프로젝트 선택</DialogTitle>
           <DialogDescription>
             이 루프에 연결할 프로젝트를 선택하세요. 최대 {maxProjects}개까지
@@ -174,7 +176,7 @@ export function ProjectSelectionModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col min-h-0 px-4 py-1 sm:px-6">
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
           {/* 필터 및 검색 */}
           <div className="space-y-3 mb-4 flex-shrink-0">
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -234,224 +236,224 @@ export function ProjectSelectionModal({
             />
           </div>
 
-          {/* 프로젝트 목록 */}
-          <div className="flex-1 overflow-y-auto space-y-2 min-h-0 px-4 sm:px-6 py-3 border border-dashed border-gray-200 rounded-lg bg-gray-50/30">
-            <div className="text-xs text-gray-500 mb-2 px-2 flex justify-between items-center">
-              <span>
-                스크롤 가능한 영역 ({filteredProjects.length}개 프로젝트)
-              </span>
-              {totalPages > 1 && (
-                <span className="text-xs text-muted-foreground">
-                  {currentPage} / {totalPages} 페이지
-                </span>
-              )}
-            </div>
-            {currentProjects.length > 0 ? (
-              currentProjects.map((project) => (
-                <Card
-                  key={project.id}
-                  className={`cursor-pointer p-3 transition-all ${
-                    selectedProjects.includes(project.id)
-                      ? "border-primary bg-primary/5"
-                      : "hover:border-primary/50"
-                  } ${
-                    isLimitReached && !selectedProjects.includes(project.id)
-                      ? "opacity-50 pointer-events-none"
-                      : ""
-                  } ${
-                    newlyCreatedProjectId === project.id
-                      ? "ring-2 ring-green-500 ring-offset-2"
-                      : ""
-                  }`}
-                  onClick={() => onProjectToggle(project.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Checkbox
-                        checked={selectedProjects.includes(project.id)}
-                        disabled
-                      />
-                      <div className="flex-1">
-                        <h4 className="font-medium">{project.title}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {project.description}
-                        </p>
-                        <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                          <span>Area: {getAreaName(project.areaId)}</span>
-                          <span>•</span>
-                          <span>
-                            {formatDate(project.startDate)} ~{" "}
-                            {formatDate(project.endDate)}
-                          </span>
+          {/* 프로젝트 목록 - ScrollArea로 감싸서 스크롤 영역 확대 */}
+          <ScrollArea className="h-[60vh] w-full border rounded-lg bg-gray-50/30">
+            <div className="p-4 space-y-3">
+              <div className="text-xs text-gray-500 mb-3 flex justify-between items-center">
+                <span>총 {filteredProjects.length}개 프로젝트</span>
+                {totalPages > 1 && (
+                  <span className="text-xs text-muted-foreground">
+                    {currentPage} / {totalPages} 페이지
+                  </span>
+                )}
+              </div>
+
+              {currentProjects.length > 0 ? (
+                <div className="grid gap-3 sm:grid-cols-1 lg:grid-cols-2">
+                  {currentProjects.map((project) => (
+                    <Card
+                      key={project.id}
+                      className={`cursor-pointer p-3 transition-all ${
+                        selectedProjects.includes(project.id)
+                          ? "border-primary bg-primary/5"
+                          : "hover:border-primary/50"
+                      } ${
+                        isLimitReached && !selectedProjects.includes(project.id)
+                          ? "opacity-50 pointer-events-none"
+                          : ""
+                      } ${
+                        newlyCreatedProjectId === project.id
+                          ? "ring-2 ring-green-500 ring-offset-2"
+                          : ""
+                      }`}
+                      onClick={() => onProjectToggle(project.id)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3 flex-1">
+                          <Checkbox
+                            checked={selectedProjects.includes(project.id)}
+                            disabled
+                            className="mt-0.5"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-sm leading-tight">
+                              {project.title}
+                            </h4>
+                            <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                              {project.description}
+                            </p>
+                            <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                              <span>{getAreaName(project.areaId)}</span>
+                              <span>•</span>
+                              <span>
+                                {formatDate(project.startDate)} ~{" "}
+                                {formatDate(project.endDate)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 ml-2">
+                          {project.loopId && (
+                            <Badge variant="secondary" className="text-xs">
+                              연결됨
+                            </Badge>
+                          )}
+                          {newlyCreatedProjectId === project.id && (
+                            <Badge
+                              variant="default"
+                              className="text-xs bg-green-500"
+                            >
+                              새로 생성됨
+                            </Badge>
+                          )}
                         </div>
                       </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      {project.loopId && (
-                        <Badge variant="secondary" className="text-xs">
-                          연결됨
-                        </Badge>
-                      )}
-                      {newlyCreatedProjectId === project.id && (
-                        <Badge
-                          variant="default"
-                          className="text-xs bg-green-500"
-                        >
-                          새로 생성됨
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              ))
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-sm text-muted-foreground mb-4">
-                  {searchTerm || statusFilter !== "all" || areaFilter !== "all"
-                    ? "검색 조건에 맞는 프로젝트가 없습니다."
-                    : showOnlyUnconnected
-                    ? "연결되지 않은 프로젝트가 없습니다."
-                    : "등록된 프로젝트가 없습니다."}
-                </p>
-                <Button asChild variant="outline">
-                  <a
-                    href="/para/projects/new?returnUrl=/loop/new"
-                    target="_blank"
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {searchTerm ||
+                    statusFilter !== "all" ||
+                    areaFilter !== "all"
+                      ? "검색 조건에 맞는 프로젝트가 없습니다."
+                      : showOnlyUnconnected
+                      ? "연결되지 않은 프로젝트가 없습니다."
+                      : "등록된 프로젝트가 없습니다."}
+                  </p>
+                  <Button asChild variant="outline">
+                    <a
+                      href="/para/projects/new?returnUrl=/loop/new"
+                      target="_blank"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />새 프로젝트 만들기
+                    </a>
+                  </Button>
+                </div>
+              )}
+
+              {/* 페이지네이션 */}
+              {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-2 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 px-3 text-xs"
                   >
-                    <Plus className="mr-2 h-4 w-4" />새 프로젝트 만들기
-                  </a>
-                </Button>
-              </div>
-            )}
+                    이전
+                  </Button>
 
-            {/* 페이지네이션 */}
-            {totalPages > 1 && (
-              <div className="flex justify-center items-center gap-2 pt-4 border-t">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  className="h-8 px-3 text-xs"
-                >
-                  이전
-                </Button>
-
-                {/* 페이지 번호 (모바일에서는 간단하게) */}
-                <div className="flex items-center gap-1">
-                  {totalPages <= 7 ? (
-                    // 7페이지 이하: 모든 페이지 번호 표시
-                    Array.from({ length: totalPages }, (_, i) => (
-                      <Button
-                        key={i + 1}
-                        variant={currentPage === i + 1 ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setCurrentPage(i + 1)}
-                        className="h-8 w-8 p-0 text-xs"
-                      >
-                        {i + 1}
-                      </Button>
-                    ))
-                  ) : (
-                    // 7페이지 초과: 현재 페이지 중심으로 표시
-                    <>
-                      {currentPage > 3 && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setCurrentPage(1)}
-                            className="h-8 w-8 p-0 text-xs"
-                          >
-                            1
-                          </Button>
-                          <span className="text-xs text-muted-foreground">
-                            ...
-                          </span>
-                        </>
-                      )}
-
-                      {Array.from(
-                        { length: Math.min(5, totalPages) },
-                        (_, i) => {
-                          let pageNum;
-                          if (currentPage <= 3) {
-                            pageNum = i + 1;
-                          } else if (currentPage >= totalPages - 2) {
-                            pageNum = totalPages - 4 + i;
-                          } else {
-                            pageNum = currentPage - 2 + i;
+                  <div className="flex items-center gap-1">
+                    {totalPages <= 7 ? (
+                      Array.from({ length: totalPages }, (_, i) => (
+                        <Button
+                          key={i + 1}
+                          variant={
+                            currentPage === i + 1 ? "default" : "outline"
                           }
-
-                          return (
+                          size="sm"
+                          onClick={() => setCurrentPage(i + 1)}
+                          className="h-8 w-8 p-0 text-xs"
+                        >
+                          {i + 1}
+                        </Button>
+                      ))
+                    ) : (
+                      <>
+                        {currentPage > 3 && (
+                          <>
                             <Button
-                              key={pageNum}
-                              variant={
-                                currentPage === pageNum ? "default" : "outline"
-                              }
+                              variant="outline"
                               size="sm"
-                              onClick={() => setCurrentPage(pageNum)}
+                              onClick={() => setCurrentPage(1)}
                               className="h-8 w-8 p-0 text-xs"
                             >
-                              {pageNum}
+                              1
                             </Button>
-                          );
-                        }
-                      )}
+                            {currentPage > 4 && (
+                              <span className="text-xs text-muted-foreground px-1">
+                                ...
+                              </span>
+                            )}
+                          </>
+                        )}
 
-                      {currentPage < totalPages - 2 && (
-                        <>
-                          <span className="text-xs text-muted-foreground">
-                            ...
-                          </span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setCurrentPage(totalPages)}
-                            className="h-8 w-8 p-0 text-xs"
-                          >
-                            {totalPages}
-                          </Button>
-                        </>
-                      )}
-                    </>
-                  )}
+                        {Array.from(
+                          { length: Math.min(5, totalPages) },
+                          (_, i) => {
+                            const pageNum =
+                              Math.max(
+                                1,
+                                Math.min(totalPages - 4, currentPage - 2)
+                              ) + i;
+                            if (pageNum > totalPages) return null;
+                            return (
+                              <Button
+                                key={pageNum}
+                                variant={
+                                  currentPage === pageNum
+                                    ? "default"
+                                    : "outline"
+                                }
+                                size="sm"
+                                onClick={() => setCurrentPage(pageNum)}
+                                className="h-8 w-8 p-0 text-xs"
+                              >
+                                {pageNum}
+                              </Button>
+                            );
+                          }
+                        )}
+
+                        {currentPage < totalPages - 2 && (
+                          <>
+                            {currentPage < totalPages - 3 && (
+                              <span className="text-xs text-muted-foreground px-1">
+                                ...
+                              </span>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCurrentPage(totalPages)}
+                              className="h-8 w-8 p-0 text-xs"
+                            >
+                              {totalPages}
+                            </Button>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setCurrentPage(Math.min(totalPages, currentPage + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                    className="h-8 px-3 text-xs"
+                  >
+                    다음
+                  </Button>
                 </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setCurrentPage(Math.min(totalPages, currentPage + 1))
-                  }
-                  disabled={currentPage === totalPages}
-                  className="h-8 px-3 text-xs"
-                >
-                  다음
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {/* 하단 버튼 */}
-          <div className="flex justify-between items-center pt-4 border-t flex-shrink-0 px-4 sm:px-6 pb-4">
-            <div className="text-sm text-muted-foreground">
-              {selectedProjects.length}개 선택됨
+              )}
             </div>
-            <div className="flex gap-2 w-full sm:w-auto">
-              <Button
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                className="flex-1 sm:flex-none"
-              >
-                취소
-              </Button>
-              <Button onClick={onConfirm} className="flex-1 sm:flex-none">
-                선택 완료
-              </Button>
-            </div>
-          </div>
+          </ScrollArea>
         </div>
+
+        <DialogFooter className="mt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            취소
+          </Button>
+          <Button onClick={onConfirm}>
+            선택 완료 ({selectedProjects.length}/{maxProjects})
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

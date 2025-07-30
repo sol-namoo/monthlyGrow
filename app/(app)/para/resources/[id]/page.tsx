@@ -11,146 +11,240 @@ import {
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useState, use, Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useQuery } from "@tanstack/react-query";
+import { fetchResourceById } from "@/lib/firebase";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-export default function ResourceDetailPage() {
-  const params = useParams();
-  const router = useRouter();
-  const { id } = params;
-  const [resource, setResource] = useState<any>(null); // 실제 데이터 타입으로 교체 필요
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-
-  // 샘플 데이터 (실제로는 ID에 따라 DB에서 데이터를 불러와야 함)
-  const sampleResources = [
-    {
-      id: "1",
-      title: "운동 루틴 아이디어",
-      type: "note",
-      content:
-        "월: 전신 운동, 화: 유산소, 수: 휴식, 목: 상체, 금: 하체, 주말: 가벼운 활동",
-      area: { id: "1", name: "건강" },
-      createdAt: "2025.05.10",
-    },
-    {
-      id: "2",
-      title: "개발 참고 자료",
-      type: "link",
-      content: "https://react.dev/learn",
-      area: { id: "2", name: "개발" },
-      createdAt: "2025.05.08",
-    },
-    {
-      id: "3",
-      title: "명상 가이드",
-      type: "file",
-      content: "/files/meditation_guide.pdf",
-      area: { id: "3", name: "마음" },
-      createdAt: "2025.05.05",
-    },
-  ];
-
-  useEffect(() => {
-    // 실제 앱에서는 여기서 ID를 사용하여 DB에서 Resource 데이터를 불러옵니다.
-    const foundResource = sampleResources.find((r) => r.id === id);
-    setResource(foundResource || null);
-  }, [id]);
-
-  if (!resource) {
-    return (
-      <div className="container max-w-md px-4 py-6 text-center">
-        <p className="text-muted-foreground">
-          자료를 불러오는 중이거나, 자료를 찾을 수 없습니다.
-        </p>
-      </div>
-    );
-  }
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "note":
-        return <FileText className="h-5 w-5" />;
-      case "link":
-        return <LinkIcon className="h-5 w-5" />;
-      case "file":
-        return <File className="h-5 w-5" />;
-      default:
-        return null;
-    }
-  };
-
+// 로딩 스켈레톤 컴포넌트
+function ResourceDetailSkeleton() {
   return (
     <div className="container max-w-md px-4 py-6">
-      {/* 헤더 */}
       <div className="flex items-center justify-between mb-6">
         <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <div className="flex gap-2">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={`/para/resources/edit/${resource.id}`}>
-              <Edit className="h-4 w-4" />
-            </Link>
-          </Button>
+          <Skeleton className="h-8 w-16" />
+          <Skeleton className="h-8 w-16" />
+        </div>
+      </div>
+
+      <Skeleton className="h-8 w-48 mb-4" />
+      <Skeleton className="h-4 w-full mb-2" />
+      <Skeleton className="h-4 w-3/4 mb-6" />
+
+      <Skeleton className="h-32 w-full mb-4" />
+    </div>
+  );
+}
+
+export default function ResourceDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const router = useRouter();
+  const { id } = use(params);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  // Firestore에서 실제 데이터 가져오기
+  const {
+    data: resource,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["resource", id],
+    queryFn: () => fetchResourceById(id as string),
+    enabled: !!id,
+  });
+
+  // 로딩 상태
+  if (isLoading) {
+    return (
+      <div className="container max-w-md px-4 py-6">
+        <div className="flex items-center justify-between mb-6">
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setShowDeleteDialog(true)}
+            onClick={() => window.history.back()}
           >
-            <Trash2 className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex gap-2">
+            <Skeleton className="h-8 w-16" />
+            <Skeleton className="h-8 w-16" />
+          </div>
+        </div>
+
+        <Skeleton className="h-8 w-48 mb-4" />
+        <Skeleton className="h-4 w-full mb-2" />
+        <Skeleton className="h-4 w-3/4 mb-6" />
+
+        <Skeleton className="h-32 w-full mb-4" />
+      </div>
+    );
+  }
+
+  // 에러 상태
+  if (error) {
+    return (
+      <div className="container max-w-md px-4 py-6">
+        <div className="flex items-center justify-between mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.history.back()}
+          >
+            <ChevronLeft className="h-4 w-4" />
           </Button>
         </div>
-      </div>
 
-      {/* Resource 기본 정보 */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-3">{resource.title}</h1>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
-          <span>생성일: {resource.createdAt}</span>
+        <Alert>
+          <AlertDescription>
+            자료를 불러오는 중 오류가 발생했습니다. 다시 시도해주세요.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  // 데이터가 없는 경우
+  if (!resource) {
+    return (
+      <div className="container max-w-md px-4 py-6">
+        <div className="flex items-center justify-between mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.history.back()}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
         </div>
-      </div>
 
-      <Card className="mb-6 p-4">
-        <div className="mb-4">
-          <h3 className="font-semibold text-lg mb-2">내용</h3>
-          {resource.type === "link" ? (
-            <a
-              href={resource.content}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:underline break-all"
+        <Alert>
+          <AlertDescription>해당 자료를 찾을 수 없습니다.</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  const getResourceIcon = () => {
+    if (resource.link) {
+      return <LinkIcon className="h-5 w-5" />;
+    } else if (resource.text) {
+      return <FileText className="h-5 w-5" />;
+    } else {
+      return <File className="h-5 w-5" />;
+    }
+  };
+
+  const getResourceLabel = () => {
+    if (resource.link) {
+      return "링크";
+    } else if (resource.text) {
+      return "노트";
+    } else {
+      return "자료";
+    }
+  };
+
+  return (
+    <Suspense fallback={<ResourceDetailSkeleton />}>
+      <div className="container max-w-md px-4 py-6">
+        {/* 헤더 */}
+        <div className="flex items-center justify-between mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.history.back()}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={`/para/resources/edit/${resource.id}`}>
+                <Edit className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowDeleteDialog(true)}
             >
-              {resource.content}
-            </a>
-          ) : (
-            <p className="text-muted-foreground whitespace-pre-wrap">
-              {resource.content}
-            </p>
-          )}
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
-        {resource.area && (
-          <div className="mb-4">
-            <h3 className="font-semibold text-lg mb-2">연결된 Area</h3>
-            <Badge variant="secondary" className="w-fit">
-              {resource.area.name}
-            </Badge>
+        {/* 자료 정보 */}
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 rounded-lg bg-muted">{getResourceIcon()}</div>
+            <div>
+              <h1 className="text-xl font-semibold">{resource.name}</h1>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant="outline" className="text-xs">
+                  {getResourceLabel()}
+                </Badge>
+                {resource.area && (
+                  <Badge variant="secondary" className="text-xs">
+                    {resource.area}
+                  </Badge>
+                )}
+              </div>
+            </div>
           </div>
-        )}
-      </Card>
-      <ConfirmDialog
-        open={showDeleteDialog}
-        onOpenChange={setShowDeleteDialog}
-        title="Resource 삭제"
-        type="delete"
-        description="이 자료를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
-        onConfirm={() => {
-          alert("Resource가 삭제되었습니다.");
-          router.push("/para?tab=resources");
-        }}
-      />
-    </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            {resource.description}
+          </p>
+        </div>
+
+        {/* 자료 내용 */}
+        <Card className="mb-4">
+          <div className="p-4">
+            {resource.link ? (
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">링크:</p>
+                <a
+                  href={resource.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline break-all"
+                >
+                  {resource.link}
+                </a>
+              </div>
+            ) : resource.text ? (
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">내용:</p>
+                <div className="whitespace-pre-wrap text-sm">
+                  {resource.text}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">내용이 없습니다.</p>
+            )}
+          </div>
+        </Card>
+
+        {/* 삭제 확인 다이얼로그 */}
+        <ConfirmDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          title="자료 삭제"
+          description="이 자료를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+          onConfirm={() => {
+            // TODO: 삭제 로직 구현
+            setShowDeleteDialog(false);
+          }}
+        />
+      </div>
+    </Suspense>
   );
 }

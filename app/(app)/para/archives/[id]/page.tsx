@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, use, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ChevronLeft, Star, Bookmark, Edit } from "lucide-react";
@@ -9,6 +9,33 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Retrospective } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { useQuery } from "@tanstack/react-query";
+import { fetchRetrospectiveById } from "@/lib/firebase";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+// 로딩 스켈레톤 컴포넌트
+function ArchiveDetailSkeleton() {
+  return (
+    <div className="container max-w-md px-4 py-6">
+      <div className="flex items-center justify-between mb-6">
+        <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <div className="flex gap-2">
+          <Skeleton className="h-8 w-16" />
+          <Skeleton className="h-8 w-16" />
+        </div>
+      </div>
+
+      <Skeleton className="h-8 w-48 mb-4" />
+      <Skeleton className="h-4 w-full mb-2" />
+      <Skeleton className="h-4 w-3/4 mb-6" />
+
+      <Skeleton className="h-32 w-full mb-4" />
+    </div>
+  );
+}
 
 export default function ArchiveDetailPage({
   params,
@@ -18,56 +45,61 @@ export default function ArchiveDetailPage({
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("official");
 
-  // 샘플 데이터 - 실제로는 ID를 기반으로 데이터를 가져와야 함
-  const retrospectiveData: Retrospective[] = [
-    {
-      id: "official-retro-1",
-      loopId: "1",
-      userId: "user-123",
-      createdAt: "2025-07-01T09:00:00Z",
-      type: "loop",
-      title: "6월 루프: 건강한 개발자 되기 회고",
-      summary: "아침 운동 습관 성공, 출장 중 식단 관리 어려움",
-      bestMoment: "매일 아침 운동을 꾸준히 했던 순간",
-      routineAdherence:
-        "계획한 루틴의 90%를 지켰습니다. 특히 아침 운동은 꾸준히 했습니다.",
-      unexpectedObstacles: "갑작스러운 출장으로 식단 관리가 어려웠습니다.",
-      nextLoopApplication:
-        "다음 루프에서는 출장 시에도 식단을 유지할 수 있는 계획을 세울 것입니다.",
-      content:
-        "전반적으로 만족스러운 루프였습니다. 건강이 많이 좋아진 것을 느낍니다.",
-      userRating: 4,
-      bookmarked: true,
-    },
-    {
-      id: "project-retro-1",
-      projectId: "1",
-      userId: "user-123",
-      createdAt: "2025-05-31T09:00:00Z",
-      type: "project",
-      title: "아침 운동 습관화 프로젝트 회고",
-      summary: "운동 습관 성공, 꾸준함의 중요성 깨달음",
-      goalAchieved: "네, 아침 운동 습관화 목표를 100% 달성했습니다.",
-      memorableTask:
-        "매일 아침 일찍 일어나 운동을 시작하는 것이 가장 기억에 남습니다.",
-      stuckPoints: "주말에 늦잠을 자서 운동을 거르는 경우가 있었습니다.",
-      newLearnings:
-        "작은 습관이라도 꾸준히 하는 것이 중요하다는 것을 깨달았습니다.",
-      nextProjectImprovements:
-        "다음 프로젝트에서는 주말에도 루틴을 유지할 수 있는 방법을 찾아야겠습니다.",
-      content:
-        "전반적으로 만족스러운 프로젝트였습니다. 건강이 많이 좋아진 것을 느낍니다.",
-      userRating: 4,
-      bookmarked: true,
-    },
-  ];
+  // Next.js 15에서는 params가 Promise이므로 unwrap
+  const resolvedParams = use(params as unknown as Promise<{ id: string }>);
+  const { id } = resolvedParams;
 
-  const retrospective = retrospectiveData.find((r) => r.id === params.id);
+  // Firestore에서 실제 데이터 가져오기
+  const {
+    data: retrospective,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["retrospective", id],
+    queryFn: () => fetchRetrospectiveById(id),
+    enabled: !!id,
+  });
 
+  // 에러 상태
+  if (error) {
+    return (
+      <div className="container max-w-md px-4 py-6">
+        <div className="flex items-center justify-between mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.history.back()}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <Alert>
+          <AlertDescription>
+            회고를 불러오는 중 오류가 발생했습니다. 다시 시도해주세요.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  // 데이터가 없는 경우
   if (!retrospective) {
     return (
-      <div className="container max-w-md px-4 py-6 pb-20 text-center">
-        <p className="text-muted-foreground">회고를 찾을 수 없습니다.</p>
+      <div className="container max-w-md px-4 py-6">
+        <div className="flex items-center justify-between mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.history.back()}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <Alert>
+          <AlertDescription>해당 회고를 찾을 수 없습니다.</AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -89,147 +121,190 @@ export default function ArchiveDetailPage({
     );
   };
 
+  const formatDate = (date: Date | string) => {
+    if (typeof date === "string") {
+      return new Date(date).toLocaleDateString("ko-KR");
+    }
+    return date.toLocaleDateString("ko-KR");
+  };
+
   return (
-    <div className="container max-w-md px-4 py-6 pb-20">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between mb-6">
-        <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex gap-2">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={`/para/archives/edit/${params.id}`}>
-              <Edit className="h-4 w-4" />
-            </Link>
+    <Suspense fallback={<ArchiveDetailSkeleton />}>
+      <div className="container max-w-md px-4 py-6 pb-20">
+        {/* 헤더 */}
+        <div className="flex items-center justify-between mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.history.back()}
+          >
+            <ChevronLeft className="h-4 w-4" />
           </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={`/para/archives/edit/${id}`}>
+                <Edit className="h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
         </div>
-      </div>
 
-      {/* 회고 기본 정보 */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-3">{retrospective.title}</h1>
-        <p className="text-muted-foreground mb-4">{retrospective.summary}</p>
-        <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
-          <span>
-            작성일:{" "}
-            {new Date(retrospective.createdAt).toLocaleDateString("ko-KR")}
-          </span>
-          <div className="flex items-center gap-2">
+        {/* 회고 정보 */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-4">
             {retrospective.bookmarked && (
-              <Bookmark className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+              <Bookmark className="h-5 w-5 text-yellow-500 fill-yellow-500" />
             )}
-            {renderStarRating(retrospective.userRating)}
+            <h1 className="text-xl font-semibold">
+              {retrospective.title || "회고"}
+            </h1>
+          </div>
+          {retrospective.summary && (
+            <p className="text-sm text-muted-foreground mb-4">
+              {retrospective.summary}
+            </p>
+          )}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>작성일: {formatDate(retrospective.createdAt)}</span>
+            {retrospective.userRating && (
+              <div className="flex items-center gap-1">
+                <span>평점:</span>
+                {renderStarRating(retrospective.userRating)}
+              </div>
+            )}
           </div>
         </div>
+
+        {/* 탭 컨텐츠 */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="official">공식 회고</TabsTrigger>
+            <TabsTrigger value="freeform">자유 회고</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="official" className="space-y-4">
+            {/* 루프용 필드들 */}
+            {retrospective.bestMoment && (
+              <Card>
+                <div className="p-4">
+                  <h3 className="font-medium mb-2">가장 좋았던 순간</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {retrospective.bestMoment}
+                  </p>
+                </div>
+              </Card>
+            )}
+
+            {retrospective.routineAdherence && (
+              <Card>
+                <div className="p-4">
+                  <h3 className="font-medium mb-2">루틴 준수율</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {retrospective.routineAdherence}
+                  </p>
+                </div>
+              </Card>
+            )}
+
+            {retrospective.unexpectedObstacles && (
+              <Card>
+                <div className="p-4">
+                  <h3 className="font-medium mb-2">예상치 못한 장애물</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {retrospective.unexpectedObstacles}
+                  </p>
+                </div>
+              </Card>
+            )}
+
+            {retrospective.nextLoopApplication && (
+              <Card>
+                <div className="p-4">
+                  <h3 className="font-medium mb-2">다음 루프 적용 방안</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {retrospective.nextLoopApplication}
+                  </p>
+                </div>
+              </Card>
+            )}
+
+            {/* 프로젝트용 필드들 */}
+            {retrospective.goalAchieved && (
+              <Card>
+                <div className="p-4">
+                  <h3 className="font-medium mb-2">목표 달성 여부</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {retrospective.goalAchieved}
+                  </p>
+                </div>
+              </Card>
+            )}
+
+            {retrospective.memorableTask && (
+              <Card>
+                <div className="p-4">
+                  <h3 className="font-medium mb-2">가장 기억에 남는 작업</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {retrospective.memorableTask}
+                  </p>
+                </div>
+              </Card>
+            )}
+
+            {retrospective.stuckPoints && (
+              <Card>
+                <div className="p-4">
+                  <h3 className="font-medium mb-2">막힌 지점</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {retrospective.stuckPoints}
+                  </p>
+                </div>
+              </Card>
+            )}
+
+            {retrospective.newLearnings && (
+              <Card>
+                <div className="p-4">
+                  <h3 className="font-medium mb-2">새로운 학습</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {retrospective.newLearnings}
+                  </p>
+                </div>
+              </Card>
+            )}
+
+            {retrospective.nextProjectImprovements && (
+              <Card>
+                <div className="p-4">
+                  <h3 className="font-medium mb-2">다음 프로젝트 개선사항</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {retrospective.nextProjectImprovements}
+                  </p>
+                </div>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="freeform">
+            {retrospective.content ? (
+              <Card>
+                <div className="p-4">
+                  <h3 className="font-medium mb-2">자유 회고</h3>
+                  <div className="whitespace-pre-wrap text-sm text-muted-foreground">
+                    {retrospective.content}
+                  </div>
+                </div>
+              </Card>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-sm text-muted-foreground">
+                  자유 회고가 없습니다.
+                </p>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
-
-      {/* 탭 영역 */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="official">공식 회고</TabsTrigger>
-          <TabsTrigger value="freeform">자유 노트</TabsTrigger>
-        </TabsList>
-
-        {/* 공식 회고 탭 */}
-        <TabsContent value="official" className="mt-4">
-          <div className="space-y-4">
-            {retrospective.type === "loop" && (
-              <>
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-2">
-                    이번 루프에서 가장 좋았던 순간은?
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {retrospective.bestMoment || "내용 없음"}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-2">
-                    계획한 루틴을 얼마나 지켰나요?
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {retrospective.routineAdherence || "내용 없음"}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-2">
-                    예기치 못한 방해 요소는 있었나요?
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {retrospective.unexpectedObstacles || "내용 없음"}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-2">
-                    다음 루프에 적용할 점은?
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {retrospective.nextLoopApplication || "내용 없음"}
-                  </p>
-                </Card>
-              </>
-            )}
-
-            {retrospective.type === "project" && (
-              <>
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-2">목표를 달성했나요?</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {retrospective.goalAchieved || "내용 없음"}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-2">
-                    가장 인상 깊었던 작업은?
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {retrospective.memorableTask || "내용 없음"}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-2">
-                    막혔던 지점은 있었나요?
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {retrospective.stuckPoints || "내용 없음"}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-2">새롭게 배운 점은?</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {retrospective.newLearnings || "내용 없음"}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-2">
-                    다음 프로젝트에서 개선할 점은?
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {retrospective.nextProjectImprovements || "내용 없음"}
-                  </p>
-                </Card>
-              </>
-            )}
-          </div>
-        </TabsContent>
-
-        {/* 자유 노트 탭 */}
-        <TabsContent value="freeform" className="mt-4">
-          <Card className="p-4">
-            <h3 className="font-semibold mb-2">자유 노트 내용</h3>
-            <p className="text-sm text-muted-foreground">
-              {retrospective.content || "작성된 자유 노트가 없습니다."}
-            </p>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* 연결된 프로젝트들 */}
-      <section className="mb-6">
-        <h2 className="mb-4 text-xl font-bold">연결된 프로젝트</h2>
-        {/* 루프 시작 시점 프로젝트들 */}
-        {/* 루프 도중 추가된 프로젝트들 */}
-      </section>
-    </div>
+    </Suspense>
   );
 }

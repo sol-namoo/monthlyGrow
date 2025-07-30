@@ -34,7 +34,14 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import Loading from "@/components/feedback/Loading";
-import dayjs from "dayjs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 // 폼 스키마 정의
 const projectFormSchema = z.object({
@@ -59,6 +66,13 @@ const projectFormSchema = z.object({
 type ProjectFormData = z.infer<typeof projectFormSchema>;
 
 function NewProjectPageContent() {
+  // 상태 관리
+  const [selectedAreaId, setSelectedAreaId] = useState<string>("");
+  const [tasks, setTasks] = useState([{ title: "", date: "", duration: 1 }]);
+  const [showLoopConnectionDialog, setShowLoopConnectionDialog] =
+    useState(false);
+  const [availableLoops, setAvailableLoops] = useState<any[]>([]);
+  const [selectedLoopId, setSelectedLoopId] = useState<string>("");
   const router = useRouter();
   const { toast } = useToast();
   const searchParams = useSearchParams();
@@ -67,10 +81,6 @@ function NewProjectPageContent() {
   const loopId = searchParams.get("loopId");
   const addedMidway = searchParams.get("addedMidway") === "true";
   const returnUrl = searchParams.get("returnUrl");
-
-  const [showLoopConnectionDialog, setShowLoopConnectionDialog] =
-    useState(false);
-  const [createdProjectData, setCreatedProjectData] = useState<any>(null);
 
   // react-hook-form 설정
   const form = useForm<ProjectFormData>({
@@ -164,19 +174,34 @@ function NewProjectPageContent() {
     }
   };
 
+  // 루프 연결 처리
   const handleLoopConnection = (connectToLoop: boolean) => {
-    if (connectToLoop) {
-      // 루프에 연결하는 로직
-      console.log("루프에 연결됨");
+    if (connectToLoop && selectedLoopId) {
+      // 선택된 루프에 프로젝트 연결하는 로직 구현 예정
+      console.log("루프에 연결:", selectedLoopId);
+      toast({
+        title: "루프 연결 완료",
+        description: "프로젝트가 선택한 루프에 연결되었습니다.",
+      });
     }
     setShowLoopConnectionDialog(false);
+    setSelectedLoopId("");
+  };
+
+  // 루프 연결 대화상자 열기
+  const openLoopConnectionDialog = () => {
+    // TODO: 현재 진행 중인 루프들을 가져오는 로직 구현
+    // setAvailableLoops(activeLoops);
+    setShowLoopConnectionDialog(true);
   };
 
   const calculateDuration = (startDate: string, dueDate: string) => {
     if (!startDate || !dueDate) return 0;
-    const start = dayjs(startDate);
-    const end = dayjs(dueDate);
-    return end.diff(start, "day") + 1; // 시작일과 종료일 포함
+    const start = new Date(startDate);
+    const end = new Date(dueDate);
+    const diffTime = end.getTime() - start.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays + 1; // 시작일과 종료일 포함
   };
 
   const calculateWeeklyAverage = (targetCount: string) => {
@@ -319,7 +344,7 @@ function NewProjectPageContent() {
                       if (
                         startDate &&
                         dueDate &&
-                        dayjs(startDate).isAfter(dayjs(dueDate))
+                        new Date(startDate) > new Date(dueDate)
                       ) {
                         form.setValue("dueDate", startDate);
                       }
@@ -345,7 +370,7 @@ function NewProjectPageContent() {
                       if (
                         startDate &&
                         dueDate &&
-                        dayjs(dueDate).isBefore(dayjs(startDate))
+                        new Date(dueDate) < new Date(startDate)
                       ) {
                         form.setValue("dueDate", startDate);
                       }
@@ -430,6 +455,32 @@ function NewProjectPageContent() {
           </div>
         </Card>
 
+        {/* 루프 연결 섹션 */}
+        <Card className="p-6">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold mb-2">루프 연결 (선택사항)</h2>
+            <p className="text-sm text-muted-foreground">
+              이 프로젝트를 현재 진행 중인 루프에 연결할 수 있습니다.
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={openLoopConnectionDialog}
+            className="w-full"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            루프에 연결하기
+          </Button>
+
+          {selectedLoopId && (
+            <div className="mt-3 p-3 bg-muted/30 rounded-lg">
+              <p className="text-sm">선택된 루프: {selectedLoopId}</p>
+            </div>
+          )}
+        </Card>
+
         <Card className="p-6">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold">태스크 목록</h2>
@@ -501,6 +552,80 @@ function NewProjectPageContent() {
           </Button>
         </div>
       </form>
+
+      {/* 루프 연결 대화상자 */}
+      <Dialog
+        open={showLoopConnectionDialog}
+        onOpenChange={setShowLoopConnectionDialog}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>루프에 연결</DialogTitle>
+            <DialogDescription>
+              이 프로젝트를 연결할 루프를 선택하세요.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {availableLoops.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">
+                  현재 진행 중인 루프가 없습니다.
+                </p>
+                <Button
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => {
+                    setShowLoopConnectionDialog(false);
+                    router.push("/loop/new");
+                  }}
+                >
+                  새 루프 만들기
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  {availableLoops.map((loop) => (
+                    <div
+                      key={loop.id}
+                      className={`p-3 border rounded-lg cursor-pointer ${
+                        selectedLoopId === loop.id
+                          ? "border-primary bg-primary/5"
+                          : "border-border"
+                      }`}
+                      onClick={() => setSelectedLoopId(loop.id)}
+                    >
+                      <h4 className="font-medium">{loop.title}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(loop.startDate).toLocaleDateString()} -{" "}
+                        {new Date(loop.endDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => handleLoopConnection(true)}
+                    disabled={!selectedLoopId}
+                    className="flex-1"
+                  >
+                    연결하기
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleLoopConnection(false)}
+                    className="flex-1"
+                  >
+                    나중에
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

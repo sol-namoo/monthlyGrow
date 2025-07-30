@@ -24,6 +24,13 @@ export interface Resource {
   updatedAt: Date;
 }
 
+export interface ConnectedLoop {
+  id: string;
+  title: string;
+  startDate: Date;
+  endDate: Date;
+}
+
 export interface Project {
   id: string;
   userId: string;
@@ -38,6 +45,7 @@ export interface Project {
   createdAt: Date;
   updatedAt: Date;
   loopId?: string; // 현재 연결된 루프 ID (legacy)
+  connectedLoops?: ConnectedLoop[]; // 연결된 루프 정보
   addedMidway?: boolean; // 루프 중간에 추가된 프로젝트 여부
   retrospective?: Retrospective;
   notes: Note[];
@@ -65,7 +73,6 @@ export interface Loop {
   title: string;
   startDate: Date;
   endDate: Date;
-  status: "in_progress" | "ended";
   focusAreas: string[]; // Area ID 배열
   projectIds: string[]; // Project ID 배열
   reward?: string;
@@ -75,6 +82,9 @@ export interface Loop {
   targetCount: number;
   retrospective?: Retrospective; // 루프 회고
   note?: Note; // 루프 노트 (선택)
+
+  // 로컬 계산 필드 (DB에 저장되지 않음)
+  status?: "planned" | "in_progress" | "ended"; // startDate와 endDate를 기반으로 클라이언트에서 계산
 }
 
 export interface Snapshot {
@@ -92,6 +102,8 @@ export interface Snapshot {
 export interface Retrospective {
   id: string;
   userId: string;
+  loopId?: string; // 루프 회고인 경우
+  projectId?: string; // 프로젝트 회고인 경우
   createdAt: Date;
   updatedAt: Date;
   content?: string; // 자유 회고
@@ -123,6 +135,43 @@ export interface Note {
   content: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// 사용자 관련 타입 정의
+export interface UserProfile {
+  displayName: string;
+  email: string;
+  photoURL?: string;
+  emailVerified: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface UserSettings {
+  defaultReward?: string;
+  defaultRewardEnabled: boolean;
+  carryOver: boolean;
+  aiRecommendations: boolean;
+  notifications: boolean;
+  theme: "light" | "dark" | "system";
+  language: "ko" | "en";
+  // Firebase Auth에서 제공하는 정보는 제외:
+  // - email (user.email)
+  // - displayName (user.displayName)
+  // - photoURL (user.photoURL)
+}
+
+export interface UserPreferences {
+  timezone: string;
+  dateFormat: string;
+  weeklyStartDay: "monday" | "sunday";
+}
+
+export interface User {
+  id: string;
+  profile: UserProfile;
+  settings: UserSettings;
+  preferences: UserPreferences;
 }
 
 // Archive는 Loop나 Project의 완료된 상태를 나타내는 뷰

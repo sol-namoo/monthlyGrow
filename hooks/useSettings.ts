@@ -1,60 +1,66 @@
 import { useState, useEffect } from "react";
-
-export interface UserSettings {
-  username: string;
-  email: string;
-  defaultReward: string;
-  defaultRewardEnabled: boolean;
-  carryOver: boolean;
-  aiRecommendations: boolean;
-  notifications: boolean;
-}
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "@/lib/firebase";
+import { fetchUserById, updateUserSettings } from "@/lib/firebase";
+import { UserSettings } from "@/lib/types";
 
 const defaultSettings: UserSettings = {
-  username: "루퍼",
-  email: "looper@example.com",
-  defaultReward: "좋아하는 카페에서 디저트 먹기",
-  defaultRewardEnabled: true,
+  defaultReward: "",
+  defaultRewardEnabled: false,
   carryOver: true,
   aiRecommendations: true,
   notifications: true,
+  theme: "system",
+  language: "ko",
 };
 
 export function useSettings() {
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
   const [isLoading, setIsLoading] = useState(true);
+  const [user, userLoading] = useAuthState(auth);
 
-  // 설정 불러오기
+  // Firestore에서 사용자 설정 불러오기
   useEffect(() => {
-    const savedSettings = localStorage.getItem("userSettings");
-    if (savedSettings) {
-      try {
-        const parsedSettings = JSON.parse(savedSettings);
-        setSettings({ ...defaultSettings, ...parsedSettings });
-      } catch (error) {
-        console.error("설정 파싱 오류:", error);
-        setSettings(defaultSettings);
+    const loadSettings = async () => {
+      if (!user?.uid) {
+        setIsLoading(false);
+        return;
       }
+
+      try {
+        const userData = await fetchUserById(user.uid);
+        setSettings(userData.settings);
+      } catch (error) {
+        console.error("설정 불러오기 실패:", error);
+        setSettings(defaultSettings);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (!userLoading) {
+      loadSettings();
     }
-    setIsLoading(false);
-  }, []);
+  }, [user?.uid, userLoading]);
 
-  // 설정 저장
-  const saveSettings = (newSettings: UserSettings) => {
-    setSettings(newSettings);
-    localStorage.setItem("userSettings", JSON.stringify(newSettings));
-  };
+  // Firestore에 설정 업데이트
+  const updateSettings = async (updates: Partial<UserSettings>) => {
+    if (!user?.uid) {
+      throw new Error("로그인된 사용자가 없습니다.");
+    }
 
-  // 설정 업데이트
-  const updateSettings = (updates: Partial<UserSettings>) => {
-    const updatedSettings = { ...settings, ...updates };
-    saveSettings(updatedSettings);
+    try {
+      await updateUserSettings(user.uid, updates);
+      setSettings((prev) => ({ ...prev, ...updates }));
+    } catch (error) {
+      console.error("설정 업데이트 실패:", error);
+      throw error;
+    }
   };
 
   return {
     settings,
-    saveSettings,
     updateSettings,
-    isLoading,
+    isLoading: isLoading || userLoading,
   };
 }

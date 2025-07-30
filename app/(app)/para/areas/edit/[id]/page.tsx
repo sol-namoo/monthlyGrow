@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, use } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,7 @@ import { useToast } from "@/hooks/use-toast";
 import { SelectItemsDialog } from "@/components/widgets/select-items-dialog";
 import { Badge } from "@/components/ui/badge";
 import Loading from "@/components/feedback/Loading";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Project {
   id: string;
@@ -50,12 +51,32 @@ interface Resource {
   type: string;
 }
 
-function EditAreaPageContent({ params }: { params: { id: string } }) {
+// 로딩 스켈레톤 컴포넌트
+function EditAreaSkeleton() {
+  return (
+    <div className="container max-w-md px-4 py-6">
+      <div className="mb-6 flex items-center">
+        <Skeleton className="h-8 w-8 mr-2" />
+        <Skeleton className="h-6 w-32" />
+      </div>
+
+      <Skeleton className="h-8 w-48 mb-4" />
+      <Skeleton className="h-4 w-full mb-2" />
+      <Skeleton className="h-4 w-3/4 mb-6" />
+
+      <Skeleton className="h-32 w-full mb-4" />
+      <Skeleton className="h-32 w-full mb-4" />
+    </div>
+  );
+}
+
+function EditAreaPageContent({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const { id } = use(params);
 
-  // 샘플 데이터 로드 (실제 앱에서는 params.id를 사용하여 데이터베이스에서 가져옴)
+  // 샘플 데이터 로드 (실제 앱에서는 id를 사용하여 데이터베이스에서 가져옴)
   const initialAreaData = {
     name: "개인 성장",
     description: "자기 계발 및 학습 관련 활동을 관리하는 영역입니다.",
@@ -139,7 +160,7 @@ function EditAreaPageContent({ params }: { params: { id: string } }) {
     } else if (tab === "resources") {
       setIsResourceSelectOpen(true);
     }
-  }, [params.id, searchParams]);
+  }, [id, searchParams]);
 
   const handleChange = (field: string, value: string) => {
     setFormData({ ...formData, [field]: value });
@@ -208,14 +229,14 @@ function EditAreaPageContent({ params }: { params: { id: string } }) {
     });
 
     // 영역 상세 페이지로 이동
-    router.push(`/para/areas/${params.id}`);
+    router.push(`/para/areas/${id}`);
   };
 
   return (
     <div className="container max-w-md px-4 py-6">
       <div className="mb-6 flex items-center">
         <Button variant="ghost" size="icon" asChild className="mr-2">
-          <Link href={`/para/areas/${params.id}`}>
+          <Link href={`/para/areas/${id}`}>
             <ChevronLeft className="h-5 w-5" />
           </Link>
         </Button>
@@ -444,9 +465,13 @@ function EditAreaPageContent({ params }: { params: { id: string } }) {
   );
 }
 
-export default function EditAreaPage({ params }: { params: { id: string } }) {
+export default function EditAreaPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   return (
-    <Suspense fallback={<Loading />}>
+    <Suspense fallback={<EditAreaSkeleton />}>
       <EditAreaPageContent params={params} />
     </Suspense>
   );

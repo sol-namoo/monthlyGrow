@@ -26,6 +26,7 @@ import { auth } from "@/lib/firebase";
 import { usePageData } from "@/hooks/usePageData";
 import { useQuery } from "@tanstack/react-query";
 import { fetchAllAreasByUserId } from "@/lib/firebase";
+import { getLoopStatus } from "@/lib/utils";
 
 export default function HomePage() {
   const [user, loading] = useAuthState(auth);
@@ -44,8 +45,11 @@ export default function HomePage() {
   if (!user) return <div>로그인이 필요합니다.</div>;
   if (error) return <div>에러 발생: {error.message}</div>;
 
-  // 가장 최근 루프(예: 진행 중인 루프)를 선택
-  const currentLoop = loops && loops.length > 0 ? loops[0] : null;
+  // 현재 진행 중인 루프를 날짜 기반으로 선택
+  const currentLoop =
+    loops && loops.length > 0
+      ? loops.find((loop) => getLoopStatus(loop) === "in_progress") || null
+      : null;
   // 현재 루프에 연결된 프로젝트만 필터링
   const currentLoopProjects =
     currentLoop && projects
@@ -85,8 +89,8 @@ export default function HomePage() {
   const hasMoreProjects = currentLoopProjects.length > 3;
 
   // areaId → area명 매핑 함수
-  const getAreaName = (areaId: string) =>
-    areas.find((a) => a.id === areaId)?.name || "-";
+  const getAreaName = (areaId?: string) =>
+    areaId ? areas.find((a) => a.id === areaId)?.name || "-" : "-";
 
   return (
     <div className="container max-w-md px-4 py-6">

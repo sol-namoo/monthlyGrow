@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, use, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,14 +16,37 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { ChevronLeft, Book } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export default function EditResourcePage() {
+// 로딩 스켈레톤 컴포넌트
+function EditResourceSkeleton() {
+  return (
+    <div className="container max-w-md px-4 py-6">
+      <div className="mb-6 flex items-center">
+        <Skeleton className="h-8 w-8 mr-2" />
+        <Skeleton className="h-6 w-32" />
+      </div>
+
+      <Skeleton className="h-8 w-48 mb-4" />
+      <Skeleton className="h-4 w-full mb-2" />
+      <Skeleton className="h-4 w-3/4 mb-6" />
+
+      <Skeleton className="h-32 w-full mb-4" />
+      <Skeleton className="h-32 w-full mb-4" />
+    </div>
+  );
+}
+
+export default function EditResourcePage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const router = useRouter();
-  const params = useParams();
   const { toast } = useToast();
-  const { id } = params;
+  const { id } = use(params);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -125,89 +148,92 @@ export default function EditResourcePage() {
   }
 
   return (
-    <div className="container max-w-md px-4 py-6">
-      <div className="mb-6 flex items-center">
-        <Button variant="ghost" size="icon" asChild className="mr-2">
-          <Link href={`/para/resources/${id}`}>
-            <ChevronLeft className="h-5 w-5" />
-          </Link>
-        </Button>
-        <h1 className="text-2xl font-bold">자료 수정</h1>
-      </div>
-
-      <div className="mb-6 text-center">
-        <div className="mb-4 flex justify-center">
-          <div className="rounded-full bg-primary/10 p-4">
-            <Book className="h-8 w-8 text-primary" />
-          </div>
+    <Suspense fallback={<EditResourceSkeleton />}>
+      <div className="container max-w-md px-4 py-6">
+        <div className="mb-6 flex items-center">
+          <Button variant="ghost" size="icon" asChild className="mr-2">
+            <Link href={`/para/resources/${id}`}>
+              <ChevronLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <h1 className="text-2xl font-bold">자료 수정</h1>
         </div>
-        <h2 className="text-lg font-bold mb-2">자료를 수정해보세요</h2>
-        <p className="text-sm text-muted-foreground">
-          자료의 내용이나 연결된 영역을 변경하여 최신 상태로 유지할 수 있습니다.
-        </p>
+
+        <div className="mb-6 text-center">
+          <div className="mb-4 flex justify-center">
+            <div className="rounded-full bg-primary/10 p-4">
+              <Book className="h-8 w-8 text-primary" />
+            </div>
+          </div>
+          <h2 className="text-lg font-bold mb-2">자료를 수정해보세요</h2>
+          <p className="text-sm text-muted-foreground">
+            자료의 내용이나 연결된 영역을 변경하여 최신 상태로 유지할 수
+            있습니다.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <Card className="mb-6 p-4">
+            <div className="mb-4">
+              <Label htmlFor="title">자료 제목</Label>
+              <Input
+                id="title"
+                value={formData.title}
+                onChange={(e) => handleChange("title", e.target.value)}
+                placeholder="예: 효과적인 시간 관리법"
+                className="mt-1"
+                required
+              />
+            </div>
+
+            <div className="mb-4">
+              <Label htmlFor="description">설명 (선택 사항)</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => handleChange("description", e.target.value)}
+                placeholder="자료에 대한 간략한 설명을 입력하세요."
+                className="mt-1"
+              />
+            </div>
+
+            <div className="mb-4">
+              <Label htmlFor="url">URL (선택 사항)</Label>
+              <Input
+                id="url"
+                type="url"
+                value={formData.url}
+                onChange={(e) => handleChange("url", e.target.value)}
+                placeholder="예: https://example.com/article"
+                className="mt-1"
+              />
+            </div>
+
+            <div className="mb-4">
+              <Label htmlFor="area">연결할 영역 (선택 사항)</Label>
+              <Select
+                value={formData.area}
+                onValueChange={(value) => handleChange("area", value)}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="영역 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {areas.map((area) => (
+                    <SelectItem key={area.id} value={area.id}>
+                      {area.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </Card>
+
+          <Button type="submit" className="w-full">
+            자료 수정
+          </Button>
+        </form>
       </div>
-
-      <form onSubmit={handleSubmit}>
-        <Card className="mb-6 p-4">
-          <div className="mb-4">
-            <Label htmlFor="title">자료 제목</Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) => handleChange("title", e.target.value)}
-              placeholder="예: 효과적인 시간 관리법"
-              className="mt-1"
-              required
-            />
-          </div>
-
-          <div className="mb-4">
-            <Label htmlFor="description">설명 (선택 사항)</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => handleChange("description", e.target.value)}
-              placeholder="자료에 대한 간략한 설명을 입력하세요."
-              className="mt-1"
-            />
-          </div>
-
-          <div className="mb-4">
-            <Label htmlFor="url">URL (선택 사항)</Label>
-            <Input
-              id="url"
-              type="url"
-              value={formData.url}
-              onChange={(e) => handleChange("url", e.target.value)}
-              placeholder="예: https://example.com/article"
-              className="mt-1"
-            />
-          </div>
-
-          <div className="mb-4">
-            <Label htmlFor="area">연결할 영역 (선택 사항)</Label>
-            <Select
-              value={formData.area}
-              onValueChange={(value) => handleChange("area", value)}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="영역 선택" />
-              </SelectTrigger>
-              <SelectContent>
-                {areas.map((area) => (
-                  <SelectItem key={area.id} value={area.id}>
-                    {area.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </Card>
-
-        <Button type="submit" className="w-full">
-          자료 수정
-        </Button>
-      </form>
-    </div>
+    </Suspense>
   );
 }

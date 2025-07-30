@@ -1,7 +1,10 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, use, Suspense } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,377 +22,439 @@ import { RecommendationBadge } from "@/components/ui/recommendation-badge";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import dayjs from "dayjs";
-import { getProjectStatus } from "@/lib/utils";
+import { getProjectStatus, formatDate } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useQuery } from "@tanstack/react-query";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "@/lib/firebase";
+import {
+  fetchProjectById,
+  updateProject,
+  fetchAllAreasByUserId,
+  fetchAllTasksByProjectId,
+} from "@/lib/firebase";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+// 프로젝트 편집 폼 스키마 정의
+const editProjectFormSchema = z
+  .object({
+    title: z.string().min(1, "프로젝트 제목을 입력해주세요"),
+    description: z.string().min(1, "프로젝트 설명을 입력해주세요"),
+    areaId: z.string().optional(),
+    startDate: z.string().min(1, "시작일을 입력해주세요"),
+    endDate: z.string().min(1, "종료일을 입력해주세요"),
+    total: z.number().min(1, "목표 횟수를 입력해주세요"),
+  })
+  .refine(
+    (data) => {
+      const startDate = new Date(data.startDate);
+      const endDate = new Date(data.endDate);
+      return endDate >= startDate;
+    },
+    {
+      message: "종료일은 시작일보다 늦어야 합니다",
+      path: ["endDate"],
+    }
+  );
+
+type EditProjectFormData = z.infer<typeof editProjectFormSchema>;
+
+// 로딩 스켈레톤 컴포넌트
+function EditProjectSkeleton() {
+  return (
+    <div className="container max-w-md px-4 py-6">
+      <div className="mb-6 flex items-center">
+        <Skeleton className="h-8 w-8 mr-2" />
+        <Skeleton className="h-6 w-32" />
+      </div>
+
+      <Skeleton className="h-8 w-48 mb-4" />
+      <Skeleton className="h-4 w-full mb-2" />
+      <Skeleton className="h-4 w-3/4 mb-6" />
+
+      <Skeleton className="h-32 w-full mb-4" />
+      <Skeleton className="h-32 w-full mb-4" />
+    </div>
+  );
+}
 
 export default function EditProjectPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const router = useRouter();
   const { toast } = useToast();
+  const [user, userLoading] = useAuthState(auth);
 
-  // 샘플 데이터 로드 (실제 앱에서는 params.id를 사용하여 데이터베이스에서 가져옴)
-  const initialProjectData = {
-    title: "새로운 웹사이트 개발",
-    description: "반응형 디자인과 최신 기술 스택을 활용한 웹사이트 구축",
-    area: "개인 성장", // 예시 Area
-    startDate: "2025-01-01",
-    endDate: "2025-12-31",
-    targetCount: 10,
-    loopIds: ["1"],
-  };
+  // Next.js 15에서는 params가 Promise이므로 unwrap
+  const resolvedParams = use(params as unknown as Promise<{ id: string }>);
+  const { id: projectId } = resolvedParams;
 
-  const [formData, setFormData] = useState(initialProjectData);
+  // Firestore에서 프로젝트 데이터 가져오기
+  const {
+    data: project,
+    isLoading: projectLoading,
+    error: projectError,
+  } = useQuery({
+    queryKey: ["project", projectId],
+    queryFn: () => fetchProjectById(projectId),
+    enabled: !!projectId,
+  });
 
-  // 프로젝트 상태를 미리 계산하여 객체에 추가
-  const formDataWithStatus = {
-    ...formData,
-    status: getProjectStatus(formData),
-  };
+  // 영역 목록 가져오기
+  const { data: areas = [], isLoading: areasLoading } = useQuery({
+    queryKey: ["areas", user?.uid],
+    queryFn: () => fetchAllAreasByUserId(user?.uid || ""),
+    enabled: !!user?.uid,
+  });
 
-  const [tasks, setTasks] = useState([
-    { id: 1, title: "기획 단계", date: "2025-01-01", duration: 2, done: false },
-    {
-      id: 2,
-      title: "디자인 단계",
-      date: "2025-01-03",
-      duration: 3,
-      done: false,
+  // 프로젝트의 Tasks 가져오기
+  const { data: tasks = [], isLoading: tasksLoading } = useQuery({
+    queryKey: ["tasks", projectId],
+    queryFn: () => fetchAllTasksByProjectId(projectId),
+    enabled: !!projectId,
+  });
+
+  // 진행률 계산 (완료된 Tasks / 전체 Tasks)
+  const completedTasks = tasks.filter((task) => task.done).length;
+  const totalTasks = tasks.length;
+  const progressPercentage =
+    totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  // react-hook-form 설정
+  const form = useForm<EditProjectFormData>({
+    resolver: zodResolver(editProjectFormSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      areaId: "",
+      startDate: "",
+      endDate: "",
+      total: 1,
     },
-    { id: 3, title: "개발 단계", date: "2025-01-06", duration: 5, done: false },
-  ]);
+  });
 
+  // 프로젝트 데이터가 로드되면 폼에 채우기
   useEffect(() => {
-    // 실제 앱에서는 여기서 params.id를 사용하여 데이터를 불러와 setFormData
-    // 예: fetchProject(params.id).then(data => setFormData(data));
-  }, [params.id]);
+    if (project) {
+      const formatDateForInput = (date: Date | string) => {
+        const dateObj = typeof date === "string" ? new Date(date) : date;
+        return dateObj.toISOString().split("T")[0];
+      };
 
-  const handleChange = (field: string, value: string) => {
-    setFormData({ ...formData, [field]: value });
+      form.reset({
+        title: project.title,
+        description: project.description,
+        areaId: project.areaId || "",
+        startDate: formatDateForInput(project.startDate),
+        endDate: formatDateForInput(project.endDate),
+        total: project.total,
+      });
+    }
+  }, [project, form]);
+
+  // 프로젝트 업데이트 처리
+  const onSubmit = async (data: EditProjectFormData) => {
+    if (!project) return;
+
+    try {
+      const updatedProject = {
+        ...project,
+        title: data.title,
+        description: data.description,
+        areaId: data.areaId || undefined,
+        startDate: new Date(data.startDate),
+        endDate: new Date(data.endDate),
+        progress: completedTasks, // Task 기반으로 계산된 진행률
+        total: data.total,
+        updatedAt: new Date(),
+      };
+
+      await updateProject(project.id, updatedProject);
+
+      toast({
+        title: "프로젝트 수정 완료",
+        description: "프로젝트가 성공적으로 수정되었습니다.",
+      });
+
+      router.push(`/para/projects/${project.id}`);
+    } catch (error) {
+      console.error("프로젝트 수정 실패:", error);
+      toast({
+        title: "프로젝트 수정 실패",
+        description: "프로젝트 수정 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  // 로딩 상태
+  if (userLoading || projectLoading || areasLoading || tasksLoading) {
+    return <EditProjectSkeleton />;
+  }
 
-    // 여기서 Project 업데이트 로직 구현
-    toast({
-      title: "프로젝트 수정 완료",
-      description: `${formData.title} 프로젝트가 업데이트되었습니다.`,
-    });
+  // 에러 상태
+  if (projectError) {
+    return (
+      <div className="container max-w-md px-4 py-6">
+        <div className="mb-6 flex items-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.history.back()}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        </div>
+        <Alert>
+          <AlertDescription>
+            프로젝트 정보를 불러오는 중 오류가 발생했습니다.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
-    // 프로젝트 상세 페이지로 이동
-    router.push(`/para/projects/${params.id}`);
+  // 프로젝트가 없는 경우
+  if (!project) {
+    return (
+      <div className="container max-w-md px-4 py-6">
+        <div className="mb-6 flex items-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.history.back()}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        </div>
+        <Alert>
+          <AlertDescription>해당 프로젝트를 찾을 수 없습니다.</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  const projectWithStatus = {
+    ...project,
+    status: getProjectStatus(project),
   };
 
-  // projectStatuses 제거됨 - getProjectStatus()로 계산
+  const calculateDuration = (startDate: string, endDate: string) => {
+    if (!startDate || !endDate) return 0;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = end.getTime() - start.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
 
-  // 예시 Area 목록 (실제 앱에서는 데이터베이스에서 가져옴)
-  const areas = [
-    { value: "개인 성장", label: "개인 성장" },
-    { value: "재정 관리", label: "재정 관리" },
-    { value: "건강", label: "건강" },
-  ];
+  const duration = calculateDuration(
+    form.watch("startDate"),
+    form.watch("endDate")
+  );
 
   return (
     <div className="container max-w-md px-4 py-6">
       <div className="mb-6 flex items-center">
-        <Button variant="ghost" size="icon" asChild className="mr-2">
-          <Link href={`/para/projects/${params.id}`}>
-            <ChevronLeft className="h-5 w-5" />
-          </Link>
+        <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
+          <ChevronLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-2xl font-bold">프로젝트 수정하기</h1>
       </div>
 
-      <div className="mb-6 text-center">
-        <div className="mb-4 flex justify-center">
-          <div className="rounded-full bg-primary/10 p-4">
-            <Briefcase className="h-8 w-8 text-primary" />
-          </div>
-        </div>
-        <h2 className="text-lg font-bold mb-2">프로젝트 정보를 수정하세요</h2>
-        <p className="text-sm text-muted-foreground">
-          {formDataWithStatus.status === "completed"
-            ? "완료된 프로젝트는 마감일만 수정할 수 있습니다."
-            : "프로젝트의 이름, 설명, 상태 등을 업데이트할 수 있습니다."}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold mb-2">프로젝트 수정</h1>
+        <p className="text-muted-foreground">
+          프로젝트 정보를 수정하고 업데이트하세요.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <Card className="mb-6 p-4">
-          <div className="mb-4">
-            <Label htmlFor="title">프로젝트 제목</Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) => handleChange("title", e.target.value)}
-              placeholder="예: 새로운 웹사이트 개발, 독서 목표 달성"
-              className="mt-1"
-              required
-              disabled={getProjectStatus(formData) === "completed"}
-            />
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {/* 기본 정보 */}
+        <Card className="p-6">
+          <div className="mb-4 flex items-center gap-2">
+            <Briefcase className="h-5 w-5" />
+            <h2 className="text-lg font-semibold">기본 정보</h2>
           </div>
 
-          <div className="mb-4">
-            <Label htmlFor="description">간단한 설명</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => handleChange("description", e.target.value)}
-              placeholder="이 프로젝트에 대한 간단한 설명을 입력하세요."
-              className="mt-1"
-              rows={2}
-              disabled={formData.status === "completed"}
-            />
-          </div>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="title">프로젝트 제목</Label>
+              <Input
+                id="title"
+                {...form.register("title")}
+                placeholder="프로젝트 제목을 입력하세요"
+              />
+              {form.formState.errors.title && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.title.message}
+                </p>
+              )}
+            </div>
 
-          {/* 상태 선택 제거됨 - getProjectStatus()로 계산 */}
+            <div>
+              <Label htmlFor="description">프로젝트 설명</Label>
+              <Textarea
+                id="description"
+                {...form.register("description")}
+                placeholder="프로젝트에 대한 자세한 설명을 입력하세요"
+                rows={3}
+              />
+              {form.formState.errors.description && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.description.message}
+                </p>
+              )}
+            </div>
 
-          <div className="mb-4">
-            <Label htmlFor="area">연결된 영역 (Area)</Label>
-            <Select
-              value={formData.area}
-              onValueChange={(value) => handleChange("area", value)}
-              disabled={formData.status === "completed"}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="연결할 영역을 선택하세요" />
-              </SelectTrigger>
-              <SelectContent>
-                {areas.map((area) => (
-                  <SelectItem key={area.value} value={area.value}>
-                    {area.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="mb-4">
-            <Label htmlFor="startDate">시작일</Label>
-            <Input
-              id="startDate"
-              type="date"
-              value={formData.startDate}
-              onChange={(e) => {
-                const startDate = e.target.value;
-                const dueDate = formData.dueDate;
-                if (
-                  startDate &&
-                  dueDate &&
-                  dayjs(startDate).isAfter(dayjs(dueDate))
-                ) {
-                  handleChange("dueDate", startDate);
+            <div>
+              <Label htmlFor="areaId">연결된 영역 (선택사항)</Label>
+              <Select
+                value={form.watch("areaId") || "none"}
+                onValueChange={(value) =>
+                  form.setValue("areaId", value === "none" ? "" : value)
                 }
-                handleChange("startDate", startDate);
-              }}
-              disabled={formData.status !== "planned"}
-              className="mt-1"
-            />
-            {formData.loopIds && formData.loopIds.length > 0 && (
-              <p className="mt-1 text-xs text-amber-600">
-                ⚠️ 연결된 루프와 기간이 맞지 않을 수 있습니다
-              </p>
-            )}
-            {getProjectStatus(formData) !== "planned" && (
-              <p className="mt-1 text-xs text-blue-600">
-                ℹ️ 진행 중이거나 완료된 프로젝트의 시작일은 수정할 수 없습니다
-              </p>
-            )}
-          </div>
-
-          <div className="mb-4">
-            <Label htmlFor="dueDate">마감일</Label>
-            <Input
-              id="dueDate"
-              type="date"
-              value={formData.dueDate}
-              onChange={(e) => {
-                const dueDate = e.target.value;
-                const startDate = formData.startDate;
-                if (
-                  startDate &&
-                  dueDate &&
-                  dayjs(dueDate).isBefore(dayjs(startDate))
-                ) {
-                  handleChange("dueDate", startDate);
-                } else {
-                  handleChange("dueDate", dueDate);
-                }
-              }}
-              min={formData.startDate || undefined}
-              className="mt-1"
-            />
-            <RecommendationBadge
-              type="info"
-              message="권장 기간: 3개월 이내로 설정하면 효과적으로 관리할 수 있어요"
-              className="mt-2"
-            />
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="영역을 선택하세요" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">영역 없음</SelectItem>
+                  {areas.map((area) => (
+                    <SelectItem key={area.id} value={area.id}>
+                      {area.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </Card>
 
-        {/* 태스크 관리 섹션 */}
-        <Card className="mb-6 p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="font-semibold">태스크 관리</h3>
-            {formData.status !== "completed" && (
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const newTask = {
-                      id: Date.now(),
-                      title: "",
-                      date: formData.startDate,
-                      duration: 1,
-                      done: false,
-                    };
-                    setTasks([...tasks, newTask]);
-                  }}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  태스크 추가
-                </Button>
-                {tasks.some((task) => task.done) && (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => {
-                      if (confirm("선택된 태스크를 삭제하시겠습니까?")) {
-                        setTasks(tasks.filter((task) => !task.done));
-                      }
-                    }}
-                  >
-                    <X className="mr-2 h-4 w-4" />
-                    선택 삭제
-                  </Button>
+        {/* 일정 정보 */}
+        <Card className="p-6">
+          <div className="mb-4 flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            <h2 className="text-lg font-semibold">일정 정보</h2>
+          </div>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="startDate">시작일</Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  {...form.register("startDate")}
+                  disabled={projectWithStatus.status !== "planned"}
+                />
+                {form.formState.errors.startDate && (
+                  <p className="mt-1 text-sm text-red-500">
+                    {form.formState.errors.startDate.message}
+                  </p>
                 )}
               </div>
+
+              <div>
+                <Label htmlFor="endDate">종료일</Label>
+                <Input id="endDate" type="date" {...form.register("endDate")} />
+                {form.formState.errors.endDate && (
+                  <p className="mt-1 text-sm text-red-500">
+                    {form.formState.errors.endDate.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {projectWithStatus.status !== "planned" && (
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  💡 프로젝트가 시작된 후에는 시작일을 변경할 수 없습니다.
+                </p>
+              </div>
+            )}
+
+            {duration > 0 && (
+              <div className="flex items-center gap-2 text-sm">
+                <Clock className="h-4 w-4" />
+                <span>프로젝트 기간: {duration}일</span>
+              </div>
+            )}
+
+            {duration > 0 && (
+              <RecommendationBadge
+                type={duration <= 90 ? "info" : "warning"}
+                message={
+                  duration <= 90
+                    ? "좋은 프로젝트 기간입니다 (3개월 이내 권장)"
+                    : "프로젝트 기간이 길어요. 더 작은 단위로 나누는 것을 고려해보세요"
+                }
+              />
             )}
           </div>
-
-          <div className="space-y-3">
-            {tasks.map((task, index) => (
-              <div key={task.id} className="rounded-lg border p-3">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-muted-foreground flex-1">
-                    {index + 1}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="checkbox"
-                      checked={task.done}
-                      onChange={(e) => {
-                        const newTasks = [...tasks];
-                        newTasks[index].done = e.target.checked;
-                        setTasks(newTasks);
-                      }}
-                    />
-                    <span className="text-xs text-muted-foreground">선택</span>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      const newTasks = tasks.filter((_, i) => i !== index);
-                      setTasks(newTasks);
-                    }}
-                    disabled={formData.status === "completed"}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  <div>
-                    <Label
-                      htmlFor={`title-${task.id}`}
-                      className="text-sm text-muted-foreground"
-                    >
-                      제목
-                    </Label>
-                    <Input
-                      id={`title-${task.id}`}
-                      placeholder="예: 기획 단계, 디자인 작업"
-                      value={task.title}
-                      onChange={(e) => {
-                        const newTasks = [...tasks];
-                        newTasks[index].title = e.target.value;
-                        setTasks(newTasks);
-                      }}
-                      disabled={formData.status === "completed"}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <Label
-                        htmlFor={`date-${task.id}`}
-                        className="text-sm text-muted-foreground"
-                      >
-                        시작일
-                      </Label>
-                      <Input
-                        id={`date-${task.id}`}
-                        type="date"
-                        value={task.date}
-                        onChange={(e) => {
-                          const newTasks = [...tasks];
-                          newTasks[index].date = e.target.value;
-                          setTasks(newTasks);
-                        }}
-                        min={formData.startDate || undefined}
-                        max={formData.dueDate || undefined}
-                        className="flex-1"
-                        disabled={formData.status === "completed"}
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <Label
-                        htmlFor={`duration-${task.id}`}
-                        className="text-sm text-muted-foreground"
-                      >
-                        소요일
-                      </Label>
-                      <Input
-                        id={`duration-${task.id}`}
-                        type="number"
-                        value={task.duration}
-                        onChange={(e) => {
-                          const newTasks = [...tasks];
-                          newTasks[index].duration =
-                            parseInt(e.target.value) || 1;
-                          setTasks(newTasks);
-                        }}
-                        className="w-full"
-                        min="1"
-                        disabled={formData.status === "completed"}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {tasks.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              <Clock className="h-8 w-8 mx-auto mb-2" />
-              <p>아직 태스크가 없습니다.</p>
-              <p className="text-sm">
-                태스크를 추가하여 프로젝트를 세분화하세요.
-              </p>
-            </div>
-          )}
         </Card>
 
-        <Button type="submit" className="w-full">
-          프로젝트 수정하기
-        </Button>
+        {/* 진행 상황 */}
+        <Card className="p-6">
+          <div className="mb-4 flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            <h2 className="text-lg font-semibold">진행 상황</h2>
+          </div>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>현재 진행 (읽기 전용)</Label>
+                <Input
+                  value={completedTasks}
+                  readOnly
+                  disabled
+                  className="bg-muted/50"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="total">목표 횟수</Label>
+                <Input
+                  id="total"
+                  type="number"
+                  {...form.register("total", { valueAsNumber: true })}
+                  min="1"
+                />
+                {form.formState.errors.total && (
+                  <p className="mt-1 text-sm text-red-500">
+                    {form.formState.errors.total.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="p-3 bg-muted/50 rounded-lg">
+              <div className="flex justify-between text-sm">
+                <span>진행률</span>
+                <span>{progressPercentage}%</span>
+              </div>
+              <div className="mt-2 w-full bg-muted rounded-full h-2">
+                <div
+                  className="bg-primary h-2 rounded-full transition-all"
+                  style={{
+                    width: `${progressPercentage}%`,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <div className="flex gap-3">
+          <Button type="submit" className="flex-1">
+            프로젝트 수정
+          </Button>
+          <Button type="button" variant="outline" onClick={() => router.back()}>
+            취소
+          </Button>
+        </div>
       </form>
     </div>
   );

@@ -5,6 +5,51 @@
 
 ## 📋 컬렉션별 스키마 정의
 
+### 🔹 Users 컬렉션
+
+사용자 프로필, 설정, 환경설정을 저장합니다.
+
+```typescript
+interface User {
+  id: string; // 문서 ID (Firebase Auth UID)
+
+  profile: {
+    displayName: string; // 사용자 표시 이름
+    email: string; // 이메일 주소
+    photoURL?: string; // 프로필 사진 URL
+    emailVerified: boolean; // 이메일 인증 여부
+    createdAt: Date; // 생성일시
+    updatedAt: Date; // 수정일시
+  };
+
+  settings: {
+    defaultReward?: string; // 기본 보상
+    defaultRewardEnabled: boolean; // 기본 보상 활성화 여부
+    carryOver: boolean; // 미완료 항목 이월 여부
+    aiRecommendations: boolean; // AI 추천 허용 여부
+    notifications: boolean; // 알림 허용 여부
+    theme: "light" | "dark" | "system"; // 테마 설정
+    language: "ko" | "en"; // 언어 설정
+    // Firebase Auth에서 제공하는 정보는 제외:
+    // - email (user.email)
+    // - displayName (user.displayName)
+    // - photoURL (user.photoURL)
+  };
+
+  preferences: {
+    timezone: string; // 시간대 (예: "Asia/Seoul")
+    dateFormat: string; // 날짜 형식 (예: "ko-KR")
+    weeklyStartDay: "monday" | "sunday"; // 주 시작일
+  };
+}
+```
+
+**인덱스:**
+
+- `id` (단일, Firebase Auth UID)
+
+---
+
 ### 🔹 Areas 컬렉션
 
 사용자가 정의한 삶의 영역들을 저장합니다.
@@ -106,33 +151,35 @@ interface Project {
 
 ### 🔹 Loops 컬렉션
 
-월간 성장 사이클인 루프들을 저장합니다.
+각 루프는 사용자가 한 달 동안 집중할 프로젝트들과 목표를 묶은 단위입니다.
 
 ```typescript
 interface Loop {
-  id: string; // 문서 ID (자동 생성)
-  userId: string; // 사용자 ID
-  title: string; // 루프 제목
-  startDate: Date; // 시작일
-  endDate: Date; // 종료일
-  status: "in_progress" | "ended"; // 루프 상태
+  id: string;
+  userId: string;
+  title: string; // 루프 제목 (예: "7월 루프: 자기계발")
+  startDate: Date; // 시작일 (보통 월초)
+  endDate: Date; // 종료일 (보통 월말)
   focusAreas: string[]; // 중점 영역 ID 배열
   projectIds: string[]; // 연결된 프로젝트 ID 배열
-  reward?: string; // 보상
-  createdAt: Date; // 생성일시
-  updatedAt: Date; // 수정일시
-  doneCount: number; // 완료된 횟수
+  reward?: string; // 목표 달성 시 보상
+  doneCount: number; // 실제 완료된 횟수
   targetCount: number; // 목표 횟수
-  retrospective?: Retrospective; // 루프 회고
-  note?: Note; // 루프 노트
+  createdAt: Date;
+  updatedAt: Date;
+  retrospective?: Retrospective; // 루프 회고 (완료 후)
+  note?: Note; // 루프 노트 (선택)
+
+  // 로컬 계산 필드 (DB에 저장되지 않음)
+  status?: "planned" | "in_progress" | "ended"; // startDate와 endDate를 기반으로 클라이언트에서 계산
 }
 ```
 
-**인덱스:**
+**상태 계산 로직:**
 
-- `userId` (단일)
-- `userId` + `status` (복합)
-- `userId` + `createdAt` (복합)
+- `planned`: 현재 날짜 < 시작일
+- `in_progress`: 시작일 ≤ 현재 날짜 ≤ 종료일
+- `ended`: 현재 날짜 > 종료일
 
 ---
 

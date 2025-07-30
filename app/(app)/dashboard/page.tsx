@@ -15,41 +15,101 @@ import {
   TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "@/lib/firebase";
+import { fetchAllLoopsByUserId, fetchAllAreasByUserId } from "@/lib/firebase";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getLoopStatus } from "@/lib/utils";
 
 export default function DashboardPage() {
-  // 샘플 데이터
-  const currentLoop = {
-    title: "5월 루프: 건강 관리",
-    progress: 65,
-    total: 100,
-    daysLeft: 12,
-    startDate: "2025년 5월 1일",
-    endDate: "2025년 5월 31일",
-  };
+  const [user, userLoading] = useAuthState(auth);
+
+  // Firestore에서 데이터 가져오기
+  const { data: loops = [], isLoading: loopsLoading } = useQuery({
+    queryKey: ["loops", user?.uid],
+    queryFn: () => fetchAllLoopsByUserId(user?.uid || ""),
+    enabled: !!user?.uid,
+  });
+
+  const { data: areas = [], isLoading: areasLoading } = useQuery({
+    queryKey: ["areas", user?.uid],
+    queryFn: () => fetchAllAreasByUserId(user?.uid || ""),
+    enabled: !!user?.uid,
+  });
+
+  // 로딩 상태
+  if (userLoading || loopsLoading || areasLoading) {
+    return (
+      <div className="container max-w-md px-4 py-6">
+        <div className="mb-6">
+          <Skeleton className="h-8 w-48 mb-4" />
+          <Skeleton className="h-4 w-full mb-2" />
+          <Skeleton className="h-4 w-3/4" />
+        </div>
+        <div className="space-y-4">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  // 현재 루프와 과거 루프 분리 (날짜 기반)
+  const currentLoop = loops.find(
+    (loop) => getLoopStatus(loop) === "in_progress"
+  );
+  const pastLoops = loops.filter((loop) => getLoopStatus(loop) === "ended");
+
+  // 계산된 데이터
+  const completionRate = currentLoop
+    ? Math.round((currentLoop.doneCount / currentLoop.targetCount) * 100)
+    : 0;
+  const previousLoopCompletion =
+    pastLoops.length > 0
+      ? Math.round((pastLoops[0].doneCount / pastLoops[0].targetCount) * 100)
+      : 0;
+  const totalFocusTime = loops.reduce(
+    (total, loop) => total + (loop.doneCount || 0),
+    0
+  );
+  const previousFocusTime =
+    pastLoops.length > 0 ? pastLoops[0].doneCount || 0 : 0;
 
   const stats = {
-    completionRate: 65,
-    previousLoopCompletion: 55,
-    changeRate: 18,
-    totalLoops: 5,
-    rewardsReceived: 4,
-    totalFocusTime: 42,
-    previousFocusTime: 35,
-    focusTimeChange: 20,
+    completionRate,
+    previousLoopCompletion,
+    changeRate:
+      pastLoops.length > 0
+        ? Math.round(
+            ((completionRate - previousLoopCompletion) /
+              previousLoopCompletion) *
+              100
+          )
+        : 0,
+    totalLoops: loops.length,
+    rewardsReceived: pastLoops.filter((loop) => loop.reward).length,
+    totalFocusTime,
+    previousFocusTime,
+    focusTimeChange:
+      pastLoops.length > 0
+        ? Math.round(
+            ((totalFocusTime - previousFocusTime) / previousFocusTime) * 100
+          )
+        : 0,
   };
 
-  const areaActivityData = [
-    { name: "건강", value: 45 },
-    { name: "개발", value: 30 },
-    { name: "마음", value: 15 },
-    { name: "기타", value: 10 },
-  ];
+  const areaActivityData = areas.map((area) => ({
+    name: area.name,
+    value: Math.floor(Math.random() * 50) + 10, // 임시 데이터
+  }));
 
-  const loopComparisonData = [
-    { name: "3월", completion: 40, focusHours: 25 },
-    { name: "4월", completion: 55, focusHours: 35 },
-    { name: "5월", completion: 65, focusHours: 42 },
-  ];
+  const loopComparisonData = pastLoops.slice(-3).map((loop, index) => ({
+    name: `${loop.startDate.getMonth() + 1}월`,
+    completion: Math.round((loop.doneCount / loop.targetCount) * 100),
+    focusHours: loop.doneCount || 0,
+  }));
 
   return (
     <div className="container max-w-md px-4 py-6">
@@ -79,15 +139,28 @@ export default function DashboardPage() {
         <TabsContent value="summary" className="mt-4 space-y-4">
           <Card className="p-4">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="font-bold">{currentLoop.title}</h3>
-              <Badge variant="outline">D-{currentLoop.daysLeft}</Badge>
+              <h3 className="font-bold">
+                {currentLoop?.title || "현재 루프 없음"}
+              </h3>
+              <Badge variant="outline">
+                D-
+                {currentLoop
+                  ? Math.max(
+                      0,
+                      Math.ceil(
+                        (currentLoop.endDate.getTime() - new Date().getTime()) /
+                          (1000 * 60 * 60 * 24)
+                      )
+                    )
+                  : 0}
+              </Badge>
             </div>
 
             <div className="mb-3">
               <div className="mb-1 flex justify-between text-sm">
                 <span>달성률: {stats.completionRate}%</span>
                 <span>
-                  {currentLoop.progress}/{currentLoop.total}
+                  {currentLoop?.doneCount || 0}/{currentLoop?.targetCount || 0}
                 </span>
               </div>
               <div className="progress-bar">
@@ -101,7 +174,11 @@ export default function DashboardPage() {
             <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
               <Calendar className="h-3 w-3" />
               <span>
-                {currentLoop.startDate} ~ {currentLoop.endDate}
+                {currentLoop
+                  ? `${currentLoop.startDate.toLocaleDateString(
+                      "ko-KR"
+                    )} ~ ${currentLoop.endDate.toLocaleDateString("ko-KR")}`
+                  : "기간 없음"}
               </span>
             </div>
 
@@ -140,7 +217,16 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium">
-                D-{currentLoop.daysLeft}
+                D-
+                {currentLoop
+                  ? Math.max(
+                      0,
+                      Math.ceil(
+                        (currentLoop.endDate.getTime() - new Date().getTime()) /
+                          (1000 * 60 * 60 * 24)
+                      )
+                    )
+                  : 0}
               </div>
             </div>
             <div className="mt-3 flex justify-end">
