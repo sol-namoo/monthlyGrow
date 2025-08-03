@@ -13,6 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchRetrospectiveById } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { formatDate } from "@/lib/utils";
 
 // 로딩 스켈레톤 컴포넌트
 function ArchiveDetailSkeleton() {
@@ -119,13 +120,6 @@ export default function ArchiveDetailPage({
         ))}
       </div>
     );
-  };
-
-  const formatDate = (date: Date | string) => {
-    if (typeof date === "string") {
-      return new Date(date).toLocaleDateString("ko-KR");
-    }
-    return date.toLocaleDateString("ko-KR");
   };
 
   return (

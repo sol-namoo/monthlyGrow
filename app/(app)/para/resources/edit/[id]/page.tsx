@@ -1,7 +1,11 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect, use, Suspense } from "react";
+import { useEffect, useState } from "react";
+import { use, Suspense } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,6 +23,26 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  fetchResourceById,
+  updateResource,
+  fetchAllAreasByUserId,
+  auth,
+} from "@/lib/firebase";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+// 폼 스키마 정의
+const resourceFormSchema = z.object({
+  title: z.string().min(1, "자료 제목을 입력해주세요"),
+  description: z.string().optional(),
+  url: z.string().url("올바른 URL을 입력해주세요").optional().or(z.literal("")),
+  text: z.string().optional(),
+  area: z.string().min(1, "영역을 선택해주세요"),
+});
+
+type ResourceFormData = z.infer<typeof resourceFormSchema>;
 
 // 로딩 스켈레톤 컴포넌트
 function EditResourceSkeleton() {
@@ -47,102 +71,105 @@ export default function EditResourcePage({
   const router = useRouter();
   const { toast } = useToast();
   const { id } = use(params);
+  const queryClient = useQueryClient();
+  const [user, userLoading] = useAuthState(auth);
 
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    url: "",
-    area: "",
+  // react-hook-form 설정
+  const form = useForm<ResourceFormData>({
+    resolver: zodResolver(resourceFormSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      url: "",
+      text: "",
+      area: "",
+    },
   });
-  const [loading, setLoading] = useState(true);
 
-  // 샘플 Resource 데이터 (실제로는 ID에 따라 DB에서 데이터를 불러와야 함)
-  const sampleResources = [
-    {
-      id: "1",
-      title: "생산성 향상을 위한 팁",
-      description: "시간 관리 및 효율적인 작업 방법에 대한 자료",
-      url: "https://example.com/productivity-tips",
-      area: "personal",
-    },
-    {
-      id: "2",
-      title: "React Hooks 완벽 가이드",
-      description: "React Hooks 사용법과 예제",
-      url: "https://example.com/react-hooks",
-      area: "career",
-    },
-  ];
+  // 자료 데이터 가져오기
+  const {
+    data: resource,
+    isLoading: resourceLoading,
+    error: resourceError,
+  } = useQuery({
+    queryKey: ["resource", id],
+    queryFn: () => fetchResourceById(id),
+    enabled: !!id,
+  });
 
-  useEffect(() => {
-    const foundResource = sampleResources.find((r) => r.id === id);
-    if (foundResource) {
-      setFormData({
-        title: foundResource.title,
-        description: foundResource.description,
-        url: foundResource.url,
-        area: foundResource.area,
-      });
-    } else {
+  // 영역 데이터 가져오기
+  const { data: allAreas = [] } = useQuery({
+    queryKey: ["areas", user?.uid],
+    queryFn: () => fetchAllAreasByUserId(user?.uid || ""),
+    enabled: !!user?.uid,
+  });
+
+  // 자료 수정 mutation
+  const updateResourceMutation = useMutation({
+    mutationFn: (data: ResourceFormData) =>
+      updateResource(id, {
+        name: data.title,
+        description: data.description || "",
+        link: data.url || undefined,
+        text: data.text || undefined,
+        areaId: data.area,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["resource", id] });
+      queryClient.invalidateQueries({ queryKey: ["resources"] });
       toast({
-        title: "자료를 찾을 수 없음",
-        description:
-          "해당 ID의 자료를 찾을 수 없습니다. 자료 목록으로 돌아갑니다.",
-        variant: "destructive",
+        title: "자료 수정 완료",
+        description: "자료가 성공적으로 수정되었습니다.",
       });
-      router.push("/para/resources");
-    }
-    setLoading(false);
-  }, [id, router, toast]);
-
-  // 샘플 데이터
-  const areas = [
-    { id: "health", name: "건강" },
-    { id: "career", name: "커리어" },
-    { id: "relationships", name: "인간관계" },
-    { id: "finance", name: "재정" },
-    { id: "personal", name: "자기계발" },
-    { id: "fun", name: "취미/여가" },
-  ];
-
-  const handleChange = (field: string, value: string) => {
-    setFormData({ ...formData, [field]: value });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.title.trim()) {
+      router.push(`/para/resources/${id}`);
+    },
+    onError: (error: Error) => {
       toast({
         title: "자료 수정 실패",
-        description: "자료 제목을 입력해주세요.",
+        description: error.message || "자료 수정 중 오류가 발생했습니다.",
         variant: "destructive",
       });
-      return;
+    },
+  });
+
+  // 자료 데이터가 로드되면 폼에 설정
+  useEffect(() => {
+    if (resource) {
+      form.reset({
+        title: resource.name,
+        description: resource.description || "",
+        url: resource.link || "",
+        text: resource.text || "",
+        area: resource.areaId || "",
+      });
     }
+  }, [resource, form]);
 
-    const updatedResource = {
-      id,
-      title: formData.title,
-      description: formData.description,
-      url: formData.url,
-      area: formData.area,
-      updatedAt: new Date().toISOString(),
-    };
-
-    console.log("자료 수정:", updatedResource);
-    toast({
-      title: "자료 수정 완료",
-      description: `${formData.title} 자료가 성공적으로 수정되었습니다.`,
-    });
-
-    router.push(`/para/resources/${id}`); // 수정 후 상세 페이지로 이동
+  const onSubmit = (data: ResourceFormData) => {
+    updateResourceMutation.mutate(data);
   };
 
-  if (loading) {
+  if (userLoading || resourceLoading) {
+    return <EditResourceSkeleton />;
+  }
+
+  if (resourceError || !resource) {
     return (
-      <div className="container max-w-md px-4 py-6 text-center">
-        <p className="text-muted-foreground">자료를 불러오는 중...</p>
+      <div className="container max-w-md px-4 py-6">
+        <div className="mb-6 flex items-center">
+          <Button variant="ghost" size="icon" asChild className="mr-2">
+            <Link href="/para?tab=resources">
+              <ChevronLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <h1 className="text-2xl font-bold">자료 수정</h1>
+        </div>
+
+        <Alert>
+          <AlertDescription>
+            자료를 불러오는 중 오류가 발생했습니다. 다시 시도해주세요.
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -172,66 +199,98 @@ export default function EditResourcePage({
           </p>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <Card className="mb-6 p-4">
-            <div className="mb-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <div className="space-y-4">
+            <div>
               <Label htmlFor="title">자료 제목</Label>
               <Input
                 id="title"
-                value={formData.title}
-                onChange={(e) => handleChange("title", e.target.value)}
+                {...form.register("title")}
                 placeholder="예: 효과적인 시간 관리법"
-                className="mt-1"
-                required
               />
+              {form.formState.errors.title && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.title.message}
+                </p>
+              )}
             </div>
 
-            <div className="mb-4">
-              <Label htmlFor="description">설명 (선택 사항)</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => handleChange("description", e.target.value)}
-                placeholder="자료에 대한 간략한 설명을 입력하세요."
-                className="mt-1"
-              />
-            </div>
-
-            <div className="mb-4">
-              <Label htmlFor="url">URL (선택 사항)</Label>
-              <Input
-                id="url"
-                type="url"
-                value={formData.url}
-                onChange={(e) => handleChange("url", e.target.value)}
-                placeholder="예: https://example.com/article"
-                className="mt-1"
-              />
-            </div>
-
-            <div className="mb-4">
-              <Label htmlFor="area">연결할 영역 (선택 사항)</Label>
+            <div>
+              <Label htmlFor="area">소속 영역</Label>
               <Select
-                value={formData.area}
-                onValueChange={(value) => handleChange("area", value)}
+                onValueChange={(value) => form.setValue("area", value)}
+                value={form.watch("area")}
               >
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="영역 선택" />
+                <SelectTrigger>
+                  <SelectValue placeholder="영역을 선택해주세요" />
                 </SelectTrigger>
                 <SelectContent>
-                  {areas.map((area) => (
+                  {allAreas.map((area) => (
                     <SelectItem key={area.id} value={area.id}>
                       {area.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {form.formState.errors.area && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.area.message}
+                </p>
+              )}
             </div>
-          </Card>
 
-          <Button type="submit" className="w-full">
-            자료 수정
-          </Button>
+            <div>
+              <Label htmlFor="description">설명 (선택 사항)</Label>
+              <Textarea
+                id="description"
+                {...form.register("description")}
+                placeholder="자료에 대한 간단한 설명을 입력하세요 (리스트에서 미리보기로 표시됩니다)"
+                rows={3}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="url">링크 (선택 사항)</Label>
+              <Input
+                id="url"
+                type="url"
+                {...form.register("url")}
+                placeholder="https://example.com"
+              />
+              {form.formState.errors.url && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.url.message}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="text">내용 (선택 사항)</Label>
+              <Textarea
+                id="text"
+                {...form.register("text")}
+                placeholder="자료의 상세한 내용을 입력하세요 (긴 텍스트, 메모, 요약 등)"
+                rows={4}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              type="submit"
+              className="flex-1"
+              disabled={updateResourceMutation.isPending}
+            >
+              {updateResourceMutation.isPending ? "수정 중..." : "자료 수정"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+            >
+              취소
+            </Button>
+          </div>
         </form>
       </div>
     </Suspense>

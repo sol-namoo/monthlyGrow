@@ -126,6 +126,12 @@ interface Project {
   retrospective?: Retrospective; // 프로젝트 회고
   notes: Note[]; // 프로젝트 노트들
 
+  // 미완료 프로젝트 이관 관련 필드
+  isCarriedOver?: boolean; // 이전 루프에서 이관된 프로젝트 여부
+  originalLoopId?: string; // 원래 루프 ID (이관된 경우)
+  carriedOverAt?: Date; // 이관된 날짜
+  migrationStatus?: "pending" | "migrated" | "ignored"; // 이관 상태
+
   // 로컬 계산 필드 (DB에 저장되지 않음)
   status?: "planned" | "in_progress" | "completed"; // startDate와 endDate를 기반으로 클라이언트에서 계산
 }

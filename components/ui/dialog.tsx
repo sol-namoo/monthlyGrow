@@ -49,7 +49,7 @@ const DialogContent = React.forwardRef<
         "max-h-[85vh] overflow-y-auto",
         // 데스크톱: 중앙 정렬 및 크기 제한
         "sm:fixed sm:left-[50%] sm:top-[50%] sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%]",
-        "sm:bottom-auto sm:left-auto sm:right-auto sm:rounded-lg sm:p-6",
+        "sm:bottom-auto sm:rounded-lg sm:p-6",
         "sm:data-[state=closed]:slide-out-to-left-1/2 sm:data-[state=closed]:slide-out-to-top-[48%]",
         "sm:data-[state=open]:slide-in-from-left-1/2 sm:data-[state=open]:slide-in-from-top-[48%]",
         "sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95",

@@ -30,7 +30,7 @@ import {
 } from "@/lib/firebase";
 import { getAuth } from "firebase/auth";
 import { Project, Area } from "@/lib/types";
-import { getProjectStatus } from "@/lib/utils";
+import { getProjectStatus, formatDate } from "@/lib/utils";
 
 interface ProjectSelectionModalProps {
   open: boolean;
@@ -48,7 +48,7 @@ export function ProjectSelectionModal({
   selectedProjects,
   onProjectToggle,
   onConfirm,
-  maxProjects = 5,
+  maxProjects,
   newlyCreatedProjectId,
 }: ProjectSelectionModalProps) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -141,16 +141,10 @@ export function ProjectSelectionModal({
     return area?.name || "미분류";
   };
 
-  // 날짜 포맷팅 함수
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  };
-
-  const isLimitReached = selectedProjects.length >= maxProjects;
+  const isLimitReached = maxProjects
+    ? selectedProjects.length >= maxProjects
+    : false;
+  const shouldShowWarning = selectedProjects.length >= 3;
 
   if (projectsLoading || areasLoading) {
     return (
@@ -171,8 +165,8 @@ export function ProjectSelectionModal({
         <DialogHeader>
           <DialogTitle>프로젝트 선택</DialogTitle>
           <DialogDescription>
-            이 루프에 연결할 프로젝트를 선택하세요. 최대 {maxProjects}개까지
-            선택할 수 있습니다.
+            이 루프에 연결할 프로젝트를 선택하세요.
+            {maxProjects && ` 최대 ${maxProjects}개까지 선택할 수 있습니다.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -231,9 +225,21 @@ export function ProjectSelectionModal({
 
             <RecommendationBadge
               type="info"
-              message={`선택된 프로젝트: ${selectedProjects.length}/${maxProjects}개`}
+              message={
+                maxProjects
+                  ? `선택된 프로젝트: ${selectedProjects.length}/${maxProjects}개`
+                  : `선택된 프로젝트: ${selectedProjects.length}개`
+              }
               className="text-xs"
             />
+
+            {shouldShowWarning && (
+              <RecommendationBadge
+                type="warning"
+                message="많은 프로젝트를 선택하면 집중도가 떨어질 수 있습니다"
+                className="text-xs"
+              />
+            )}
           </div>
 
           {/* 프로젝트 목록 - ScrollArea로 감싸서 스크롤 영역 확대 */}
@@ -451,7 +457,8 @@ export function ProjectSelectionModal({
             취소
           </Button>
           <Button onClick={onConfirm}>
-            선택 완료 ({selectedProjects.length}/{maxProjects})
+            선택 완료 ({selectedProjects.length}
+            {maxProjects ? `/${maxProjects}` : ""}개)
           </Button>
         </DialogFooter>
       </DialogContent>

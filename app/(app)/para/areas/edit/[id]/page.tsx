@@ -76,6 +76,29 @@ function EditAreaPageContent({ params }: { params: Promise<{ id: string }> }) {
   const { toast } = useToast();
   const { id } = use(params);
 
+  // "미분류" 영역은 수정 불가
+  if (initialAreaData.name === "미분류") {
+    return (
+      <div className="container max-w-md px-4 py-6">
+        <div className="mb-6 flex items-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.history.back()}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="text-center py-8">
+          <h2 className="text-xl font-bold mb-2">수정 불가</h2>
+          <p className="text-muted-foreground">
+            "미분류" 영역은 수정할 수 없습니다.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // 샘플 데이터 로드 (실제 앱에서는 id를 사용하여 데이터베이스에서 가져옴)
   const initialAreaData = {
     name: "개인 성장",

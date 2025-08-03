@@ -13,8 +13,6 @@ import {
   fetchArchivedItemsByUserId,
 } from "../lib/firebase"; // lib/firebase.ts에서 기본 함수들을 import
 import { Area, Loop, Project, Resource, Task } from "../lib/types";
-import { getAuth } from "firebase/auth";
-const auth = getAuth();
 
 // Loops
 export const getLoop = async (loopId: string): Promise<Loop> => {

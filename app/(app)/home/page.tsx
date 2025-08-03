@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CharacterAvatar } from "@/components/character-avatar";
 import { ProgressCard } from "@/components/widgets/progress-card";
 import { StatsCard } from "@/components/widgets/stats-card";
 import { AreaActivityChart } from "@/components/widgets/area-activity-chart";
 import { LoopComparisonChart } from "@/components/widgets/loop-comparison-chart";
+import { UncategorizedStatsCard } from "@/components/widgets/uncategorized-stats-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -28,8 +29,16 @@ import {
   fetchAllAreasByUserId,
   fetchAllProjectsByUserId,
   fetchAllLoopsByUserId,
+  fetchAllResourcesByUserId,
+  getOrCreateUncategorizedArea,
+  getTodayDeadlineProjects,
+  checkAndAutoCompleteProjects,
+  getTaskCountsByProjectId,
+  getTaskCountsForMultipleProjects,
+  fetchYearlyActivityStats,
 } from "@/lib/firebase";
-import { getLoopStatus } from "@/lib/utils";
+import { calculateYearlyStatsFromSnapshots } from "@/scripts/create-snapshots";
+import { getLoopStatus, formatDate } from "@/lib/utils";
 
 export default function HomePage() {
   const [user, loading] = useAuthState(auth);
@@ -38,7 +47,24 @@ export default function HomePage() {
   // Firestore에서 직접 데이터 가져오기
   const { data: areas = [] } = useQuery({
     queryKey: ["areas", user?.uid],
-    queryFn: () => (user ? fetchAllAreasByUserId(user.uid) : []),
+    queryFn: async () => {
+      if (!user) return [];
+      const userAreas = await fetchAllAreasByUserId(user.uid);
+
+      // "미분류" 영역이 없으면 생성
+      const hasUncategorized = userAreas.some((area) => area.name === "미분류");
+      if (!hasUncategorized) {
+        try {
+          await getOrCreateUncategorizedArea(user.uid);
+          // 영역 목록을 다시 가져옴
+          return await fetchAllAreasByUserId(user.uid);
+        } catch (error) {
+          console.error("미분류 영역 생성 실패:", error);
+        }
+      }
+
+      return userAreas;
+    },
     enabled: !!user,
   });
 
@@ -53,6 +79,100 @@ export default function HomePage() {
     queryFn: () => (user ? fetchAllLoopsByUserId(user.uid) : []),
     enabled: !!user,
   });
+
+  const { data: resources = [] } = useQuery({
+    queryKey: ["resources", user?.uid],
+    queryFn: () => (user ? fetchAllResourcesByUserId(user.uid) : []),
+    enabled: !!user,
+  });
+
+  // 오늘 마감인 프로젝트들
+  const { data: todayDeadlineProjects = [] } = useQuery({
+    queryKey: ["todayDeadlineProjects", user?.uid],
+    queryFn: () => (user ? getTodayDeadlineProjects(user.uid) : []),
+    enabled: !!user,
+  });
+
+  // 오늘 마감 프로젝트의 태스크 개수 가져오기 (배치 최적화)
+  const { data: todayProjectTaskCounts = {} } = useQuery({
+    queryKey: ["todayProjectTaskCounts", user?.uid],
+    queryFn: async () => {
+      if (!user?.uid || todayDeadlineProjects.length === 0) return {};
+      const projectIds = todayDeadlineProjects.map((project) => project.id);
+      try {
+        return await getTaskCountsForMultipleProjects(projectIds);
+      } catch (error) {
+        console.error(
+          "Failed to get batch task counts for today projects:",
+          error
+        );
+        // 폴백: 개별 쿼리
+        const counts: {
+          [projectId: string]: { totalTasks: number; completedTasks: number };
+        } = {};
+        for (const project of todayDeadlineProjects) {
+          try {
+            counts[project.id] = await getTaskCountsByProjectId(project.id);
+          } catch (error) {
+            console.error(
+              `Failed to get task counts for project ${project.id}:`,
+              error
+            );
+            counts[project.id] = { totalTasks: 0, completedTasks: 0 };
+          }
+        }
+        return counts;
+      }
+    },
+    enabled: !!user?.uid && todayDeadlineProjects.length > 0,
+  });
+
+  // 연간 활동 통계 가져오기 (스냅샷 기반)
+  const { data: yearlyStats } = useQuery({
+    queryKey: ["yearlyStats", user?.uid, new Date().getFullYear()],
+    queryFn: () =>
+      calculateYearlyStatsFromSnapshots(
+        user?.uid || "",
+        new Date().getFullYear()
+      ),
+    enabled: !!user?.uid,
+  });
+
+  // 자동 완료 체크 (페이지 로드 시 한 번만 실행)
+  useEffect(() => {
+    if (user) {
+      checkAndAutoCompleteProjects(user.uid);
+    }
+  }, [user]);
+
+  // 브라우저 콘솔에서 사용할 수 있도록 전역 함수로 등록
+  useEffect(() => {
+    if (typeof window !== "undefined" && user?.uid) {
+      const runSampleDataInBrowser = async () => {
+        try {
+          console.log("🚀 샘플 데이터 생성 시작...");
+          console.log(`👤 사용자: ${user.email}`);
+
+          // 스크립트들을 동적으로 import
+          const { runSampleDataGeneration } = await import(
+            "@/scripts/run-sample-data"
+          );
+
+          const result = await runSampleDataGeneration(user.uid);
+          console.log("✅ 결과:", result);
+
+          // 페이지 새로고침으로 데이터 반영
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        } catch (error) {
+          console.error("❌ 샘플 데이터 생성 실패:", error);
+        }
+      };
+
+      (window as any).runSampleData = runSampleDataInBrowser;
+    }
+  }, [user?.uid]);
 
   const isLoading = loading || projectsLoading || loopsLoading;
 
@@ -77,11 +197,9 @@ export default function HomePage() {
       : 0;
   const total = currentLoop?.targetCount || 0;
   const startDate = currentLoop?.startDate
-    ? new Date(currentLoop.startDate).toLocaleDateString()
+    ? formatDate(currentLoop.startDate)
     : "-";
-  const endDate = currentLoop?.endDate
-    ? new Date(currentLoop.endDate).toLocaleDateString()
-    : "-";
+  const endDate = currentLoop?.endDate ? formatDate(currentLoop.endDate) : "-";
   const today = new Date();
   const daysLeft = currentLoop?.endDate
     ? Math.max(
@@ -105,6 +223,15 @@ export default function HomePage() {
   // areaId → area명 매핑 함수
   const getAreaName = (areaId?: string) =>
     areaId ? areas.find((a) => a.id === areaId)?.name || "-" : "-";
+
+  // 미분류 항목 통계 계산
+  const uncategorizedArea = areas.find((area) => area.name === "미분류");
+  const uncategorizedProjects = projects.filter(
+    (project) => project.areaId === uncategorizedArea?.id
+  ).length;
+  const uncategorizedResources = resources.filter(
+    (resource) => resource.areaId === uncategorizedArea?.id
+  ).length;
 
   return (
     <div className="container max-w-md px-4 py-6">
@@ -130,6 +257,13 @@ export default function HomePage() {
         </TabsList>
 
         <TabsContent value="summary" className="mt-4 space-y-6">
+          {/* 미분류 항목 통계 카드 */}
+          <UncategorizedStatsCard
+            uncategorizedProjects={uncategorizedProjects}
+            uncategorizedResources={uncategorizedResources}
+            totalAreas={areas.length}
+          />
+
           <section>
             <div className="mb-4 flex items-center">
               <h2 className="text-xl font-bold">현재 루프</h2>
@@ -170,6 +304,55 @@ export default function HomePage() {
               </div>
             </Card>
           </section>
+
+          {/* 오늘 마감 가이드 */}
+          {todayDeadlineProjects.length > 0 && (
+            <section className="mb-6">
+              <Card className="border-orange-200 bg-orange-50/50 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="h-4 w-4 text-orange-600" />
+                  <h3 className="font-medium text-orange-800">오늘 마감</h3>
+                </div>
+                <p className="text-sm text-orange-700 mb-3">
+                  {todayDeadlineProjects.length}개 프로젝트가 오늘 마감입니다.
+                </p>
+                <div className="space-y-2">
+                  {todayDeadlineProjects.slice(0, 3).map((project) => (
+                    <div
+                      key={project.id}
+                      className="flex items-center justify-between"
+                    >
+                      <span className="text-sm font-medium">
+                        {project.title}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="text-xs border-orange-300 text-orange-700"
+                      >
+                        {(() => {
+                          const taskCount = todayProjectTaskCounts[project.id];
+                          if (taskCount) {
+                            console.log(
+                              `🔍 Home - Project ${project.id}:`,
+                              taskCount
+                            );
+                            return `${taskCount.completedTasks}/${taskCount.totalTasks}`;
+                          }
+                          // 로딩 중이거나 데이터가 없을 때
+                          return "0/0";
+                        })()}
+                      </Badge>
+                    </div>
+                  ))}
+                  {todayDeadlineProjects.length > 3 && (
+                    <p className="text-xs text-orange-600">
+                      외 {todayDeadlineProjects.length - 3}개 프로젝트
+                    </p>
+                  )}
+                </div>
+              </Card>
+            </section>
+          )}
 
           <section>
             <div className="mb-4 flex items-center">
@@ -259,22 +442,40 @@ export default function HomePage() {
           <div className="grid grid-cols-2 gap-4">
             <StatsCard
               title="집중 시간"
-              value={`0시간`}
+              value={
+                yearlyStats
+                  ? `${Math.round(yearlyStats.totalFocusTime / 60)}시간`
+                  : "0시간"
+              }
               description={
                 <div className="flex items-center gap-1 text-green-600">
                   <TrendingUp className="h-3 w-3" />
-                  <span>0% ↑</span>
+                  <span>
+                    {yearlyStats
+                      ? Math.round(yearlyStats.averageCompletionRate)
+                      : 0}
+                    % ↑
+                  </span>
                 </div>
               }
               icon={<Clock className="h-4 w-4 text-muted-foreground" />}
             />
             <StatsCard
               title="완료율"
-              value={`0%`}
+              value={
+                yearlyStats
+                  ? `${Math.round(yearlyStats.averageCompletionRate)}%`
+                  : "0%"
+              }
               description={
                 <div className="flex items-center gap-1 text-green-600">
                   <TrendingUp className="h-3 w-3" />
-                  <span>0% ↑</span>
+                  <span>
+                    {yearlyStats
+                      ? Math.round(yearlyStats.averageCompletionRate)
+                      : 0}
+                    % ↑
+                  </span>
                 </div>
               }
               icon={<Target className="h-4 w-4 text-muted-foreground" />}
@@ -284,13 +485,13 @@ export default function HomePage() {
           <div className="grid grid-cols-2 gap-4">
             <StatsCard
               title="누적 루프"
-              value={0}
+              value={yearlyStats?.completedLoops || 0}
               description="완료한 루프 수"
               icon={<Target className="h-4 w-4 text-muted-foreground" />}
             />
             <StatsCard
               title="받은 보상"
-              value={0}
+              value={yearlyStats?.totalRewards || 0}
               description="달성한 보상 수"
               icon={<Award className="h-4 w-4 text-muted-foreground" />}
             />
@@ -299,14 +500,40 @@ export default function HomePage() {
           <Card className="p-4">
             <h3 className="mb-4 font-bold">Area 활동 비중</h3>
             <div className="h-64">
-              <AreaActivityChart data={[]} />
+              <AreaActivityChart
+                data={
+                  yearlyStats?.areaStats
+                    ? Object.entries(yearlyStats.areaStats).map(
+                        ([areaId, stats]) => ({
+                          name: stats.name,
+                          value: stats.focusTime,
+                          completionRate: stats.completionRate,
+                          projectCount: stats.projectCount,
+                        })
+                      )
+                    : []
+                }
+              />
             </div>
           </Card>
 
           <Card className="p-4">
             <h3 className="mb-4 font-bold">루프 비교</h3>
             <div className="h-64">
-              <LoopComparisonChart data={[]} />
+              <LoopComparisonChart
+                data={
+                  yearlyStats?.monthlyProgress
+                    ? Object.entries(yearlyStats.monthlyProgress).map(
+                        ([month, stats]) => ({
+                          month: parseInt(month),
+                          completionRate: stats.completionRate,
+                          focusTime: stats.focusTime,
+                          projectCount: stats.projectCount,
+                        })
+                      )
+                    : []
+                }
+              />
             </div>
           </Card>
         </TabsContent>

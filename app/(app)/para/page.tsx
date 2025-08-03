@@ -33,6 +33,8 @@ import {
   Link as LinkIcon,
   ExternalLink,
   AlertCircle,
+  ArrowUpDown,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -46,7 +48,7 @@ import {
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
 import Loading from "@/components/feedback/Loading";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
   Select,
   SelectContent,
@@ -55,14 +57,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getProjectStatus } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
 import {
-  fetchAllProjectsByUserId,
   fetchAllAreasByUserId,
-  fetchAllResourcesByUserId,
-  fetchAllRetrospectivesByUserId,
+  fetchProjectsByUserIdWithPaging,
+  fetchResourcesByUserIdWithPaging,
+  fetchArchivesByUserIdWithPaging,
+  getTaskCountsForMultipleProjects,
 } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatDateShort } from "@/lib/utils";
@@ -77,60 +79,138 @@ function ParaPageContent() {
     router.push(`/para?tab=${value}`, { scroll: false });
   };
 
-  // 필터링 상태
+  // 필터링 및 정렬 상태
   const [projectFilter, setProjectFilter] = useState("all");
+  const [projectSortBy, setProjectSortBy] = useState("latest");
+  const [resourceSortBy, setResourceSortBy] = useState("latest");
+  const [archiveSortBy, setArchiveSortBy] = useState("latest");
+  const [filterType, setFilterType] = useState("all");
 
-  // 무한 스크롤 관련 상태
-  const [displayedProjects, setDisplayedProjects] = useState<any[]>([]);
-  const [hasMoreProjects, setHasMoreProjects] = useState(true);
-  const [isLoadingMoreProjects, setIsLoadingMoreProjects] = useState(false);
-  const observerRef = useRef<IntersectionObserver | null>(null);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-
-  // 불필요한 코드 제거 - TanStack Query가 처리함
-  const [filterType, setFilterType] = useState("all"); // 'all', 'loop', 'project'
-  const [sortBy, setSortBy] = useState("latest"); // 'latest', 'rating'
-
-  // Firestore에서 데이터 가져오기
-  const { data: projects = [], isLoading: projectsLoading } = useQuery({
-    queryKey: ["projects", user?.uid],
-    queryFn: () => fetchAllProjectsByUserId(user?.uid || ""),
-    enabled: !!user?.uid,
-  });
-
+  // Areas는 한 번에 가져오기 (개수가 많지 않을 것으로 예상)
   const { data: areas = [], isLoading: areasLoading } = useQuery({
     queryKey: ["areas", user?.uid],
     queryFn: () => fetchAllAreasByUserId(user?.uid || ""),
     enabled: !!user?.uid,
   });
 
-  const { data: resources = [], isLoading: resourcesLoading } = useQuery({
-    queryKey: ["resources", user?.uid],
-    queryFn: () => fetchAllResourcesByUserId(user?.uid || ""),
+  // 프로젝트 무한 쿼리
+  const {
+    data: projectsData,
+    fetchNextPage: fetchNextProjects,
+    hasNextPage: hasNextProjects,
+    isFetchingNextPage: isFetchingNextProjects,
+    isLoading: projectsLoading,
+    refetch: refetchProjects,
+  } = useInfiniteQuery({
+    queryKey: ["projects", user?.uid, projectSortBy],
+    queryFn: ({ pageParam }) =>
+      fetchProjectsByUserIdWithPaging(
+        user?.uid || "",
+        10,
+        pageParam?.lastDoc,
+        projectSortBy
+      ),
     enabled: !!user?.uid,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasMore ? { lastDoc: lastPage.lastDoc } : undefined,
+    initialPageParam: { lastDoc: undefined },
   });
 
-  const { data: archives = [], isLoading: archivesLoading } = useQuery({
-    queryKey: ["archives", user?.uid],
-    queryFn: () => fetchAllRetrospectivesByUserId(user?.uid || ""),
+  // 리소스 무한 쿼리
+  const {
+    data: resourcesData,
+    fetchNextPage: fetchNextResources,
+    hasNextPage: hasNextResources,
+    isFetchingNextPage: isFetchingNextResources,
+    isLoading: resourcesLoading,
+    refetch: refetchResources,
+  } = useInfiniteQuery({
+    queryKey: ["resources", user?.uid, resourceSortBy],
+    queryFn: ({ pageParam }) =>
+      fetchResourcesByUserIdWithPaging(
+        user?.uid || "",
+        10,
+        pageParam?.lastDoc,
+        resourceSortBy
+      ),
     enabled: !!user?.uid,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasMore ? { lastDoc: lastPage.lastDoc } : undefined,
+    initialPageParam: { lastDoc: undefined },
   });
 
-  // 로딩 상태
-  // 디버깅용 로그
-  console.log("Data loaded:", {
-    projects: projects.length,
-    areas: areas.length,
-    resources: resources.length,
-    archives: archives.length,
+  // 아카이브 무한 쿼리
+  const {
+    data: archivesData,
+    fetchNextPage: fetchNextArchives,
+    hasNextPage: hasNextArchives,
+    isFetchingNextPage: isFetchingNextArchives,
+    isLoading: archivesLoading,
+    refetch: refetchArchives,
+  } = useInfiniteQuery({
+    queryKey: ["archives", user?.uid, archiveSortBy],
+    queryFn: ({ pageParam }) =>
+      fetchArchivesByUserIdWithPaging(
+        user?.uid || "",
+        10,
+        pageParam?.lastDoc,
+        archiveSortBy
+      ),
+    enabled: !!user?.uid,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasMore ? { lastDoc: lastPage.lastDoc } : undefined,
+    initialPageParam: { lastDoc: undefined },
   });
 
+  // 정렬 변경 시 쿼리 다시 실행
+  useEffect(() => {
+    if (user?.uid) {
+      refetchProjects();
+    }
+  }, [projectSortBy, user?.uid, refetchProjects]);
+
+  useEffect(() => {
+    if (user?.uid) {
+      refetchResources();
+    }
+  }, [resourceSortBy, user?.uid, refetchResources]);
+
+  useEffect(() => {
+    if (user?.uid) {
+      refetchArchives();
+    }
+  }, [archiveSortBy, user?.uid, refetchArchives]);
+
+  // 데이터 평탄화
+  const allProjects =
+    projectsData?.pages.flatMap((page) => page.projects) || [];
+  const allResources =
+    resourcesData?.pages.flatMap((page) => page.resources) || [];
+  const allArchives =
+    archivesData?.pages.flatMap((page) => page.archives) || [];
+
+  // 프로젝트별 태스크 개수 가져오기 (배치 최적화)
+  const { data: projectTaskCounts = {}, isLoading: taskCountsLoading } =
+    useQuery({
+      queryKey: ["projectTaskCounts", user?.uid, allProjects.length],
+      queryFn: async () => {
+        if (!user?.uid || allProjects.length === 0) return {};
+        const projectIds = allProjects.map((project) => project.id);
+        try {
+          return await getTaskCountsForMultipleProjects(projectIds);
+        } catch (error) {
+          console.error("Failed to get batch task counts:", error);
+          return {};
+        }
+      },
+      enabled: !!user?.uid && allProjects.length > 0,
+    });
+
+  // 로딩 상태 - 프로젝트와 태스크 개수가 모두 로드될 때까지 스켈레톤 표시
   if (
     userLoading ||
-    projectsLoading ||
     areasLoading ||
-    resourcesLoading ||
-    archivesLoading
+    (allProjects.length > 0 && taskCountsLoading)
   ) {
     return (
       <div className="container max-w-md px-4 py-6">
@@ -149,10 +229,16 @@ function ParaPageContent() {
   }
 
   // 프로젝트 상태를 미리 계산하여 객체에 추가
-  const projectsWithStatus = projects.map((project) => ({
+  const projectsWithStatus = allProjects.map((project) => ({
     ...project,
     status: getProjectStatus(project),
   }));
+
+  // 필터링된 프로젝트 목록
+  const filteredProjects = projectsWithStatus.filter((project) => {
+    if (projectFilter === "all") return true;
+    return project.status === projectFilter;
+  });
 
   const renderStars = (rating: number | undefined) => {
     if (!rating) return null;
@@ -189,8 +275,20 @@ function ParaPageContent() {
       return false;
     }
 
+    // 날짜만 비교 (시간 제외)
     const today = new Date();
-    return date < today;
+    const todayDateOnly = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
+    const endDateOnly = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    );
+
+    return endDateOnly < todayDateOnly;
   };
 
   return (
@@ -218,8 +316,8 @@ function ParaPageContent() {
             </Button>
           </div>
 
-          {/* 프로젝트 필터링 */}
-          <div className="flex items-center gap-2 mb-4">
+          {/* 프로젝트 필터링 및 정렬 */}
+          <div className="flex items-center justify-between mb-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
@@ -229,7 +327,7 @@ function ParaPageContent() {
                     <Filter className="mr-2 h-4 w-4 text-primary" />
                   )}
                   {projectFilter === "all"
-                    ? `전체 (${projects.length}개)`
+                    ? `전체 (${filteredProjects.length}개)`
                     : projectFilter === "planned"
                     ? `예정 (${
                         projectsWithStatus.filter((p) => p.status === "planned")
@@ -265,10 +363,47 @@ function ParaPageContent() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* 정렬 드롭다운 */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  {projectSortBy === "latest" ? (
+                    <ArrowUpDown className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Clock className="mr-2 h-4 w-4" />
+                  )}
+                  {projectSortBy === "latest" && "최신순"}
+                  {projectSortBy === "oldest" && "생성순"}
+                  {projectSortBy === "name" && "이름순"}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => setProjectSortBy("latest")}>
+                  <ArrowUpDown className="mr-2 h-4 w-4" />
+                  최신순
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setProjectSortBy("oldest")}>
+                  <Clock className="mr-2 h-4 w-4" />
+                  생성순
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setProjectSortBy("name")}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  이름순
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <div className="space-y-4">
-            {projects.length === 0 ? (
+            {projectsLoading ||
+            (allProjects.length > 0 && taskCountsLoading) ? (
+              <div className="space-y-4">
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-32 w-full" />
+              </div>
+            ) : filteredProjects.length === 0 ? (
               <Card className="p-6 text-center border-dashed">
                 <div className="mb-4 flex justify-center">
                   <div className="rounded-full bg-muted/50 p-4">
@@ -287,7 +422,7 @@ function ParaPageContent() {
               </Card>
             ) : (
               <>
-                {projectsWithStatus.map((project) => (
+                {filteredProjects.map((project) => (
                   <Card
                     key={project.id}
                     className="cursor-pointer transition-all hover:shadow-md"
@@ -301,7 +436,15 @@ function ParaPageContent() {
                         </h3>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="text-xs">
-                            {project.area}
+                            {(() => {
+                              if (project.areaId) {
+                                const area = areas.find(
+                                  (a) => a.id === project.areaId
+                                );
+                                return area ? area.name : "미분류";
+                              }
+                              return "미분류";
+                            })()}
                           </Badge>
                           <Badge
                             variant={
@@ -336,21 +479,54 @@ function ParaPageContent() {
                           </span>
                           {/* 상태 이상 아이콘들 */}
                           <div className="flex items-center gap-1">
-                            {/* 기한 초과 아이콘 */}
+                            {/* 기한 초과 아이콘 - 진행 중이고 완료되지 않은 프로젝트만 */}
                             {project.endDate && isOverdue(project.endDate) && (
                               <AlertCircle className="h-3 w-3 text-red-500" />
                             )}
                           </div>
                         </div>
 
-                        {/* 진행률 */}
+                        {/* 진행률 - 최적화된 태스크 개수 사용 */}
                         <span className="text-xs">
-                          {project.progress}/{project.total}
+                          {(() => {
+                            const taskCount = projectTaskCounts[project.id];
+                            if (taskCount) {
+                              return `${taskCount.completedTasks}/${taskCount.totalTasks}`;
+                            }
+                            // 태스크 개수가 로딩 중일 때는 스켈레톤 표시
+                            if (taskCountsLoading) {
+                              return (
+                                <span className="inline-block w-8 h-3 bg-muted animate-pulse rounded" />
+                              );
+                            }
+                            // 데이터가 없을 때
+                            return "0/0";
+                          })()}
                         </span>
                       </div>
                     </div>
                   </Card>
                 ))}
+
+                {/* 더보기 버튼 */}
+                {hasNextProjects && (
+                  <div className="flex justify-center pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => fetchNextProjects()}
+                      disabled={isFetchingNextProjects}
+                    >
+                      {isFetchingNextProjects ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          로딩 중...
+                        </>
+                      ) : (
+                        "더보기"
+                      )}
+                    </Button>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -391,18 +567,12 @@ function ParaPageContent() {
           ) : (
             <div className="space-y-4">
               {areas.map((area) => {
-                const areaProjects = projects.filter(
+                const areaProjects = allProjects.filter(
                   (p) => p.areaId === area.id
                 );
-                const areaResources = resources.filter(
+                const areaResources = allResources.filter(
                   (r) => r.areaId === area.id
                 );
-
-                console.log(`Area ${area.name}:`, {
-                  projects: areaProjects.length,
-                  resources: areaResources.length,
-                  areaId: area.id,
-                });
 
                 const getIconComponent = (iconId: string) => {
                   const iconMap: { [key: string]: any } = {
@@ -468,15 +638,60 @@ function ParaPageContent() {
         </TabsContent>
 
         <TabsContent value="resources" className="mt-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Folder className="h-4 w-4" />
-            <span>아이디어와 참고 자료</span>
-            <span className="text-xs text-muted-foreground">
-              ({resources.length}개)
-            </span>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Folder className="h-4 w-4" />
+              <span>아이디어와 참고 자료</span>
+              <span className="text-xs text-muted-foreground">
+                ({allResources.length}개)
+              </span>
+            </div>
+            <Button asChild size="sm">
+              <Link href="/para/resources/new">
+                <Plus className="mr-2 h-4 w-4" />새 자료 추가
+              </Link>
+            </Button>
           </div>
 
-          {resources.length === 0 ? (
+          {/* 리소스 정렬 */}
+          <div className="flex items-center justify-end mb-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  {resourceSortBy === "latest" ? (
+                    <ArrowUpDown className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Clock className="mr-2 h-4 w-4" />
+                  )}
+                  {resourceSortBy === "latest" && "최신순"}
+                  {resourceSortBy === "oldest" && "생성순"}
+                  {resourceSortBy === "name" && "이름순"}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => setResourceSortBy("latest")}>
+                  <ArrowUpDown className="mr-2 h-4 w-4" />
+                  최신순
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setResourceSortBy("oldest")}>
+                  <Clock className="mr-2 h-4 w-4" />
+                  생성순
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setResourceSortBy("name")}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  이름순
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {resourcesLoading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-32 w-full" />
+            </div>
+          ) : allResources.length === 0 ? (
             <Card className="p-6 text-center border-dashed mt-4">
               <div className="mb-4 flex justify-center">
                 <div className="rounded-full bg-muted/50 p-4">
@@ -494,8 +709,8 @@ function ParaPageContent() {
               </Button>
             </Card>
           ) : (
-            <div className="space-y-4 mt-4">
-              {resources.map((resource) => (
+            <div className="space-y-4">
+              {allResources.map((resource) => (
                 <Card key={resource.id} className="p-4">
                   <Link
                     href={`/para/resources/${resource.id}`}
@@ -521,6 +736,26 @@ function ParaPageContent() {
                   </Link>
                 </Card>
               ))}
+
+              {/* 더보기 버튼 */}
+              {hasNextResources && (
+                <div className="flex justify-center pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => fetchNextResources()}
+                    disabled={isFetchingNextResources}
+                  >
+                    {isFetchingNextResources ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        로딩 중...
+                      </>
+                    ) : (
+                      "더보기"
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </TabsContent>
@@ -531,11 +766,12 @@ function ParaPageContent() {
               <Archive className="h-4 w-4" />
               <span>완료된 항목에 대한 회고</span>
               <span className="text-xs text-muted-foreground">
-                ({archives.length}개)
+                ({allArchives.length}개)
               </span>
             </div>
           </div>
-          <div className="flex justify-between items-center mb-4">
+          {/* 아카이브 필터링 및 정렬 */}
+          <div className="flex items-center justify-between mb-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
@@ -563,30 +799,38 @@ function ParaPageContent() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* 정렬 드롭다운 */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
-                  {sortBy === "latest" ? (
-                    <CalendarDays className="mr-2 h-4 w-4" />
+                  {archiveSortBy === "latest" ? (
+                    <ArrowUpDown className="mr-2 h-4 w-4" />
                   ) : (
                     <Star className="mr-2 h-4 w-4" />
                   )}
-                  {sortBy === "latest" ? "최신순" : "회고 별점순"}
+                  {archiveSortBy === "latest" ? "최신순" : "회고 별점순"}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setSortBy("latest")}>
-                  <CalendarDays className="mr-2 h-4 w-4" />
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => setArchiveSortBy("latest")}>
+                  <ArrowUpDown className="mr-2 h-4 w-4" />
                   최신순
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSortBy("rating")}>
+                <DropdownMenuItem onClick={() => setArchiveSortBy("rating")}>
                   <Star className="mr-2 h-4 w-4" />
                   회고 별점순
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          {archives.length === 0 ? (
+          {archivesLoading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-32 w-full" />
+            </div>
+          ) : allArchives.length === 0 ? (
             <Card className="p-6 text-center border-dashed">
               <p className="text-muted-foreground">
                 아직 보관된 회고가 없어요.
@@ -594,22 +838,12 @@ function ParaPageContent() {
             </Card>
           ) : (
             <div className="space-y-4">
-              {archives
+              {allArchives
                 .filter((archive) => {
                   if (filterType === "all") return true;
                   if (filterType === "loop") return archive.loopId;
                   if (filterType === "project") return archive.projectId;
                   return true;
-                })
-                .sort((a, b) => {
-                  if (sortBy === "latest") {
-                    return (
-                      new Date(b.createdAt).getTime() -
-                      new Date(a.createdAt).getTime()
-                    );
-                  } else {
-                    return (b.userRating || 0) - (a.userRating || 0);
-                  }
                 })
                 .map((archive) => (
                   <Card key={archive.id} className="p-4">
@@ -638,16 +872,36 @@ function ParaPageContent() {
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Clock className="h-3 w-3" />
                           <span>{formatDate(archive.createdAt)}</span>
+                          {renderStars(archive.userRating)}
                           {archive.bookmarked && (
                             <Bookmark className="h-3 w-3 text-yellow-500 fill-yellow-500" />
                           )}
-                          {renderStars(archive.userRating)}
                         </div>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
                     </Link>
                   </Card>
                 ))}
+
+              {/* 더보기 버튼 */}
+              {hasNextArchives && (
+                <div className="flex justify-center pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => fetchNextArchives()}
+                    disabled={isFetchingNextArchives}
+                  >
+                    {isFetchingNextArchives ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        로딩 중...
+                      </>
+                    ) : (
+                      "더보기"
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </TabsContent>

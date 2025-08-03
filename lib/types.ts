@@ -36,10 +36,11 @@ export interface Project {
   userId: string;
   title: string;
   description: string;
+  category?: "repetitive" | "task_based"; // 프로젝트 유형
   areaId?: string;
   area?: string; // Area 이름 (denormalized - DB에 저장되지 않고 쿼리 시 함께 제공)
-  progress: number;
-  total: number;
+  target: number; // 목표 개수 (반복형: 목표 횟수, 작업형: 목표 작업 수)
+  completedTasks: number; // 실제 완료된 태스크 수
   startDate: Date;
   endDate: Date;
   createdAt: Date;
@@ -51,8 +52,14 @@ export interface Project {
   notes: Note[];
   // tasks는 서브컬렉션으로 관리: projects/{projectId}/tasks/{taskId}
 
-  // 로컬 계산 필드 (DB에 저장되지 않음)
-  status?: "planned" | "in_progress" | "completed"; // startDate와 endDate를 기반으로 클라이언트에서 계산
+  // 미완료 프로젝트 이관 관련 필드
+  isCarriedOver?: boolean; // 이전 루프에서 이관된 프로젝트 여부
+  originalLoopId?: string; // 원래 루프 ID (이관된 경우)
+  carriedOverAt?: Date; // 이관된 날짜
+  migrationStatus?: "pending" | "migrated" | "ignored"; // 이관 상태
+
+  // 프로젝트 상태 (Firestore에 저장)
+  status: "in_progress" | "completed";
 }
 
 export interface Task {
@@ -120,6 +127,13 @@ export interface Retrospective {
   stuckPoints?: string;
   newLearnings?: string;
   nextProjectImprovements?: string;
+
+  // 스마트 회고 필드 (완료율 90% 미만 시)
+  incompleteAnalysis?: {
+    planningNeedsImprovement?: boolean;
+    executionNeedsImprovement?: boolean;
+    otherReason?: string;
+  };
 
   // 공통
   userRating?: number; // 별점 (1~5)

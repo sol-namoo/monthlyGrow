@@ -94,40 +94,40 @@ export function ConfirmDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full max-w-none max-h-none rounded-none border-0 m-0 p-2 sm:max-w-lg sm:max-h-[90vh] sm:rounded-lg sm:border sm:mx-2 sm:my-4">
-        <DialogHeader>
+        <DialogHeader className="pt-4">
           <DialogTitle>
             <div className="flex items-center gap-2">
               {getIcon()}
               {title}
             </div>
           </DialogTitle>
-          <DialogDescription>
-            <div className="space-y-3">
-              {description && <p>{description}</p>}
-              {children}
-              {showCheckbox && checkboxLabel && (
-                <div className="flex items-center space-x-2 pt-2">
-                  <Checkbox
-                    id="confirm-checkbox"
-                    checked={checkboxChecked}
-                    onCheckedChange={(checked) =>
-                      onCheckboxChange?.(checked as boolean)
-                    }
-                  />
-                  <label
-                    htmlFor="confirm-checkbox"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    {checkboxLabel}
-                  </label>
-                </div>
-              )}
-              {warningMessage && (
-                <p className="text-sm text-red-600">⚠️ {warningMessage}</p>
-              )}
-            </div>
-          </DialogDescription>
         </DialogHeader>
+        <div className="flex flex-col space-y-3 text-center sm:text-left">
+          {description && (
+            <p className="text-sm text-muted-foreground">{description}</p>
+          )}
+          {children}
+          {showCheckbox && checkboxLabel && (
+            <div className="flex items-center space-x-2 pt-2">
+              <Checkbox
+                id="confirm-checkbox"
+                checked={checkboxChecked}
+                onCheckedChange={(checked) =>
+                  onCheckboxChange?.(checked as boolean)
+                }
+              />
+              <label
+                htmlFor="confirm-checkbox"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                {checkboxLabel}
+              </label>
+            </div>
+          )}
+          {warningMessage && (
+            <p className="text-sm text-red-600">⚠️ {warningMessage}</p>
+          )}
+        </div>
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel}>
             {cancelText}

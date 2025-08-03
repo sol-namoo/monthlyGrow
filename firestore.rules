@@ -1,0 +1,55 @@
+// rules_version = '2';
+// service cloud.firestore {
+//   match /databases/{database}/documents {
+
+//     // 🔐 루프 정보
+//     match /loops/{loopId} {
+//       allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+//     }
+
+//     // 🔐 프로젝트 정보
+//     match /projects/{projectId} {
+//       allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+//     }
+
+//     // 🔐 태스크 정보
+//     match /tasks/{taskId} {
+//       allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+//     }
+
+//     // 🔐 사용자 프로필 (optional)
+//     match /users/{userId} {
+//       allow read, write: if request.auth != null && request.auth.uid == userId;
+//     }
+
+//     // 🔒 나머지는 차단
+//     match /{document=**} {
+//       allow read, write: if false;
+//     }
+//   }}
+  
+  service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 🔐 루프 정보
+    match /loops/{loopId} {
+      allow read, write: if true;    }
+
+    // 🔐 프로젝트 정보
+    match /projects/{projectId} {
+      allow read, write: if true;    }
+
+    // 🔐 태스크 정보
+    match /tasks/{taskId} {
+      allow read, write: if true;    }
+
+    // 🔐 사용자 프로필 (optional)
+    match /users/{userId} {
+      allow read, write: if true;    }
+
+    // 🔒 나머지는 차단
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

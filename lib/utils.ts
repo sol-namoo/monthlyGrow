@@ -73,6 +73,40 @@ export const formatDateShort = (
 };
 
 /**
+ * 날짜를 HTML input[type="date"]용 YYYY-MM-DD 형식으로 변환 (로컬 시간 기준)
+ */
+export const formatDateForInput = (
+  dateInput: Date | string | any | null | undefined
+): string => {
+  let date: Date;
+
+  if (!dateInput) {
+    return "";
+  }
+
+  // Firestore Timestamp 처리
+  if (dateInput && typeof dateInput.toDate === "function") {
+    date = dateInput.toDate();
+  } else if (typeof dateInput === "string") {
+    date = new Date(dateInput);
+  } else if (dateInput instanceof Date) {
+    date = dateInput;
+  } else {
+    return "";
+  }
+
+  if (isNaN(date.getTime())) {
+    return "";
+  }
+
+  // 로컬 시간 기준으로 YYYY-MM-DD 형식 생성
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+/**
  * 날짜를 숫자 형식으로 포맷팅 (예: "2024-01-15")
  */
 export const formatDateNumeric = (

@@ -32,16 +32,18 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { getProjectStatus } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
 import {
   fetchAreaById,
   fetchProjectsByAreaId,
   fetchAllResourcesByUserId,
+  deleteAreaById,
 } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 
 // 로딩 스켈레톤 컴포넌트
 function AreaDetailSkeleton() {
@@ -76,7 +78,37 @@ export default function AreaDetailPage({
   const { id } = use(params);
   const [user, userLoading] = useAuthState(auth);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  // 연결된 데이터를 함께 삭제할지 사용자가 선택
   const [deleteWithItems, setDeleteWithItems] = useState(false);
+
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  // 영역 삭제 mutation
+  const deleteAreaMutation = useMutation({
+    mutationFn: () => deleteAreaById(id, deleteWithItems),
+    onSuccess: () => {
+      // 성공 시 캐시 무효화 및 목록 페이지로 이동
+      queryClient.invalidateQueries({ queryKey: ["areas"] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["resources"] });
+      toast({
+        title: "영역 삭제 완료",
+        description: deleteWithItems
+          ? "영역과 연결된 모든 항목이 삭제되었습니다."
+          : "영역이 삭제되었습니다. 연결된 프로젝트와 자료는 유지됩니다.",
+      });
+      router.push("/para?tab=areas");
+    },
+    onError: (error: Error) => {
+      console.error("영역 삭제 실패:", error);
+      toast({
+        title: "삭제 실패",
+        description: "영역 삭제에 실패했습니다.",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Firestore에서 실제 데이터 가져오기
   const {
@@ -205,18 +237,23 @@ export default function AreaDetailPage({
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <div className="flex gap-2">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href={`/para/areas/edit/${id}`}>
-                <Edit className="h-4 w-4" />
-              </Link>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowDeleteDialog(true)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            {/* "미분류" 영역은 수정/삭제 불가 */}
+            {areaData.name !== "미분류" && (
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href={`/para/areas/edit/${id}`}>
+                    <Edit className="h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -321,13 +358,19 @@ export default function AreaDetailPage({
           open={showDeleteDialog}
           onOpenChange={setShowDeleteDialog}
           title="영역 삭제"
-          description={
+          description="이 영역을 삭제하시겠습니까?"
+          type="delete"
+          showCheckbox={true}
+          checkboxLabel="연결된 프로젝트와 자료도 함께 삭제"
+          checkboxChecked={deleteWithItems}
+          onCheckboxChange={setDeleteWithItems}
+          warningMessage={
             deleteWithItems
-              ? "이 영역과 연결된 모든 프로젝트와 자료도 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
-              : "이 영역을 삭제하시겠습니까? 연결된 프로젝트와 자료는 유지됩니다."
+              ? "연결된 모든 프로젝트와 자료가 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
+              : undefined
           }
           onConfirm={() => {
-            // TODO: 삭제 로직 구현
+            deleteAreaMutation.mutate();
             setShowDeleteDialog(false);
           }}
         />

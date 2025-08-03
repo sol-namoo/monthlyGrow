@@ -18,7 +18,7 @@ import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { updateUserDisplayName } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
-import { Edit2, Check, X, Save } from "lucide-react";
+import { Edit2, Check, X, Save, Loader2 } from "lucide-react";
 
 // 설정 폼 스키마 정의 (Firebase Auth 정보 제외)
 const settingsFormSchema = z.object({
@@ -216,9 +216,6 @@ export default function SettingsPage() {
                   </Button>
                 </div>
               )}
-              <p className="text-xs text-muted-foreground mt-1">
-                Firebase Auth에서 관리되는 정보입니다.
-              </p>
             </div>
 
             <div>
@@ -231,9 +228,6 @@ export default function SettingsPage() {
                 readOnly
                 disabled
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                Firebase Auth에서 관리되는 정보입니다.
-              </p>
             </div>
           </Card>
         </section>

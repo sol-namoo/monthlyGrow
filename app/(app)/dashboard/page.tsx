@@ -20,9 +20,14 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
-import { fetchAllLoopsByUserId, fetchAllAreasByUserId } from "@/lib/firebase";
+import {
+  fetchAllLoopsByUserId,
+  fetchAllAreasByUserId,
+  fetchProjectsByLoopId,
+  getTaskCountsForMultipleProjects,
+} from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getLoopStatus } from "@/lib/utils";
+import { getLoopStatus, formatDate } from "@/lib/utils";
 
 export default function DashboardPage() {
   const [user, userLoading] = useAuthState(auth);
@@ -40,8 +45,59 @@ export default function DashboardPage() {
     enabled: !!user?.uid,
   });
 
+  // 각 루프의 프로젝트와 태스크 데이터 가져오기
+  const { data: loopProjects = {}, isLoading: projectsLoading } = useQuery({
+    queryKey: ["loopProjects", user?.uid],
+    queryFn: async () => {
+      const projectsMap: { [loopId: string]: any[] } = {};
+      for (const loop of loops) {
+        const projects = await fetchProjectsByLoopId(loop.id);
+        projectsMap[loop.id] = projects;
+      }
+      return projectsMap;
+    },
+    enabled: !!user?.uid && loops.length > 0,
+  });
+
+  // 각 루프의 태스크 개수 데이터 가져오기
+  const { data: loopTaskCounts = {}, isLoading: taskCountsLoading } = useQuery({
+    queryKey: ["loopTaskCounts", user?.uid],
+    queryFn: async () => {
+      const taskCountsMap: {
+        [loopId: string]: { totalTasks: number; completedTasks: number };
+      } = {};
+      for (const loop of loops) {
+        const projects = loopProjects[loop.id] || [];
+        if (projects.length > 0) {
+          const projectIds = projects.map((p) => p.id);
+          const taskCounts = await getTaskCountsForMultipleProjects(projectIds);
+          const totalTasks = Object.values(taskCounts).reduce(
+            (sum, counts) => sum + counts.totalTasks,
+            0
+          );
+          const completedTasks = Object.values(taskCounts).reduce(
+            (sum, counts) => sum + counts.completedTasks,
+            0
+          );
+          taskCountsMap[loop.id] = { totalTasks, completedTasks };
+        } else {
+          taskCountsMap[loop.id] = { totalTasks: 0, completedTasks: 0 };
+        }
+      }
+      return taskCountsMap;
+    },
+    enabled:
+      !!user?.uid && loops.length > 0 && Object.keys(loopProjects).length > 0,
+  });
+
   // 로딩 상태
-  if (userLoading || loopsLoading || areasLoading) {
+  if (
+    userLoading ||
+    loopsLoading ||
+    areasLoading ||
+    projectsLoading ||
+    taskCountsLoading
+  ) {
     return (
       <div className="container max-w-md px-4 py-6">
         <div className="mb-6">
@@ -64,20 +120,41 @@ export default function DashboardPage() {
   );
   const pastLoops = loops.filter((loop) => getLoopStatus(loop) === "ended");
 
-  // 계산된 데이터
-  const completionRate = currentLoop
-    ? Math.round((currentLoop.doneCount / currentLoop.targetCount) * 100)
-    : 0;
+  // 실제 데이터 기반 통계 계산
+  const getLoopCompletionRate = (loop: any) => {
+    const taskCounts = loopTaskCounts[loop.id];
+    if (taskCounts && taskCounts.totalTasks > 0) {
+      return Math.round(
+        (taskCounts.completedTasks / taskCounts.totalTasks) * 100
+      );
+    }
+    return 0;
+  };
+
+  const getLoopTaskCounts = (loop: any) => {
+    const taskCounts = loopTaskCounts[loop.id];
+    return {
+      completed: taskCounts?.completedTasks || 0,
+      total: taskCounts?.totalTasks || 0,
+    };
+  };
+
+  const completionRate = currentLoop ? getLoopCompletionRate(currentLoop) : 0;
   const previousLoopCompletion =
-    pastLoops.length > 0
-      ? Math.round((pastLoops[0].doneCount / pastLoops[0].targetCount) * 100)
-      : 0;
-  const totalFocusTime = loops.reduce(
-    (total, loop) => total + (loop.doneCount || 0),
-    0
-  );
+    pastLoops.length > 0 ? getLoopCompletionRate(pastLoops[0]) : 0;
+
+  const totalFocusTime = loops.reduce((total, loop) => {
+    const taskCounts = loopTaskCounts[loop.id];
+    return total + (taskCounts?.completedTasks || 0);
+  }, 0);
+
   const previousFocusTime =
-    pastLoops.length > 0 ? pastLoops[0].doneCount || 0 : 0;
+    pastLoops.length > 0
+      ? (() => {
+          const taskCounts = loopTaskCounts[pastLoops[0].id];
+          return taskCounts?.completedTasks || 0;
+        })()
+      : 0;
 
   const stats = {
     completionRate,
@@ -107,11 +184,19 @@ export default function DashboardPage() {
     value: Math.floor(Math.random() * 50) + 10, // 임시 데이터
   }));
 
-  const loopComparisonData = pastLoops.slice(-3).map((loop, index) => ({
-    name: `${loop.startDate.getMonth() + 1}월`,
-    completion: Math.round((loop.doneCount / loop.targetCount) * 100),
-    focusHours: loop.doneCount || 0,
-  }));
+  const loopComparisonData = pastLoops.slice(-3).map((loop, index) => {
+    const taskCounts = loopTaskCounts[loop.id];
+    return {
+      name: `${loop.startDate.getMonth() + 1}월`,
+      completion:
+        taskCounts && taskCounts.totalTasks > 0
+          ? Math.round(
+              (taskCounts.completedTasks / taskCounts.totalTasks) * 100
+            )
+          : 0,
+      focusHours: taskCounts?.completedTasks || 0,
+    };
+  });
 
   return (
     <div className="container max-w-md px-4 py-6">
@@ -162,7 +247,11 @@ export default function DashboardPage() {
               <div className="mb-1 flex justify-between text-sm">
                 <span>달성률: {stats.completionRate}%</span>
                 <span>
-                  {currentLoop?.doneCount || 0}/{currentLoop?.targetCount || 0}
+                  {(() => {
+                    if (!currentLoop) return "0/0";
+                    const counts = getLoopTaskCounts(currentLoop);
+                    return `${counts.completed}/${counts.total}`;
+                  })()}
                 </span>
               </div>
               <div className="progress-bar">
@@ -177,9 +266,9 @@ export default function DashboardPage() {
               <Calendar className="h-3 w-3" />
               <span>
                 {currentLoop
-                  ? `${currentLoop.startDate.toLocaleDateString(
-                      "ko-KR"
-                    )} ~ ${currentLoop.endDate.toLocaleDateString("ko-KR")}`
+                  ? `${formatDate(currentLoop.startDate)} ~ ${formatDate(
+                      currentLoop.endDate
+                    )}`
                   : "기간 없음"}
               </span>
             </div>

@@ -20,6 +20,7 @@ import {
   Trash2,
   AlertCircle,
   ExternalLink,
+  Edit2,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -32,11 +33,24 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getProjectStatus } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
-import { fetchProjectById } from "@/lib/firebase";
-import { formatDate } from "@/lib/utils";
+import {
+  fetchProjectById,
+  deleteProjectById,
+  fetchAllTasksByProjectId,
+  getTaskCountsByProjectId,
+  getTaskTimeStatsByProjectId,
+  addTaskToProject,
+  updateTaskInProject,
+  deleteTaskFromProject,
+} from "@/lib/firebase";
+import { formatDate, formatDateForInput } from "@/lib/utils";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +60,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+
+// 태스크 폼 스키마 정의
+const taskFormSchema = z.object({
+  title: z.string().min(1, "태스크 제목을 입력해주세요"),
+  date: z.string().min(1, "날짜를 선택해주세요"),
+  duration: z.number().min(1, "소요 시간을 입력해주세요"),
+});
+
+type TaskFormData = z.infer<typeof taskFormSchema>;
 
 // 로딩 스켈레톤 컴포넌트
 function ProjectDetailSkeleton() {
@@ -84,6 +107,172 @@ export default function ProjectDetailPage({
   const { toast } = useToast();
   const [user, userLoading] = useAuthState(auth);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showTaskDialog, setShowTaskDialog] = useState(false);
+  const [showEditTaskDialog, setShowEditTaskDialog] = useState(false);
+  const [editingTask, setEditingTask] = useState<any>(null);
+
+  // 태스크 폼 설정
+  const taskForm = useForm<TaskFormData>({
+    resolver: zodResolver(taskFormSchema),
+    defaultValues: {
+      title: "",
+      date: "",
+      duration: 1,
+    },
+  });
+
+  // 태스크 수정 폼 설정
+  const editTaskForm = useForm<TaskFormData>({
+    resolver: zodResolver(taskFormSchema),
+    defaultValues: {
+      title: "",
+      date: "",
+      duration: 1,
+    },
+  });
+
+  const queryClient = useQueryClient();
+
+  // 프로젝트 삭제 mutation
+  const deleteProjectMutation = useMutation({
+    mutationFn: () => deleteProjectById(projectId),
+    onSuccess: () => {
+      // 성공 시 캐시 무효화 및 목록 페이지로 이동
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast({
+        title: "프로젝트 삭제 완료",
+        description: "프로젝트가 성공적으로 삭제되었습니다.",
+      });
+      router.push("/para?tab=projects");
+    },
+    onError: (error: Error) => {
+      console.error("프로젝트 삭제 실패:", error);
+      toast({
+        title: "삭제 실패",
+        description: "프로젝트 삭제에 실패했습니다.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // 태스크 추가 mutation
+  const addTaskMutation = useMutation({
+    mutationFn: (taskData: TaskFormData) => {
+      const newTask = {
+        title: taskData.title,
+        date: new Date(taskData.date),
+        duration: taskData.duration,
+        done: false,
+      };
+      return addTaskToProject(projectId, newTask);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+      toast({
+        title: "태스크 추가 완료",
+        description: "새 태스크가 성공적으로 추가되었습니다.",
+      });
+      setShowTaskDialog(false);
+      taskForm.reset();
+    },
+    onError: (error) => {
+      toast({
+        title: "태스크 추가 실패",
+        description: "태스크 추가 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // 태스크 수정 mutation
+  const updateTaskMutation = useMutation({
+    mutationFn: ({
+      taskId,
+      taskData,
+    }: {
+      taskId: string;
+      taskData: Partial<any>;
+    }) => {
+      return updateTaskInProject(taskId, taskData);
+    },
+    onMutate: async ({ taskId, taskData }) => {
+      // 진행 중인 쿼리 취소
+      await queryClient.cancelQueries({ queryKey: ["tasks", projectId] });
+
+      // 이전 데이터 백업
+      const previousTasks = queryClient.getQueryData(["tasks", projectId]);
+
+      // Optimistic update
+      queryClient.setQueryData(["tasks", projectId], (old: any) => {
+        if (!old) return old;
+        return old.map((task: any) =>
+          task.id === taskId
+            ? { ...task, ...taskData, updatedAt: new Date() }
+            : task
+        );
+      });
+
+      return { previousTasks };
+    },
+    onError: (error, variables, context) => {
+      // 오류 시 이전 데이터로 복원
+      if (context?.previousTasks) {
+        queryClient.setQueryData(["tasks", projectId], context.previousTasks);
+      }
+      toast({
+        title: "태스크 수정 실패",
+        description: "태스크 수정 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
+      // 성공/실패와 관계없이 쿼리 무효화하여 최신 데이터 확보
+      queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+    },
+  });
+
+  // 태스크 삭제 mutation
+  const deleteTaskMutation = useMutation({
+    mutationFn: (taskId: string) => {
+      return deleteTaskFromProject(taskId);
+    },
+    onMutate: async (taskId) => {
+      // 진행 중인 쿼리 취소
+      await queryClient.cancelQueries({ queryKey: ["tasks", projectId] });
+
+      // 이전 데이터 백업
+      const previousTasks = queryClient.getQueryData(["tasks", projectId]);
+
+      // Optimistic update - 태스크 제거
+      queryClient.setQueryData(["tasks", projectId], (old: any) => {
+        if (!old) return old;
+        return old.filter((task: any) => task.id !== taskId);
+      });
+
+      return { previousTasks };
+    },
+    onError: (error, taskId, context) => {
+      // 오류 시 이전 데이터로 복원
+      if (context?.previousTasks) {
+        queryClient.setQueryData(["tasks", projectId], context.previousTasks);
+      }
+      toast({
+        title: "태스크 삭제 실패",
+        description: "태스크 삭제 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "태스크 삭제 완료",
+        description: "태스크가 성공적으로 삭제되었습니다.",
+      });
+    },
+    onSettled: () => {
+      // 성공/실패와 관계없이 쿼리 무효화하여 최신 데이터 확보
+      queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+    },
+  });
 
   // 모든 useState들을 useQuery 전에 호출
   const [activeTab, setActiveTab] = useState("overview");
@@ -99,6 +288,13 @@ export default function ProjectDetailPage({
   const [bookmarked, setBookmarked] = useState(false);
   const [hoverRating, setHoverRating] = useState<number | undefined>(undefined);
 
+  // 스마트 회고 상태
+  const [planningNeedsImprovement, setPlanningNeedsImprovement] =
+    useState(false);
+  const [executionNeedsImprovement, setExecutionNeedsImprovement] =
+    useState(false);
+  const [otherReason, setOtherReason] = useState("");
+
   // Firestore에서 실제 데이터 가져오기
   const {
     data: project,
@@ -108,6 +304,38 @@ export default function ProjectDetailPage({
     queryKey: ["project", projectId],
     queryFn: () => fetchProjectById(projectId),
     enabled: !!projectId,
+  });
+
+  // 태스크 개수만 가져오기 (성능 최적화용) - 우선 로드
+  const { data: taskCounts, isLoading: isTaskCountsLoading } = useQuery({
+    queryKey: ["taskCounts", projectId],
+    queryFn: () => getTaskCountsByProjectId(projectId),
+    enabled: !!projectId,
+  });
+
+  console.log("🔍 TaskCounts Query Status:", {
+    projectId,
+    isTaskCountsLoading,
+    taskCounts,
+    enabled: !!projectId,
+  });
+
+  // 시간 통계 가져오기 (개요 탭에서 사용)
+  const { data: timeStats, isLoading: isTimeStatsLoading } = useQuery({
+    queryKey: ["timeStats", projectId],
+    queryFn: () => getTaskTimeStatsByProjectId(projectId),
+    enabled: !!projectId && activeTab === "overview",
+  });
+
+  // 프로젝트의 모든 tasks 가져오기 (필요할 때만)
+  const {
+    data: tasks,
+    isLoading: isTasksLoading,
+    error: tasksError,
+  } = useQuery({
+    queryKey: ["tasks", "project", projectId],
+    queryFn: () => fetchAllTasksByProjectId(projectId),
+    enabled: !!projectId && activeTab === "tasks", // 태스크 탭에서만 로드
   });
 
   // 회고 모달 상태 변경 시 데이터 로드/초기화
@@ -123,6 +351,21 @@ export default function ProjectDetailPage({
       );
       setUserRating(project.retrospective.userRating);
       setBookmarked(project.retrospective.bookmarked || false);
+
+      // 스마트 회고 데이터 로드
+      if (project.retrospective.incompleteAnalysis) {
+        setPlanningNeedsImprovement(
+          project.retrospective.incompleteAnalysis.planningNeedsImprovement ||
+            false
+        );
+        setExecutionNeedsImprovement(
+          project.retrospective.incompleteAnalysis.executionNeedsImprovement ||
+            false
+        );
+        setOtherReason(
+          project.retrospective.incompleteAnalysis.otherReason || ""
+        );
+      }
     } else if (!showRetrospectiveDialog) {
       // 모달이 닫힐 때 폼 초기화
       setGoalAchieved("");
@@ -133,6 +376,11 @@ export default function ProjectDetailPage({
       setUserRating(undefined);
       setBookmarked(false);
       setHoverRating(undefined);
+
+      // 스마트 회고 상태 초기화
+      setPlanningNeedsImprovement(false);
+      setExecutionNeedsImprovement(false);
+      setOtherReason("");
     }
   }, [showRetrospectiveDialog, project?.retrospective]);
 
@@ -180,7 +428,7 @@ export default function ProjectDetailPage({
   }, [project]);
 
   // 로딩 상태
-  if (isLoading) {
+  if (isLoading || isTasksLoading) {
     return (
       <div className="container max-w-md px-4 py-6">
         <div className="flex items-center justify-between mb-6">
@@ -198,7 +446,7 @@ export default function ProjectDetailPage({
   }
 
   // 에러 상태
-  if (error) {
+  if (error || tasksError) {
     return (
       <div className="container max-w-md px-4 py-6">
         <div className="flex items-center justify-between mb-6">
@@ -212,7 +460,8 @@ export default function ProjectDetailPage({
         </div>
         <Alert>
           <AlertDescription>
-            프로젝트 정보를 불러오는 중 오류가 발생했습니다.
+            {error ? "프로젝트 정보를 불러오는 중 오류가 발생했습니다." : ""}
+            {tasksError ? "작업 정보를 불러오는 중 오류가 발생했습니다." : ""}
           </AlertDescription>
         </Alert>
       </div>
@@ -247,6 +496,50 @@ export default function ProjectDetailPage({
       }
     : null;
 
+  // 최적화된 태스크 개수 사용 (taskCounts 우선, 폴백으로 tasks 사용)
+  const completedTasks =
+    taskCounts?.completedTasks ??
+    tasks?.filter((task: any) => task.done).length ??
+    0;
+  const totalTasks = taskCounts?.totalTasks ?? tasks?.length ?? 0;
+
+  // 반복형 프로젝트의 경우 목표 횟수가 없으면 완료된 태스크 수를 목표로 설정
+  const targetCount =
+    project?.target ||
+    (project?.category === "repetitive" ? completedTasks : 0);
+
+  const progressPercentage =
+    totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  // 디버깅용 로그
+  console.log("🔍 Project Detail - Task Counts:", {
+    projectId,
+    taskCounts,
+    completedTasks,
+    totalTasks,
+    progressPercentage,
+    tasksLength: tasks?.length,
+    projectTarget: project?.target,
+    projectCategory: project?.category,
+    projectData: project,
+  });
+
+  // 추가 디버깅 로그
+  console.log("🔍 Project Display Values:", {
+    projectTitle: project?.title,
+    projectTarget: project?.target,
+    projectCategory: project?.category,
+    completedTasks,
+    totalTasks,
+    calculatedRemaining:
+      project?.category === "repetitive"
+        ? Math.max(0, (project?.target || 0) - (completedTasks || 0))
+        : (totalTasks || 0) - (completedTasks || 0),
+  });
+
+  // 스마트 회고 조건 (완료율 90% 미만)
+  const shouldShowSmartRetrospective = progressPercentage < 90;
+
   if (!project) {
     return (
       <div className="container max-w-md px-4 py-6 pb-20 text-center">
@@ -255,15 +548,61 @@ export default function ProjectDetailPage({
     );
   }
 
-  // 샘플 태스크 데이터
-  const tasks = [
-    { id: 1, title: "운동복 준비하기", completed: true, date: "2025.05.01" },
-    { id: 2, title: "운동 계획 세우기", completed: true, date: "2025.05.02" },
-    { id: 3, title: "첫 주 운동 완료", completed: true, date: "2025.05.07" },
-    { id: 4, title: "둘째 주 운동 완료", completed: true, date: "2025.05.14" },
-    { id: 5, title: "셋째 주 운동 완료", completed: false, date: "2025.05.21" },
-    { id: 6, title: "넷째 주 운동 완료", completed: false, date: "2025.05.28" },
-  ];
+  // 태스크 폼 제출 핸들러
+  const onTaskSubmit = (data: TaskFormData) => {
+    addTaskMutation.mutate(data);
+  };
+
+  // 태스크 모달 열기 핸들러
+  const openTaskDialog = () => {
+    // 프로젝트 시작일을 기본값으로 설정
+    const projectStart = new Date(project.startDate);
+
+    taskForm.setValue("date", formatDateForInput(projectStart));
+    setShowTaskDialog(true);
+  };
+
+  // 태스크 완료 상태 토글 핸들러
+  const toggleTaskCompletion = (taskId: string, currentStatus: boolean) => {
+    updateTaskMutation.mutate({
+      taskId,
+      taskData: { done: !currentStatus },
+    });
+  };
+
+  // 태스크 삭제 핸들러
+  const handleDeleteTask = (taskId: string) => {
+    if (confirm("이 태스크를 삭제하시겠습니까?")) {
+      deleteTaskMutation.mutate(taskId);
+    }
+  };
+
+  // 태스크 수정 모달 열기 핸들러
+  const openEditTaskDialog = (task: any) => {
+    setEditingTask(task);
+    editTaskForm.setValue("title", task.title);
+    editTaskForm.setValue("date", formatDateForInput(task.date));
+    editTaskForm.setValue("duration", task.duration);
+    setShowEditTaskDialog(true);
+  };
+
+  // 태스크 수정 제출 핸들러
+  const onEditTaskSubmit = (data: TaskFormData) => {
+    if (!editingTask) return;
+
+    updateTaskMutation.mutate({
+      taskId: editingTask.id,
+      taskData: {
+        title: data.title,
+        date: new Date(data.date),
+        duration: data.duration,
+      },
+    });
+
+    setShowEditTaskDialog(false);
+    setEditingTask(null);
+    editTaskForm.reset();
+  };
 
   const handleSaveRetrospective = () => {
     if (!userRating) {
@@ -294,6 +633,14 @@ export default function ProjectDetailPage({
       content: `목표 달성: ${goalAchieved}\n\n기억에 남는 작업: ${memorableTask}\n\n막힌 부분: ${stuckPoints}\n\n새로운 배움: ${newLearnings}\n\n다음 프로젝트 개선점: ${nextProjectImprovements}`,
       userRating,
       bookmarked,
+      // 스마트 회고 데이터 (완료율 90% 미만 시에만 포함)
+      ...(shouldShowSmartRetrospective && {
+        incompleteAnalysis: {
+          planningNeedsImprovement,
+          executionNeedsImprovement,
+          otherReason: otherReason.trim() || undefined,
+        },
+      }),
     };
 
     console.log("프로젝트 회고 저장:", newRetrospective);
@@ -433,10 +780,19 @@ export default function ProjectDetailPage({
           </div>
 
           <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">
+              목표 {project.category === "repetitive" ? "횟수" : "태스크 수"}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {project.target || 0}
+              {project.category === "repetitive" ? "회" : "개"}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between">
             <span className="text-sm font-medium">진행률</span>
             <span className="text-sm text-muted-foreground">
-              {project.progress}/{project.total} (
-              {Math.round((project.progress / project.total) * 100)}%)
+              {progressPercentage || 0}%
             </span>
           </div>
 
@@ -444,9 +800,7 @@ export default function ProjectDetailPage({
             <div
               className="progress-value"
               style={{
-                width: `${Math.round(
-                  (project.progress / project.total) * 100
-                )}%`,
+                width: `${progressPercentage || 0}%`,
               }}
             ></div>
           </div>
@@ -456,7 +810,7 @@ export default function ProjectDetailPage({
             <span className="text-sm font-medium">연결된 루프</span>
             <div className="mt-2 space-y-2">
               {project.connectedLoops && project.connectedLoops.length > 0 ? (
-                project.connectedLoops.map((loop, index) => (
+                project.connectedLoops.map((loop) => (
                   <div
                     key={loop.id}
                     className="flex items-center gap-3 p-2 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors"
@@ -516,47 +870,91 @@ export default function ProjectDetailPage({
         {/* 개요 탭 */}
         <TabsContent value="overview" className="mt-4">
           <div className="space-y-4">
-            {/* 통계 카드 */}
-            <div className="grid grid-cols-2 gap-4">
-              <Card className="p-4">
-                <div className="flex items-center gap-2">
-                  <Target className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">목표</p>
-                    <p className="font-semibold">{project.total}일</p>
-                  </div>
+            {/* 세부 진행 상황 */}
+            <Card className="p-4 mb-4">
+              <h3 className="font-semibold mb-3">진행 현황</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    완료된{" "}
+                    {project.category === "repetitive" ? "횟수" : "태스크"}
+                  </span>
+                  <span className="font-medium">
+                    {project.category === "repetitive"
+                      ? completedTasks || 0
+                      : completedTasks || 0}
+                    {project.category === "repetitive" ? "회" : "개"}
+                  </span>
                 </div>
-              </Card>
-
-              <Card className="p-4">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">완료</p>
-                    <p className="font-semibold">{project.progress}일</p>
-                  </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    남은 {project.category === "repetitive" ? "횟수" : "태스크"}
+                  </span>
+                  <span className="font-medium">
+                    {project.category === "repetitive"
+                      ? Math.max(0, targetCount - (completedTasks || 0))
+                      : (totalTasks || 0) - (completedTasks || 0)}
+                    {project.category === "repetitive" ? "회" : "개"}
+                  </span>
                 </div>
-              </Card>
-            </div>
+                <hr />
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">완료된 시간</span>
+                  <span className="font-medium">
+                    {timeStats?.completedTime || 0}시간
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">남은 시간</span>
+                  <span className="font-medium">
+                    {timeStats?.remainingTime || 0}시간
+                  </span>
+                </div>
+              </div>
+            </Card>
 
             {/* 최근 활동 */}
             <Card className="p-4">
               <h3 className="font-semibold mb-3">최근 활동</h3>
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  <span>둘째 주 운동 완료</span>
-                  <span className="text-muted-foreground ml-auto">
-                    2025.05.14
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Circle className="h-4 w-4 text-muted-foreground" />
-                  <span>셋째 주 운동 시작</span>
-                  <span className="text-muted-foreground ml-auto">
-                    2025.05.15
-                  </span>
-                </div>
+                {tasks && tasks.length > 0 ? (
+                  tasks
+                    .filter((task) => task.updatedAt) // updatedAt이 있는 태스크만
+                    .sort(
+                      (a, b) =>
+                        new Date(b.updatedAt!).getTime() -
+                        new Date(a.updatedAt!).getTime()
+                    ) // 최신순 정렬
+                    .slice(0, 2) // 최근 2개만
+                    .map((task) => (
+                      <div
+                        key={task.id}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        {task.done ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <Circle className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <span
+                          className={
+                            task.done
+                              ? "line-through text-muted-foreground"
+                              : ""
+                          }
+                        >
+                          {task.title}
+                        </span>
+                        <span className="text-muted-foreground ml-auto">
+                          {formatDate(task.updatedAt)}
+                        </span>
+                      </div>
+                    ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    아직 활동이 없습니다.
+                  </p>
+                )}
               </div>
             </Card>
 
@@ -565,16 +963,32 @@ export default function ProjectDetailPage({
               <h3 className="font-semibold mb-3">프로젝트 정보</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
+                  <span className="text-muted-foreground">프로젝트 유형</span>
+                  <span>
+                    {project.category === "repetitive" ? "반복형" : "작업형"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    목표{" "}
+                    {project.category === "repetitive" ? "횟수" : "태스크 수"}
+                  </span>
+                  <span>
+                    {project.target || 0}
+                    {project.category === "repetitive" ? "회" : "개"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">연결된 Area</span>
+                  <span>{project.area}</span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-muted-foreground">생성일</span>
                   <span>{formatDate(project.createdAt)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">수정일</span>
                   <span>{formatDate(project.updatedAt)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Area</span>
-                  <span>{project.area}</span>
                 </div>
               </div>
             </Card>
@@ -586,43 +1000,114 @@ export default function ProjectDetailPage({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">태스크 목록</h3>
-              <Button size="sm" variant="outline">
-                <Plus className="h-4 w-4 mr-2" />
-                추가
-              </Button>
+              {project.category === "task_based" && (
+                <Button size="sm" variant="outline" onClick={openTaskDialog}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  추가
+                </Button>
+              )}
             </div>
 
+            {project.category === "repetitive" && (
+              <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  💡 반복형 프로젝트는 목표 횟수에 따라 태스크가 자동으로
+                  생성됩니다.
+                </p>
+                <p className="text-xs text-blue-600 mt-2">
+                  🎯 목표 달성 후 초과 달성 태스크를 추가할 수 있어요
+                </p>
+              </div>
+            )}
+
             <div className="space-y-2">
-              {tasks.map((task) => (
-                <Card key={task.id} className="p-3">
-                  <div className="flex items-center gap-3">
-                    {task.completed ? (
-                      <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    ) : (
-                      <Circle className="h-5 w-5 text-muted-foreground" />
-                    )}
-                    <div className="flex-1">
-                      <p
-                        className={`text-sm ${
-                          task.completed
-                            ? "line-through text-muted-foreground"
-                            : ""
-                        }`}
-                      >
-                        {task.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {task.date}
-                      </p>
+              {tasks
+                ?.sort(
+                  (a, b) =>
+                    new Date(a.date).getTime() - new Date(b.date).getTime()
+                )
+                .map((task) => (
+                  <Card key={task.id} className="p-3">
+                    <div className="flex items-center gap-3">
+                      {project.category === "task_based" ? (
+                        <button
+                          onClick={() =>
+                            toggleTaskCompletion(task.id, task.done)
+                          }
+                          className="flex-shrink-0 hover:scale-110 transition-transform"
+                        >
+                          {task.done ? (
+                            <CheckCircle2 className="h-5 w-5 text-green-600 fill-green-600" />
+                          ) : (
+                            <Circle className="h-5 w-5 text-muted-foreground hover:text-green-600 hover:fill-green-100" />
+                          )}
+                        </button>
+                      ) : (
+                        <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
+                          <span className="text-xs text-muted-foreground">
+                            {tasks.indexOf(task) + 1}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p
+                            className={`text-sm font-medium ${
+                              task.done
+                                ? "line-through text-muted-foreground"
+                                : ""
+                            }`}
+                          >
+                            {task.title}
+                          </p>
+                          {task.done && (
+                            <Badge
+                              variant="default"
+                              className="text-xs bg-green-100 text-green-800 border-green-200"
+                            >
+                              완료
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            <span>{formatDate(task.date)}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            <span>{task.duration}시간</span>
+                          </div>
+                        </div>
+                      </div>
+                      {project.category === "task_based" && (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditTaskDialog(task)}
+                            className="flex-shrink-0 h-8 w-8 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteTask(task.id)}
+                            className="flex-shrink-0 h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                )) || []}
             </div>
 
             <div className="text-center text-sm text-muted-foreground">
-              {tasks.filter((task) => task.completed).length}/{tasks.length}{" "}
-              태스크 완료
+              {completedTasks || 0}/{totalTasks || 0} 태스크 완료 (
+              {progressPercentage || 0}%)
             </div>
           </div>
         </TabsContent>
@@ -670,8 +1155,7 @@ export default function ProjectDetailPage({
                 </Button>
               ) : (
                 <div className="text-sm text-muted-foreground">
-                  진행률: {Math.round((project.progress / project.total) * 100)}
-                  %
+                  진행률: {progressPercentage}%
                 </div>
               )}
             </Card>
@@ -873,6 +1357,79 @@ export default function ProjectDetailPage({
                   placeholder="예: 다음 프로젝트에서는 주말에도 루틴을 유지할 수 있는 방법을 찾아야겠습니다."
                 />
               </div>
+
+              {/* 스마트 회고 섹션 (완료율 90% 미만 시 표시) */}
+              {shouldShowSmartRetrospective && (
+                <div className="border-t pt-4 mt-4">
+                  <div className="mb-3">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">
+                      계획한 태스크를 다 끝내지 못했는데
+                    </h4>
+                    <p className="text-xs text-gray-500 mb-3">
+                      다음 중 어떤 부분에 개선이 필요한지 선택해주세요
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">
+                      <Checkbox
+                        id="planningNeedsImprovement"
+                        checked={planningNeedsImprovement}
+                        onCheckedChange={(checked) =>
+                          setPlanningNeedsImprovement(checked as boolean)
+                        }
+                      />
+                      <div className="flex-1">
+                        <label
+                          htmlFor="planningNeedsImprovement"
+                          className="text-sm font-medium text-gray-900 cursor-pointer"
+                        >
+                          계획에 개선이 필요한지
+                        </label>
+                        <p className="text-xs text-gray-500 mt-1">
+                          목표 설정이나 일정 계획이 현실적이지 않았을 수
+                          있습니다
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">
+                      <Checkbox
+                        id="executionNeedsImprovement"
+                        checked={executionNeedsImprovement}
+                        onCheckedChange={(checked) =>
+                          setExecutionNeedsImprovement(checked as boolean)
+                        }
+                      />
+                      <div className="flex-1">
+                        <label
+                          htmlFor="executionNeedsImprovement"
+                          className="text-sm font-medium text-gray-900 cursor-pointer"
+                        >
+                          실행 방식에 개선이 필요한지
+                        </label>
+                        <p className="text-xs text-gray-500 mt-1">
+                          실제 실행 과정에서 효율성이나 지속성이 부족했을 수
+                          있습니다
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        기타 이유
+                      </label>
+                      <Textarea
+                        className="mt-1"
+                        rows={2}
+                        value={otherReason}
+                        onChange={(e) => setOtherReason(e.target.value)}
+                        placeholder="다른 이유가 있다면 자유롭게 작성해주세요"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   이 프로젝트는 나에게 도움이 되었나요?
@@ -918,6 +1475,182 @@ export default function ProjectDetailPage({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 태스크 추가 모달 */}
+      <Dialog open={showTaskDialog} onOpenChange={setShowTaskDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>새 태스크 추가</DialogTitle>
+            <DialogDescription>
+              프로젝트에 새로운 태스크를 추가하세요.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={taskForm.handleSubmit(onTaskSubmit)}
+            className="space-y-4"
+          >
+            <div>
+              <Label htmlFor="task-title">태스크 제목</Label>
+              <Input
+                id="task-title"
+                placeholder="태스크 제목을 입력하세요"
+                {...taskForm.register("title")}
+              />
+              {taskForm.formState.errors.title && (
+                <p className="text-sm text-red-500 mt-1">
+                  {taskForm.formState.errors.title.message}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="task-date">날짜</Label>
+              <Input
+                id="task-date"
+                type="date"
+                min={formatDateForInput(project.startDate)}
+                max={formatDateForInput(project.endDate)}
+                {...taskForm.register("date")}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                프로젝트 기간: {formatDate(project.startDate)} ~{" "}
+                {formatDate(project.endDate)}
+              </p>
+              {taskForm.formState.errors.date && (
+                <p className="text-sm text-red-500 mt-1">
+                  {taskForm.formState.errors.date.message}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="task-duration">소요 시간 (시간)</Label>
+              <Input
+                id="task-duration"
+                type="number"
+                min="1"
+                max="24"
+                placeholder="1"
+                {...taskForm.register("duration", { valueAsNumber: true })}
+              />
+              {taskForm.formState.errors.duration && (
+                <p className="text-sm text-red-500 mt-1">
+                  {taskForm.formState.errors.duration.message}
+                </p>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowTaskDialog(false)}
+              >
+                취소
+              </Button>
+              <Button type="submit" disabled={addTaskMutation.isPending}>
+                {addTaskMutation.isPending ? "추가 중..." : "태스크 추가"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* 태스크 수정 모달 */}
+      <Dialog open={showEditTaskDialog} onOpenChange={setShowEditTaskDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>태스크 수정</DialogTitle>
+            <DialogDescription>태스크 정보를 수정하세요.</DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={editTaskForm.handleSubmit(onEditTaskSubmit)}
+            className="space-y-4"
+          >
+            <div>
+              <Label htmlFor="edit-task-title">태스크 제목</Label>
+              <Input
+                id="edit-task-title"
+                placeholder="태스크 제목을 입력하세요"
+                {...editTaskForm.register("title")}
+              />
+              {editTaskForm.formState.errors.title && (
+                <p className="text-sm text-red-500 mt-1">
+                  {editTaskForm.formState.errors.title.message}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="edit-task-date">날짜</Label>
+              <Input
+                id="edit-task-date"
+                type="date"
+                min={formatDateForInput(project.startDate)}
+                max={formatDateForInput(project.endDate)}
+                {...editTaskForm.register("date")}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                프로젝트 기간: {formatDate(project.startDate)} ~{" "}
+                {formatDate(project.endDate)}
+              </p>
+              {editTaskForm.formState.errors.date && (
+                <p className="text-sm text-red-500 mt-1">
+                  {editTaskForm.formState.errors.date.message}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="edit-task-duration">소요 시간 (시간)</Label>
+              <Input
+                id="edit-task-duration"
+                type="number"
+                min="1"
+                max="24"
+                placeholder="1"
+                {...editTaskForm.register("duration", { valueAsNumber: true })}
+              />
+              {editTaskForm.formState.errors.duration && (
+                <p className="text-sm text-red-500 mt-1">
+                  {editTaskForm.formState.errors.duration.message}
+                </p>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowEditTaskDialog(false);
+                  setEditingTask(null);
+                  editTaskForm.reset();
+                }}
+              >
+                취소
+              </Button>
+              <Button type="submit" disabled={updateTaskMutation.isPending}>
+                {updateTaskMutation.isPending ? "수정 중..." : "태스크 수정"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="프로젝트 삭제"
+        description="이 프로젝트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+        onConfirm={() => {
+          deleteProjectMutation.mutate();
+          setShowDeleteDialog(false);
+        }}
+      />
     </div>
   );
 }

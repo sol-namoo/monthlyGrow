@@ -11,6 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ChevronLeft,
   Plus,
   Compass,
@@ -23,6 +30,7 @@ import {
   BookOpen,
   Palette,
   AlertCircle,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -31,6 +39,18 @@ import { useSettings } from "@/hooks/useSettings";
 import Loading from "@/components/feedback/Loading";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { useQuery } from "@tanstack/react-query";
+import {
+  auth,
+  findLoopByMonth,
+  deleteLoopById,
+  connectPendingProjectsToNewLoop,
+  fetchAllProjectsByUserId,
+  fetchAllAreasByUserId,
+  db,
+} from "@/lib/firebase";
+import { addDoc, collection } from "firebase/firestore";
 import { RecommendationBadge } from "@/components/ui/recommendation-badge";
 import { ProjectSelectionModal } from "@/components/ui/project-selection-modal";
 import {
@@ -41,16 +61,33 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { formatDate } from "@/lib/utils";
 
 // 기본 폼 스키마 정의
-const loopFormSchema = z.object({
-  title: z.string().min(1, "루프 제목을 입력해주세요"),
-  reward: z.string().min(1, "보상을 입력해주세요"),
-  startDate: z.string().min(1, "시작일을 입력해주세요"),
-  endDate: z.string().min(1, "종료일을 입력해주세요"),
-  selectedAreas: z.array(z.string()).min(1, "최소 1개의 영역을 선택해주세요"),
-  selectedExistingProjects: z.array(z.string()),
-});
+const loopFormSchema = z
+  .object({
+    title: z.string().min(1, "루프 제목을 입력해주세요"),
+    reward: z.string().min(1, "보상을 입력해주세요"),
+    selectedMonth: z.string().min(1, "루프 월을 선택해주세요"),
+    startDate: z.string().min(1, "시작일을 입력해주세요"),
+    endDate: z.string().min(1, "종료일을 입력해주세요"),
+    selectedAreas: z.array(z.string()).min(1, "최소 1개의 영역을 선택해주세요"),
+    selectedExistingProjects: z.array(z.string()),
+  })
+  .refine(
+    (data) => {
+      // 6개월 제한 체크
+      const selectedDate = new Date(data.selectedMonth + "-01");
+      const sixMonthsLater = new Date();
+      sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
+
+      return selectedDate <= sixMonthsLater;
+    },
+    {
+      message: "루프는 최대 6개월 후까지만 생성할 수 있습니다",
+      path: ["selectedMonth"],
+    }
+  );
 
 type LoopFormData = z.infer<typeof loopFormSchema>;
 
@@ -74,6 +111,53 @@ function NewLoopPageContent() {
   const { toast } = useToast();
   const { settings } = useSettings();
   const searchParams = useSearchParams();
+  const [user] = useAuthState(auth);
+
+  // 사용자의 모든 프로젝트 가져오기
+  const { data: allProjects = [], isLoading: projectsLoading } = useQuery({
+    queryKey: ["projects", user?.uid],
+    queryFn: () => fetchAllProjectsByUserId(user?.uid || ""),
+    enabled: !!user?.uid,
+  });
+
+  // 사용자의 모든 영역 가져오기
+  const { data: allAreas = [], isLoading: areasLoading } = useQuery({
+    queryKey: ["areas", user?.uid],
+    queryFn: () => fetchAllAreasByUserId(user?.uid || ""),
+    enabled: !!user?.uid,
+  });
+
+  // 중복 루프 관련 상태
+  const [existingLoop, setExistingLoop] = useState<any>(null);
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [showFinalConfirmDialog, setShowFinalConfirmDialog] = useState(false);
+  const [blockedMonth, setBlockedMonth] = useState<string | null>(null);
+
+  // 6개월 후까지의 월 옵션 생성
+  const getAvailableMonths = () => {
+    const months = [];
+    const today = new Date();
+
+    for (let i = 0; i <= 6; i++) {
+      const targetDate = new Date(today.getFullYear(), today.getMonth() + i, 1);
+      const yearMonth = `${targetDate.getFullYear()}-${String(
+        targetDate.getMonth() + 1
+      ).padStart(2, "0")}`;
+      const monthName = targetDate.toLocaleDateString("ko-KR", {
+        year: "numeric",
+        month: "long",
+      });
+
+      months.push({
+        value: yearMonth,
+        label: monthName,
+        isThisMonth: i === 0,
+        isNextMonth: i === 1,
+      });
+    }
+
+    return months;
+  };
 
   // react-hook-form 설정
   const form = useForm<LoopFormData>({
@@ -81,6 +165,7 @@ function NewLoopPageContent() {
     defaultValues: {
       title: "",
       reward: "",
+      selectedMonth: "",
       startDate: "",
       endDate: "",
       selectedAreas: [],
@@ -98,56 +183,146 @@ function NewLoopPageContent() {
   const [projectModalRefreshKey, setProjectModalRefreshKey] = useState(0);
   const [currentUrl, setCurrentUrl] = useState("/loop/new");
 
-  // 사용자 설정 불러오기
+  // 사용자 설정 불러오기 (Firestore에서)
   useEffect(() => {
-    const savedSettings = localStorage.getItem("userSettings");
-    if (savedSettings) {
-      const settings = JSON.parse(savedSettings);
-
-      // 기본 보상이 활성화되어 있고, 보상 필드가 비어있을 때만 자동으로 채우기
-      if (
-        settings.defaultRewardEnabled &&
-        settings.defaultReward &&
-        !form.getValues("reward")
-      ) {
-        form.setValue("reward", settings.defaultReward);
-      }
+    // 기본 보상이 활성화되어 있고, 보상 필드가 비어있을 때만 자동으로 채우기
+    if (
+      settings.defaultRewardEnabled &&
+      settings.defaultReward &&
+      !form.getValues("reward")
+    ) {
+      form.setValue("reward", settings.defaultReward);
     }
-  }, [form]);
+  }, [settings, form]);
 
-  // 월 단위 날짜 자동 설정
+  // 월 단위 날짜 자동 설정 (monthOffset 기반)
   useEffect(() => {
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth();
+    const monthOffset = parseInt(searchParams.get("monthOffset") || "0");
+    if (monthOffset > 0) {
+      const currentDate = new Date();
+      const targetMonth = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth() + monthOffset,
+        1
+      );
 
-    // 해당 월의 1일
-    const startDate = `${currentYear}-${String(currentMonth + 1).padStart(
-      2,
-      "0"
-    )}-01`;
+      const yearMonth = `${targetMonth.getFullYear()}-${String(
+        targetMonth.getMonth() + 1
+      ).padStart(2, "0")}`;
+      form.setValue("selectedMonth", yearMonth);
 
-    // 해당 월의 마지막 날
-    const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
-    const endDate = `${currentYear}-${String(currentMonth + 1).padStart(
-      2,
-      "0"
-    )}-${String(lastDay).padStart(2, "0")}`;
+      // 월 선택 시 자동으로 날짜와 제목 설정되도록 트리거
+      handleMonthChange(yearMonth);
+    }
+  }, [form, searchParams]);
 
-    // 폼에 자동 설정
-    form.setValue("startDate", startDate);
-    form.setValue("endDate", endDate);
-  }, [form]);
+  // 월 선택 변경 핸들러
+  const handleMonthChange = async (selectedMonth: string) => {
+    if (!selectedMonth || !user?.uid) return;
 
-  // 샘플 데이터
-  const areas = [
-    { id: "area1", name: "건강", color: "#ef4444", icon: "heart" },
-    { id: "area2", name: "커리어", color: "#3b82f6", icon: "briefcase" },
-    { id: "area3", name: "학습", color: "#8b5cf6", icon: "bookOpen" },
-    { id: "area4", name: "재정", color: "#10b981", icon: "dollarSign" },
-    { id: "area5", name: "관계", color: "#f59e0b", icon: "users" },
-    { id: "area6", name: "취미", color: "#ec4899", icon: "gamepad2" },
-  ];
+    // 차단된 월인지 확인
+    if (blockedMonth === selectedMonth) {
+      form.setValue("selectedMonth", "");
+      toast({
+        title: "월 선택 제한",
+        description:
+          "이 월은 기존 루프가 있어 선택할 수 없습니다. 다른 월을 선택해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const [year, month] = selectedMonth.split("-").map(Number);
+
+    // 중복 루프 확인
+    try {
+      const existing = await findLoopByMonth(user.uid, year, month);
+      if (existing) {
+        setExistingLoop(existing);
+        setShowDuplicateDialog(true);
+        return; // 중복 확인 대화상자가 나올 때까지 진행하지 않음
+      }
+    } catch (error) {
+      console.error("중복 루프 확인 중 오류:", error);
+    }
+
+    // 중복이 없으면 계속 진행
+    applyMonthChanges(year, month);
+  };
+
+  // 월 변경 사항 적용
+  const applyMonthChanges = (year: number, month: number) => {
+    // 해당 월의 첫 날과 마지막 날 계산
+    const startOfMonth = new Date(year, month - 1, 1);
+    const endOfMonth = new Date(year, month, 0);
+
+    // 로컬 시간 기준으로 YYYY-MM-DD 형식 생성
+    const formatLocalDate = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
+    const startDateString = formatLocalDate(startOfMonth);
+    const endDateString = formatLocalDate(endOfMonth);
+
+    form.setValue("startDate", startDateString);
+    form.setValue("endDate", endDateString);
+
+    // 제목에 기본값 설정 ("n월 루프: ")
+    const monthName = startOfMonth.toLocaleDateString("ko-KR", {
+      month: "long",
+    });
+
+    const currentTitle = form.getValues("title");
+    // 기존 제목이 없거나 이전 월 루프 패턴이면 새로 설정
+    if (!currentTitle || /^\d+월 루프:/.test(currentTitle)) {
+      form.setValue("title", `${monthName} 루프: `);
+    }
+  };
+
+  // 중복 루프 대체 확인
+  const handleDuplicateConfirm = async (shouldReplace: boolean) => {
+    if (!shouldReplace) {
+      // 대체하지 않음 - 월 선택 초기화하고 해당 월 차단
+      const selectedMonth = form.getValues("selectedMonth");
+      setBlockedMonth(selectedMonth);
+      form.setValue("selectedMonth", "");
+      setShowDuplicateDialog(false);
+      setExistingLoop(null);
+      return;
+    }
+
+    // 기존 루프 삭제 후 계속 진행
+    try {
+      if (existingLoop) {
+        await deleteLoopById(existingLoop.id);
+        toast({
+          title: "기존 루프 삭제 완료",
+          description: `${existingLoop.title}가 삭제되었습니다.`,
+        });
+
+        // 월 변경 사항 적용
+        const selectedMonth = form.getValues("selectedMonth");
+        const [year, month] = selectedMonth.split("-").map(Number);
+        applyMonthChanges(year, month);
+      }
+    } catch (error) {
+      console.error("기존 루프 삭제 중 오류:", error);
+      toast({
+        title: "삭제 실패",
+        description: "기존 루프를 삭제하는 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
+
+    setShowDuplicateDialog(false);
+    setExistingLoop(null);
+  };
+
+  // 실제 areas 데이터 사용 (allAreas)
+  const areas = allAreas;
 
   // 폼 데이터를 URL에 자동 저장
   useEffect(() => {
@@ -270,6 +445,21 @@ function NewLoopPageContent() {
     }
   }, [searchParams, form, toast]);
 
+  // 로딩 상태 확인
+  if (projectsLoading || areasLoading) {
+    return <Loading />;
+  }
+
+  if (!user) {
+    return (
+      <div className="container max-w-md px-4 py-6">
+        <div className="text-center">
+          <p>로그인이 필요합니다.</p>
+        </div>
+      </div>
+    );
+  }
+
   // Area가 있는지 확인
   const hasAreas = areas.length > 0;
 
@@ -305,20 +495,69 @@ function NewLoopPageContent() {
     }
   };
 
-  const onSubmit = (data: LoopFormData) => {
-    // 루프 생성 로직 (실제 구현에서는 API 호출)
-    const loopData = {
-      ...data,
-      createdAt: new Date(),
-    };
+  const onSubmit = async (data: LoopFormData) => {
+    // 차단된 월인지 최종 확인
+    if (blockedMonth === data.selectedMonth) {
+      setShowFinalConfirmDialog(true);
+      return;
+    }
 
-    toast({
-      title: "루프 생성 완료",
-      description: `${data.title} 루프가 생성되었습니다.`,
-    });
+    // 중복 루프 최종 확인
+    if (user?.uid && data.selectedMonth) {
+      const [year, month] = data.selectedMonth.split("-").map(Number);
+      try {
+        const existing = await findLoopByMonth(user.uid, year, month);
+        if (existing) {
+          setShowFinalConfirmDialog(true);
+          return;
+        }
+      } catch (error) {
+        console.error("최종 중복 확인 중 오류:", error);
+      }
+    }
 
-    // 루프 목록 페이지로 이동
-    router.push("/loop");
+    // 실제 루프 생성
+    createLoop(data);
+  };
+
+  const createLoop = async (data: LoopFormData) => {
+    if (!user?.uid) return;
+
+    try {
+      // 루프 생성
+      const loopData = {
+        userId: user.uid,
+        title: data.title,
+        reward: data.reward,
+        startDate: new Date(data.startDate),
+        endDate: new Date(data.endDate),
+        projectIds: data.selectedExistingProjects,
+        retrospective: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      // Firebase에 루프 추가
+      const newLoopId = await addDoc(collection(db, "loops"), loopData);
+
+      // 대기 중인 프로젝트들을 새 루프에 자동 연결
+      await connectPendingProjectsToNewLoop(user.uid, newLoopId.id);
+
+      toast({
+        title: "루프 생성 완료",
+        description: `${data.title} 루프가 생성되었습니다.`,
+      });
+
+      // 루프 목록 페이지로 이동
+      router.push("/loop");
+    } catch (error) {
+      console.error("루프 생성 중 오류:", error);
+      toast({
+        title: "루프 생성 실패",
+        description: "루프 생성 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
   };
 
   // 프로젝트 개수 계산
@@ -341,34 +580,6 @@ function NewLoopPageContent() {
   };
 
   const monthName = getMonthFromDate(form.watch("startDate"));
-
-  const handleCreateCurrentLoop = () => {
-    if (!hasAreas) {
-      // Area가 없으면 Area 생성 페이지로 이동하면서 돌아올 URL 전달
-      const currentUrl = `/loop/new${
-        searchParams.get("startDate")
-          ? `?startDate=${searchParams.get("startDate")}`
-          : ""
-      }`;
-      window.location.href = `/para/areas/new?returnUrl=${encodeURIComponent(
-        currentUrl
-      )}`;
-      return;
-    }
-
-    const currentYear = new Date().getFullYear();
-    const currentMonth = new Date().getMonth();
-    const startDate = `${currentYear}-${String(currentMonth + 1).padStart(
-      2,
-      "0"
-    )}-01`;
-    form.setValue("startDate", startDate);
-    form.setValue(
-      "endDate",
-      new Date(currentYear, currentMonth + 1, 0).toISOString().split("T")[0]
-    );
-    form.setValue("title", `${getMonthFromDate(startDate)} 루프`);
-  };
 
   // Area가 없는 경우 전체 페이지를 다르게 렌더링
   if (!hasAreas) {
@@ -431,7 +642,7 @@ function NewLoopPageContent() {
             <ChevronLeft className="h-5 w-5" />
           </Link>
         </Button>
-        <h1 className="text-2xl font-bold">{monthName} 루프 생성</h1>
+        <h1 className="text-2xl font-bold">루프 생성</h1>
       </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -439,6 +650,49 @@ function NewLoopPageContent() {
         <Card className="p-6">
           <h2 className="mb-4 text-lg font-semibold">기본 정보</h2>
           <div className="space-y-4">
+            {/* 월 선택 */}
+            <div>
+              <Label htmlFor="selectedMonth">루프 월 선택</Label>
+              <Select
+                value={form.watch("selectedMonth")}
+                onValueChange={(value) => {
+                  form.setValue("selectedMonth", value);
+                  handleMonthChange(value);
+                }}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="루프를 진행할 월을 선택하세요" />
+                </SelectTrigger>
+                <SelectContent>
+                  {getAvailableMonths().map((month) => (
+                    <SelectItem key={month.value} value={month.value}>
+                      <div className="flex items-center gap-2">
+                        <span>{month.label}</span>
+                        {month.isThisMonth && (
+                          <Badge variant="secondary" className="text-xs">
+                            현재
+                          </Badge>
+                        )}
+                        {month.isNextMonth && (
+                          <Badge variant="outline" className="text-xs">
+                            다음
+                          </Badge>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.selectedMonth && (
+                <p className="text-sm text-red-500 mt-1">
+                  {form.formState.errors.selectedMonth.message}
+                </p>
+              )}
+              <p className="text-sm text-muted-foreground mt-1">
+                💡 루프는 최대 6개월 후까지 생성할 수 있습니다
+              </p>
+            </div>
+
             <div>
               <Label htmlFor="title">루프 제목</Label>
               <Input
@@ -506,15 +760,6 @@ function NewLoopPageContent() {
                 </p>
               </div>
             </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleCreateCurrentLoop}
-              className="w-full"
-            >
-              이번 달 루프 자동 생성
-            </Button>
           </div>
         </Card>
 
@@ -642,9 +887,40 @@ function NewLoopPageContent() {
                 </Badge>
               </div>
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  프로젝트 선택 모달에서 선택한 프로젝트들이 여기에 표시됩니다.
-                </p>
+                {form.watch("selectedExistingProjects").map((projectId) => {
+                  const project = allProjects.find((p) => p.id === projectId);
+                  if (!project) return null;
+
+                  return (
+                    <div
+                      key={projectId}
+                      className="flex items-center justify-between p-2 bg-background rounded border"
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{project.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {project.area || "미분류"}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const current = form.getValues(
+                            "selectedExistingProjects"
+                          );
+                          form.setValue(
+                            "selectedExistingProjects",
+                            current.filter((id) => id !== projectId)
+                          );
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -691,7 +967,6 @@ function NewLoopPageContent() {
           selectedProjects={form.watch("selectedExistingProjects")}
           onProjectToggle={toggleExistingProject}
           onConfirm={() => setShowProjectModal(false)}
-          maxProjects={5}
           newlyCreatedProjectId={newlyCreatedProjectId}
           key={projectModalRefreshKey} // 리프레시를 위한 키
         />
@@ -769,6 +1044,98 @@ function NewLoopPageContent() {
               onClick={() => setShowNewProjectDialog(false)}
             >
               취소
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 중복 루프 대체 확인 대화상자 */}
+      <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>기존 루프가 있습니다</DialogTitle>
+            <DialogDescription>
+              선택한 월에 이미 루프가 존재합니다. 기존 루프를 삭제하고 새로운
+              루프를 생성하시겠습니까?
+            </DialogDescription>
+          </DialogHeader>
+
+          {existingLoop && (
+            <div className="my-4 p-4 bg-muted/50 rounded-lg">
+              <h4 className="font-medium mb-2">기존 루프 정보</h4>
+              <div className="text-sm text-muted-foreground space-y-1">
+                <div>제목: {existingLoop.title}</div>
+                <div>
+                  기간: {formatDate(existingLoop.startDate)} ~{" "}
+                  {formatDate(existingLoop.endDate)}
+                </div>
+                <div>
+                  연결된 프로젝트: {existingLoop.projectIds?.length || 0}개
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <span className="text-primary">💡</span>
+              <span>
+                연결된 프로젝트는 삭제되지 않고 루프 연결만 해제됩니다.
+              </span>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => handleDuplicateConfirm(false)}
+            >
+              취소
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => handleDuplicateConfirm(true)}
+            >
+              기존 루프 삭제하고 계속
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 최종 루프 생성 확인 대화상자 */}
+      <Dialog
+        open={showFinalConfirmDialog}
+        onOpenChange={setShowFinalConfirmDialog}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>루프 생성 확인</DialogTitle>
+            <DialogDescription>
+              선택한 월에 기존 루프가 있거나 이전에 취소한 월입니다. 정말로
+              루프를 생성하시겠습니까?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="text-sm text-muted-foreground">
+            <p>⚠️ 기존 루프가 있는 경우 삭제되고 새로운 루프가 생성됩니다.</p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowFinalConfirmDialog(false)}
+            >
+              취소
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                const formData = form.getValues();
+                setShowFinalConfirmDialog(false);
+                createLoop(formData);
+              }}
+            >
+              확인, 루프 생성
             </Button>
           </DialogFooter>
         </DialogContent>

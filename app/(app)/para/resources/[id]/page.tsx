@@ -2,23 +2,17 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  ChevronLeft,
-  LinkIcon,
-  FileText,
-  File,
-  Edit,
-  Trash2,
-} from "lucide-react";
+import { ChevronLeft, Edit, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, use, Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { useQuery } from "@tanstack/react-query";
-import { fetchResourceById } from "@/lib/firebase";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { fetchResourceById, deleteResourceById } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 
 // 로딩 스켈레톤 컴포넌트
 function ResourceDetailSkeleton() {
@@ -51,6 +45,22 @@ export default function ResourceDetailPage({
   const router = useRouter();
   const { id } = use(params);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const queryClient = useQueryClient();
+
+  // 자료 삭제 mutation
+  const deleteResourceMutation = useMutation({
+    mutationFn: () => deleteResourceById(id),
+    onSuccess: () => {
+      // 성공 시 캐시 무효화 및 목록 페이지로 이동
+      queryClient.invalidateQueries({ queryKey: ["resources"] });
+      router.push("/para?tab=resources");
+    },
+    onError: (error: Error) => {
+      console.error("자료 삭제 실패:", error);
+      alert("자료 삭제에 실패했습니다.");
+    },
+  });
 
   // Firestore에서 실제 데이터 가져오기
   const {
@@ -134,26 +144,6 @@ export default function ResourceDetailPage({
     );
   }
 
-  const getResourceIcon = () => {
-    if (resource.link) {
-      return <LinkIcon className="h-5 w-5" />;
-    } else if (resource.text) {
-      return <FileText className="h-5 w-5" />;
-    } else {
-      return <File className="h-5 w-5" />;
-    }
-  };
-
-  const getResourceLabel = () => {
-    if (resource.link) {
-      return "링크";
-    } else if (resource.text) {
-      return "노트";
-    } else {
-      return "자료";
-    }
-  };
-
   return (
     <Suspense fallback={<ResourceDetailSkeleton />}>
       <div className="container max-w-md px-4 py-6">
@@ -184,54 +174,52 @@ export default function ResourceDetailPage({
 
         {/* 자료 정보 */}
         <div className="mb-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-3 rounded-lg bg-muted">{getResourceIcon()}</div>
-            <div>
-              <h1 className="text-xl font-semibold">{resource.name}</h1>
-              <div className="flex items-center gap-2 mt-1">
-                <Badge variant="outline" className="text-xs">
-                  {getResourceLabel()}
-                </Badge>
-                {resource.area && (
-                  <Badge variant="secondary" className="text-xs">
-                    {resource.area}
-                  </Badge>
-                )}
-              </div>
-            </div>
-          </div>
-          <p className="text-sm text-muted-foreground mb-4">
-            {resource.description}
-          </p>
+          <h1 className="text-2xl font-bold mb-2">{resource.name}</h1>
+          {resource.area && (
+            <Badge variant="secondary" className="mb-3">
+              {resource.area}
+            </Badge>
+          )}
+          {resource.description && (
+            <p className="text-sm text-muted-foreground mb-4">
+              {resource.description}
+            </p>
+          )}
         </div>
 
         {/* 자료 내용 */}
-        <Card className="mb-4">
-          <div className="p-4">
-            {resource.link ? (
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">링크:</p>
-                <a
-                  href={resource.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline break-all"
-                >
-                  {resource.link}
-                </a>
-              </div>
-            ) : resource.text ? (
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">내용:</p>
-                <div className="whitespace-pre-wrap text-sm">
-                  {resource.text}
+        {(resource.link || resource.text) && (
+          <Card className="mb-4">
+            <div className="p-4 space-y-4">
+              {resource.link && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-2">
+                    링크
+                  </p>
+                  <a
+                    href={resource.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline break-all"
+                  >
+                    {resource.link}
+                  </a>
                 </div>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">내용이 없습니다.</p>
-            )}
-          </div>
-        </Card>
+              )}
+
+              {resource.text && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-2">
+                    내용
+                  </p>
+                  <div className="whitespace-pre-wrap text-sm">
+                    {resource.text}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
 
         {/* 삭제 확인 다이얼로그 */}
         <ConfirmDialog
@@ -240,7 +228,7 @@ export default function ResourceDetailPage({
           title="자료 삭제"
           description="이 자료를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
           onConfirm={() => {
-            // TODO: 삭제 로직 구현
+            deleteResourceMutation.mutate();
             setShowDeleteDialog(false);
           }}
         />

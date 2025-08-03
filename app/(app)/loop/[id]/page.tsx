@@ -12,6 +12,9 @@ import {
   Bookmark,
   Edit,
   Gift,
+  Trash2,
+  FileText,
+  PenTool,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -27,13 +30,35 @@ import { useToast } from "@/hooks/use-toast";
 import type { Retrospective } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
-import { fetchLoopById, fetchAllTasksByProjectId } from "@/lib/firebase";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  fetchLoopById,
+  fetchAllTasksByProjectId,
+  deleteLoopById,
+  findIncompleteProjectsInLoop,
+  moveProjectToLoop,
+  fetchAllLoopsByUserId,
+  fetchAllAreasByUserId,
+  fetchProjectsByLoopId,
+  getTaskCountsForMultipleProjects,
+} from "@/lib/firebase";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "@/lib/firebase";
 import { formatDate, getLoopStatus } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useRouter } from "next/navigation";
 
 // 로딩 스켈레톤 컴포넌트
 function LoopDetailSkeleton() {
@@ -66,9 +91,16 @@ export function LoopDetailPage({
 }) {
   const { id } = use(params);
   const { toast } = useToast();
+  const router = useRouter();
+  const [user] = useAuthState(auth);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
   const [showRetrospectiveDialog, setShowRetrospectiveDialog] = useState(false);
+  const [showProjectMigrationDialog, setShowProjectMigrationDialog] =
+    useState(false);
+  const [incompleteProjects, setIncompleteProjects] = useState<any[]>([]);
+  const [selectedTargetLoop, setSelectedTargetLoop] = useState<string>("");
   const [noteContent, setNoteContent] = useState("");
   const [bestMoment, setBestMoment] = useState("");
   const [routineAdherence, setRoutineAdherence] = useState("");
@@ -77,6 +109,77 @@ export function LoopDetailPage({
   const [userRating, setUserRating] = useState<number | undefined>(undefined);
   const [bookmarked, setBookmarked] = useState(false);
   const [hoverRating, setHoverRating] = useState<number | undefined>(undefined);
+
+  const queryClient = useQueryClient();
+
+  // 미완료 프로젝트 확인
+  const checkIncompleteProjects = async () => {
+    if (!loop) return;
+
+    try {
+      const incomplete = await findIncompleteProjectsInLoop(loop.id);
+      if (incomplete.length > 0) {
+        setIncompleteProjects(incomplete);
+        setShowProjectMigrationDialog(true);
+      }
+    } catch (error) {
+      console.error("미완료 프로젝트 확인 중 오류:", error);
+    }
+  };
+
+  // 프로젝트 이동 처리
+  const handleProjectMigration = async () => {
+    if (!selectedTargetLoop || incompleteProjects.length === 0) return;
+
+    try {
+      // 모든 미완료 프로젝트를 선택된 루프로 이동
+      for (const project of incompleteProjects) {
+        await moveProjectToLoop(project.id, loop?.id || "", selectedTargetLoop);
+      }
+
+      toast({
+        title: "프로젝트 이동 완료",
+        description: `${incompleteProjects.length}개의 미완료 프로젝트가 다음 루프로 이동되었습니다.`,
+      });
+
+      // 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ["loops"] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+
+      setShowProjectMigrationDialog(false);
+      setIncompleteProjects([]);
+      setSelectedTargetLoop("");
+    } catch (error) {
+      console.error("프로젝트 이동 중 오류:", error);
+      toast({
+        title: "이동 실패",
+        description: "프로젝트 이동 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // 루프 삭제 mutation
+  const deleteLoopMutation = useMutation({
+    mutationFn: () => deleteLoopById(id),
+    onSuccess: () => {
+      // 성공 시 캐시 무효화 및 목록 페이지로 이동
+      queryClient.invalidateQueries({ queryKey: ["loops"] });
+      toast({
+        title: "루프 삭제 완료",
+        description: "루프가 성공적으로 삭제되었습니다.",
+      });
+      router.push("/loop");
+    },
+    onError: (error: Error) => {
+      console.error("루프 삭제 실패:", error);
+      toast({
+        title: "삭제 실패",
+        description: "루프 삭제에 실패했습니다.",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Firestore에서 실제 루프 데이터 가져오기
   const {
@@ -89,15 +192,40 @@ export function LoopDetailPage({
     enabled: !!id,
   });
 
-  // 가상의 프로젝트 데이터 (실제로는 loop.projectIds를 통해 가져와야 함)
-  const projects =
-    loop?.projectIds?.map((projectId, index) => ({
-      id: projectId,
-      title: `프로젝트 ${index + 1}`,
-      progress: Math.floor(Math.random() * 30),
-      total: 30,
-      addedMidway: index > 0,
-    })) || [];
+  // 사용자의 모든 루프 가져오기 (프로젝트 이동용)
+  const { data: allLoops = [] } = useQuery({
+    queryKey: ["loops", user?.uid],
+    queryFn: () => fetchAllLoopsByUserId(user?.uid || ""),
+    enabled: !!user?.uid,
+  });
+
+  // 사용자의 모든 Area 가져오기 (Area 링크용)
+  const { data: areas = [] } = useQuery({
+    queryKey: ["areas", user?.uid],
+    queryFn: () => fetchAllAreasByUserId(user?.uid || ""),
+    enabled: !!user?.uid,
+  });
+
+  // 루프가 완료되었을 때 미완료 프로젝트 확인
+  useEffect(() => {
+    if (loop && getLoopStatus(loop) === "ended") {
+      checkIncompleteProjects();
+    }
+  }, [loop]);
+
+  // 실제 프로젝트 데이터 가져오기
+  const { data: projects = [], isLoading: projectsLoading } = useQuery({
+    queryKey: ["projects", "loop", id],
+    queryFn: () => fetchProjectsByLoopId(id),
+    enabled: !!id && !!loop?.projectIds,
+  });
+
+  // 프로젝트별 태스크 개수 가져오기
+  const { data: projectTaskCounts = {} } = useQuery({
+    queryKey: ["projectTaskCounts", "loop", id],
+    queryFn: () => getTaskCountsForMultipleProjects(loop?.projectIds || []),
+    enabled: !!loop?.projectIds && loop.projectIds.length > 0,
+  });
 
   // 가상의 노트 데이터
   const notes = loop?.note
@@ -191,11 +319,21 @@ export function LoopDetailPage({
   const loopStatus = getLoopStatus(loop);
   const isCompleted = loopStatus === "ended";
 
-  // 진행률 계산 (실제 데이터 기반)
-  const completionRate =
-    loop.targetCount > 0
-      ? Math.round((loop.doneCount / loop.targetCount) * 100)
-      : 0;
+  // 진행률 계산 (실제 프로젝트 데이터 기반)
+  const completionRate = (() => {
+    if (projectsLoading || projects.length === 0) return 0;
+
+    const totalTasks = Object.values(projectTaskCounts).reduce(
+      (sum, counts) => sum + counts.totalTasks,
+      0
+    );
+    const completedTasks = Object.values(projectTaskCounts).reduce(
+      (sum, counts) => sum + counts.completedTasks,
+      0
+    );
+
+    return totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  })();
 
   // 프로젝트 추가 가능 여부 확인 (최대 5개)
   const canAddProject = projects.length < 5;
@@ -279,6 +417,41 @@ export function LoopDetailPage({
     setShowRetrospectiveDialog(false);
   };
 
+  // 프로젝트 상태 계산 함수
+  const getProjectStatus = (project: any) => {
+    const now = new Date();
+    const startDate = project.startDate ? new Date(project.startDate) : null;
+    const endDate = project.endDate ? new Date(project.endDate) : null;
+
+    if (!startDate || !endDate)
+      return { status: "미정", color: "text-gray-500" };
+
+    if (now < startDate) {
+      return { status: "예정", color: "text-blue-500" };
+    } else if (now >= startDate && now <= endDate) {
+      return { status: "진행 중", color: "text-green-500" };
+    } else {
+      return { status: "완료", color: "text-purple-500" };
+    }
+  };
+
+  // 프로젝트 기간 계산 함수
+  const getProjectDuration = (project: any) => {
+    const startDate = project.startDate ? new Date(project.startDate) : null;
+    const endDate = project.endDate ? new Date(project.endDate) : null;
+
+    if (!startDate || !endDate) return "기간 미정";
+
+    const start = formatDate(startDate);
+    const end = formatDate(endDate);
+
+    if (start === end) {
+      return start;
+    }
+
+    return `${start} ~ ${end}`;
+  };
+
   const renderStarRating = (
     rating: number | undefined,
     setRating?: (rating: number) => void
@@ -312,6 +485,7 @@ export function LoopDetailPage({
 
   return (
     <div className="container max-w-md px-4 py-6 pb-20">
+      {/* 헤더 */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center">
           <Button variant="ghost" size="icon" asChild className="mr-2">
@@ -321,17 +495,26 @@ export function LoopDetailPage({
           </Button>
           <h1 className="text-2xl font-bold">루프 상세</h1>
         </div>
-        {!isCompleted && (
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/loop/edit/${loop.id}`}>
-              <Edit className="mr-2 h-4 w-4" />
-              루프 수정
-            </Link>
+        <div className="flex gap-2">
+          {!isCompleted && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/loop/edit/${loop.id}`}>
+                <Edit className="mr-2 h-4 w-4" />
+                루프 수정
+              </Link>
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowDeleteDialog(true)}
+          >
+            <Trash2 className="h-4 w-4" />
           </Button>
-        )}
+        </div>
       </div>
 
-      {/* 루프 정보 요약 */}
+      {/* 1. 📘 루프 개요 */}
       <Card className="mb-6 p-4">
         <h2 className="mb-2 text-xl font-bold">{loop.title}</h2>
         <div className="mb-4 flex items-center gap-2 text-sm">
@@ -343,7 +526,20 @@ export function LoopDetailPage({
           <div className="mb-1 flex justify-between text-sm">
             <span>달성률: {completionRate}%</span>
             <span>
-              {loop.doneCount}/{loop.targetCount}
+              {projectsLoading ? (
+                <Skeleton className="h-4 w-16" />
+              ) : (
+                (() => {
+                  const totalTasks = Object.values(projectTaskCounts).reduce(
+                    (sum, counts) => sum + counts.totalTasks,
+                    0
+                  );
+                  const completedTasks = Object.values(
+                    projectTaskCounts
+                  ).reduce((sum, counts) => sum + counts.completedTasks, 0);
+                  return `${completedTasks}/${totalTasks}`;
+                })()
+              )}
             </span>
           </div>
           <div className="progress-bar">
@@ -370,203 +566,290 @@ export function LoopDetailPage({
         <div className="mb-4">
           <h3 className="mb-2 font-medium">중점 Areas</h3>
           <div className="flex flex-wrap gap-2">
-            {loop.focusAreas?.map((area) => (
-              <span
-                key={area}
-                className="rounded-full bg-secondary px-3 py-1 text-xs"
-              >
-                {area}
-              </span>
-            )) || (
-              <span className="text-xs text-muted-foreground">
-                중점 영역이 설정되지 않았습니다.
-              </span>
-            )}
+            {(() => {
+              // 디버깅: 현재 루프 데이터 구조 확인
+              console.log("루프 데이터:", {
+                focusAreas: loop?.focusAreas,
+                areasCount: areas.length,
+              });
+
+              // focusAreas (ID 기반) 사용
+              let focusAreas: any[] = [];
+
+              if (loop?.focusAreas && loop.focusAreas.length > 0) {
+                // ID 기반 필터링
+                focusAreas = areas.filter((area) =>
+                  loop.focusAreas.includes(area.id)
+                );
+              }
+
+              if (focusAreas.length > 0) {
+                return focusAreas.map((area) => (
+                  <Link
+                    key={area.id}
+                    href={`/para/areas/${area.id}`}
+                    className="rounded-full bg-secondary px-3 py-1 text-xs hover:bg-secondary/80 transition-colors"
+                  >
+                    {area.name}
+                  </Link>
+                ));
+              } else if (loop?.focusAreas && loop.focusAreas.length > 0) {
+                // Area ID는 있지만 해당 Area를 찾을 수 없는 경우
+                const missingItems = loop.focusAreas || [];
+                return missingItems.map((item: any, index: number) => (
+                  <span
+                    key={index}
+                    className="rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground"
+                  >
+                    {typeof item === "string" ? item : `Area ${item}`}
+                  </span>
+                ));
+              } else {
+                return (
+                  <span className="text-xs text-muted-foreground">
+                    중점 영역이 설정되지 않았습니다.
+                  </span>
+                );
+              }
+            })()}
           </div>
         </div>
       </Card>
 
-      {/* 연결된 프로젝트 리스트 */}
+      {/* 2. 📂 연결된 프로젝트들 */}
       <section className="mb-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-medium">프로젝트 ({projects.length}/5)</h3>
-          {!isCompleted && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleAddProject}
-              disabled={!canAddProject}
-            >
-              <Plus className="mr-1 h-4 w-4" />
-              프로젝트 추가
-            </Button>
-          )}
+        <div className="mb-4">
+          <h3 className="font-medium">연결된 프로젝트 ({projects.length}/5)</h3>
         </div>
 
-        {projects.length === 0 ? (
+        {projectsLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="p-3">
+                <Skeleton className="h-4 w-3/4 mb-2" />
+                <Skeleton className="h-2 w-full mb-2" />
+                <Skeleton className="h-3 w-1/2" />
+              </Card>
+            ))}
+          </div>
+        ) : projects.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center">
             <p className="text-muted-foreground mb-2">
               이 루프에 연결된 프로젝트가 없어요
             </p>
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="text-sm text-muted-foreground">
               연결된 프로젝트가 없으면 달성률을 측정할 수 없어요
             </p>
-            <div className="flex flex-col gap-2">
-              <Button onClick={handleAddProject}>
-                <Plus className="mr-2 h-4 w-4" />
-                프로젝트 연결하기
-              </Button>
-              <Button variant="outline" asChild>
-                <Link href={`/loop/edit/${loop.id}`}>루프 편집</Link>
-              </Button>
-            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              프로젝트를 연결하려면 상단의 "루프 수정" 버튼을 사용하세요
+            </p>
           </div>
         ) : (
           <div className="space-y-2">
-            {projects.map((project) => (
-              <div
-                key={project.id}
-                className="rounded-lg bg-secondary p-3 text-sm"
-              >
-                <div className="mb-1 flex justify-between">
-                  <div className="flex items-center gap-2">
-                    <span>{project.title}</span>
-                    {project.addedMidway && (
-                      <Badge
-                        variant="outline"
-                        className="bg-amber-100 text-amber-800 text-xs"
-                      >
-                        🔥 루프 중 추가됨
-                      </Badge>
-                    )}
+            {projects.map((project) => {
+              const taskCounts = projectTaskCounts[project.id] || {
+                totalTasks: 0,
+                completedTasks: 0,
+              };
+              const progressPercentage =
+                taskCounts.totalTasks > 0
+                  ? Math.round(
+                      (taskCounts.completedTasks / taskCounts.totalTasks) * 100
+                    )
+                  : 0;
+
+              const projectStatus = getProjectStatus(project);
+              const projectDuration = getProjectDuration(project);
+
+              return (
+                <Card
+                  key={project.id}
+                  className="cursor-pointer transition-all hover:shadow-md"
+                  onClick={() => router.push(`/para/projects/${project.id}`)}
+                >
+                  <div className="p-3">
+                    {/* 프로젝트 제목과 상태 */}
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{project.title}</span>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${projectStatus.color}`}
+                        >
+                          {projectStatus.status}
+                        </Badge>
+                      </div>
+                      <span className="text-sm font-medium">
+                        {taskCounts.completedTasks}/{taskCounts.totalTasks}
+                      </span>
+                    </div>
+
+                    {/* 진행률 바 */}
+                    <div className="progress-bar mb-3">
+                      <div
+                        className="progress-value"
+                        style={{
+                          width: `${progressPercentage}%`,
+                        }}
+                      ></div>
+                    </div>
+
+                    {/* 프로젝트 정보 */}
+                    <div className="space-y-1">
+                      {/* 기간 정보 */}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">기간:</span>
+                        <span className="text-muted-foreground">
+                          {projectDuration}
+                        </span>
+                      </div>
+
+                      {/* 영역 정보 */}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Area:</span>
+                        <span className="text-muted-foreground">
+                          {(() => {
+                            if (project.areaId) {
+                              const area = areas.find(
+                                (a) => a.id === project.areaId
+                              );
+                              return area ? area.name : "미분류";
+                            }
+                            return "미분류";
+                          })()}
+                        </span>
+                      </div>
+
+                      {/* 루프 도중 추가 표시 */}
+                      {project.addedMidway && (
+                        <div className="flex justify-end">
+                          <Badge
+                            variant="outline"
+                            className="bg-amber-100 text-amber-800 text-xs"
+                          >
+                            💡 루프 도중 추가됨
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <span>
-                    {project.progress}/{project.total}
-                  </span>
-                </div>
-                <div className="progress-bar">
-                  <div
-                    className="progress-value"
-                    style={{
-                      width: `${Math.round(
-                        (project.progress / project.total) * 100
-                      )}%`,
-                    }}
-                  ></div>
-                </div>
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    Area: 미분류
-                  </span>
-                  {project.addedMidway ? (
-                    <Badge
-                      variant="outline"
-                      className="bg-amber-100 text-amber-800 text-xs"
-                    >
-                      💡 루프 도중 추가됨
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="bg-primary/10 text-xs">
-                      현재 루프 연결됨
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         )}
       </section>
 
-      {/* 공식 회고 1개 */}
+      {/* 3. 🧾 회고 / 노트 (탭 분리) */}
       <section className="mb-6">
-        <h2 className="mb-4 text-xl font-bold">월간 회고</h2>
-        {loop.retrospective ? (
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-medium">
-                {loop.retrospective.title || "회고 작성 완료"}
-              </h3>
-              <div className="flex items-center gap-2 text-lg font-bold text-primary">
-                {loop.retrospective.bookmarked && (
-                  <Bookmark className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+        <Tabs defaultValue="retrospective" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger
+              value="retrospective"
+              className="flex items-center gap-2"
+            >
+              <FileText className="h-4 w-4" />
+              회고
+            </TabsTrigger>
+            <TabsTrigger value="notes" className="flex items-center gap-2">
+              <PenTool className="h-4 w-4" />
+              노트
+            </TabsTrigger>
+          </TabsList>
+
+          {/* 회고 탭 */}
+          <TabsContent value="retrospective" className="mt-4">
+            {loop.retrospective ? (
+              <Card className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium">
+                    {loop.retrospective.title || "회고 작성 완료"}
+                  </h3>
+                  <div className="flex items-center gap-2 text-lg font-bold text-primary">
+                    {loop.retrospective.bookmarked && (
+                      <Bookmark className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                    )}
+                    {renderStarRating(loop.retrospective.userRating)}
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
+                  {loop.retrospective.summary ||
+                    loop.retrospective.content ||
+                    loop.retrospective.bestMoment ||
+                    "작성된 회고 요약이 없습니다."}
+                </p>
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={`/para/archives/${loop.retrospective.id}`}>
+                      회고 상세 보기
+                    </Link>
+                  </Button>
+                </div>
+              </Card>
+            ) : (
+              <Card className="p-4 text-center">
+                <h3 className="font-medium mb-4">
+                  이번 루프를 회고하고, 다음 단계를 계획하세요.
+                </h3>
+                {isCompleted ? (
+                  <Button onClick={() => setShowRetrospectiveDialog(true)}>
+                    회고 작성
+                  </Button>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    진행률: {completionRate}%
+                  </div>
                 )}
-                {renderStarRating(loop.retrospective.userRating)}
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
-              {loop.retrospective.summary ||
-                loop.retrospective.content ||
-                loop.retrospective.bestMoment ||
-                "작성된 회고 요약이 없습니다."}
-            </p>
-            <div className="flex justify-end">
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/para/archives/${loop.retrospective.id}`}>
-                  회고 상세 보기
-                </Link>
-              </Button>
-            </div>
-          </Card>
-        ) : (
-          <Card className="p-4 text-center">
-            <h3 className="font-medium mb-4">
-              이번 루프를 회고하고, 다음 단계를 계획하세요.
-            </h3>
-            {isCompleted ? (
-              <Button onClick={() => setShowRetrospectiveDialog(true)}>
-                회고 작성
-              </Button>
-            ) : (
-              <div className="text-sm text-muted-foreground">
-                진행률: {completionRate}%
-              </div>
+              </Card>
             )}
-          </Card>
-        )}
-      </section>
+          </TabsContent>
 
-      {/* 노트 (단일 노트) */}
-      <section className="mb-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-medium">노트</h3>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAddNoteDialog(true)}
-          >
+          {/* 노트 탭 */}
+          <TabsContent value="notes" className="mt-4">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-medium">루프 노트</h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddNoteDialog(true)}
+              >
+                {notes && notes.length > 0 ? (
+                  <>
+                    <Edit className="mr-1 h-4 w-4" />
+                    노트 수정
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-1 h-4 w-4" />
+                    노트 작성
+                  </>
+                )}
+              </Button>
+            </div>
+
             {notes && notes.length > 0 ? (
-              <>
-                <Edit className="mr-1 h-4 w-4" />
-                노트 수정
-              </>
+              <Card className="p-3">
+                <p className="text-sm mb-2">{notes[0].content}</p>
+                <p className="text-xs text-muted-foreground">
+                  {formatDisplayDate(notes[0].createdAt)}
+                </p>
+              </Card>
             ) : (
-              <>
-                <Plus className="mr-1 h-4 w-4" />
-                노트 작성
-              </>
+              <div className="rounded-lg border border-dashed p-8 text-center">
+                <p className="text-muted-foreground mb-2">
+                  작성된 노트가 없어요
+                </p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  이번 루프에서 느낀 점을 기록해 보세요
+                </p>
+                <Button onClick={() => setShowAddNoteDialog(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  노트 작성하기
+                </Button>
+              </div>
             )}
-          </Button>
-        </div>
-
-        {notes && notes.length > 0 ? (
-          <Card className="p-3">
-            <p className="text-sm mb-2">{notes[0].content}</p>
-            <p className="text-xs text-muted-foreground">
-              {formatDisplayDate(notes[0].createdAt)}
-            </p>
-          </Card>
-        ) : (
-          <div className="rounded-lg border border-dashed p-8 text-center">
-            <p className="text-muted-foreground mb-2">작성된 노트가 없어요</p>
-            <p className="text-sm text-muted-foreground mb-4">
-              이번 루프에서 느낀 점을 기록해 보세요
-            </p>
-            <Button onClick={() => setShowAddNoteDialog(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              노트 작성하기
-            </Button>
-          </div>
-        )}
+          </TabsContent>
+        </Tabs>
       </section>
 
       {/* 프로젝트 추가 다이얼로그 */}
@@ -762,6 +1045,127 @@ export function LoopDetailPage({
               취소
             </Button>
             <Button onClick={handleSaveRetrospective}>회고 저장</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="루프 삭제"
+        description="이 루프를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+        onConfirm={() => {
+          deleteLoopMutation.mutate();
+          setShowDeleteDialog(false);
+        }}
+      />
+
+      {/* 미완료 프로젝트 이동 대화상자 */}
+      <Dialog
+        open={showProjectMigrationDialog}
+        onOpenChange={setShowProjectMigrationDialog}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>미완료 프로젝트 발견</DialogTitle>
+            <DialogDescription>
+              이 루프에 완료되지 않은 프로젝트가 있습니다. 다른 루프로
+              이동하시겠습니까?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* 미완료 프로젝트 목록 */}
+            <div>
+              <h4 className="font-medium mb-2">
+                미완료 프로젝트 ({incompleteProjects.length}개)
+              </h4>
+              <div className="max-h-40 overflow-y-auto space-y-2">
+                {incompleteProjects.map((project) => (
+                  <div key={project.id} className="p-3 bg-muted/50 rounded-lg">
+                    <div className="font-medium">{project.title}</div>
+                    <div className="text-sm text-muted-foreground">
+                      진행률: {project.progress}/{project.total} (
+                      {Math.round(
+                        (project.progress / Math.max(project.total, 1)) * 100
+                      )}
+                      %)
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 대상 루프 선택 */}
+            <div>
+              <h4 className="font-medium mb-2">이동할 루프 선택</h4>
+              <Select
+                value={selectedTargetLoop}
+                onValueChange={setSelectedTargetLoop}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="루프를 선택하세요" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allLoops
+                    .filter(
+                      (targetLoop) =>
+                        targetLoop.id !== loop?.id &&
+                        (getLoopStatus(targetLoop) === "in_progress" ||
+                          getLoopStatus(targetLoop) === "planned")
+                    )
+                    .map((targetLoop) => (
+                      <SelectItem key={targetLoop.id} value={targetLoop.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{targetLoop.title}</span>
+                          <Badge
+                            variant={
+                              getLoopStatus(targetLoop) === "in_progress"
+                                ? "default"
+                                : "secondary"
+                            }
+                          >
+                            {getLoopStatus(targetLoop) === "in_progress"
+                              ? "진행 중"
+                              : "예정"}
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              {allLoops.filter(
+                (targetLoop) =>
+                  targetLoop.id !== loop?.id &&
+                  (getLoopStatus(targetLoop) === "in_progress" ||
+                    getLoopStatus(targetLoop) === "planned")
+              ).length === 0 && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  💡 현재 이동 가능한 루프가 없습니다. 새로운 루프를 먼저
+                  생성해주세요.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowProjectMigrationDialog(false);
+                setIncompleteProjects([]);
+                setSelectedTargetLoop("");
+              }}
+            >
+              나중에 처리
+            </Button>
+            <Button
+              onClick={handleProjectMigration}
+              disabled={!selectedTargetLoop || incompleteProjects.length === 0}
+            >
+              프로젝트 이동
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
