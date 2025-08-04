@@ -4,7 +4,11 @@
 import { functions } from "firebase-functions";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { autoMigrateIncompleteProjects } from "./firebase-utils";
+import {
+  autoMigrateIncompleteProjects,
+  isCarryOverEnabled,
+} from "./firebase-utils";
+import { createAllSnapshotsForUser } from "./snapshot-utils";
 
 // Firebase Admin 초기화
 initializeApp();
@@ -51,8 +55,34 @@ export const checkCompletedLoops = functions
         );
 
         try {
-          // 미완료 프로젝트 자동 이관
-          await autoMigrateIncompleteProjects(userId, loopId);
+          // 이월 설정 확인
+          const carryOverEnabled = await isCarryOverEnabled(userId);
+
+          if (carryOverEnabled) {
+            // 미완료 프로젝트 자동 이관
+            await autoMigrateIncompleteProjects(userId, loopId);
+            console.log(
+              `Carry over enabled for user ${userId}. Migration processed.`
+            );
+          } else {
+            console.log(
+              `Carry over disabled for user ${userId}. Skipping migration.`
+            );
+          }
+
+          // 활동 스냅샷 생성 (이월 설정과 관계없이 항상 실행)
+          if (!processedUsers.has(userId)) {
+            try {
+              await createAllSnapshotsForUser(userId);
+              console.log(`Successfully created snapshots for user ${userId}`);
+            } catch (snapshotError) {
+              console.error(
+                `Failed to create snapshots for user ${userId}:`,
+                snapshotError
+              );
+            }
+          }
+
           processedUsers.add(userId);
           totalMigrations++;
 
@@ -92,11 +122,21 @@ export const testProjectMigration = functions
     }
 
     try {
-      await autoMigrateIncompleteProjects(userId as string, loopId as string);
-      res.json({
-        success: true,
-        message: `Migration completed for user ${userId}, loop ${loopId}`,
-      });
+      // 이월 설정 확인
+      const carryOverEnabled = await isCarryOverEnabled(userId as string);
+
+      if (carryOverEnabled) {
+        await autoMigrateIncompleteProjects(userId as string, loopId as string);
+        res.json({
+          success: true,
+          message: `Migration completed for user ${userId}, loop ${loopId}`,
+        });
+      } else {
+        res.json({
+          success: true,
+          message: `Carry over is disabled for user ${userId}. Migration skipped.`,
+        });
+      }
     } catch (error) {
       console.error("Test migration failed:", error);
       res.status(500).json({

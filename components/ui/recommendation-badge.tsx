@@ -26,11 +26,11 @@ export function RecommendationBadge({
   const getStyles = () => {
     switch (type) {
       case "info":
-        return "text-blue-600 bg-blue-50 border-blue-200";
+        return "text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-950/30 dark:border-blue-700";
       case "warning":
-        return "text-orange-600 bg-orange-50 border-orange-200";
+        return "text-orange-600 bg-orange-50 border-orange-200 dark:text-orange-400 dark:bg-orange-950/30 dark:border-orange-700";
       case "success":
-        return "text-green-600 bg-green-50 border-green-200";
+        return "text-green-600 bg-green-50 border-green-200 dark:text-green-400 dark:bg-green-950/30 dark:border-green-700";
     }
   };
 

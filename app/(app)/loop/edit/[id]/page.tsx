@@ -450,7 +450,15 @@ export default function EditLoopPage({
                         <div className="mb-1 flex justify-between">
                           <span className="font-medium">{project.title}</span>
                           <span className="text-muted-foreground">
-                            {project.area || "미분류"}
+                            {(() => {
+                              if (project.areaId) {
+                                const area = areas.find(
+                                  (a) => a.id === project.areaId
+                                );
+                                return area ? area.name : "미분류";
+                              }
+                              return "미분류";
+                            })()}
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground mb-2 line-clamp-1">

@@ -9,7 +9,7 @@ import { useState, use, Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchResourceById, deleteResourceById } from "@/lib/firebase";
+import { fetchResourceWithAreaById, deleteResourceById } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
@@ -69,7 +69,7 @@ export default function ResourceDetailPage({
     error,
   } = useQuery({
     queryKey: ["resource", id],
-    queryFn: () => fetchResourceById(id as string),
+    queryFn: () => fetchResourceWithAreaById(id as string),
     enabled: !!id,
   });
 
@@ -177,7 +177,7 @@ export default function ResourceDetailPage({
           <h1 className="text-2xl font-bold mb-2">{resource.name}</h1>
           {resource.area && (
             <Badge variant="secondary" className="mb-3">
-              {resource.area}
+              {resource.area.name}
             </Badge>
           )}
           {resource.description && (

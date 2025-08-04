@@ -34,7 +34,11 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
 import { Loop, Retrospective } from "@/lib/types";
-import { fetchAllLoopsByUserId, fetchProjectsByLoopId, getTaskCountsForMultipleProjects } from "@/lib/firebase";
+import {
+  fetchAllLoopsByUserId,
+  fetchProjectsByLoopId,
+  getTaskCountsForMultipleProjects,
+} from "@/lib/firebase";
 import { formatDate, formatDateNumeric, getLoopStatus } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -81,14 +85,22 @@ function LoopPageContent() {
   const { data: loopTaskCounts = {}, isLoading: taskCountsLoading } = useQuery({
     queryKey: ["loopTaskCounts", user?.uid],
     queryFn: async () => {
-      const taskCountsMap: { [loopId: string]: { totalTasks: number; completedTasks: number } } = {};
+      const taskCountsMap: {
+        [loopId: string]: { totalTasks: number; completedTasks: number };
+      } = {};
       for (const loop of loops) {
         const projects = loopProjects[loop.id] || [];
         if (projects.length > 0) {
-          const projectIds = projects.map(p => p.id);
+          const projectIds = projects.map((p) => p.id);
           const taskCounts = await getTaskCountsForMultipleProjects(projectIds);
-          const totalTasks = Object.values(taskCounts).reduce((sum, counts) => sum + counts.totalTasks, 0);
-          const completedTasks = Object.values(taskCounts).reduce((sum, counts) => sum + counts.completedTasks, 0);
+          const totalTasks = Object.values(taskCounts).reduce(
+            (sum, counts) => sum + counts.totalTasks,
+            0
+          );
+          const completedTasks = Object.values(taskCounts).reduce(
+            (sum, counts) => sum + counts.completedTasks,
+            0
+          );
           taskCountsMap[loop.id] = { totalTasks, completedTasks };
         } else {
           taskCountsMap[loop.id] = { totalTasks: 0, completedTasks: 0 };
@@ -96,7 +108,8 @@ function LoopPageContent() {
       }
       return taskCountsMap;
     },
-    enabled: !!user?.uid && loops.length > 0 && Object.keys(loopProjects).length > 0,
+    enabled:
+      !!user?.uid && loops.length > 0 && Object.keys(loopProjects).length > 0,
   });
 
   // 로딩 상태
@@ -135,7 +148,9 @@ function LoopPageContent() {
   const getCompletionRate = (loop: Loop) => {
     const taskCounts = loopTaskCounts[loop.id];
     if (taskCounts && taskCounts.totalTasks > 0) {
-      return Math.round((taskCounts.completedTasks / taskCounts.totalTasks) * 100);
+      return Math.round(
+        (taskCounts.completedTasks / taskCounts.totalTasks) * 100
+      );
     }
     return 0;
   };
@@ -144,7 +159,7 @@ function LoopPageContent() {
     const taskCounts = loopTaskCounts[loop.id];
     return {
       completed: taskCounts?.completedTasks || 0,
-      total: taskCounts?.totalTasks || 0
+      total: taskCounts?.totalTasks || 0,
     };
   };
 
@@ -336,13 +351,13 @@ function LoopPageContent() {
               {futureLoops.map((loop, index) => (
                 <div key={loop.id} className={index > 0 ? "mt-4" : ""}>
                   <Link href={`/loop/${loop.id}`}>
-                    <Card className="border-2 border-purple-200 bg-purple-50/50 p-4 cursor-pointer hover:shadow-md transition-shadow">
+                    <Card className="border-2 border-purple-200 dark:border-purple-700 bg-purple-50/50 dark:bg-purple-950/30 p-4 cursor-pointer hover:shadow-md transition-shadow">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="text-lg font-bold">{loop.title}</h3>
                         <div className="flex items-center gap-2">
                           <Badge
                             variant="outline"
-                            className="bg-purple-100 text-purple-800 border-purple-200"
+                            className="bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700"
                           >
                             {new Date(loop.startDate).toLocaleDateString(
                               "ko-KR",
@@ -356,7 +371,7 @@ function LoopPageContent() {
                       </div>
 
                       <div className="mb-4 flex items-center gap-2 text-sm">
-                        <Gift className="h-4 w-4 text-purple-500" />
+                        <Gift className="h-4 w-4 text-purple-500 dark:text-purple-400" />
                         <span>보상: {loop.reward}</span>
                       </div>
 

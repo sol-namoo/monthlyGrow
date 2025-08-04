@@ -705,7 +705,7 @@ function NewProjectPageContent() {
           목표를 자유롭게 등록해보세요.
         </p>
         {returnUrl && (
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+          <div className="mt-4 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg">
             <p className="text-xs text-blue-700">
               프로젝트 생성 완료 후 루프 생성 페이지로 돌아갑니다.
             </p>
@@ -1070,7 +1070,7 @@ function NewProjectPageContent() {
           </div>
 
           {form.watch("category") === "repetitive" && (
-            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+            <div className="mb-4 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg">
               <p className="text-sm text-blue-700">
                 💡 반복형 프로젝트는 목표 횟수에 따라 태스크가 자동으로
                 생성됩니다.
@@ -1132,11 +1132,11 @@ function NewProjectPageContent() {
                       </div>
                     ))}
                   </div>
-                  <div className="text-xs text-muted-foreground p-2 bg-blue-50 rounded">
+                  <div className="text-xs text-muted-foreground p-2 bg-muted/50 dark:bg-muted/20 rounded">
                     💡 태스크 제목을 수정할 수 있습니다. 날짜와 소요시간은
                     자동으로 계산됩니다.
                   </div>
-                  <div className="text-xs text-muted-foreground p-2 bg-green-50 rounded">
+                  <div className="text-xs text-muted-foreground p-2 bg-muted/50 dark:bg-muted/20 rounded">
                     🎯 목표 달성 후 초과 달성 태스크를 추가할 수 있어요
                   </div>
                 </div>
@@ -1312,7 +1312,7 @@ function NewProjectPageContent() {
                 <p className="text-xs text-muted-foreground mt-2">
                   6개월 이내의 루프만 연결할 수 있습니다.
                 </p>
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <div className="mt-4 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg">
                   <p className="text-xs text-blue-700">
                     💡 <strong>팁:</strong> AI 플래닝 기능(준비중)을 사용하면
                     장기 목표에 맞는 여러 루프를 자동으로 생성할 수 있습니다.

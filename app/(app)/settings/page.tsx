@@ -301,6 +301,7 @@ export default function SettingsPage() {
           </Card>
         </section>
 
+        {/* AI 설정 - 임시 주석처리
         <section>
           <h2 className="mb-4 text-xl font-bold">AI 설정</h2>
           <Card className="p-4">
@@ -327,7 +328,9 @@ export default function SettingsPage() {
             </div>
           </Card>
         </section>
+        */}
 
+        {/* 알림 설정 - 임시 주석처리
         <section>
           <h2 className="mb-4 text-xl font-bold">알림 설정</h2>
           <Card className="p-4">
@@ -354,6 +357,7 @@ export default function SettingsPage() {
             </div>
           </Card>
         </section>
+        */}
 
         <section>
           <h2 className="mb-4 text-xl font-bold">테마 설정</h2>
@@ -410,19 +414,20 @@ export default function SettingsPage() {
 
       {/* 로그아웃 섹션 */}
       <section className="mt-8">
-        <h2 className="mb-4 text-xl font-bold text-red-600">계정</h2>
-        <Card className="p-4 border-red-200">
+        <h2 className="mb-4 text-xl font-bold text-foreground">계정</h2>
+        <Card className="p-4 border-border">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-medium text-red-800">로그아웃</h3>
-              <p className="text-sm text-red-600">
+              <h3 className="font-medium text-foreground">로그아웃</h3>
+              <p className="text-sm text-muted-foreground">
                 현재 계정에서 로그아웃합니다.
               </p>
             </div>
             <Button
-              variant="destructive"
+              variant="outline"
               onClick={handleLogout}
               disabled={userLoading}
+              className="text-muted-foreground hover:text-foreground"
             >
               로그아웃
             </Button>

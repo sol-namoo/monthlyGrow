@@ -27,6 +27,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   fetchAllProjectsByUserId,
   fetchAllAreasByUserId,
+  fetchProjectsByUserIdWithPaging,
 } from "@/lib/firebase";
 import { getAuth } from "firebase/auth";
 import { Project, Area } from "@/lib/types";
@@ -40,6 +41,11 @@ interface ProjectSelectionModalProps {
   onConfirm: () => void;
   maxProjects?: number;
   newlyCreatedProjectId?: string;
+  projects?: any[]; // 외부에서 전달받은 프로젝트 목록
+  areas?: any[]; // 외부에서 전달받은 영역 목록
+  projectsLoading?: boolean;
+  areasLoading?: boolean;
+  currentLoopId?: string; // 현재 루프 ID (수정 시에만 사용)
 }
 
 export function ProjectSelectionModal({
@@ -50,34 +56,70 @@ export function ProjectSelectionModal({
   onConfirm,
   maxProjects,
   newlyCreatedProjectId,
+  projects: externalProjects,
+  areas: externalAreas,
+  projectsLoading: externalProjectsLoading,
+  areasLoading: externalAreasLoading,
+  currentLoopId,
 }: ProjectSelectionModalProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [areaFilter, setAreaFilter] = useState<string>("all");
-  const [showOnlyUnconnected, setShowOnlyUnconnected] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [showOnlyUnconnected, setShowOnlyUnconnected] = useState(true);
   const [itemsPerPage] = useState(10);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [lastDoc, setLastDoc] = useState<any>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [allProjects, setAllProjects] = useState<any[]>([]);
 
+  // 외부에서 전달받은 데이터가 있으면 사용, 없으면 직접 가져오기
   const auth = getAuth();
   const user = auth.currentUser;
 
-  // Firestore에서 프로젝트와 영역 데이터 가져오기
   const {
-    data: projects = [],
-    isLoading: projectsLoading,
+    data: internalProjectsData,
+    isLoading: internalProjectsLoading,
     refetch: refetchProjects,
   } = useQuery({
     queryKey: ["projects", user?.uid, refreshKey],
-    queryFn: () => fetchAllProjectsByUserId(user?.uid || ""),
-    enabled: !!user?.uid,
+    queryFn: async () => {
+      if (externalProjects) return null;
+
+      const result = await fetchProjectsByUserIdWithPaging(
+        user?.uid || "",
+        itemsPerPage,
+        lastDoc,
+        "latest"
+      );
+
+      if (lastDoc === null) {
+        // 첫 페이지 로드
+        setAllProjects(result.projects);
+      } else {
+        // 추가 페이지 로드
+        setAllProjects((prev) => [...prev, ...result.projects]);
+      }
+
+      setLastDoc(result.lastDoc);
+      setHasMore(result.hasMore);
+
+      return result.projects;
+    },
+    enabled: !!user?.uid && !externalProjects,
   });
 
-  const { data: areas = [], isLoading: areasLoading } = useQuery({
-    queryKey: ["areas", user?.uid],
-    queryFn: () => fetchAllAreasByUserId(user?.uid || ""),
-    enabled: !!user?.uid,
-  });
+  const { data: internalAreas = [], isLoading: internalAreasLoading } =
+    useQuery({
+      queryKey: ["areas", user?.uid],
+      queryFn: () => fetchAllAreasByUserId(user?.uid || ""),
+      enabled: !!user?.uid && !externalAreas,
+    });
+
+  // 외부 데이터 또는 내부 데이터 사용
+  const projects = externalProjects || allProjects;
+  const areas = externalAreas || internalAreas;
+  const projectsLoading = externalProjectsLoading || internalProjectsLoading;
+  const areasLoading = externalAreasLoading || internalAreasLoading;
 
   // 프로젝트 상태를 미리 계산하여 객체에 추가
   const projectsWithStatus = projects.map((project) => ({
@@ -87,9 +129,6 @@ export function ProjectSelectionModal({
 
   // 필터링된 프로젝트
   const filteredProjects = projectsWithStatus.filter((project) => {
-    // 완료된 프로젝트 제외
-    if (project.status === "completed") return false;
-
     // 검색어 필터
     if (
       searchTerm &&
@@ -116,15 +155,11 @@ export function ProjectSelectionModal({
     return true;
   });
 
-  // 페이지네이션 계산
-  const totalPages = Math.ceil(filteredProjects.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentProjects = filteredProjects.slice(startIndex, endIndex);
-
-  // 필터 변경 시 첫 페이지로 이동
+  // 필터 변경 시 프로젝트 목록 초기화
   useEffect(() => {
-    setCurrentPage(1);
+    setLastDoc(null);
+    setAllProjects([]);
+    setHasMore(true);
   }, [searchTerm, statusFilter, areaFilter, showOnlyUnconnected]);
 
   // 새로 생성된 프로젝트가 있을 때 리프레시
@@ -139,6 +174,22 @@ export function ProjectSelectionModal({
     if (!areaId) return "미분류";
     const area = areas.find((a) => a.id === areaId);
     return area?.name || "미분류";
+  };
+
+  // 더 많은 프로젝트 로드
+  const loadMoreProjects = async () => {
+    if (!hasMore || externalProjects) return;
+
+    const result = await fetchProjectsByUserIdWithPaging(
+      user?.uid || "",
+      itemsPerPage,
+      lastDoc,
+      "latest"
+    );
+
+    setAllProjects((prev) => [...prev, ...result.projects]);
+    setLastDoc(result.lastDoc);
+    setHasMore(result.hasMore);
   };
 
   const isLimitReached = maxProjects
@@ -192,6 +243,7 @@ export function ProjectSelectionModal({
                     <SelectItem value="all">모든 상태</SelectItem>
                     <SelectItem value="planned">계획됨</SelectItem>
                     <SelectItem value="in_progress">진행 중</SelectItem>
+                    <SelectItem value="completed">완료됨</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={areaFilter} onValueChange={setAreaFilter}>
@@ -219,19 +271,17 @@ export function ProjectSelectionModal({
                 }
               />
               <Label htmlFor="showOnlyUnconnected" className="text-sm">
-                루프에 연결된 적 없는 프로젝트만
+                연결되지 않은 프로젝트만 보기
               </Label>
             </div>
 
-            <RecommendationBadge
-              type="info"
-              message={
-                maxProjects
+            <div className="p-3 bg-muted/50 dark:bg-muted/20 rounded-lg border border-border">
+              <p className="text-sm text-foreground">
+                {maxProjects
                   ? `선택된 프로젝트: ${selectedProjects.length}/${maxProjects}개`
-                  : `선택된 프로젝트: ${selectedProjects.length}개`
-              }
-              className="text-xs"
-            />
+                  : `선택된 프로젝트: ${selectedProjects.length}개`}
+              </p>
+            </div>
 
             {shouldShowWarning && (
               <RecommendationBadge
@@ -243,20 +293,26 @@ export function ProjectSelectionModal({
           </div>
 
           {/* 프로젝트 목록 - ScrollArea로 감싸서 스크롤 영역 확대 */}
-          <ScrollArea className="h-[60vh] w-full border rounded-lg bg-gray-50/30">
+          <ScrollArea className="h-[60vh] w-full border rounded-lg bg-background">
             <div className="p-4 space-y-3">
-              <div className="text-xs text-gray-500 mb-3 flex justify-between items-center">
+              <div className="text-xs text-muted-foreground mb-3 flex justify-between items-center">
                 <span>총 {filteredProjects.length}개 프로젝트</span>
-                {totalPages > 1 && (
-                  <span className="text-xs text-muted-foreground">
-                    {currentPage} / {totalPages} 페이지
-                  </span>
+                {hasMore && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={loadMoreProjects}
+                    disabled={projectsLoading}
+                    className="text-xs"
+                  >
+                    {projectsLoading ? "로딩 중..." : "더 보기"}
+                  </Button>
                 )}
               </div>
 
-              {currentProjects.length > 0 ? (
+              {filteredProjects.length > 0 ? (
                 <div className="grid gap-3 sm:grid-cols-1 lg:grid-cols-2">
-                  {currentProjects.map((project) => (
+                  {filteredProjects.map((project) => (
                     <Card
                       key={project.id}
                       className={`cursor-pointer p-3 transition-all ${
@@ -299,11 +355,22 @@ export function ProjectSelectionModal({
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1 ml-2">
-                          {project.loopId && (
-                            <Badge variant="secondary" className="text-xs">
-                              연결됨
-                            </Badge>
-                          )}
+                          {currentLoopId &&
+                            project.loopId === currentLoopId && (
+                              <Badge variant="secondary" className="text-xs">
+                                현재 루프에 연결됨
+                              </Badge>
+                            )}
+                          {currentLoopId &&
+                            project.loopId &&
+                            project.loopId !== currentLoopId && (
+                              <Badge
+                                variant="outline"
+                                className="text-xs text-muted-foreground"
+                              >
+                                다른 루프에 연결됨
+                              </Badge>
+                            )}
                           {newlyCreatedProjectId === project.id && (
                             <Badge
                               variant="default"
@@ -335,116 +402,6 @@ export function ProjectSelectionModal({
                     >
                       <Plus className="mr-2 h-4 w-4" />새 프로젝트 만들기
                     </a>
-                  </Button>
-                </div>
-              )}
-
-              {/* 페이지네이션 */}
-              {totalPages > 1 && (
-                <div className="flex justify-center items-center gap-2 pt-4 border-t">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                    className="h-8 px-3 text-xs"
-                  >
-                    이전
-                  </Button>
-
-                  <div className="flex items-center gap-1">
-                    {totalPages <= 7 ? (
-                      Array.from({ length: totalPages }, (_, i) => (
-                        <Button
-                          key={i + 1}
-                          variant={
-                            currentPage === i + 1 ? "default" : "outline"
-                          }
-                          size="sm"
-                          onClick={() => setCurrentPage(i + 1)}
-                          className="h-8 w-8 p-0 text-xs"
-                        >
-                          {i + 1}
-                        </Button>
-                      ))
-                    ) : (
-                      <>
-                        {currentPage > 3 && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setCurrentPage(1)}
-                              className="h-8 w-8 p-0 text-xs"
-                            >
-                              1
-                            </Button>
-                            {currentPage > 4 && (
-                              <span className="text-xs text-muted-foreground px-1">
-                                ...
-                              </span>
-                            )}
-                          </>
-                        )}
-
-                        {Array.from(
-                          { length: Math.min(5, totalPages) },
-                          (_, i) => {
-                            const pageNum =
-                              Math.max(
-                                1,
-                                Math.min(totalPages - 4, currentPage - 2)
-                              ) + i;
-                            if (pageNum > totalPages) return null;
-                            return (
-                              <Button
-                                key={pageNum}
-                                variant={
-                                  currentPage === pageNum
-                                    ? "default"
-                                    : "outline"
-                                }
-                                size="sm"
-                                onClick={() => setCurrentPage(pageNum)}
-                                className="h-8 w-8 p-0 text-xs"
-                              >
-                                {pageNum}
-                              </Button>
-                            );
-                          }
-                        )}
-
-                        {currentPage < totalPages - 2 && (
-                          <>
-                            {currentPage < totalPages - 3 && (
-                              <span className="text-xs text-muted-foreground px-1">
-                                ...
-                              </span>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setCurrentPage(totalPages)}
-                              className="h-8 w-8 p-0 text-xs"
-                            >
-                              {totalPages}
-                            </Button>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setCurrentPage(Math.min(totalPages, currentPage + 1))
-                    }
-                    disabled={currentPage === totalPages}
-                    className="h-8 px-3 text-xs"
-                  >
-                    다음
                   </Button>
                 </div>
               )}

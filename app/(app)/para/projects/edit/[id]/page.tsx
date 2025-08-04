@@ -35,6 +35,7 @@ import {
   Calendar,
   Clock,
   Edit2,
+  Info,
 } from "lucide-react";
 import { RecommendationBadge } from "@/components/ui/recommendation-badge";
 import Link from "next/link";
@@ -756,9 +757,13 @@ export default function EditProjectPage({
             </div>
 
             {projectWithStatus.status !== "planned" && (
-              <div className="p-3 bg-muted/50 rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  💡 프로젝트가 시작된 후에는 시작일을 변경할 수 없습니다.
+              <div className="p-3 bg-muted/50 dark:bg-muted/20 rounded-lg border border-border">
+                <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200 text-sm">
+                  <Info className="h-4 w-4" />
+                  <span className="font-medium">프로젝트 정보</span>
+                </div>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                  프로젝트가 시작된 후에는 시작일을 변경할 수 없습니다.
                 </p>
               </div>
             )}
@@ -942,7 +947,7 @@ export default function EditProjectPage({
           </div>
 
           {form.watch("category") === "repetitive" && (
-            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+            <div className="mb-4 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg">
               <p className="text-sm text-blue-700">
                 💡 반복형 프로젝트는 목표 횟수에 따라 태스크가 자동으로
                 생성됩니다.
@@ -1167,7 +1172,7 @@ export default function EditProjectPage({
                 <p className="text-xs text-muted-foreground mt-2">
                   프로젝트 기간과 겹치는 루프만 연결할 수 있습니다.
                 </p>
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <div className="mt-4 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg">
                   <p className="text-xs text-blue-700">
                     💡 <strong>팁:</strong> 루프를 먼저 생성하거나 프로젝트
                     기간을 조정해보세요.

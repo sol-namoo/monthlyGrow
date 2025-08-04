@@ -62,9 +62,13 @@ import { auth } from "@/lib/firebase";
 import {
   fetchAllAreasByUserId,
   fetchProjectsByUserIdWithPaging,
-  fetchResourcesByUserIdWithPaging,
+  fetchResourcesWithAreasByUserIdWithPaging,
   fetchArchivesByUserIdWithPaging,
   getTaskCountsForMultipleProjects,
+  fetchAreaCountsByUserId,
+  fetchProjectCountByUserId,
+  fetchResourceCountByUserId,
+  fetchArchiveCountByUserId,
 } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatDateShort } from "@/lib/utils";
@@ -89,7 +93,21 @@ function ParaPageContent() {
   // Areas는 한 번에 가져오기 (개수가 많지 않을 것으로 예상)
   const { data: areas = [], isLoading: areasLoading } = useQuery({
     queryKey: ["areas", user?.uid],
-    queryFn: () => fetchAllAreasByUserId(user?.uid || ""),
+    queryFn: async () => {
+      const areasData = await fetchAllAreasByUserId(user?.uid || "");
+      return areasData;
+    },
+    enabled: !!user?.uid,
+  });
+
+  // 영역별 개수 가져오기
+  const { data: areaCounts = {}, isLoading: areaCountsLoading } = useQuery({
+    queryKey: ["areaCounts", user?.uid],
+    queryFn: async () => {
+      const counts = await fetchAreaCountsByUserId(user?.uid || "");
+      console.log("PARA: Loaded area counts:", counts);
+      return counts;
+    },
     enabled: !!user?.uid,
   });
 
@@ -127,7 +145,7 @@ function ParaPageContent() {
   } = useInfiniteQuery({
     queryKey: ["resources", user?.uid, resourceSortBy],
     queryFn: ({ pageParam }) =>
-      fetchResourcesByUserIdWithPaging(
+      fetchResourcesWithAreasByUserIdWithPaging(
         user?.uid || "",
         10,
         pageParam?.lastDoc,
@@ -210,6 +228,7 @@ function ParaPageContent() {
   if (
     userLoading ||
     areasLoading ||
+    areaCountsLoading ||
     (allProjects.length > 0 && taskCountsLoading)
   ) {
     return (
@@ -567,12 +586,10 @@ function ParaPageContent() {
           ) : (
             <div className="space-y-4">
               {areas.map((area) => {
-                const areaProjects = allProjects.filter(
-                  (p) => p.areaId === area.id
-                );
-                const areaResources = allResources.filter(
-                  (r) => r.areaId === area.id
-                );
+                const counts = areaCounts[area.id] || {
+                  projectCount: 0,
+                  resourceCount: 0,
+                };
 
                 const getIconComponent = (iconId: string) => {
                   const iconMap: { [key: string]: any } = {
@@ -616,10 +633,10 @@ function ParaPageContent() {
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant="secondary" className="text-xs">
-                            프로젝트 {areaProjects.length}개
+                            프로젝트 {counts.projectCount}개
                           </Badge>
                           <Badge variant="secondary" className="text-xs">
-                            자료 {areaResources.length}개
+                            자료 {counts.resourceCount}개
                           </Badge>
                         </div>
                       </div>
@@ -719,8 +736,7 @@ function ParaPageContent() {
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-lg font-bold">{resource.name}</h3>
                       <Badge variant="outline" className="text-xs">
-                        {areas.find((area) => area.id === resource.areaId)
-                          ?.name || "기타"}
+                        {resource.area?.name || "기타"}
                       </Badge>
                     </div>
                     <p className="text-muted-foreground text-sm mb-3 line-clamp-2">

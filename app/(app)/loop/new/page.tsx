@@ -132,6 +132,7 @@ function NewLoopPageContent() {
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [showFinalConfirmDialog, setShowFinalConfirmDialog] = useState(false);
   const [blockedMonth, setBlockedMonth] = useState<string | null>(null);
+  const [loopToDelete, setLoopToDelete] = useState<any>(null); // 삭제할 루프 정보 임시 저장
 
   // 6개월 후까지의 월 옵션 생성
   const getAvailableMonths = () => {
@@ -195,30 +196,12 @@ function NewLoopPageContent() {
     }
   }, [settings, form]);
 
-  // 월 단위 날짜 자동 설정 (monthOffset 기반)
-  useEffect(() => {
-    const monthOffset = parseInt(searchParams.get("monthOffset") || "0");
-    if (monthOffset > 0) {
-      const currentDate = new Date();
-      const targetMonth = new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth() + monthOffset,
-        1
-      );
-
-      const yearMonth = `${targetMonth.getFullYear()}-${String(
-        targetMonth.getMonth() + 1
-      ).padStart(2, "0")}`;
-      form.setValue("selectedMonth", yearMonth);
-
-      // 월 선택 시 자동으로 날짜와 제목 설정되도록 트리거
-      handleMonthChange(yearMonth);
-    }
-  }, [form, searchParams]);
-
   // 월 선택 변경 핸들러
   const handleMonthChange = async (selectedMonth: string) => {
     if (!selectedMonth || !user?.uid) return;
+
+    // 빈 값이거나 유효하지 않은 형식이면 중복 확인하지 않음
+    if (selectedMonth === "" || !selectedMonth.includes("-")) return;
 
     // 차단된 월인지 확인
     if (blockedMonth === selectedMonth) {
@@ -291,30 +274,23 @@ function NewLoopPageContent() {
       form.setValue("selectedMonth", "");
       setShowDuplicateDialog(false);
       setExistingLoop(null);
+      setLoopToDelete(null);
       return;
     }
 
-    // 기존 루프 삭제 후 계속 진행
-    try {
-      if (existingLoop) {
-        await deleteLoopById(existingLoop.id);
-        toast({
-          title: "기존 루프 삭제 완료",
-          description: `${existingLoop.title}가 삭제되었습니다.`,
-        });
-
-        // 월 변경 사항 적용
-        const selectedMonth = form.getValues("selectedMonth");
-        const [year, month] = selectedMonth.split("-").map(Number);
-        applyMonthChanges(year, month);
-      }
-    } catch (error) {
-      console.error("기존 루프 삭제 중 오류:", error);
+    // 기존 루프 정보를 임시 저장하고 계속 진행
+    if (existingLoop) {
+      setLoopToDelete(existingLoop);
       toast({
-        title: "삭제 실패",
-        description: "기존 루프를 삭제하는 중 오류가 발생했습니다.",
-        variant: "destructive",
+        title: "기존 루프 대체 준비 완료",
+        description:
+          "루프 생성하기 버튼을 누르면 기존 루프가 삭제되고 새 루프가 생성됩니다.",
       });
+
+      // 월 변경 사항 적용
+      const selectedMonth = form.getValues("selectedMonth");
+      const [year, month] = selectedMonth.split("-").map(Number);
+      applyMonthChanges(year, month);
     }
 
     setShowDuplicateDialog(false);
@@ -524,6 +500,15 @@ function NewLoopPageContent() {
     if (!user?.uid) return;
 
     try {
+      // 기존 루프가 있다면 먼저 삭제
+      if (loopToDelete) {
+        await deleteLoopById(loopToDelete.id);
+        toast({
+          title: "기존 루프 삭제 완료",
+          description: `${loopToDelete.title}가 삭제되었습니다.`,
+        });
+      }
+
       // 루프 생성
       const loopData = {
         userId: user.uid,
@@ -657,7 +642,10 @@ function NewLoopPageContent() {
                 value={form.watch("selectedMonth")}
                 onValueChange={(value) => {
                   form.setValue("selectedMonth", value);
-                  handleMonthChange(value);
+                  // 실제 값이 선택되었을 때만 중복 확인
+                  if (value && value !== "") {
+                    handleMonthChange(value);
+                  }
                 }}
               >
                 <SelectTrigger className="mt-1">
@@ -783,7 +771,9 @@ function NewLoopPageContent() {
             <>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
                 {areas.map((area) => {
-                  const IconComponent = getIconComponent(area.icon);
+                  const IconComponent = getIconComponent(
+                    area.icon || "compass"
+                  );
 
                   return (
                     <div
@@ -797,11 +787,13 @@ function NewLoopPageContent() {
                     >
                       <div
                         className="mb-1 rounded-full p-1"
-                        style={{ backgroundColor: `${area.color}20` }}
+                        style={{
+                          backgroundColor: `${area.color || "#6b7280"}20`,
+                        }}
                       >
                         <IconComponent
                           className="h-3 w-3"
-                          style={{ color: area.color }}
+                          style={{ color: area.color || "#6b7280" }}
                         />
                       </div>
                       <span className="text-xs">{area.name}</span>
@@ -968,6 +960,10 @@ function NewLoopPageContent() {
           onProjectToggle={toggleExistingProject}
           onConfirm={() => setShowProjectModal(false)}
           newlyCreatedProjectId={newlyCreatedProjectId}
+          projects={allProjects}
+          areas={allAreas}
+          projectsLoading={projectsLoading}
+          areasLoading={areasLoading}
           key={projectModalRefreshKey} // 리프레시를 위한 키
         />
 
@@ -992,30 +988,30 @@ function NewLoopPageContent() {
 
           <div className="space-y-3">
             <div className="space-y-3">
-              <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
-                <div className="rounded-full bg-blue-100 p-1 mt-0.5">
-                  <Plus className="h-4 w-4 text-blue-600" />
+              <div className="flex items-start gap-3 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg border border-border">
+                <div className="rounded-full bg-blue-100 dark:bg-blue-900 p-1 mt-0.5">
+                  <Plus className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div className="flex-1">
-                  <h4 className="text-sm font-medium text-blue-900 mb-1">
+                  <h4 className="text-sm font-medium text-blue-900 dark:text-blue-200 mb-1">
                     새 프로젝트 생성
                   </h4>
-                  <p className="text-xs text-blue-700">
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
                     프로젝트 생성 페이지로 이동하여 새 프로젝트를 만들고, 완료
                     후 이 루프 페이지로 돌아와서 연결할 수 있습니다.
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg">
-                <div className="rounded-full bg-amber-100 p-1 mt-0.5">
-                  <AlertCircle className="h-4 w-4 text-amber-600" />
+              <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-700">
+                <div className="rounded-full bg-amber-100 dark:bg-amber-900 p-1 mt-0.5">
+                  <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div className="flex-1">
-                  <h4 className="text-sm font-medium text-amber-900 mb-1">
+                  <h4 className="text-sm font-medium text-amber-900 dark:text-amber-200 mb-1">
                     참고 사항
                   </h4>
-                  <p className="text-xs text-amber-700">
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
                     현재 작성 중인 루프 정보는 저장되므로 안심하고 이동하세요.
                   </p>
                 </div>
@@ -1055,7 +1051,7 @@ function NewLoopPageContent() {
           <DialogHeader>
             <DialogTitle>기존 루프가 있습니다</DialogTitle>
             <DialogDescription>
-              선택한 월에 이미 루프가 존재합니다. 기존 루프를 삭제하고 새로운
+              선택한 월에 이미 루프가 존재합니다. 기존 루프를 대체하고 새로운
               루프를 생성하시겠습니까?
             </DialogDescription>
           </DialogHeader>
@@ -1083,6 +1079,12 @@ function NewLoopPageContent() {
                 연결된 프로젝트는 삭제되지 않고 루프 연결만 해제됩니다.
               </span>
             </div>
+            <div className="flex items-center gap-2">
+              <span className="text-amber-500">⚠️</span>
+              <span>
+                기존 루프는 "루프 생성하기" 버튼을 누를 때 삭제됩니다.
+              </span>
+            </div>
           </div>
 
           <DialogFooter>
@@ -1096,7 +1098,7 @@ function NewLoopPageContent() {
               variant="destructive"
               onClick={() => handleDuplicateConfirm(true)}
             >
-              기존 루프 삭제하고 계속
+              기존 루프 대체하고 계속
             </Button>
           </DialogFooter>
         </DialogContent>

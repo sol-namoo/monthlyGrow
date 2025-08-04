@@ -21,6 +21,7 @@ import {
   AlertCircle,
   ExternalLink,
   Edit2,
+  Info,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -842,12 +843,10 @@ export default function ProjectDetailPage({
             <div className="space-y-3">
               {project.connectedLoops.length >= 3 &&
                 projectWithStatus?.status === "in_progress" && (
-                  <Alert className="mb-4 bg-amber-50 border-amber-200">
-                    <AlertCircle className="h-4 w-4 text-amber-600" />
-                    <AlertTitle className="text-amber-800">
-                      장기 프로젝트 안내
-                    </AlertTitle>
-                    <AlertDescription className="text-amber-700">
+                  <Alert variant="warning" className="mb-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>장기 프로젝트 안내</AlertTitle>
+                    <AlertDescription>
                       이 프로젝트는 {project.connectedLoops.length}개의 루프에
                       연결되어 있습니다. 정리하거나 회고를 작성해보는 건
                       어떨까요?
@@ -1009,13 +1008,13 @@ export default function ProjectDetailPage({
             </div>
 
             {project.category === "repetitive" && (
-              <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm text-blue-700">
-                  💡 반복형 프로젝트는 목표 횟수에 따라 태스크가 자동으로
-                  생성됩니다.
-                </p>
-                <p className="text-xs text-blue-600 mt-2">
-                  🎯 목표 달성 후 초과 달성 태스크를 추가할 수 있어요
+              <div className="mb-4 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg border border-border">
+                <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200 text-sm">
+                  <Info className="h-4 w-4" />
+                  <span className="font-medium">프로젝트 정보</span>
+                </div>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                  프로젝트가 시작된 후에는 시작일을 변경할 수 없습니다.
                 </p>
               </div>
             )}
@@ -1371,7 +1370,7 @@ export default function ProjectDetailPage({
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">
+                    <div className="flex items-center space-x-3 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg border border-border">
                       <Checkbox
                         id="planningNeedsImprovement"
                         checked={planningNeedsImprovement}
@@ -1382,18 +1381,18 @@ export default function ProjectDetailPage({
                       <div className="flex-1">
                         <label
                           htmlFor="planningNeedsImprovement"
-                          className="text-sm font-medium text-gray-900 cursor-pointer"
+                          className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer"
                         >
                           계획에 개선이 필요한지
                         </label>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           목표 설정이나 일정 계획이 현실적이지 않았을 수
                           있습니다
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">
+                    <div className="flex items-center space-x-3 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg border border-border">
                       <Checkbox
                         id="executionNeedsImprovement"
                         checked={executionNeedsImprovement}
@@ -1404,11 +1403,11 @@ export default function ProjectDetailPage({
                       <div className="flex-1">
                         <label
                           htmlFor="executionNeedsImprovement"
-                          className="text-sm font-medium text-gray-900 cursor-pointer"
+                          className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer"
                         >
                           실행 방식에 개선이 필요한지
                         </label>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           실제 실행 과정에서 효율성이나 지속성이 부족했을 수
                           있습니다
                         </p>
@@ -1416,7 +1415,7 @@ export default function ProjectDetailPage({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         기타 이유
                       </label>
                       <Textarea
@@ -1431,12 +1430,12 @@ export default function ProjectDetailPage({
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                   이 프로젝트는 나에게 도움이 되었나요?
                 </label>
                 {renderStarRating(userRating, setUserRating)}
               </div>
-              <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                 <Checkbox
                   id="bookmarked"
                   checked={bookmarked}
@@ -1448,11 +1447,11 @@ export default function ProjectDetailPage({
                 <div className="flex-1">
                   <label
                     htmlFor="bookmarked"
-                    className="text-sm font-medium text-gray-900 cursor-pointer"
+                    className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer"
                   >
                     다시 읽고 싶은 회고로 표시
                   </label>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     중요한 회고는 북마크하여 나중에 쉽게 찾을 수 있습니다
                   </p>
                 </div>

@@ -37,7 +37,6 @@ import {
   getTaskCountsForMultipleProjects,
   fetchYearlyActivityStats,
 } from "@/lib/firebase";
-import { calculateYearlyStatsFromSnapshots } from "@/scripts/create-snapshots";
 import { getLoopStatus, formatDate } from "@/lib/utils";
 
 export default function HomePage() {
@@ -98,81 +97,38 @@ export default function HomePage() {
     queryKey: ["todayProjectTaskCounts", user?.uid],
     queryFn: async () => {
       if (!user?.uid || todayDeadlineProjects.length === 0) return {};
+
       const projectIds = todayDeadlineProjects.map((project) => project.id);
-      try {
-        return await getTaskCountsForMultipleProjects(projectIds);
-      } catch (error) {
-        console.error(
-          "Failed to get batch task counts for today projects:",
-          error
-        );
-        // 폴백: 개별 쿼리
-        const counts: {
-          [projectId: string]: { totalTasks: number; completedTasks: number };
-        } = {};
-        for (const project of todayDeadlineProjects) {
-          try {
-            counts[project.id] = await getTaskCountsByProjectId(project.id);
-          } catch (error) {
-            console.error(
-              `Failed to get task counts for project ${project.id}:`,
-              error
-            );
-            counts[project.id] = { totalTasks: 0, completedTasks: 0 };
-          }
-        }
-        return counts;
-      }
+      return await getTaskCountsForMultipleProjects(projectIds);
     },
-    enabled: !!user?.uid && todayDeadlineProjects.length > 0,
+    enabled: !!user && todayDeadlineProjects.length > 0,
   });
 
-  // 연간 활동 통계 가져오기 (스냅샷 기반)
+  // 연간 통계 데이터
   const { data: yearlyStats } = useQuery({
-    queryKey: ["yearlyStats", user?.uid, new Date().getFullYear()],
+    queryKey: ["yearlyStats", user?.uid],
     queryFn: () =>
-      calculateYearlyStatsFromSnapshots(
-        user?.uid || "",
-        new Date().getFullYear()
-      ),
-    enabled: !!user?.uid,
+      user
+        ? fetchYearlyActivityStats(user.uid, new Date().getFullYear())
+        : null,
+    enabled: !!user,
   });
 
-  // 자동 완료 체크 (페이지 로드 시 한 번만 실행)
+  // 브라우저 콘솔에서 사용할 수 있도록 전역 함수로 등록 (개발용)
   useEffect(() => {
-    if (user) {
-      checkAndAutoCompleteProjects(user.uid);
+    if (
+      typeof window !== "undefined" &&
+      user?.uid &&
+      process.env.NODE_ENV === "development"
+    ) {
+      // 개발 환경에서만 디버깅 함수들을 전역에 등록
+      (window as any).debugUser = user;
+      (window as any).debugAreas = areas;
+      (window as any).debugProjects = projects;
+      (window as any).debugLoops = loops;
+      (window as any).debugResources = resources;
     }
-  }, [user]);
-
-  // 브라우저 콘솔에서 사용할 수 있도록 전역 함수로 등록
-  useEffect(() => {
-    if (typeof window !== "undefined" && user?.uid) {
-      const runSampleDataInBrowser = async () => {
-        try {
-          console.log("🚀 샘플 데이터 생성 시작...");
-          console.log(`👤 사용자: ${user.email}`);
-
-          // 스크립트들을 동적으로 import
-          const { runSampleDataGeneration } = await import(
-            "@/scripts/run-sample-data"
-          );
-
-          const result = await runSampleDataGeneration(user.uid);
-          console.log("✅ 결과:", result);
-
-          // 페이지 새로고침으로 데이터 반영
-          setTimeout(() => {
-            window.location.reload();
-          }, 2000);
-        } catch (error) {
-          console.error("❌ 샘플 데이터 생성 실패:", error);
-        }
-      };
-
-      (window as any).runSampleData = runSampleDataInBrowser;
-    }
-  }, [user?.uid]);
+  }, [user?.uid, areas, projects, loops, resources]);
 
   const isLoading = loading || projectsLoading || loopsLoading;
 
@@ -211,8 +167,6 @@ export default function HomePage() {
       )
     : 0;
   const changeRate = 0; // 추후 통계 fetch로 대체
-
-  // stats, areaActivityData, loopComparisonData 등은 추후 Firestore 통계 데이터 fetch로 대체 가능
 
   // 프로젝트 표시 개수 제한 (정책: 3개 이하면 모두 표시, 4개 이상이면 3개만 표시 + 더보기 버튼)
   const displayedProjects = showAllProjects
@@ -332,57 +286,43 @@ export default function HomePage() {
                         {(() => {
                           const taskCount = todayProjectTaskCounts[project.id];
                           if (taskCount) {
-                            console.log(
-                              `🔍 Home - Project ${project.id}:`,
-                              taskCount
-                            );
-                            return `${taskCount.completedTasks}/${taskCount.totalTasks}`;
+                            return `${taskCount.completedTasks}/${taskCount.totalTasks} 완료`;
                           }
-                          // 로딩 중이거나 데이터가 없을 때
-                          return "0/0";
+                          return "진행 중";
                         })()}
                       </Badge>
                     </div>
                   ))}
-                  {todayDeadlineProjects.length > 3 && (
-                    <p className="text-xs text-orange-600">
-                      외 {todayDeadlineProjects.length - 3}개 프로젝트
-                    </p>
-                  )}
                 </div>
               </Card>
             </section>
           )}
 
+          {/* 현재 루프 프로젝트들 */}
           <section>
-            <div className="mb-4 flex items-center">
+            <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xl font-bold">현재 루프 프로젝트</h2>
+              <Link href="/loop/new">
+                <Button size="sm" className="h-8">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </Link>
             </div>
 
             <div className="space-y-3">
               {currentLoopProjects.length === 0 ? (
-                <Card className="p-4 border-dashed">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-lg font-bold text-muted-foreground">
-                      프로젝트 없음
-                    </h3>
-                    <Badge variant="outline" className="text-xs">
-                      {currentLoop ? "루프 연결됨" : "루프 없음"}
-                    </Badge>
-                  </div>
-                  <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
-                    {currentLoop
-                      ? "현재 루프에 연결된 프로젝트가 없습니다."
-                      : "현재 진행 중인 루프가 없습니다."}
+                <Card className="p-4 text-center">
+                  <div className="mb-2 text-4xl">🎯</div>
+                  <h3 className="mb-1 font-medium">프로젝트가 없습니다</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    현재 루프에 연결된 프로젝트가 없습니다.
                   </p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>Area: -</span>
-                      <span>•</span>
-                      <span>-</span>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
+                  <Link href="/para/projects/new">
+                    <Button size="sm">
+                      <Plus className="h-4 w-4 mr-1" />
+                      프로젝트 추가
+                    </Button>
+                  </Link>
                 </Card>
               ) : (
                 <>
@@ -390,8 +330,8 @@ export default function HomePage() {
                     <ProgressCard
                       key={project.id}
                       title={project.title}
-                      progress={project.progress}
-                      total={project.total}
+                      progress={project.completedTasks}
+                      total={project.target}
                     >
                       <div className="mt-2 flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
@@ -504,7 +444,7 @@ export default function HomePage() {
                 data={
                   yearlyStats?.areaStats
                     ? Object.entries(yearlyStats.areaStats).map(
-                        ([areaId, stats]) => ({
+                        ([areaId, stats]: [string, any]) => ({
                           name: stats.name,
                           value: stats.focusTime,
                           completionRate: stats.completionRate,
@@ -524,11 +464,10 @@ export default function HomePage() {
                 data={
                   yearlyStats?.monthlyProgress
                     ? Object.entries(yearlyStats.monthlyProgress).map(
-                        ([month, stats]) => ({
-                          month: parseInt(month),
-                          completionRate: stats.completionRate,
-                          focusTime: stats.focusTime,
-                          projectCount: stats.projectCount,
+                        ([month, stats]: [string, any]) => ({
+                          name: `${parseInt(month)}월`,
+                          completion: stats.completionRate,
+                          focusHours: Math.round(stats.focusTime / 60),
                         })
                       )
                     : []
@@ -536,6 +475,12 @@ export default function HomePage() {
               />
             </div>
           </Card>
+
+          <div className="text-center text-xs text-muted-foreground mt-4">
+            <p>
+              📊 활동 대시보드는 매월 1일 오전 4시에 자동으로 업데이트됩니다.
+            </p>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

@@ -111,11 +111,13 @@ function AddExistingProjectPageContent() {
       </Card>
 
       {!canAddMoreProjects && (
-        <Alert className="mb-6 bg-red-50">
-          <AlertCircle className="h-4 w-4 text-red-600" />
-          <AlertTitle className="text-red-600">프로젝트 추가 불가</AlertTitle>
-          <AlertDescription className="text-red-600">
-            한 루프에는 최대 5개의 프로젝트만 등록할 수 있습니다.
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>주의사항</AlertTitle>
+          <AlertDescription>
+            기존 프로젝트를 루프에 연결하면 해당 프로젝트의 기존 데이터가
+            유지됩니다. 프로젝트의 시작일과 목표 완료일이 루프 기간과 맞지 않을
+            수 있습니다.
           </AlertDescription>
         </Alert>
       )}

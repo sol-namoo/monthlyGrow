@@ -209,6 +209,47 @@ export const fetchResourceById = async (
   }
 };
 
+// 리소스와 연결된 영역 정보를 함께 가져오는 함수
+export const fetchResourceWithAreaById = async (
+  resourceId: string
+): Promise<Resource & { area?: { id: string; name: string } }> => {
+  const docRef = doc(db, "resources", resourceId);
+  const docSnap = await getDoc(docRef);
+  if (docSnap.exists()) {
+    const data = docSnap.data();
+    const resource = {
+      id: docSnap.id,
+      ...data,
+      createdAt: data.createdAt.toDate(),
+      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+    } as Resource;
+
+    // 영역 정보 가져오기
+    if (resource.areaId) {
+      try {
+        const areaRef = doc(db, "areas", resource.areaId);
+        const areaSnap = await getDoc(areaRef);
+        if (areaSnap.exists()) {
+          const areaData = areaSnap.data();
+          return {
+            ...resource,
+            area: {
+              id: areaSnap.id,
+              name: areaData.name || "기타",
+            },
+          } as Resource & { area?: { id: string; name: string } };
+        }
+      } catch (error) {
+        console.error("Error fetching area for resource:", error);
+      }
+    }
+
+    return resource as Resource & { area?: { id: string; name: string } };
+  } else {
+    throw new Error("Resource not found");
+  }
+};
+
 // Projects
 export const fetchAllProjectsByUserId = async (
   userId: string
@@ -1210,7 +1251,7 @@ export const createUser = async (
   const defaultSettings: UserSettings = {
     defaultReward: "",
     defaultRewardEnabled: false,
-    carryOver: true,
+    carryOver: true, // 기본적으로 true로 설정
     aiRecommendations: true,
     notifications: true,
     theme: "system",
@@ -1403,6 +1444,17 @@ export const autoMigrateIncompleteProjects = async (
   userId: string,
   completedLoopId: string
 ): Promise<void> => {
+  // 사용자 설정 확인
+  const userData = await fetchUserById(userId);
+  const carryOverEnabled = userData.settings?.carryOver ?? true; // 기본값 true
+
+  if (!carryOverEnabled) {
+    console.log(
+      `Carry over is disabled for user ${userId}. Skipping migration.`
+    );
+    return;
+  }
+
   // 1. 미완료 프로젝트 찾기
   const incompleteProjects = await findIncompleteProjectsInLoop(
     completedLoopId
@@ -1463,6 +1515,17 @@ export const connectPendingProjectsToNewLoop = async (
   userId: string,
   newLoopId: string
 ): Promise<void> => {
+  // 사용자 설정 확인
+  const userData = await fetchUserById(userId);
+  const carryOverEnabled = userData.settings?.carryOver ?? true; // 기본값 true
+
+  if (!carryOverEnabled) {
+    console.log(
+      `Carry over is disabled for user ${userId}. Skipping pending project connection.`
+    );
+    return;
+  }
+
   const projectsQuery = query(
     collection(db, "projects"),
     where("userId", "==", userId),
@@ -1950,6 +2013,139 @@ export const fetchResourcesByUserIdWithPaging = async (
   }
 };
 
+// 리소스와 연결된 영역 정보를 함께 가져오는 함수
+export const fetchResourcesWithAreasByUserIdWithPaging = async (
+  userId: string,
+  pageLimit: number = 10,
+  lastDoc?: any,
+  sortBy: string = "latest"
+): Promise<{
+  resources: Array<Resource & { area?: { id: string; name: string } }>;
+  lastDoc: any;
+  hasMore: boolean;
+}> => {
+  try {
+    // 먼저 리소스들을 가져옴
+    const resourcesResult = await fetchResourcesByUserIdWithPaging(
+      userId,
+      pageLimit,
+      lastDoc,
+      sortBy
+    );
+
+    // 리소스들의 고유한 areaId들을 수집
+    const areaIds = [
+      ...new Set(
+        resourcesResult.resources
+          .map((resource) => resource.areaId)
+          .filter((areaId) => areaId) // null/undefined 제거
+      ),
+    ];
+
+    // 영역 정보를 배치로 가져오기
+    const areasMap = new Map<string, { id: string; name: string }>();
+
+    if (areaIds.length > 0) {
+      const areasQuery = query(
+        collection(db, "areas"),
+        where("__name__", "in", areaIds)
+      );
+      const areasSnapshot = await getDocs(areasQuery);
+
+      areasSnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        areasMap.set(doc.id, {
+          id: doc.id,
+          name: data.name || "기타",
+        });
+      });
+    }
+
+    // 리소스에 영역 정보 추가
+    const resourcesWithAreas = resourcesResult.resources.map((resource) => ({
+      ...resource,
+      area: resource.areaId ? areasMap.get(resource.areaId) : undefined,
+    })) as Array<Resource & { area?: { id: string; name: string } }>;
+
+    console.log(
+      "PARA: Resources with areas:",
+      resourcesWithAreas.map((r) => ({
+        name: r.name,
+        areaId: r.areaId,
+        areaName: r.area?.name,
+      }))
+    );
+
+    return {
+      resources: resourcesWithAreas,
+      lastDoc: resourcesResult.lastDoc,
+      hasMore: resourcesResult.hasMore,
+    };
+  } catch (error) {
+    console.error("Error fetching resources with areas:", error);
+    throw new Error("리소스와 영역 정보 조회에 실패했습니다.");
+  }
+};
+
+// 영역별 프로젝트와 리소스 개수만 가져오는 함수 (최적화)
+export const fetchAreaCountsByUserId = async (
+  userId: string
+): Promise<{
+  [areaId: string]: {
+    projectCount: number;
+    resourceCount: number;
+  };
+}> => {
+  try {
+    // Firestore 집계 쿼리로 개수만 계산
+    const projectsQuery = query(
+      collection(db, "projects"),
+      where("userId", "==", userId)
+    );
+    const projectsSnapshot = await getDocs(projectsQuery);
+
+    const resourcesQuery = query(
+      collection(db, "resources"),
+      where("userId", "==", userId)
+    );
+    const resourcesSnapshot = await getDocs(resourcesQuery);
+
+    // 영역별 개수 계산 (클라이언트에서 최소한의 계산)
+    const stats: {
+      [areaId: string]: { projectCount: number; resourceCount: number };
+    } = {};
+
+    // 프로젝트 개수 계산
+    projectsSnapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      const areaId = data.areaId;
+      if (areaId) {
+        if (!stats[areaId]) {
+          stats[areaId] = { projectCount: 0, resourceCount: 0 };
+        }
+        stats[areaId].projectCount++;
+      }
+    });
+
+    // 리소스 개수 계산
+    resourcesSnapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      const areaId = data.areaId;
+      if (areaId) {
+        if (!stats[areaId]) {
+          stats[areaId] = { projectCount: 0, resourceCount: 0 };
+        }
+        stats[areaId].resourceCount++;
+      }
+    });
+
+    return stats;
+  } catch (error) {
+    console.error("Error fetching area counts:", error);
+    throw new Error("영역별 개수 조회에 실패했습니다.");
+  }
+};
+
 // 페이징을 위한 아카이브 조회 함수
 export const fetchArchivesByUserIdWithPaging = async (
   userId: string,
@@ -2011,5 +2207,56 @@ export const fetchArchivesByUserIdWithPaging = async (
   } catch (error) {
     console.error("Error fetching archives with paging:", error);
     throw new Error("아카이브 조회에 실패했습니다.");
+  }
+};
+
+// 전체 프로젝트 개수만 가져오는 함수
+export const fetchProjectCountByUserId = async (
+  userId: string
+): Promise<number> => {
+  try {
+    const projectsQuery = query(
+      collection(db, "projects"),
+      where("userId", "==", userId)
+    );
+    const projectsSnapshot = await getDocs(projectsQuery);
+    return projectsSnapshot.size;
+  } catch (error) {
+    console.error("Error fetching project count:", error);
+    throw new Error("프로젝트 개수 조회에 실패했습니다.");
+  }
+};
+
+// 전체 리소스 개수만 가져오는 함수
+export const fetchResourceCountByUserId = async (
+  userId: string
+): Promise<number> => {
+  try {
+    const resourcesQuery = query(
+      collection(db, "resources"),
+      where("userId", "==", userId)
+    );
+    const resourcesSnapshot = await getDocs(resourcesQuery);
+    return resourcesSnapshot.size;
+  } catch (error) {
+    console.error("Error fetching resource count:", error);
+    throw new Error("리소스 개수 조회에 실패했습니다.");
+  }
+};
+
+// 전체 아카이브 개수만 가져오는 함수
+export const fetchArchiveCountByUserId = async (
+  userId: string
+): Promise<number> => {
+  try {
+    const archivesQuery = query(
+      collection(db, "retrospectives"),
+      where("userId", "==", userId)
+    );
+    const archivesSnapshot = await getDocs(archivesQuery);
+    return archivesSnapshot.size;
+  } catch (error) {
+    console.error("Error fetching archive count:", error);
+    throw new Error("아카이브 개수 조회에 실패했습니다.");
   }
 };
