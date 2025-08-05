@@ -46,7 +46,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
-import { useFieldArray } from "react-hook-form";
+import { useFieldArray, Controller } from "react-hook-form";
 import type { Project } from "@/lib/types";
 import {
   fetchProjectById,
@@ -69,7 +69,7 @@ const editProjectFormSchema = z
     areaId: z.string().optional(),
     startDate: z.string().min(1, "시작일을 입력해주세요"),
     endDate: z.string().min(1, "종료일을 입력해주세요"),
-    total: z.number().min(1, "목표 횟수를 입력해주세요"),
+    total: z.number().min(0, "목표를 입력해주세요"),
     tasks: z.array(
       z.object({
         id: z.number(),
@@ -142,8 +142,8 @@ export default function EditProjectPage({
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   // 삭제된 태스크 ID들을 추적하는 상태
   const [deletedTaskIds, setDeletedTaskIds] = useState<string[]>([]);
-  // 삭제된 인덱스들을 추적하는 상태
-  const [deletedIndexes, setDeletedIndexes] = useState<number[]>([]);
+  // 임시로 삭제된 태스크 인덱스들을 추적 (제출 시에만 실제 삭제)
+  const [tempDeletedIndexes, setTempDeletedIndexes] = useState<number[]>([]);
 
   // 루프 연결 관리 상태
   const [showLoopConnectionDialog, setShowLoopConnectionDialog] =
@@ -288,7 +288,7 @@ export default function EditProjectPage({
     name: "tasks",
   });
 
-  // 태스크 데이터가 로드되면 폼에 채우기
+  // 태스크 데이터가 로드되면 폼에 채우기 (초기 로드 시에만)
   useEffect(() => {
     console.log("tasks loaded:", tasks);
     console.log("tasksLoading:", tasksLoading);
@@ -296,13 +296,9 @@ export default function EditProjectPage({
     console.log("fields length:", fields.length);
     console.log("deletedTaskIds:", deletedTaskIds);
 
-    if (form && !tasksLoading) {
-      // 삭제된 인덱스를 고려하여 태스크 필터링
-      const filteredTasks = tasks.filter(
-        (task, index) => !deletedIndexes.includes(index)
-      );
-
-      const formattedTasks = filteredTasks.map((task, index) => ({
+    if (form && !tasksLoading && fields.length === 0) {
+      // 초기 로드 시에만 태스크 데이터를 폼에 설정
+      const formattedTasks = tasks.map((task, index) => ({
         id: index + 1, // 폼 필드용 인덱스 사용
         title: task.title,
         date: formatDateForInput(task.date),
@@ -315,7 +311,6 @@ export default function EditProjectPage({
         (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
       );
 
-      console.log("filteredTasks:", filteredTasks);
       console.log("formattedTasks:", formattedTasks);
       console.log("sortedTasks:", sortedTasks);
       replace(sortedTasks);
@@ -325,7 +320,7 @@ export default function EditProjectPage({
         console.log("fields after replace:", fields.length);
       }, 100);
     }
-  }, [tasks, tasksLoading, form, deletedIndexes]);
+  }, [tasks, tasksLoading, form]);
 
   // 태스크 추가/삭제 헬퍼 함수
   const addTask = () => {
@@ -411,18 +406,20 @@ export default function EditProjectPage({
           endDate: loop.endDate,
         }));
 
-      // 폼의 tasks 데이터를 Firestore 형식으로 변환
-      const updatedTasks = data.tasks.map((task) => ({
-        id: task.id.toString(),
-        userId: project.userId,
-        projectId: project.id,
-        title: task.title,
-        date: new Date(task.date),
-        duration: task.duration,
-        done: task.done,
-        createdAt: new Date(), // 새로 추가된 태스크의 경우
-        updatedAt: new Date(),
-      }));
+      // 폼의 tasks 데이터를 Firestore 형식으로 변환 (임시 삭제된 태스크 제외)
+      const updatedTasks = data.tasks
+        .filter((_, index) => !tempDeletedIndexes.includes(index))
+        .map((task) => ({
+          id: task.id.toString(),
+          userId: project.userId,
+          projectId: project.id,
+          title: task.title,
+          date: new Date(task.date),
+          duration: task.duration,
+          done: task.done,
+          createdAt: new Date(), // 새로 추가된 태스크의 경우
+          updatedAt: new Date(),
+        }));
 
       // areaId가 빈 문자열이면 제외
       const updateData: Partial<Omit<Project, "id" | "userId" | "createdAt">> =
@@ -803,7 +800,7 @@ export default function EditProjectPage({
                       : "예: 10"
                   }
                   onChange={(e) => {
-                    // 반복형 프로젝트에서 목표 횟수 변경 시 태스크 목록 업데이트
+                    // 반복형 프로젝트에서만 목표 횟수 변경 시 태스크 목록 업데이트
                     const category = form.watch("category");
                     const total = e.target.value;
                     const startDate = form.watch("startDate");
@@ -902,11 +899,13 @@ export default function EditProjectPage({
                         deletedTaskIds
                       );
 
-                      // 삭제된 인덱스들을 추적
-                      setDeletedIndexes((prev) => [
-                        ...prev,
-                        ...selectedIndexes,
-                      ]);
+                      // 임시로 삭제된 인덱스들을 추적 (실제 삭제는 제출 시에만)
+                      setTempDeletedIndexes((prev) => {
+                        const newIndexes = [...prev, ...selectedIndexes];
+                        const uniqueIndexes = [...new Set(newIndexes)]; // 중복 제거
+                        console.log("임시 삭제된 인덱스들:", uniqueIndexes);
+                        return uniqueIndexes;
+                      });
 
                       // 삭제된 태스크 ID들을 추적 (중복 제거)
                       setDeletedTaskIds((prev) => {
@@ -971,7 +970,12 @@ export default function EditProjectPage({
             ) : (
               <div className="max-h-[calc(100vh-120px)] overflow-y-auto space-y-2 pr-2">
                 {fields.map((field, index) => (
-                  <div key={field.id} className="group">
+                  <div
+                    key={field.id}
+                    className={`group ${
+                      tempDeletedIndexes.includes(index) ? "hidden" : ""
+                    }`}
+                  >
                     {/* 선택 체크박스 (카드 위쪽) - 작업형 또는 반복형에서 추가된 태스크만 표시 */}
                     {(form.watch("category") === "task_based" ||
                       (form.watch("category") === "repetitive" &&
@@ -997,6 +1001,13 @@ export default function EditProjectPage({
                       <div className="space-y-4">
                         {/* 첫 번째 줄: 완료 상태, 제목 */}
                         <div className="flex items-center gap-3">
+                          {/* 인덱스 번호 */}
+                          <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+                            <span className="text-xs font-medium text-muted-foreground">
+                              {index + 1}
+                            </span>
+                          </div>
+
                           {/* 완료 상태 표시 (작은 배지) */}
                           {form.watch(`tasks.${index}.done`) && (
                             <div className="flex-shrink-0 w-2 h-2 bg-green-500 rounded-full" />

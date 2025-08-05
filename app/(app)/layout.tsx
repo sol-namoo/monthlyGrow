@@ -1,10 +1,22 @@
+"use client";
+
 import type React from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { BottomNav } from "@/components/widgets/bottom-nav";
+import Loading from "@/components/feedback/Loading";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  // localstorage에서 사용자 정보 저장 여부를 확인하여 user info 유무 확인
-  // user info 있다면 주요 정보 새로 페칭 후 jotai에 저장 -> home으로 이동
-  // user info 없다면 로그인 페이지로 이동
+  const { user, loading } = useAuth(true); // 인증 필요
+
+  // 로딩 중일 때 로딩 화면 표시
+  if (loading) {
+    return <Loading />;
+  }
+
+  // 사용자가 로그인되지 않은 경우 아무것도 렌더링하지 않음
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="flex min-h-screen flex-col">

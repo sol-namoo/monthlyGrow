@@ -196,39 +196,19 @@ export default function ProjectDetailPage({
     }) => {
       return updateTaskInProject(taskId, taskData);
     },
-    onMutate: async ({ taskId, taskData }) => {
-      // 진행 중인 쿼리 취소
-      await queryClient.cancelQueries({ queryKey: ["tasks", projectId] });
-
-      // 이전 데이터 백업
-      const previousTasks = queryClient.getQueryData(["tasks", projectId]);
-
-      // Optimistic update
-      queryClient.setQueryData(["tasks", projectId], (old: any) => {
-        if (!old) return old;
-        return old.map((task: any) =>
-          task.id === taskId
-            ? { ...task, ...taskData, updatedAt: new Date() }
-            : task
-        );
+    onSuccess: () => {
+      // 성공 시 쿼리 무효화하여 최신 데이터 확보
+      queryClient.invalidateQueries({
+        queryKey: ["tasks", "project", projectId],
       });
-
-      return { previousTasks };
+      queryClient.invalidateQueries({ queryKey: ["taskCounts", projectId] });
     },
-    onError: (error, variables, context) => {
-      // 오류 시 이전 데이터로 복원
-      if (context?.previousTasks) {
-        queryClient.setQueryData(["tasks", projectId], context.previousTasks);
-      }
+    onError: (error) => {
       toast({
         title: "태스크 수정 실패",
         description: "태스크 수정 중 오류가 발생했습니다.",
         variant: "destructive",
       });
-    },
-    onSettled: () => {
-      // 성공/실패와 관계없이 쿼리 무효화하여 최신 데이터 확보
-      queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
     },
   });
 
@@ -295,6 +275,9 @@ export default function ProjectDetailPage({
   const [executionNeedsImprovement, setExecutionNeedsImprovement] =
     useState(false);
   const [otherReason, setOtherReason] = useState("");
+
+  // 현재 업데이트 중인 태스크 ID 추적
+  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
 
   // Firestore에서 실제 데이터 가져오기
   const {
@@ -569,6 +552,53 @@ export default function ProjectDetailPage({
       taskId,
       taskData: { done: !currentStatus },
     });
+  };
+
+  // 태스크 완료 상태 토글 핸들러 (개선된 버전)
+  const handleTaskToggle = (taskId: string, currentStatus: boolean) => {
+    setUpdatingTaskId(taskId);
+
+    // Optimistic update - 즉시 UI 반영
+    queryClient.setQueryData(["tasks", "project", projectId], (old: any) => {
+      if (!old) return old;
+      return old.map((task: any) =>
+        task.id === taskId
+          ? { ...task, done: !currentStatus, updatedAt: new Date() }
+          : task
+      );
+    });
+
+    updateTaskMutation.mutate(
+      {
+        taskId,
+        taskData: { done: !currentStatus },
+      },
+      {
+        onSuccess: () => {
+          // 성공 시 쿼리 무효화하여 최신 데이터 확보
+          queryClient.invalidateQueries({
+            queryKey: ["tasks", "project", projectId],
+          });
+          queryClient.invalidateQueries({
+            queryKey: ["taskCounts", projectId],
+          });
+        },
+        onError: (error, variables, context) => {
+          // 오류 시 이전 데이터로 복원
+          queryClient.invalidateQueries({
+            queryKey: ["tasks", "project", projectId],
+          });
+          toast({
+            title: "태스크 상태 변경 실패",
+            description: "태스크 상태 변경 중 오류가 발생했습니다.",
+            variant: "destructive",
+          });
+        },
+        onSettled: () => {
+          setUpdatingTaskId(null);
+        },
+      }
+    );
   };
 
   // 태스크 삭제 핸들러
@@ -1026,32 +1056,42 @@ export default function ProjectDetailPage({
                     new Date(a.date).getTime() - new Date(b.date).getTime()
                 )
                 .map((task) => (
-                  <Card key={task.id} className="p-3">
+                  <Card
+                    key={task.id}
+                    className={`p-3 cursor-pointer transition-all duration-200 hover:shadow-md ${
+                      task.done ? "bg-green-50/50 dark:bg-green-900/20" : ""
+                    } ${updatingTaskId === task.id ? "opacity-50" : ""}`}
+                    onClick={() => handleTaskToggle(task.id, task.done)}
+                  >
                     <div className="flex items-center gap-3">
-                      {project.category === "task_based" ? (
-                        <button
-                          onClick={() =>
-                            toggleTaskCompletion(task.id, task.done)
-                          }
-                          className="flex-shrink-0 hover:scale-110 transition-transform"
-                        >
-                          {task.done ? (
-                            <CheckCircle2 className="h-5 w-5 text-green-600 fill-green-600" />
-                          ) : (
-                            <Circle className="h-5 w-5 text-muted-foreground hover:text-green-600 hover:fill-green-100" />
-                          )}
-                        </button>
-                      ) : (
-                        <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
-                          <span className="text-xs text-muted-foreground">
-                            {tasks.indexOf(task) + 1}
-                          </span>
-                        </div>
-                      )}
+                      {/* 인덱스 번호 */}
+                      <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {tasks.indexOf(task) + 1}
+                        </span>
+                      </div>
+
+                      {/* 완료 상태 토글 버튼 */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTaskToggle(task.id, task.done);
+                        }}
+                        className="flex-shrink-0 hover:scale-110 transition-transform"
+                        disabled={updatingTaskId === task.id}
+                      >
+                        {updatingTaskId === task.id ? (
+                          <div className="h-3 w-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        ) : task.done ? (
+                          <CheckCircle2 className="h-3 w-3 text-green-600 fill-green-600" />
+                        ) : (
+                          <Circle className="h-3 w-3 text-muted-foreground hover:text-green-600 hover:fill-green-100" />
+                        )}
+                      </button>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <p
-                            className={`text-sm font-medium ${
+                            className={`text-sm font-medium transition-all duration-200 ${
                               task.done
                                 ? "line-through text-muted-foreground"
                                 : ""
@@ -1062,7 +1102,7 @@ export default function ProjectDetailPage({
                           {task.done && (
                             <Badge
                               variant="default"
-                              className="text-xs bg-green-100 text-green-800 border-green-200"
+                              className="text-xs bg-green-100 text-green-800 border-green-200 dark:bg-green-900 dark:text-green-200"
                             >
                               완료
                             </Badge>

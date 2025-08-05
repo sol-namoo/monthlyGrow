@@ -1319,9 +1319,22 @@ export const updateUserSettings = async (
   updateData: Partial<UserSettings>
 ): Promise<void> => {
   const docRef = doc(db, "users", userId);
-  await updateDoc(docRef, {
-    settings: updateData,
+
+  // 점 표기법을 사용하여 중첩 필드 업데이트
+  const updateFields: any = {};
+  Object.entries(updateData).forEach(([key, value]) => {
+    updateFields[`settings.${key}`] = value;
   });
+
+  console.log("Updating user settings:", { userId, updateData, updateFields });
+
+  try {
+    await updateDoc(docRef, updateFields);
+    console.log("User settings updated successfully");
+  } catch (error) {
+    console.error("Failed to update user settings:", error);
+    throw error;
+  }
 };
 
 export const updateUserPreferences = async (
@@ -1329,9 +1342,14 @@ export const updateUserPreferences = async (
   updateData: Partial<UserPreferences>
 ): Promise<void> => {
   const docRef = doc(db, "users", userId);
-  await updateDoc(docRef, {
-    preferences: updateData,
+
+  // 점 표기법을 사용하여 중첩 필드 업데이트
+  const updateFields: any = {};
+  Object.entries(updateData).forEach(([key, value]) => {
+    updateFields[`preferences.${key}`] = value;
   });
+
+  await updateDoc(docRef, updateFields);
 };
 
 // --- Firebase Auth Profile Update ---

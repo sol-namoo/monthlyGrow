@@ -19,7 +19,8 @@ export function useSettings() {
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
   const [isLoading, setIsLoading] = useState(true);
   const [user, userLoading] = useAuthState(auth);
-  const { setTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Firestore에서 사용자 설정 불러오기
   useEffect(() => {
@@ -31,13 +32,25 @@ export function useSettings() {
 
       try {
         const userData = await fetchUserById(user.uid);
-        setSettings(userData.settings);
-        // next-themes와 동기화
-        setTheme(userData.settings.theme);
+        const userSettings = userData.settings || defaultSettings;
+        setSettings(userSettings);
+
+        // 초기 로드 시에만 테마 동기화 (이미 설정된 테마와 다를 때만)
+        if (
+          !isInitialized &&
+          userSettings.theme &&
+          userSettings.theme !== resolvedTheme
+        ) {
+          setTheme(userSettings.theme);
+        }
+        setIsInitialized(true);
       } catch (error) {
         console.error("설정 불러오기 실패:", error);
         setSettings(defaultSettings);
-        setTheme(defaultSettings.theme);
+        if (!isInitialized) {
+          setTheme(defaultSettings.theme);
+        }
+        setIsInitialized(true);
       } finally {
         setIsLoading(false);
       }
@@ -46,7 +59,7 @@ export function useSettings() {
     if (!userLoading) {
       loadSettings();
     }
-  }, [user?.uid, userLoading, setTheme]);
+  }, [user?.uid, userLoading, setTheme, resolvedTheme, isInitialized]);
 
   // Firestore에 설정 업데이트
   const updateSettings = async (updates: Partial<UserSettings>) => {
@@ -58,8 +71,8 @@ export function useSettings() {
       await updateUserSettings(user.uid, updates);
       setSettings((prev) => ({ ...prev, ...updates }));
 
-      // 테마 변경 시 next-themes와 동기화
-      if (updates.theme) {
+      // 테마 변경 시에만 next-themes와 동기화
+      if (updates.theme && updates.theme !== resolvedTheme) {
         setTheme(updates.theme);
       }
     } catch (error) {

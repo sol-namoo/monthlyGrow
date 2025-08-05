@@ -29,6 +29,8 @@ import { useRouter } from "next/navigation";
 
 import { auth, db, googleAuthProvider } from "@/lib/firebase";
 import Link from "next/link";
+import Loading from "@/components/feedback/Loading";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -40,6 +42,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   let newUser: User;
+
+  // 인증 상태 확인 (로그인 페이지에서는 인증 불필요)
+  const { user, loading } = useAuth(false);
+
+  // 로딩 중이거나 이미 로그인된 경우 로딩 화면 표시
+  if (loading || user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loading />
+      </div>
+    );
+  }
 
   const handleLogin = async () => {
     setIsLoading(true);

@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useState, Suspense, useEffect } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -69,22 +69,22 @@ const projectFormSchema = z
     loop: z.string().optional(),
     startDate: z.string().min(1, "시작일을 입력해주세요"),
     dueDate: z.string().min(1, "목표 완료일을 입력해주세요"),
-    targetCount: z
-      .string()
-      .min(1, "목표를 입력해주세요")
-      .refine((val) => {
-        const num = parseInt(val);
-        return !isNaN(num) && num > 0;
-      }, "목표는 1 이상의 숫자여야 합니다"),
-    tasks: z.array(
-      z.object({
-        id: z.number(),
-        title: z.string().min(1, "태스크 제목을 입력해주세요"),
-        date: z.string(),
-        duration: z.number().min(1),
-        done: z.boolean(),
-      })
-    ),
+    targetCount: z.string().refine((val) => {
+      if (!val) return false;
+      const num = parseInt(val);
+      return !isNaN(num) && num >= 0;
+    }, "목표를 입력해주세요"),
+    tasks: z
+      .array(
+        z.object({
+          id: z.number(),
+          title: z.string().min(1, "태스크 제목을 입력해주세요"),
+          date: z.string(),
+          duration: z.number().min(1),
+          done: z.boolean(),
+        })
+      )
+      .optional(),
   })
   .refine(
     (data) => {
@@ -104,7 +104,7 @@ const projectFormSchema = z
   .refine(
     (data) => {
       // 태스크가 없으면 통과
-      if (data.tasks.length === 0) return true;
+      if (!data.tasks || data.tasks.length === 0) return true;
 
       // 태스크 날짜가 프로젝트 기간 내에 있어야 함
       if (data.startDate && data.dueDate) {
@@ -112,7 +112,7 @@ const projectFormSchema = z
         const dueDate = new Date(data.dueDate);
 
         return data.tasks.every((task) => {
-          if (!task.date) return true; // 날짜가 없으면 통과
+          if (!task.date) return false;
           const taskDate = new Date(task.date);
           return taskDate >= startDate && taskDate <= dueDate;
         });
@@ -139,6 +139,10 @@ function NewProjectPageContent() {
   const [showLoopConnectionDialog, setShowLoopConnectionDialog] =
     useState(false);
   const [selectedLoopIds, setSelectedLoopIds] = useState<string[]>([]);
+  
+  // 태스크 삭제 관련 상태
+  const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
+  const [tempDeletedIndexes, setTempDeletedIndexes] = useState<number[]>([]);
   const router = useRouter();
   const { toast } = useToast();
   const searchParams = useSearchParams();
@@ -249,38 +253,6 @@ function NewProjectPageContent() {
     form.watch("dueDate"),
     replace,
   ]);
-
-  // 작업형 프로젝트에서 목표 횟수 입력 시 태스크 자동 생성
-  useEffect(() => {
-    const category = form.watch("category");
-    const targetCount = form.watch("targetCount");
-    const currentTasks = form.getValues("tasks");
-
-    if (category === "task_based" && targetCount) {
-      const targetNumber = parseInt(targetCount);
-      if (!isNaN(targetNumber) && targetNumber > 0) {
-        if (currentTasks.length === 0) {
-          // 태스크 목록이 비어있으면 새로 생성
-          const newTasks = generateTaskBasedTasks(targetNumber);
-          replace(newTasks);
-        } else if (targetNumber > currentTasks.length) {
-          // 기존 태스크보다 목표 개수가 많으면 부족분을 뒤에 추가
-          const additionalCount = targetNumber - currentTasks.length;
-          const maxId = Math.max(...currentTasks.map((task) => task.id), 0);
-
-          for (let i = 0; i < additionalCount; i++) {
-            append({
-              id: maxId + i + 1,
-              title: "",
-              date: "",
-              duration: 1,
-              done: false,
-            });
-          }
-        }
-      }
-    }
-  }, [form.watch("category"), form.watch("targetCount"), replace, append]);
 
   // 프로젝트 기간과 겹치는 루프만 필터링
   const availableLoopsForConnection = allLoops.filter((loop) => {
@@ -397,12 +369,13 @@ function NewProjectPageContent() {
 
   // 작업형 프로젝트에서 목표 횟수에 따라 빈 태스크 생성
   const generateTaskBasedTasks = (targetCount: number) => {
+    const startDate = form.watch("startDate");
     const tasks = [];
     for (let i = 0; i < targetCount; i++) {
       tasks.push({
         id: i + 1,
         title: "",
-        date: "",
+        date: startDate || "",
         duration: 1,
         done: false,
       });
@@ -420,13 +393,6 @@ function NewProjectPageContent() {
       duration: 1,
       done: false,
     });
-  };
-
-  const removeTask = (taskId: number) => {
-    const index = fields.findIndex((task) => task.id === taskId);
-    if (index > -1) {
-      remove(index);
-    }
   };
 
   const onSubmit = async (data: ProjectFormData) => {
@@ -513,21 +479,18 @@ function NewProjectPageContent() {
 
         tasks = generateRepetitiveTasks(targetCount, startDate, endDate);
       } else {
-        // 작업형 프로젝트: 사용자가 입력한 태스크 사용
-        tasks =
-          data.tasks.length > 0
-            ? data.tasks.map((task, index) => ({
-                id: `task_${index + 1}`,
-                title: task.title,
-                date: createValidDate(task.date),
-                duration: task.duration,
-                done: task.done,
-                projectId: "", // 생성 후 업데이트
-                userId: user!.uid,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-              }))
-            : [];
+        // 작업형 프로젝트: 사용자가 입력한 태스크만 사용 (자동 생성 없음)
+        tasks = (data.tasks || []).map((task, index) => ({
+          id: `task_${index + 1}`,
+          title: task.title,
+          date: createValidDate(task.date),
+          duration: task.duration,
+          done: task.done,
+          projectId: "", // 생성 후 업데이트
+          userId: user!.uid,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }));
       }
 
       // 선택된 루프들을 ConnectedLoop 형식으로 변환
@@ -937,74 +900,47 @@ function NewProjectPageContent() {
                 </span>
               </Label>
               <div className="flex gap-2 items-center">
-                <Input
-                  id="targetCount"
-                  type="number"
-                  min="1"
-                  {...form.register("targetCount")}
-                  placeholder={getTargetPlaceholder(form.watch("category"))}
-                  className="flex-1"
-                  onChange={(e) => {
-                    // 실시간으로 태스크 목록 업데이트
-                    const category = form.watch("category");
-                    const targetCount = e.target.value;
-                    const startDate = form.watch("startDate");
-                    const dueDate = form.watch("dueDate");
+                <Controller
+                  name="targetCount"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Input
+                      id="targetCount"
+                      type="number"
+                      min="1"
+                      value={field.value}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        field.onChange(value);
 
-                    if (
-                      category === "repetitive" &&
-                      targetCount &&
-                      startDate &&
-                      dueDate
-                    ) {
-                      const targetNumber = parseInt(targetCount);
-                      if (!isNaN(targetNumber) && targetNumber > 0) {
-                        const currentTasks = form.getValues("tasks");
-                        const previewTasks = generatePreviewTasks(
-                          targetNumber,
-                          startDate,
-                          dueDate,
-                          currentTasks
-                        );
-                        replace(previewTasks);
-                      }
-                    }
-                  }}
-                  onBlur={(e) => {
-                    // 작업형 프로젝트에서 태스크 자동 생성
-                    const category = form.watch("category");
-                    const targetCount = e.target.value;
-                    const currentTasks = form.getValues("tasks");
+                        // 실시간으로 태스크 목록 업데이트
+                        const category = form.watch("category");
+                        const startDate = form.watch("startDate");
+                        const dueDate = form.watch("dueDate");
 
-                    if (category === "task_based" && targetCount) {
-                      const targetNumber = parseInt(targetCount);
-                      if (!isNaN(targetNumber) && targetNumber > 0) {
-                        if (currentTasks.length === 0) {
-                          // 태스크 목록이 비어있으면 새로 생성
-                          const newTasks = generateTaskBasedTasks(targetNumber);
-                          replace(newTasks);
-                        } else if (targetNumber > currentTasks.length) {
-                          // 기존 태스크보다 목표 개수가 많으면 부족분을 뒤에 추가
-                          const additionalCount =
-                            targetNumber - currentTasks.length;
-                          const maxId = Math.max(
-                            ...currentTasks.map((task) => task.id),
-                            0
-                          );
-
-                          for (let i = 0; i < additionalCount; i++) {
-                            append({
-                              id: maxId + i + 1,
-                              title: "",
-                              date: "",
-                              duration: 1,
-                              done: false,
-                            });
+                        if (
+                          category === "repetitive" &&
+                          value &&
+                          startDate &&
+                          dueDate
+                        ) {
+                          const targetNumber = parseInt(value);
+                          if (!isNaN(targetNumber) && targetNumber > 0) {
+                            const currentTasks = form.getValues("tasks");
+                            const previewTasks = generatePreviewTasks(
+                              targetNumber,
+                              startDate,
+                              dueDate,
+                              currentTasks
+                            );
+                            replace(previewTasks);
                           }
                         }
-                      }
-                    }
-                  }}
+                      }}
+                      placeholder={getTargetPlaceholder(form.watch("category"))}
+                      className="flex-1"
+                    />
+                  )}
                 />
                 <span className="text-sm text-muted-foreground">
                   {getUnitLabel(form.watch("category"))}
@@ -1054,20 +990,62 @@ function NewProjectPageContent() {
         </Card>
 
         <Card className="p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">태스크 목록</h2>
-            {form.watch("category") === "task_based" && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addTask}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                태스크 추가
-              </Button>
-            )}
-          </div>
+                      <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">태스크 목록</h2>
+                <span className="text-sm text-muted-foreground">
+                  ({fields.length}개)
+                </span>
+              </div>
+              {form.watch("category") === "task_based" && (
+                <div className="flex gap-2">
+                  {selectedTasks.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        // 선택된 태스크들 삭제
+                        const selectedIndexes = selectedTasks
+                          .map((taskId) =>
+                            fields.findIndex((field) => field.id === taskId)
+                          )
+                          .filter((index) => index !== -1)
+                          .sort((a, b) => b - a); // 뒤에서부터 삭제
+
+                        // 임시로 삭제된 인덱스들을 추적
+                        setTempDeletedIndexes((prev) => {
+                          const newIndexes = [...prev, ...selectedIndexes];
+                          const uniqueIndexes = [...new Set(newIndexes)]; // 중복 제거
+                          return uniqueIndexes;
+                        });
+
+                        // 선택 상태 초기화
+                        setSelectedTasks([]);
+
+                        const deletedCount = selectedTasks.length;
+                        toast({
+                          title: "태스크 삭제됨",
+                          description: `${deletedCount}개 태스크가 삭제되었습니다.`,
+                        });
+                      }}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      삭제 ({selectedTasks.length})
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addTask}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    태스크 추가
+                  </Button>
+                </div>
+              )}
+            </div>
 
           {form.watch("category") === "repetitive" && (
             <div className="mb-4 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg">
@@ -1154,65 +1132,90 @@ function NewProjectPageContent() {
                     프로젝트 달성을 위한 구체적인 태스크를 추가해보세요
                   </p>
                 </div>
-              ) : (
-                fields.map((field, index) => (
-                  <div
-                    key={field.id}
-                    className="space-y-2 rounded-lg border p-4"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">
-                        태스크 {index + 1}
-                      </span>
-                      {fields.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeTask(field.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-
-                    <div>
-                      <Label>태스크 제목</Label>
-                      <Input
-                        {...form.register(`tasks.${index}.title`)}
-                        placeholder="태스크 제목을 입력하세요"
+                          ) : (
+              <div className="max-h-[calc(100vh-120px)] overflow-y-auto space-y-2 pr-2">
+                {fields.map((field, index) => (
+                  <div key={field.id} className="group">
+                    {/* 선택 체크박스 (카드 위쪽) */}
+                    <div className="flex justify-start mb-2">
+                      <Checkbox
+                        checked={selectedTasks.includes(field.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedTasks((prev) => [...prev, field.id]);
+                          } else {
+                            setSelectedTasks((prev) =>
+                              prev.filter((id) => id !== field.id)
+                            );
+                          }
+                        }}
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>예정일</Label>
-                        <Input
-                          type="date"
-                          {...form.register(`tasks.${index}.date`)}
-                          min={form.watch("startDate") || undefined}
-                          max={form.watch("dueDate") || undefined}
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          프로젝트 기간 내에서 선택
-                        </p>
-                      </div>
-                      <div>
-                        <Label>소요 시간 (시간)</Label>
-                        <Input
-                          type="number"
-                          {...form.register(`tasks.${index}.duration`, {
-                            valueAsNumber: true,
-                          })}
-                          min="1"
-                        />
+                    {/* 태스크 카드 */}
+                    <div className="p-4 border rounded-xl bg-card shadow-sm hover:shadow-md transition-all duration-200 group-hover:border-primary/20">
+                      <div className="space-y-4">
+                        {/* 첫 번째 줄: 제목 */}
+                        <div className="flex items-center gap-3">
+                          <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+                            <span className="text-xs font-medium text-muted-foreground">
+                              {index + 1}
+                            </span>
+                          </div>
+                          <Input
+                            {...form.register(`tasks.${index}.title`)}
+                            placeholder="태스크 제목"
+                            className="flex-1 min-w-0"
+                          />
+                        </div>
+
+                        {/* 두 번째 줄: 날짜, 시간 */}
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            <Input
+                              type="date"
+                              {...form.register(`tasks.${index}.date`)}
+                              className="w-auto text-sm min-w-0"
+                              min={form.watch("startDate")}
+                              max={form.watch("dueDate")}
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Clock className="h-4 w-4 text-muted-foreground" />
+                            <Input
+                              type="number"
+                              {...form.register(`tasks.${index}.duration`, {
+                                valueAsNumber: true,
+                              })}
+                              placeholder="시간"
+                              min="1"
+                              className="w-16 text-sm"
+                            />
+                            <span className="text-sm text-muted-foreground">
+                              시간
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 에러 메시지 표시 */}
+                        {form.formState.errors.tasks?.[index] && (
+                          <div className="text-sm text-red-500">
+                            {Object.values(
+                              form.formState.errors.tasks[index] || {}
+                            ).map((error: any, errorIndex: number) => (
+                              <p key={errorIndex}>{error?.message}</p>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </Card>
 
         {/* 루프 연결 섹션 */}

@@ -64,14 +64,22 @@ export default function SettingsPage() {
       setSavingStates((prev) => ({ ...prev, [key]: true }));
 
       try {
+        console.log(`Saving setting: ${key} = ${value}`);
         await updateSettings({ [key]: value });
+        console.log(`Setting saved successfully: ${key} = ${value}`);
 
         toast({
           title: successMessage || "설정 저장 완료",
           description: "설정이 Firestore에 저장되었습니다.",
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error("설정 저장 실패:", error);
+        console.error("Error details:", {
+          key,
+          value,
+          error: error?.message || "Unknown error",
+          stack: error?.stack,
+        });
         toast({
           title: "설정 저장 실패",
           description: "Firestore에 설정을 저장하는 중 오류가 발생했습니다.",
@@ -370,12 +378,17 @@ export default function SettingsPage() {
                   value={form.watch("theme")}
                   onChange={async (e) => {
                     const value = e.target.value as "light" | "dark" | "system";
-                    form.setValue("theme", value);
-                    await saveSetting(
-                      "theme",
-                      value,
-                      "테마 설정이 저장되었습니다."
-                    );
+                    const currentValue = form.getValues("theme");
+
+                    // 값이 실제로 변경되었을 때만 저장
+                    if (value !== currentValue) {
+                      form.setValue("theme", value);
+                      await saveSetting(
+                        "theme",
+                        value,
+                        "테마 설정이 저장되었습니다."
+                      );
+                    }
                   }}
                   disabled={savingStates["theme"]}
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
@@ -393,12 +406,17 @@ export default function SettingsPage() {
                   value={form.watch("language")}
                   onChange={async (e) => {
                     const value = e.target.value as "ko" | "en";
-                    form.setValue("language", value);
-                    await saveSetting(
-                      "language",
-                      value,
-                      "언어 설정이 저장되었습니다."
-                    );
+                    const currentValue = form.getValues("language");
+
+                    // 값이 실제로 변경되었을 때만 저장
+                    if (value !== currentValue) {
+                      form.setValue("language", value);
+                      await saveSetting(
+                        "language",
+                        value,
+                        "언어 설정이 저장되었습니다."
+                      );
+                    }
                   }}
                   disabled={savingStates["language"]}
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
