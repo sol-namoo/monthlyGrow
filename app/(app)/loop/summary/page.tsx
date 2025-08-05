@@ -9,18 +9,35 @@ import Link from "next/link";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
 import { usePageData } from "@/hooks/usePageData";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function LoopSummaryPage() {
+  const [user, loading] = useAuthState(auth);
   const [reflection, setReflection] = useState("");
   const [rewardClaimed, setRewardClaimed] = useState(false);
   const [selectedLoopId, setSelectedLoopId] = useState<string | undefined>(
     undefined
   );
 
-  const [user, loading] = useAuthState(auth);
   const { loops, isLoading: isLoadingLoops } = usePageData("home", {
     userId: user?.uid,
   });
+  const router = useRouter();
+  const { toast } = useToast();
+
+  // 로그인 상태 확인 및 리다이렉션
+  useEffect(() => {
+    if (!loading && !user) {
+      toast({
+        title: "로그인이 필요합니다",
+        description: "로그인 페이지로 이동합니다.",
+        variant: "destructive",
+      });
+      router.push("/login");
+    }
+  }, [user, loading, toast, router]);
+
   // 최근 루프 id 선택
   useEffect(() => {
     if (loops && loops.length > 0) {
@@ -32,7 +49,11 @@ export default function LoopSummaryPage() {
   });
 
   if (loading || isLoadingLoops || isLoading) return <div>로딩 중...</div>;
-  if (!user) return <div>로그인이 필요합니다.</div>;
+
+  if (!user) {
+    return null;
+  }
+
   if (error) return <div>에러 발생: {error.message}</div>;
   if (!loop) return <div>루프 데이터가 없습니다.</div>;
 
@@ -81,8 +102,8 @@ export default function LoopSummaryPage() {
           {projects && projects.length > 0 ? (
             projects.map((project, index) => {
               const projProgress =
-                project.total > 0
-                  ? Math.round((project.progress / project.total) * 100)
+                project.target > 0
+                  ? Math.round((project.completedTasks / project.target) * 100)
                   : 0;
               return (
                 <Card key={project.id} className="p-4">
@@ -90,7 +111,7 @@ export default function LoopSummaryPage() {
                   <div className="mb-1 flex justify-between text-sm">
                     <span>달성률: {projProgress}%</span>
                     <span>
-                      {project.progress}/{project.total}
+                      {project.completedTasks}/{project.target}
                     </span>
                   </div>
                   <div className="progress-bar">
@@ -114,7 +135,7 @@ export default function LoopSummaryPage() {
           <Textarea
             placeholder="이번 루프에서 배운 점, 어려웠던 점, 다음 루프에 적용할 점 등을 자유롭게 작성해보세요."
             className="min-h-32"
-            value={reflection || loop.reflection || ""}
+            value={reflection || loop.retrospective?.content || ""}
             onChange={(e) => setReflection(e.target.value)}
           />
         </Card>

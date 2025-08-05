@@ -41,6 +41,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { RecommendationBadge } from "@/components/ui/recommendation-badge";
 import Loading from "@/components/feedback/Loading";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 // 폼 스키마 정의
 const areaFormSchema = z.object({
@@ -56,6 +57,7 @@ function NewAreaPageContent() {
   const router = useRouter();
   const { toast } = useToast();
   const searchParams = useSearchParams();
+  const [isSubmitting, setIsSubmitting] = useState(false); // Area 생성 중 로딩 상태
 
   // react-hook-form 설정
   const form = useForm<AreaFormData>({
@@ -140,25 +142,44 @@ function NewAreaPageContent() {
     return option ? option.icon : Compass;
   };
 
-  const onSubmit = (data: AreaFormData) => {
-    // 여기서 Area 생성 로직 구현
-    toast({
-      title: "Area 생성 완료",
-      description: `${data.title} 영역이 생성되었습니다.`,
-    });
+  const onSubmit = async (data: AreaFormData) => {
+    setIsSubmitting(true); // 로딩 상태 시작
 
-    // 루프 생성 페이지에서 왔다면 다시 루프 생성 페이지로 돌아가기
-    const returnUrl = searchParams.get("returnUrl");
-    if (returnUrl) {
-      router.push(returnUrl);
-    } else {
-      // 일반적인 경우는 PARA areas 페이지로 이동
-      router.push("/para/areas");
+    try {
+      // 여기서 Area 생성 로직 구현
+      toast({
+        title: "Area 생성 완료",
+        description: `${data.title} 영역이 생성되었습니다.`,
+      });
+
+      // 루프 생성 페이지에서 왔다면 다시 루프 생성 페이지로 돌아가기
+      const returnUrl = searchParams.get("returnUrl");
+      if (returnUrl) {
+        router.push(returnUrl);
+      } else {
+        // 일반적인 경우는 PARA areas 페이지로 이동
+        router.push("/para/areas");
+      }
+    } catch (error) {
+      console.error("Area 생성 실패:", error);
+      toast({
+        title: "Area 생성 실패",
+        description: "Area 생성 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false); // 로딩 상태 해제
     }
   };
 
   return (
-    <div className="container max-w-md px-4 py-6">
+    <div
+      className={`container max-w-md px-4 py-6 relative ${
+        isSubmitting ? "pointer-events-none" : ""
+      }`}
+    >
+      {/* 로딩 오버레이 */}
+      <LoadingOverlay isVisible={isSubmitting} message="영역 생성 중..." />
       <div className="mb-6 flex items-center">
         <Button
           variant="ghost"
@@ -347,10 +368,15 @@ function NewAreaPageContent() {
         </Card>
 
         <div className="flex gap-3">
-          <Button type="submit" className="flex-1">
-            영역 생성
+          <Button type="submit" className="flex-1" disabled={isSubmitting}>
+            {isSubmitting ? "생성 중..." : "영역 생성"}
           </Button>
-          <Button type="button" variant="outline" onClick={() => router.back()}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.back()}
+            disabled={isSubmitting}
+          >
             취소
           </Button>
         </div>

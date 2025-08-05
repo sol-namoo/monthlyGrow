@@ -31,6 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Retrospective } from "@/lib/types";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { getProjectStatus } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -114,6 +115,8 @@ export default function ProjectDetailPage({
   const [showTaskDialog, setShowTaskDialog] = useState(false);
   const [showEditTaskDialog, setShowEditTaskDialog] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
+  const [hasChanges, setHasChanges] = useState(false); // 변경 사항 감지 플래그
+  const [isNavigating, setIsNavigating] = useState(false); // 페이지 이동 중 로딩 상태
 
   // 태스크 폼 설정
   const taskForm = useForm<TaskFormData>({
@@ -136,6 +139,50 @@ export default function ProjectDetailPage({
   });
 
   const queryClient = useQueryClient();
+
+  // 페이지를 나갈 때 캐시 무효화 (변경 사항이 있을 때만)
+  useEffect(() => {
+    return () => {
+      // 변경 사항이 있을 때만 캐시 무효화
+      if (hasChanges) {
+        console.log("🔄 변경 사항 감지됨 - 캐시 무효화 실행");
+        queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+        queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+        queryClient.invalidateQueries({ queryKey: ["projects", user?.uid] });
+        queryClient.invalidateQueries({ queryKey: ["taskCounts", projectId] });
+        queryClient.invalidateQueries({ queryKey: ["timeStats", projectId] });
+      }
+    };
+  }, [projectId, user?.uid, queryClient, hasChanges]);
+
+  // 페이지 이동 시 조건부 캐시 무효화
+  const handleNavigateToEdit = async () => {
+    setIsNavigating(true); // 로딩 상태 시작
+
+    try {
+      // 변경사항이 있을 때만 캐시 무효화
+      if (hasChanges) {
+        console.log("🔄 변경사항 감지됨 - 수정 페이지 이동 시 캐시 무효화");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
+          queryClient.invalidateQueries({ queryKey: ["tasks", projectId] }),
+          queryClient.invalidateQueries({
+            queryKey: ["taskCounts", projectId],
+          }),
+          queryClient.invalidateQueries({ queryKey: ["timeStats", projectId] }),
+        ]);
+
+        // 캐시에서 완전히 제거
+        queryClient.removeQueries({ queryKey: ["project", projectId] });
+        queryClient.removeQueries({ queryKey: ["tasks", projectId] });
+      }
+
+      router.push(`/para/projects/edit/${projectId}`);
+    } catch (error) {
+      console.error("페이지 이동 중 오류:", error);
+      setIsNavigating(false); // 오류 시 로딩 상태 해제
+    }
+  };
 
   // 프로젝트 삭제 mutation
   const deleteProjectMutation = useMutation({
@@ -171,7 +218,7 @@ export default function ProjectDetailPage({
       return addTaskToProject(projectId, newTask);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+      setHasChanges(true); // 변경 사항 플래그 설정만
       toast({
         title: "태스크 추가 완료",
         description: "새 태스크가 성공적으로 추가되었습니다.",
@@ -200,11 +247,7 @@ export default function ProjectDetailPage({
       return updateTaskInProject(taskId, taskData);
     },
     onSuccess: () => {
-      // 성공 시 쿼리 무효화하여 최신 데이터 확보
-      queryClient.invalidateQueries({
-        queryKey: ["tasks", "project", projectId],
-      });
-      queryClient.invalidateQueries({ queryKey: ["taskCounts", projectId] });
+      setHasChanges(true); // 변경 사항 플래그 설정만
     },
     onError: (error) => {
       toast({
@@ -222,13 +265,19 @@ export default function ProjectDetailPage({
     },
     onMutate: async (taskId) => {
       // 진행 중인 쿼리 취소
-      await queryClient.cancelQueries({ queryKey: ["tasks", projectId] });
+      await queryClient.cancelQueries({
+        queryKey: ["tasks", "project", projectId],
+      });
 
       // 이전 데이터 백업
-      const previousTasks = queryClient.getQueryData(["tasks", projectId]);
+      const previousTasks = queryClient.getQueryData([
+        "tasks",
+        "project",
+        projectId,
+      ]);
 
       // Optimistic update - 태스크 제거
-      queryClient.setQueryData(["tasks", projectId], (old: any) => {
+      queryClient.setQueryData(["tasks", "project", projectId], (old: any) => {
         if (!old) return old;
         return old.filter((task: any) => task.id !== taskId);
       });
@@ -238,7 +287,10 @@ export default function ProjectDetailPage({
     onError: (error, taskId, context) => {
       // 오류 시 이전 데이터로 복원
       if (context?.previousTasks) {
-        queryClient.setQueryData(["tasks", projectId], context.previousTasks);
+        queryClient.setQueryData(
+          ["tasks", "project", projectId],
+          context.previousTasks
+        );
       }
       toast({
         title: "태스크 삭제 실패",
@@ -247,6 +299,7 @@ export default function ProjectDetailPage({
       });
     },
     onSuccess: () => {
+      setHasChanges(true); // 변경 사항 플래그 설정
       toast({
         title: "태스크 삭제 완료",
         description: "태스크가 성공적으로 삭제되었습니다.",
@@ -254,7 +307,12 @@ export default function ProjectDetailPage({
     },
     onSettled: () => {
       // 성공/실패와 관계없이 쿼리 무효화하여 최신 데이터 확보
-      queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+      queryClient.invalidateQueries({
+        queryKey: ["tasks", "project", projectId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["taskCounts", projectId],
+      });
     },
   });
 
@@ -549,14 +607,6 @@ export default function ProjectDetailPage({
     setShowTaskDialog(true);
   };
 
-  // 태스크 완료 상태 토글 핸들러
-  const toggleTaskCompletion = (taskId: string, currentStatus: boolean) => {
-    updateTaskMutation.mutate({
-      taskId,
-      taskData: { done: !currentStatus },
-    });
-  };
-
   // 태스크 완료 상태 토글 핸들러 (개선된 버전)
   const handleTaskToggle = (taskId: string, currentStatus: boolean) => {
     setUpdatingTaskId(taskId);
@@ -571,6 +621,18 @@ export default function ProjectDetailPage({
       );
     });
 
+    // taskCounts도 optimistic update
+    queryClient.setQueryData(["taskCounts", projectId], (old: any) => {
+      if (!old) return old;
+      const newCompletedTasks = currentStatus
+        ? old.completedTasks - 1
+        : old.completedTasks + 1;
+      return {
+        ...old,
+        completedTasks: newCompletedTasks,
+      };
+    });
+
     updateTaskMutation.mutate(
       {
         taskId,
@@ -578,18 +640,15 @@ export default function ProjectDetailPage({
       },
       {
         onSuccess: () => {
-          // 성공 시 쿼리 무효화하여 최신 데이터 확보
-          queryClient.invalidateQueries({
-            queryKey: ["tasks", "project", projectId],
-          });
-          queryClient.invalidateQueries({
-            queryKey: ["taskCounts", projectId],
-          });
+          setHasChanges(true); // 변경 사항 플래그 설정만
         },
         onError: (error, variables, context) => {
           // 오류 시 이전 데이터로 복원
           queryClient.invalidateQueries({
             queryKey: ["tasks", "project", projectId],
+          });
+          queryClient.invalidateQueries({
+            queryKey: ["taskCounts", projectId],
           });
           toast({
             title: "태스크 상태 변경 실패",
@@ -745,17 +804,26 @@ export default function ProjectDetailPage({
   };
 
   return (
-    <div className="container max-w-md px-4 py-6 pb-20">
+    <div
+      className={`container max-w-md px-4 py-6 pb-20 relative ${
+        isNavigating ? "pointer-events-none" : ""
+      }`}
+    >
+      {/* 로딩 오버레이 */}
+      <LoadingOverlay isVisible={isNavigating} message="페이지 이동 중..." />
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-6">
         <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <div className="flex gap-2">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={`/para/projects/edit/${projectId}`}>
-              <Edit className="h-4 w-4" />
-            </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleNavigateToEdit}
+            disabled={isNavigating}
+          >
+            <Edit className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"

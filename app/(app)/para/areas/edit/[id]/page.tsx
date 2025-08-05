@@ -38,6 +38,7 @@ import { SelectItemsDialog } from "@/components/widgets/select-items-dialog";
 import { Badge } from "@/components/ui/badge";
 import Loading from "@/components/feedback/Loading";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 interface Project {
   id: string;
@@ -75,6 +76,7 @@ function EditAreaPageContent({ params }: { params: Promise<{ id: string }> }) {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const { id } = use(params);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Area 수정 중 로딩 상태
 
   // "미분류" 영역은 수정 불가
   if (initialAreaData.name === "미분류") {
@@ -238,25 +240,44 @@ function EditAreaPageContent({ params }: { params: Promise<{ id: string }> }) {
     router.replace(newUrl);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true); // 로딩 상태 시작
 
-    // 여기서 Area 업데이트 로직 구현
-    // formData.name, formData.description, formData.tags,
-    // formData.associatedProjects, formData.associatedResources를 서버로 전송
-    console.log("Updated Area Data:", formData);
+    try {
+      // 여기서 Area 업데이트 로직 구현
+      // formData.name, formData.description, formData.tags,
+      // formData.associatedProjects, formData.associatedResources를 서버로 전송
+      console.log("Updated Area Data:", formData);
 
-    toast({
-      title: "영역 수정 완료",
-      description: `${formData.name} 영역이 업데이트되었습니다.`,
-    });
+      toast({
+        title: "영역 수정 완료",
+        description: `${formData.name} 영역이 업데이트되었습니다.`,
+      });
 
-    // 영역 상세 페이지로 이동
-    router.push(`/para/areas/${id}`);
+      // 영역 상세 페이지로 이동
+      router.push(`/para/areas/${id}`);
+    } catch (error) {
+      console.error("Area 수정 실패:", error);
+      toast({
+        title: "영역 수정 실패",
+        description: "영역 수정 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false); // 로딩 상태 해제
+    }
   };
 
   return (
-    <div className="container max-w-md px-4 py-6">
+    <div
+      className={`container max-w-md px-4 py-6 relative ${
+        isSubmitting ? "pointer-events-none" : ""
+      }`}
+    >
+      {/* 로딩 오버레이 */}
+      <LoadingOverlay isVisible={isSubmitting} message="영역 수정 중..." />
+
       <div className="mb-6 flex items-center">
         <Button variant="ghost" size="icon" asChild className="mr-2">
           <Link href={`/para/areas/${id}`}>
@@ -450,8 +471,8 @@ function EditAreaPageContent({ params }: { params: Promise<{ id: string }> }) {
           </Button>
         </Card>
 
-        <Button type="submit" className="w-full">
-          변경 사항 저장
+        <Button type="submit" className="w-full" disabled={isSubmitting}>
+          {isSubmitting ? "저장 중..." : "변경 사항 저장"}
         </Button>
       </form>
 

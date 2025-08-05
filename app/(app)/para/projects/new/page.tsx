@@ -22,6 +22,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { RecommendationBadge } from "@/components/ui/recommendation-badge";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import {
   Accordion,
   AccordionContent,
@@ -146,17 +147,14 @@ function NewProjectPageContent() {
   const [selectedCategory, setSelectedCategory] = useState<
     "repetitive" | "task_based"
   >("repetitive");
-  const [selectedAreaId, setSelectedAreaId] = useState<string>("");
-  const [tasks, setTasks] = useState<
-    Array<{ title: string; date: string; duration: number }>
-  >([]);
-  const [showLoopConnectionDialog, setShowLoopConnectionDialog] =
-    useState(false);
   const [selectedLoopIds, setSelectedLoopIds] = useState<string[]>([]);
 
-  // 태스크 삭제 관련 상태
+  // 선택된 태스크들을 관리하는 상태
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
-  const [tempDeletedIndexes, setTempDeletedIndexes] = useState<number[]>([]);
+
+  // 루프 연결 관리 상태
+  const [showLoopConnectionDialog, setShowLoopConnectionDialog] =
+    useState(false);
 
   // 프로젝트 유형 변경 다이얼로그 상태
   const [showCategoryChangeDialog, setShowCategoryChangeDialog] =
@@ -164,11 +162,24 @@ function NewProjectPageContent() {
   const [pendingCategoryChange, setPendingCategoryChange] = useState<
     "repetitive" | "task_based" | null
   >(null);
+  const [isSubmitting, setIsSubmitting] = useState(false); // 프로젝트 생성 중 로딩 상태
 
   const router = useRouter();
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const [user, userLoading] = useAuthState(auth);
+
+  // 로그인 상태 확인 및 리다이렉션
+  useEffect(() => {
+    if (!userLoading && !user) {
+      toast({
+        title: "로그인이 필요합니다",
+        description: "로그인 페이지로 이동합니다.",
+        variant: "destructive",
+      });
+      router.push("/login");
+    }
+  }, [user, userLoading, toast, router]);
 
   // URL 파라미터에서 loopId와 addedMidway 값을 가져옴
   const loopId = searchParams.get("loopId");
@@ -486,6 +497,8 @@ function NewProjectPageContent() {
   };
 
   const onSubmit = async (data: ProjectFormData) => {
+    setIsSubmitting(true); // 로딩 상태 시작
+
     try {
       console.log("폼 제출 시작:", data);
       console.log(
@@ -708,6 +721,8 @@ function NewProjectPageContent() {
         description: "프로젝트 생성 중 오류가 발생했습니다.",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false); // 로딩 상태 해제
     }
   };
 
@@ -749,17 +764,17 @@ function NewProjectPageContent() {
   }
 
   if (!user) {
-    return (
-      <div className="container max-w-md px-4 py-6">
-        <div className="text-center">
-          <p>로그인이 필요합니다.</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
-    <div className="container max-w-md px-4 py-6">
+    <div
+      className={`container max-w-md px-4 py-6 relative ${
+        isSubmitting ? "pointer-events-none" : ""
+      }`}
+    >
+      {/* 로딩 오버레이 */}
+      <LoadingOverlay isVisible={isSubmitting} message="프로젝트 생성 중..." />
       <div className="mb-6 flex items-center">
         <Button
           variant="ghost"
@@ -1145,11 +1160,9 @@ function NewProjectPageContent() {
                         .filter((index) => index !== -1)
                         .sort((a, b) => b - a); // 뒤에서부터 삭제
 
-                      // 임시로 삭제된 인덱스들을 추적
-                      setTempDeletedIndexes((prev) => {
-                        const newIndexes = [...prev, ...selectedIndexes];
-                        const uniqueIndexes = [...new Set(newIndexes)]; // 중복 제거
-                        return uniqueIndexes;
+                      // 실제로 fields에서 선택된 인덱스들을 제거 (뒤에서부터 제거하여 인덱스 변화 방지)
+                      selectedIndexes.forEach((index) => {
+                        remove(index);
                       });
 
                       // 선택 상태 초기화
@@ -1478,10 +1491,15 @@ function NewProjectPageContent() {
         </Card>
 
         <div className="flex gap-3">
-          <Button type="submit" className="flex-1">
-            프로젝트 생성
+          <Button type="submit" className="flex-1" disabled={isSubmitting}>
+            {isSubmitting ? "생성 중..." : "프로젝트 생성"}
           </Button>
-          <Button type="button" variant="outline" onClick={() => router.back()}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.back()}
+            disabled={isSubmitting}
+          >
             취소
           </Button>
         </div>

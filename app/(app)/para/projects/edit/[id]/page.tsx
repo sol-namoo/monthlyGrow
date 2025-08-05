@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect, use, Suspense } from "react";
+import { useState, useEffect, use, Suspense, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -55,8 +55,11 @@ import {
   fetchAllTasksByProjectId,
   fetchAllLoopsByUserId,
   deleteTaskFromProject,
+  addTaskToProject,
+  updateTaskInProject,
 } from "@/lib/firebase";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 // 프로젝트 편집 폼 스키마 정의
 const editProjectFormSchema = z
@@ -145,13 +148,22 @@ export default function EditProjectPage({
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   // 삭제된 태스크 ID들을 추적하는 상태
   const [deletedTaskIds, setDeletedTaskIds] = useState<string[]>([]);
-  // 임시로 삭제된 태스크 인덱스들을 추적 (제출 시에만 실제 삭제)
-  const [tempDeletedIndexes, setTempDeletedIndexes] = useState<number[]>([]);
+  // 새로 추가된 태스크들을 추적하는 상태 (임시 ID -> 실제 Firestore ID 매핑)
+  const [newTaskIds, setNewTaskIds] = useState<Set<string>>(new Set());
 
   // 루프 연결 관리 상태
   const [showLoopConnectionDialog, setShowLoopConnectionDialog] =
     useState(false);
   const [selectedLoopIds, setSelectedLoopIds] = useState<string[]>([]);
+
+  // 카테고리 변경 다이얼로그 상태
+  const [showCategoryChangeDialog, setShowCategoryChangeDialog] =
+    useState(false);
+  const [pendingCategoryChange, setPendingCategoryChange] = useState<
+    "repetitive" | "task_based" | null
+  >(null);
+  const [isSubmitting, setIsSubmitting] = useState(false); // 저장 중 로딩 상태
+
   const [user, userLoading] = useAuthState(auth);
 
   // Next.js 15에서는 params가 Promise이므로 unwrap
@@ -248,6 +260,49 @@ export default function EditProjectPage({
     );
   };
 
+  // 카테고리 변경 핸들러
+  const handleCategoryChange = (newCategory: "repetitive" | "task_based") => {
+    const currentCategory = form.watch("category");
+
+    // 같은 카테고리면 변경하지 않음
+    if (currentCategory === newCategory) return;
+
+    // 현재 태스크가 있는지 확인
+    const currentTasks = form.watch("tasks") || [];
+    const hasTasks = currentTasks.length > 0;
+
+    // 태스크가 있으면 무조건 다이얼로그 표시
+    if (hasTasks) {
+      setPendingCategoryChange(newCategory);
+      setShowCategoryChangeDialog(true);
+    } else {
+      // 태스크가 없으면 바로 변경
+      applyCategoryChange(newCategory);
+    }
+  };
+
+  // 다이얼로그에서 확인 선택 (태스크 초기화)
+  const handleConfirmCategoryChange = () => {
+    if (pendingCategoryChange) {
+      form.setValue("category", pendingCategoryChange);
+
+      // 태스크 초기화
+      replace([]);
+
+      // 반복형으로 변경하는 경우 기본값 설정
+      if (pendingCategoryChange === "repetitive") {
+        form.setValue("total", 1);
+      }
+    }
+    setShowCategoryChangeDialog(false);
+    setPendingCategoryChange(null);
+  };
+
+  // 카테고리 변경 적용
+  const applyCategoryChange = (newCategory: "repetitive" | "task_based") => {
+    form.setValue("category", newCategory);
+  };
+
   // 루프 상태 확인
   const getLoopStatus = (loop: any) => {
     const now = new Date();
@@ -283,16 +338,76 @@ export default function EditProjectPage({
         setSelectedLoopIds(project.connectedLoops.map((loop) => loop.id));
       }
     }
-  }, [project, form]);
+  }, [project, form, areas]);
 
   // useFieldArray for tasks (form 초기화 이후에 정의)
   const { fields, append, remove, replace } = useFieldArray({
     control: form.control,
     name: "tasks",
+    keyName: "key", // 고유 키 사용
   });
 
-  // 태스크 데이터가 로드되면 폼에 채우기 (초기 로드 시에만)
+  // 태스크 데이터를 폼에 설정하는 함수
+  const initializeFormWithTasks = useCallback(() => {
+    if (!form || tasksLoading) return;
+
+    console.log("🔍 폼 초기화 시작");
+    console.log("tasks length:", tasks.length);
+
+    // 태스크가 없어도 폼 초기화 진행
+    const formattedTasks = tasks.map((task) => ({
+      id: task.id, // 🔑 실제 Firestore ID 사용
+      title: task.title,
+      date: formatDateForInput(task.date),
+      duration: task.duration,
+      done: task.done,
+    }));
+
+    // 날짜순으로 정렬
+    const sortedTasks = formattedTasks.sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    console.log("formattedTasks:", formattedTasks);
+    console.log("sortedTasks:", sortedTasks);
+    console.log(
+      "원본 tasks 배열의 ID들:",
+      tasks.map((t) => t.id)
+    );
+
+    // 각 태스크의 ID 변환 과정 확인
+    formattedTasks.forEach((task, index) => {
+      console.log(
+        `🔍 태스크 ${index}: 원본 ID=${tasks[index].id}, 변환 후 ID=${task.id}`
+      );
+    });
+
+    // 폼 초기화 전에 현재 상태 확인
+    console.log("🔍 폼 초기화 전 fields 상태:", fields);
+
+    // useFieldArray의 replace를 직접 사용 (key 속성 추가)
+    const tasksWithKeys = sortedTasks.map((task, index) => ({
+      ...task,
+      key: task.id, // Firestore ID를 key로 사용
+    }));
+    replace(tasksWithKeys);
+
+    // 페이지 로드 시 삭제 상태 초기화
+    setDeletedTaskIds([]);
+    setNewTaskIds(new Set());
+
+    console.log("🔍 폼 초기화 완료");
+
+    // fields가 업데이트될 때까지 잠시 기다린 후 다시 로그
+    setTimeout(() => {
+      console.log("fields after replace:", fields.length);
+      console.log("🔍 폼 초기화 후 fields 상태:", fields);
+    }, 100);
+  }, [form, tasks, tasksLoading, replace]);
+
+  // 태스크 데이터가 로드되면 폼에 채우기
   useEffect(() => {
+    console.log("!! useEffect 실행 !!");
     console.log("tasks loaded:", tasks);
     console.log("tasksLoading:", tasksLoading);
     console.log("form available:", !!form);
@@ -300,47 +415,43 @@ export default function EditProjectPage({
     console.log("deletedTaskIds:", deletedTaskIds);
 
     if (form && !tasksLoading && fields.length === 0) {
-      // 초기 로드 시에만 태스크 데이터를 폼에 설정
-      const formattedTasks = tasks.map((task, index) => ({
-        id: (index + 1).toString(), // 폼 필드용 인덱스 사용
-        title: task.title,
-        date: formatDateForInput(task.date),
-        duration: task.duration,
-        done: task.done,
-      }));
-
-      // 날짜순으로 정렬
-      const sortedTasks = formattedTasks.sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
-
-      console.log("formattedTasks:", formattedTasks);
-      console.log("sortedTasks:", sortedTasks);
-      replace(sortedTasks);
-
-      // fields가 업데이트될 때까지 잠시 기다린 후 다시 로그
-      setTimeout(() => {
-        console.log("fields after replace:", fields.length);
-      }, 100);
+      initializeFormWithTasks();
     }
-  }, [tasks, tasksLoading, form]);
+  }, [tasks, tasksLoading, form, fields.length, initializeFormWithTasks]);
+
+  // fields 변화 감지
+  useEffect(() => {
+    if (fields.length > 0) {
+      console.log("✅ fields가 성공적으로 업데이트됨:", fields.length);
+      console.log(
+        "✅ fields 내용:",
+        fields.map((f) => ({ id: f.id, title: f.title }))
+      );
+    }
+  }, [fields]);
 
   // 태스크 추가/삭제 헬퍼 함수
   const addTask = () => {
-    const newId =
-      Math.max(
-        ...fields.map((t) =>
-          typeof t.id === "string" ? parseInt(t.id) : t.id
-        ),
-        0
-      ) + 1;
+    // 기존 태스크들의 ID를 확인하여 고유한 임시 ID 생성
+    const existingIds = fields.map((f) => f.id);
+    let tempId;
+    let counter = 1;
+
+    do {
+      tempId = `temp_${counter}`;
+      counter++;
+    } while (existingIds.includes(tempId));
+
     append({
-      id: newId.toString(),
+      id: tempId,
       title: "",
       date: formatDateForInput(new Date()),
       duration: 1,
       done: false,
     });
+
+    // 새로 추가된 태스크 ID를 추적
+    setNewTaskIds((prev) => new Set([...prev, tempId]));
   };
 
   // 반복형 프로젝트에서 목표 횟수에 따라 태스크 목록 동적 생성
@@ -381,31 +492,39 @@ export default function EditProjectPage({
         taskDate.setTime(end.getTime());
       }
 
-      // 기존 태스크의 제목을 유지하거나 새로 생성
+      // 기존 태스크의 제목과 ID를 유지하거나 새로 생성
       const existingTask = existingTasks[i];
       const title = existingTask?.title || `${i + 1}회차`;
+      const id = existingTask?.id || `temp_${i + 1}`; // 기존 ID 유지, 없으면 임시 ID
+
+      console.log(
+        `🔍 generatePreviewTasks - 태스크 ${i}: 기존 ID=${existingTask?.id}, 최종 ID=${id}`
+      );
 
       tasks.push({
-        id: (i + 1).toString(),
+        id: id,
         title: title,
         date: taskDate.toISOString().split("T")[0], // YYYY-MM-DD 형식
-        duration: 1,
-        done: false,
+        duration: existingTask?.duration || 1,
+        done: existingTask?.done || false,
       });
     }
     return tasks;
-  };
-
-  const removeTask = (index: number) => {
-    remove(index);
   };
 
   // 프로젝트 업데이트 처리
   const onSubmit = async (data: EditProjectFormData) => {
     if (!project) return;
 
+    setIsSubmitting(true); // 로딩 상태 시작
+
     try {
-      // 선택된 루프 정보로 connectedLoops 배열 생성
+      console.log("🚀 프로젝트 수정 시작");
+      console.log("원본 tasks:", tasks.length);
+      console.log("삭제된 태스크들:", deletedTaskIds);
+      console.log("새로 추가된 태스크들:", Array.from(newTaskIds));
+
+      // 1. 프로젝트 정보 업데이트
       const connectedLoops = allLoops
         .filter((loop) => selectedLoopIds.includes(loop.id))
         .map((loop) => ({
@@ -415,34 +534,6 @@ export default function EditProjectPage({
           endDate: loop.endDate,
         }));
 
-      // 폼의 tasks 데이터를 Firestore 형식으로 변환 (임시 삭제된 태스크 제외)
-      const updatedTasks = data.tasks
-        .filter((_, index) => !tempDeletedIndexes.includes(index))
-        .map((task) => ({
-          id: task.id.toString(),
-          userId: project.userId,
-          projectId: project.id,
-          title: task.title,
-          date: new Date(task.date),
-          duration: (() => {
-            // duration 안전하게 처리
-            let safeDuration = 1; // 기본값
-            if (typeof task.duration === "string") {
-              const parsed = parseFloat(task.duration);
-              safeDuration = isNaN(parsed) ? 1 : Math.max(0, parsed);
-            } else if (typeof task.duration === "number") {
-              safeDuration = isNaN(task.duration)
-                ? 1
-                : Math.max(0, task.duration);
-            }
-            return safeDuration;
-          })(),
-          done: task.done,
-          createdAt: new Date(), // 새로 추가된 태스크의 경우
-          updatedAt: new Date(),
-        }));
-
-      // areaId가 빈 문자열이면 제외
       const updateData: Partial<Omit<Project, "id" | "userId" | "createdAt">> =
         {
           title: data.title,
@@ -451,75 +542,93 @@ export default function EditProjectPage({
           startDate: new Date(data.startDate),
           endDate: new Date(data.endDate),
           target: data.total,
-          connectedLoops, // 루프 연결 정보 포함
+          connectedLoops,
           updatedAt: new Date(),
         };
 
-      // areaId가 유효한 값일 때만 추가
       if (data.areaId && data.areaId.trim() !== "") {
         updateData.areaId = data.areaId;
       }
 
-      const updatedProject = {
-        ...project,
-        ...updateData,
-      };
+      await updateProject(project.id, { ...project, ...updateData });
 
-      await updateProject(project.id, updatedProject);
-
-      // 삭제된 태스크들을 Firestore에서 삭제
+      // 2. 삭제된 태스크들 처리
       if (deletedTaskIds.length > 0) {
-        console.log("🔥 Firestore에서 태스크 삭제 시작:", deletedTaskIds);
+        console.log("🗑️ 삭제할 태스크들:", deletedTaskIds);
         for (const taskId of deletedTaskIds) {
           try {
-            console.log(`🗑️ 태스크 삭제 중: ${taskId}`);
             await deleteTaskFromProject(taskId);
             console.log(`✅ 태스크 삭제 완료: ${taskId}`);
           } catch (error) {
-            console.error(`❌ 태스크 삭제 실패 ${taskId}:`, error);
+            console.error(`❌ 태스크 삭제 실패: ${taskId}`, error);
           }
         }
-        console.log("🔥 Firestore 태스크 삭제 완료");
-      } else {
-        console.log("📝 삭제할 태스크가 없습니다");
       }
 
-      // 새로 추가되거나 수정된 태스크들을 Firestore에 저장
-      console.log("Updated tasks:", updatedTasks);
+      // 3. 폼의 태스크들 처리
+      const formTasks = data.tasks.map((task) => ({
+        ...task,
+        title: task.title.trim() || "태스크",
+      }));
 
-      // 관련 데이터 revalidation - 더 강력한 캐시 무효화
-      await queryClient.invalidateQueries({ queryKey: ["project", projectId] });
-      await queryClient.invalidateQueries({
-        queryKey: ["projects", user?.uid],
-      });
-      await queryClient.invalidateQueries({ queryKey: ["loops", user?.uid] });
-      await queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+      console.log("📝 처리할 태스크들:", formTasks.length);
 
-      // 캐시에서 완전히 제거
-      queryClient.removeQueries({ queryKey: ["tasks", projectId] });
+      for (const task of formTasks) {
+        const isNewTask = task.id.startsWith("temp_");
+        const isExistingTask = tasks.some((t) => t.id === task.id);
 
-      // 각 루프 상세 정보도 invalidate
-      selectedLoopIds.forEach((loopId) => {
-        queryClient.invalidateQueries({ queryKey: ["loop", loopId] });
-      });
+        console.log(
+          `🔍 태스크: ${task.title} (ID: ${task.id}, 새: ${isNewTask}, 기존: ${isExistingTask})`
+        );
 
-      // 원래 연결되어 있던 루프들도 invalidate
-      if (project?.connectedLoops) {
-        project.connectedLoops.forEach((loop) => {
-          queryClient.invalidateQueries({ queryKey: ["loop", loop.id] });
-        });
+        try {
+          if (isNewTask) {
+            // 새 태스크 생성
+            console.log(`➕ 새 태스크 생성: ${task.title}`);
+            await addTaskToProject(project.id, {
+              title: task.title,
+              date: new Date(task.date),
+              duration: task.duration,
+              done: task.done,
+            });
+          } else if (isExistingTask) {
+            // 기존 태스크 수정
+            console.log(`📝 기존 태스크 수정: ${task.title}`);
+            await updateTaskInProject(task.id, {
+              title: task.title,
+              date: new Date(task.date),
+              duration: task.duration,
+              done: task.done,
+            });
+          } else {
+            console.warn(
+              `⚠️ 알 수 없는 태스크: ${task.title} (ID: ${task.id})`
+            );
+          }
+        } catch (error) {
+          console.error(`❌ 태스크 처리 실패: ${task.title}`, error);
+          throw new Error(`태스크 저장 실패: ${task.title}`);
+        }
       }
 
-      // 성공 메시지에 삭제된 태스크 정보 포함
+      // 성공 메시지
       const successMessage =
         deletedTaskIds.length > 0
-          ? `프로젝트가 성공적으로 수정되었습니다. (${deletedTaskIds.length}개 태스크 삭제됨)`
-          : "프로젝트가 성공적으로 수정되었습니다.";
+          ? `프로젝트 수정 완료 (${deletedTaskIds.length}개 태스크 삭제됨)`
+          : "프로젝트 수정 완료";
 
       toast({
         title: "프로젝트 수정 완료",
         description: successMessage,
       });
+
+      // 4. 캐시 무효화 후 페이지 이동
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
+        queryClient.invalidateQueries({ queryKey: ["projects", user?.uid] }),
+        queryClient.invalidateQueries({ queryKey: ["tasks", projectId] }),
+        queryClient.invalidateQueries({ queryKey: ["taskCounts", projectId] }),
+      ]);
 
       router.push(`/para/projects/${project.id}`);
     } catch (error) {
@@ -529,6 +638,8 @@ export default function EditProjectPage({
         description: "프로젝트 수정 중 오류가 발생했습니다.",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false); // 로딩 상태 해제
     }
   };
 
@@ -605,7 +716,14 @@ export default function EditProjectPage({
   );
 
   return (
-    <div className="container max-w-md px-4 py-6">
+    <div
+      className={`container max-w-md px-4 py-6 relative ${
+        isSubmitting ? "pointer-events-none" : ""
+      }`}
+    >
+      {/* 로딩 오버레이 */}
+      <LoadingOverlay isVisible={isSubmitting} message="프로젝트 저장 중..." />
+
       <div className="mb-6 flex items-center">
         <Button
           variant="ghost"
@@ -641,7 +759,7 @@ export default function EditProjectPage({
               <RadioGroup
                 value={form.watch("category")}
                 onValueChange={(value: "repetitive" | "task_based") => {
-                  form.setValue("category", value);
+                  handleCategoryChange(value);
                 }}
                 className="mt-2"
               >
@@ -820,35 +938,25 @@ export default function EditProjectPage({
                       ? "예: 30"
                       : "예: 10"
                   }
-                  onChange={(e) => {
-                    // 반복형 프로젝트에서만 목표 횟수 변경 시 태스크 목록 업데이트
-                    const category = form.watch("category");
-                    const total = e.target.value;
-                    const startDate = form.watch("startDate");
-                    const endDate = form.watch("endDate");
+                  onBlur={(e) => {
+                    // 반복형 프로젝트에서만 목표 횟수 변경 시 태스크 목록 동적 생성
+                    if (form.watch("category") === "repetitive") {
+                      const newTotal = parseInt(e.target.value) || 1;
+                      const startDate = form.watch("startDate");
+                      const endDate = form.watch("endDate");
 
-                    if (
-                      category === "repetitive" &&
-                      total &&
-                      startDate &&
-                      endDate
-                    ) {
-                      const targetNumber = parseInt(total);
-                      if (!isNaN(targetNumber) && targetNumber > 0) {
-                        const currentTasks = form.getValues("tasks");
+                      if (startDate && endDate && newTotal > 0) {
+                        console.log(
+                          "🔄 반복형 프로젝트 - 목표 횟수 변경:",
+                          newTotal
+                        );
                         const previewTasks = generatePreviewTasks(
-                          targetNumber,
+                          newTotal,
                           startDate,
                           endDate,
-                          currentTasks
+                          fields
                         );
-                        // 날짜순으로 정렬
-                        const sortedTasks = previewTasks.sort(
-                          (a: any, b: any) =>
-                            new Date(a.date).getTime() -
-                            new Date(b.date).getTime()
-                        );
-                        replace(sortedTasks);
+                        replace(previewTasks);
                       }
                     }
                   }}
@@ -885,67 +993,58 @@ export default function EditProjectPage({
                     variant="destructive"
                     size="sm"
                     onClick={() => {
-                      console.log("삭제 버튼 클릭됨");
-                      console.log("선택된 태스크:", selectedTasks);
-                      console.log("현재 fields:", fields);
+                      console.log("🗑️ 삭제 버튼 클릭됨");
+                      console.log("선택된 태스크 ID들:", selectedTasks);
 
-                      // 선택된 태스크들 삭제 (폼에서만 제거, 실제 저장은 submit 시)
-                      const selectedIndexes = selectedTasks
-                        .map((taskId) =>
-                          fields.findIndex((field) => field.id === taskId)
-                        )
-                        .filter((index) => index !== -1)
-                        .sort((a, b) => b - a); // 뒤에서부터 삭제
-
-                      console.log("삭제할 인덱스들:", selectedIndexes);
-
-                      // 삭제된 태스크 ID들을 추적 (실제 Firestore ID가 있는 경우만)
-                      const deletedIds = selectedTasks
-                        .filter((taskId) => {
-                          // selectedTasks는 폼 필드의 id (number)이므로
-                          // 해당 인덱스의 원래 태스크 ID를 찾아야 함
-                          const fieldIndex = fields.findIndex(
-                            (field) => field.id === taskId
-                          );
-                          if (fieldIndex !== -1 && fieldIndex < tasks.length) {
-                            return tasks[fieldIndex].id; // 원래 Firestore ID 반환
-                          }
-                          return null;
-                        })
-                        .filter(Boolean);
-
-                      console.log("삭제될 Firestore ID들:", deletedIds);
-                      console.log(
-                        "deletedTaskIds 상태 업데이트 전:",
-                        deletedTaskIds
+                      // 1. UI에서 선택된 태스크들 제거
+                      const remainingTasks = fields.filter(
+                        (field) => !selectedTasks.includes(field.id)
                       );
 
-                      // 임시로 삭제된 인덱스들을 추적 (실제 삭제는 제출 시에만)
-                      setTempDeletedIndexes((prev) => {
-                        const newIndexes = [...prev, ...selectedIndexes];
-                        const uniqueIndexes = [...new Set(newIndexes)]; // 중복 제거
-                        console.log("임시 삭제된 인덱스들:", uniqueIndexes);
-                        return uniqueIndexes;
+                      console.log(
+                        "삭제 후 남을 태스크들:",
+                        remainingTasks.length
+                      );
+
+                      // 2. 삭제된 태스크들 분류
+                      const deletedExistingTasks = selectedTasks.filter(
+                        (taskId) => {
+                          const field = fields.find((f) => f.id === taskId);
+                          return field && !field.id.startsWith("temp_"); // 기존 Firestore 태스크만
+                        }
+                      );
+
+                      const deletedNewTasks = selectedTasks.filter((taskId) => {
+                        const field = fields.find((f) => f.id === taskId);
+                        return field && field.id.startsWith("temp_"); // 새로 추가된 태스크만
                       });
 
-                      // 삭제된 태스크 ID들을 추적 (중복 제거)
-                      setDeletedTaskIds((prev) => {
-                        const newIds = [...prev, ...deletedIds];
-                        const uniqueIds = [...new Set(newIds)]; // 중복 제거
-                        console.log(
-                          "deletedTaskIds 상태 업데이트 후:",
-                          uniqueIds
-                        );
-                        return uniqueIds;
+                      console.log(
+                        "삭제될 기존 태스크들:",
+                        deletedExistingTasks
+                      );
+                      console.log("삭제될 새 태스크들:", deletedNewTasks);
+
+                      // 3. 상태 업데이트
+                      setDeletedTaskIds((prev) => [
+                        ...prev,
+                        ...deletedExistingTasks,
+                      ]);
+                      setNewTaskIds((prev) => {
+                        const updated = new Set(prev);
+                        deletedNewTasks.forEach((id) => updated.delete(id));
+                        return updated;
                       });
 
-                      // 선택 상태 초기화
+                      // 4. 폼 업데이트
+                      replace(remainingTasks);
+
+                      // 5. 선택 상태 초기화
                       setSelectedTasks([]);
 
-                      const deletedCount = selectedTasks.length;
                       toast({
                         title: "태스크 삭제됨",
-                        description: `${deletedCount}개 태스크가 삭제되었습니다. 저장 시 반영됩니다.`,
+                        description: `${selectedTasks.length}개 태스크가 삭제되었습니다. 저장 시 반영됩니다.`,
                       });
                     }}
                   >
@@ -991,12 +1090,7 @@ export default function EditProjectPage({
             ) : (
               <div className="max-h-[calc(100vh-120px)] overflow-y-auto space-y-2 pr-2">
                 {fields.map((field, index) => (
-                  <div
-                    key={field.id}
-                    className={`group ${
-                      tempDeletedIndexes.includes(index) ? "hidden" : ""
-                    }`}
-                  >
+                  <div key={field.id} className="group">
                     {/* 선택 체크박스 (카드 위쪽) - 작업형 또는 반복형에서 추가된 태스크만 표시 */}
                     {(form.watch("category") === "task_based" ||
                       (form.watch("category") === "repetitive" &&
@@ -1005,6 +1099,17 @@ export default function EditProjectPage({
                         <Checkbox
                           checked={selectedTasks.includes(field.id)}
                           onCheckedChange={(checked) => {
+                            console.log("checkbox click", field);
+                            console.log(
+                              "현재 fields 배열:",
+                              fields.map((f) => ({ id: f.id, title: f.title }))
+                            );
+                            console.log("클릭된 field의 ID:", field.id);
+                            console.log(
+                              "fields 배열에서 같은 title을 가진 항목:",
+                              fields.find((f) => f.title === field.title)
+                            );
+
                             if (checked) {
                               setSelectedTasks((prev) => [...prev, field.id]);
                             } else {
@@ -1199,10 +1304,15 @@ export default function EditProjectPage({
         </Card>
 
         <div className="flex gap-3">
-          <Button type="submit" className="flex-1">
-            프로젝트 수정
+          <Button type="submit" className="flex-1" disabled={isSubmitting}>
+            {isSubmitting ? "저장 중..." : "프로젝트 수정"}
           </Button>
-          <Button type="button" variant="outline" onClick={() => router.back()}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.back()}
+            disabled={isSubmitting}
+          >
             취소
           </Button>
         </div>
@@ -1320,6 +1430,49 @@ export default function EditProjectPage({
                 </div>
               </>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 카테고리 변경 다이얼로그 */}
+      <Dialog
+        open={showCategoryChangeDialog}
+        onOpenChange={setShowCategoryChangeDialog}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>프로젝트 유형 변경</DialogTitle>
+            <DialogDescription>
+              프로젝트 유형을 변경하면 현재 태스크 목록이 초기화됩니다.
+              계속하시겠습니까?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              현재 태스크: {fields.length}개
+            </p>
+            <p className="text-sm text-muted-foreground">
+              변경할 유형:{" "}
+              {pendingCategoryChange === "repetitive" ? "반복형" : "작업형"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              모든 태스크가 삭제되고 새로 시작됩니다.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleConfirmCategoryChange} className="flex-1">
+              계속하기
+            </Button>
+            <Button
+              onClick={() => {
+                setShowCategoryChangeDialog(false);
+                setPendingCategoryChange(null);
+              }}
+              variant="outline"
+              className="flex-1"
+            >
+              취소
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

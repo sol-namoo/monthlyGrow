@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useForm } from "react-hook-form";
+import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { fetchAllAreasByUserId, auth } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 // 폼 스키마 정의
 const resourceFormSchema = z.object({
@@ -39,6 +41,7 @@ export default function NewResourcePage() {
   const router = useRouter();
   const { toast } = useToast();
   const [user, userLoading] = useAuthState(auth);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Resource 생성 중 로딩 상태
 
   // react-hook-form 설정
   const form = useForm<ResourceFormData>({
@@ -61,18 +64,37 @@ export default function NewResourcePage() {
 
   const areas = allAreas;
 
-  const onSubmit = (data: ResourceFormData) => {
-    toast({
-      title: "자료 생성 완료",
-      description: `${data.title} 자료가 생성되었습니다.`,
-    });
+  const onSubmit = async (data: ResourceFormData) => {
+    setIsSubmitting(true); // 로딩 상태 시작
 
-    router.push("/para/resources");
+    try {
+      toast({
+        title: "자료 생성 완료",
+        description: `${data.title} 자료가 생성되었습니다.`,
+      });
+
+      router.push("/para/resources");
+    } catch (error) {
+      console.error("Resource 생성 실패:", error);
+      toast({
+        title: "자료 생성 실패",
+        description: "자료 생성 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false); // 로딩 상태 해제
+    }
   };
 
   if (userLoading || areasLoading) {
     return (
-      <div className="container max-w-md px-4 py-6">
+      <div
+        className={`container max-w-md px-4 py-6 relative ${
+          isSubmitting ? "pointer-events-none" : ""
+        }`}
+      >
+        {/* 로딩 오버레이 */}
+        <LoadingOverlay isVisible={isSubmitting} message="자료 생성 중..." />
         <div className="mb-6 flex items-center">
           <Button
             variant="ghost"

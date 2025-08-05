@@ -35,10 +35,6 @@ import {
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { useSettings } from "@/hooks/useSettings";
-import Loading from "@/components/feedback/Loading";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -62,6 +58,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/utils";
+import Loading from "@/components/feedback/Loading";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { formatDateForInput } from "@/lib/utils";
 
 // 기본 폼 스키마 정의
 const loopFormSchema = z
@@ -109,9 +109,22 @@ const getIconComponent = (iconName: string) => {
 function NewLoopPageContent() {
   const router = useRouter();
   const { toast } = useToast();
-  const { settings } = useSettings();
   const searchParams = useSearchParams();
-  const [user] = useAuthState(auth);
+  const [user, userLoading] = useAuthState(auth);
+
+  // 로그인 상태 확인 및 리다이렉션
+  useEffect(() => {
+    if (!userLoading && !user) {
+      toast({
+        title: "로그인이 필요합니다",
+        description: "로그인 페이지로 이동합니다.",
+        variant: "destructive",
+      });
+      router.push("/login");
+    }
+  }, [user, userLoading, toast, router]);
+
+  // URL 파라미터에서 loopId와 addedMidway 값을 가져옴
 
   // 사용자의 모든 프로젝트 가져오기
   const { data: allProjects = [], isLoading: projectsLoading } = useQuery({
@@ -183,18 +196,6 @@ function NewLoopPageContent() {
   >();
   const [projectModalRefreshKey, setProjectModalRefreshKey] = useState(0);
   const [currentUrl, setCurrentUrl] = useState("/loop/new");
-
-  // 사용자 설정 불러오기 (Firestore에서)
-  useEffect(() => {
-    // 기본 보상이 활성화되어 있고, 보상 필드가 비어있을 때만 자동으로 채우기
-    if (
-      settings.defaultRewardEnabled &&
-      settings.defaultReward &&
-      !form.getValues("reward")
-    ) {
-      form.setValue("reward", settings.defaultReward);
-    }
-  }, [settings, form]);
 
   // 월 선택 변경 핸들러
   const handleMonthChange = async (selectedMonth: string) => {
@@ -424,16 +425,6 @@ function NewLoopPageContent() {
   // 로딩 상태 확인
   if (projectsLoading || areasLoading) {
     return <Loading />;
-  }
-
-  if (!user) {
-    return (
-      <div className="container max-w-md px-4 py-6">
-        <div className="text-center">
-          <p>로그인이 필요합니다.</p>
-        </div>
-      </div>
-    );
   }
 
   // Area가 있는지 확인
@@ -704,12 +695,10 @@ function NewLoopPageContent() {
                 placeholder="예: 새로운 운동화 구매"
                 className="mt-1"
               />
-              {!settings.defaultRewardEnabled && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  💡 기본 보상 설정이 비활성화되어 있습니다. 설정에서 활성화하면
-                  새 루프 생성 시 자동으로 보상이 채워집니다.
-                </p>
-              )}
+              <p className="text-sm text-muted-foreground mt-1">
+                💡 기본 보상 설정이 비활성화되어 있습니다. 설정에서 활성화하면
+                새 루프 생성 시 자동으로 보상이 채워집니다.
+              </p>
               {form.formState.errors.reward && (
                 <p className="text-sm text-red-500 mt-1">
                   {form.formState.errors.reward.message}

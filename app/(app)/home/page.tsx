@@ -38,10 +38,26 @@ import {
   fetchYearlyActivityStats,
 } from "@/lib/firebase";
 import { getLoopStatus, formatDate } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
+import { useRouter } from "next/navigation";
 
 export default function HomePage() {
   const [user, loading] = useAuthState(auth);
   const [showAllProjects, setShowAllProjects] = useState(false);
+  const { toast } = useToast();
+  const router = useRouter();
+
+  // 로그인 상태 확인 및 리다이렉션
+  useEffect(() => {
+    if (!loading && !user) {
+      toast({
+        title: "로그인이 필요합니다",
+        description: "로그인 페이지로 이동합니다.",
+        variant: "destructive",
+      });
+      router.push("/login");
+    }
+  }, [user, loading, toast, router]);
 
   // Firestore에서 직접 데이터 가져오기
   const { data: areas = [] } = useQuery({
@@ -133,7 +149,10 @@ export default function HomePage() {
   const isLoading = loading || projectsLoading || loopsLoading;
 
   if (loading || isLoading) return <div>로딩 중...</div>;
-  if (!user) return <div>로그인이 필요합니다.</div>;
+
+  if (!user) {
+    return null;
+  }
 
   // 현재 진행 중인 루프를 날짜 기반으로 선택
   const currentLoop =
