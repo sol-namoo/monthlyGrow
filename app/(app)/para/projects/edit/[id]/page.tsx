@@ -192,9 +192,7 @@ export default function EditProjectPage({
   const { data: tasks = [], isLoading: tasksLoading } = useQuery({
     queryKey: ["tasks", projectId],
     queryFn: async () => {
-      console.log("🔍 Fetching tasks for projectId:", projectId);
       const result = await fetchAllTasksByProjectId(projectId);
-      console.log("📦 Raw tasks data from Firestore:", result);
       return result;
     },
     enabled: !!projectId,
@@ -321,7 +319,6 @@ export default function EditProjectPage({
   // 프로젝트 데이터가 로드되면 폼에 채우기
   useEffect(() => {
     if (project) {
-      console.log("Firestore: Project data:", project);
       form.reset({
         title: project.title,
         description: project.description,
@@ -351,9 +348,6 @@ export default function EditProjectPage({
   const initializeFormWithTasks = useCallback(() => {
     if (!form || tasksLoading) return;
 
-    console.log("🔍 폼 초기화 시작");
-    console.log("tasks length:", tasks.length);
-
     // 태스크가 없어도 폼 초기화 진행
     const formattedTasks = tasks.map((task) => ({
       id: task.id, // 🔑 실제 Firestore ID 사용
@@ -368,23 +362,6 @@ export default function EditProjectPage({
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    console.log("formattedTasks:", formattedTasks);
-    console.log("sortedTasks:", sortedTasks);
-    console.log(
-      "원본 tasks 배열의 ID들:",
-      tasks.map((t) => t.id)
-    );
-
-    // 각 태스크의 ID 변환 과정 확인
-    formattedTasks.forEach((task, index) => {
-      console.log(
-        `🔍 태스크 ${index}: 원본 ID=${tasks[index].id}, 변환 후 ID=${task.id}`
-      );
-    });
-
-    // 폼 초기화 전에 현재 상태 확인
-    console.log("🔍 폼 초기화 전 fields 상태:", fields);
-
     // useFieldArray의 replace를 직접 사용 (key 속성 추가)
     const tasksWithKeys = sortedTasks.map((task, index) => ({
       ...task,
@@ -395,25 +372,10 @@ export default function EditProjectPage({
     // 페이지 로드 시 삭제 상태 초기화
     setDeletedTaskIds([]);
     setNewTaskIds(new Set());
-
-    console.log("🔍 폼 초기화 완료");
-
-    // fields가 업데이트될 때까지 잠시 기다린 후 다시 로그
-    setTimeout(() => {
-      console.log("fields after replace:", fields.length);
-      console.log("🔍 폼 초기화 후 fields 상태:", fields);
-    }, 100);
   }, [form, tasks, tasksLoading, replace]);
 
   // 태스크 데이터가 로드되면 폼에 채우기
   useEffect(() => {
-    console.log("!! useEffect 실행 !!");
-    console.log("tasks loaded:", tasks);
-    console.log("tasksLoading:", tasksLoading);
-    console.log("form available:", !!form);
-    console.log("fields length:", fields.length);
-    console.log("deletedTaskIds:", deletedTaskIds);
-
     if (form && !tasksLoading && fields.length === 0) {
       initializeFormWithTasks();
     }
@@ -422,11 +384,6 @@ export default function EditProjectPage({
   // fields 변화 감지
   useEffect(() => {
     if (fields.length > 0) {
-      console.log("✅ fields가 성공적으로 업데이트됨:", fields.length);
-      console.log(
-        "✅ fields 내용:",
-        fields.map((f) => ({ id: f.id, title: f.title }))
-      );
     }
   }, [fields]);
 
@@ -497,10 +454,6 @@ export default function EditProjectPage({
       const title = existingTask?.title || `${i + 1}회차`;
       const id = existingTask?.id || `temp_${i + 1}`; // 기존 ID 유지, 없으면 임시 ID
 
-      console.log(
-        `🔍 generatePreviewTasks - 태스크 ${i}: 기존 ID=${existingTask?.id}, 최종 ID=${id}`
-      );
-
       tasks.push({
         id: id,
         title: title,
@@ -519,11 +472,6 @@ export default function EditProjectPage({
     setIsSubmitting(true); // 로딩 상태 시작
 
     try {
-      console.log("🚀 프로젝트 수정 시작");
-      console.log("원본 tasks:", tasks.length);
-      console.log("삭제된 태스크들:", deletedTaskIds);
-      console.log("새로 추가된 태스크들:", Array.from(newTaskIds));
-
       // 1. 프로젝트 정보 업데이트
       const connectedLoops = allLoops
         .filter((loop) => selectedLoopIds.includes(loop.id))
@@ -554,11 +502,9 @@ export default function EditProjectPage({
 
       // 2. 삭제된 태스크들 처리
       if (deletedTaskIds.length > 0) {
-        console.log("🗑️ 삭제할 태스크들:", deletedTaskIds);
         for (const taskId of deletedTaskIds) {
           try {
             await deleteTaskFromProject(taskId);
-            console.log(`✅ 태스크 삭제 완료: ${taskId}`);
           } catch (error) {
             console.error(`❌ 태스크 삭제 실패: ${taskId}`, error);
           }
@@ -571,20 +517,13 @@ export default function EditProjectPage({
         title: task.title.trim() || "태스크",
       }));
 
-      console.log("📝 처리할 태스크들:", formTasks.length);
-
       for (const task of formTasks) {
         const isNewTask = task.id.startsWith("temp_");
         const isExistingTask = tasks.some((t) => t.id === task.id);
 
-        console.log(
-          `🔍 태스크: ${task.title} (ID: ${task.id}, 새: ${isNewTask}, 기존: ${isExistingTask})`
-        );
-
         try {
           if (isNewTask) {
             // 새 태스크 생성
-            console.log(`➕ 새 태스크 생성: ${task.title}`);
             await addTaskToProject(project.id, {
               title: task.title,
               date: new Date(task.date),
@@ -593,7 +532,6 @@ export default function EditProjectPage({
             });
           } else if (isExistingTask) {
             // 기존 태스크 수정
-            console.log(`📝 기존 태스크 수정: ${task.title}`);
             await updateTaskInProject(task.id, {
               title: task.title,
               date: new Date(task.date),
@@ -946,10 +884,6 @@ export default function EditProjectPage({
                       const endDate = form.watch("endDate");
 
                       if (startDate && endDate && newTotal > 0) {
-                        console.log(
-                          "🔄 반복형 프로젝트 - 목표 횟수 변경:",
-                          newTotal
-                        );
                         const previewTasks = generatePreviewTasks(
                           newTotal,
                           startDate,
@@ -993,17 +927,9 @@ export default function EditProjectPage({
                     variant="destructive"
                     size="sm"
                     onClick={() => {
-                      console.log("🗑️ 삭제 버튼 클릭됨");
-                      console.log("선택된 태스크 ID들:", selectedTasks);
-
                       // 1. UI에서 선택된 태스크들 제거
                       const remainingTasks = fields.filter(
                         (field) => !selectedTasks.includes(field.id)
-                      );
-
-                      console.log(
-                        "삭제 후 남을 태스크들:",
-                        remainingTasks.length
                       );
 
                       // 2. 삭제된 태스크들 분류
@@ -1018,12 +944,6 @@ export default function EditProjectPage({
                         const field = fields.find((f) => f.id === taskId);
                         return field && field.id.startsWith("temp_"); // 새로 추가된 태스크만
                       });
-
-                      console.log(
-                        "삭제될 기존 태스크들:",
-                        deletedExistingTasks
-                      );
-                      console.log("삭제될 새 태스크들:", deletedNewTasks);
 
                       // 3. 상태 업데이트
                       setDeletedTaskIds((prev) => [
@@ -1099,17 +1019,6 @@ export default function EditProjectPage({
                         <Checkbox
                           checked={selectedTasks.includes(field.id)}
                           onCheckedChange={(checked) => {
-                            console.log("checkbox click", field);
-                            console.log(
-                              "현재 fields 배열:",
-                              fields.map((f) => ({ id: f.id, title: f.title }))
-                            );
-                            console.log("클릭된 field의 ID:", field.id);
-                            console.log(
-                              "fields 배열에서 같은 title을 가진 항목:",
-                              fields.find((f) => f.title === field.title)
-                            );
-
                             if (checked) {
                               setSelectedTasks((prev) => [...prev, field.id]);
                             } else {
@@ -1178,32 +1087,8 @@ export default function EditProjectPage({
                               type="number"
                               {...form.register(`tasks.${index}.duration`, {
                                 valueAsNumber: true,
-                                onChange: (e) => {
-                                  console.log(
-                                    `🔍 Edit Task ${
-                                      index + 1
-                                    } duration onChange:`,
-                                    {
-                                      rawValue: e.target.value,
-                                      type: typeof e.target.value,
-                                      parsed: parseFloat(e.target.value),
-                                      isNaN: isNaN(parseFloat(e.target.value)),
-                                    }
-                                  );
-                                },
-                                onBlur: (e) => {
-                                  console.log(
-                                    `🔍 Edit Task ${
-                                      index + 1
-                                    } duration onBlur:`,
-                                    {
-                                      rawValue: e.target.value,
-                                      type: typeof e.target.value,
-                                      parsed: parseFloat(e.target.value),
-                                      isNaN: isNaN(parseFloat(e.target.value)),
-                                    }
-                                  );
-                                },
+                                onChange: (e) => {},
+                                onBlur: (e) => {},
                               })}
                               placeholder="시간"
                               min="0"

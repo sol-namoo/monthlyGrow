@@ -486,7 +486,6 @@ function NewProjectPageContent() {
         0
       ) + 1;
     const startDate = form.watch("startDate");
-    console.log("🔍 addTask - duration type:", typeof 1);
     append({
       id: newId.toString(),
       title: "",
@@ -500,17 +499,6 @@ function NewProjectPageContent() {
     setIsSubmitting(true); // 로딩 상태 시작
 
     try {
-      console.log("폼 제출 시작:", data);
-      console.log(
-        "🔍 Tasks duration values:",
-        data.tasks?.map((task, index) => ({
-          taskIndex: index + 1,
-          duration: task.duration,
-          type: typeof task.duration,
-          isNaN: isNaN(task.duration),
-        }))
-      );
-
       // areaId는 필수이므로 그대로 사용
       const areaId = data.area;
 
@@ -518,7 +506,6 @@ function NewProjectPageContent() {
       const createValidDate = (dateString: string) => {
         const date = new Date(dateString);
         if (isNaN(date.getTime())) {
-          console.error("Invalid date string:", dateString);
           throw new Error(`Invalid date: ${dateString}`);
         }
         return date;
@@ -583,12 +570,6 @@ function NewProjectPageContent() {
         const endDate = createValidDate(data.dueDate);
         const targetCount = parseInt(data.targetCount);
 
-        console.log("반복형 프로젝트 태스크 생성:", {
-          targetCount,
-          startDate,
-          endDate,
-        });
-
         tasks = generateRepetitiveTasks(targetCount, startDate, endDate);
       } else {
         // 작업형 프로젝트: 사용자가 입력한 태스크만 사용 (자동 생성 없음)
@@ -603,12 +584,6 @@ function NewProjectPageContent() {
               ? 1
               : Math.max(0, task.duration);
           }
-
-          console.log(`🔍 Task ${index + 1} duration processing:`, {
-            original: task.duration,
-            type: typeof task.duration,
-            safe: safeDuration,
-          });
 
           return {
             id: `task_${index + 1}`,
@@ -648,24 +623,10 @@ function NewProjectPageContent() {
         userId: user!.uid,
       };
 
-      console.log("프로젝트 생성:", {
-        title: projectData.title,
-        startDate: projectData.startDate,
-        endDate: projectData.endDate,
-        target: projectData.target,
-        category: projectData.category,
-        areaId: projectData.areaId,
-        tasksCount: projectData.tasks.length,
-      });
-
-      console.log("Firebase 호출 시작...");
-
       const newProject = await createProject(projectData);
 
       // 태스크가 있으면 Firebase에 저장
       if (tasks.length > 0) {
-        console.log("태스크 저장 시작:", tasks.length, "개");
-
         try {
           // 각 태스크를 Firebase에 저장
           const taskPromises = tasks.map(async (task) => {
@@ -674,7 +635,6 @@ function NewProjectPageContent() {
               projectId: newProject.id, // 프로젝트 ID 설정
             };
 
-            console.log("태스크 저장:", taskData.title);
             return await addTaskToProject(newProject.id, {
               title: taskData.title,
               date: taskData.date,
@@ -684,9 +644,7 @@ function NewProjectPageContent() {
           });
 
           await Promise.all(taskPromises);
-          console.log("모든 태스크 저장 완료");
         } catch (taskError) {
-          console.error("태스크 저장 실패:", taskError);
           // 태스크 저장 실패해도 프로젝트는 생성되었으므로 경고만 표시
           toast({
             title: "프로젝트 생성 완료 (태스크 저장 실패)",
@@ -715,7 +673,6 @@ function NewProjectPageContent() {
         router.push("/para?tab=projects");
       }
     } catch (error) {
-      console.error("프로젝트 생성 실패:", error);
       toast({
         title: "프로젝트 생성 실패",
         description: "프로젝트 생성 중 오류가 발생했습니다.",
@@ -1351,47 +1308,12 @@ function NewProjectPageContent() {
                                 type="number"
                                 {...form.register(`tasks.${index}.duration`, {
                                   valueAsNumber: true,
-                                  onChange: (e) => {
-                                    console.log(
-                                      `🔍 Task ${index + 1} duration onChange:`,
-                                      {
-                                        rawValue: e.target.value,
-                                        type: typeof e.target.value,
-                                        parsed: parseFloat(e.target.value),
-                                        isNaN: isNaN(
-                                          parseFloat(e.target.value)
-                                        ),
-                                      }
-                                    );
-                                  },
+                                  onChange: (e) => {},
                                   onBlur: (e) => {
-                                    console.log(
-                                      `🔍 Task ${index + 1} duration onBlur:`,
-                                      {
-                                        rawValue: e.target.value,
-                                        type: typeof e.target.value,
-                                        parsed: parseFloat(e.target.value),
-                                        isNaN: isNaN(
-                                          parseFloat(e.target.value)
-                                        ),
-                                      }
-                                    );
                                     // 에러 상태 확인
                                     setTimeout(() => {
                                       const errors = form.formState.errors;
                                       const currentValues = form.getValues();
-                                      console.log(
-                                        `🔍 Task ${
-                                          index + 1
-                                        } errors after onBlur:`,
-                                        {
-                                          taskErrors: errors.tasks?.[index],
-                                          currentTaskValue:
-                                            currentValues.tasks?.[index]
-                                              ?.duration,
-                                          allErrors: errors,
-                                        }
-                                      );
                                     }, 100);
                                   },
                                 })}

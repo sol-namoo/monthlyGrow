@@ -1439,8 +1439,31 @@ export const deleteResourceById = async (resourceId: string): Promise<void> => {
 
 export const deleteProjectById = async (projectId: string): Promise<void> => {
   try {
+    console.log(`🗑️ 프로젝트 삭제 시작 - ID: ${projectId}`);
+
+    // 1. 프로젝트에 연관된 모든 태스크 조회
+    const tasks = await fetchAllTasksByProjectId(projectId);
+    console.log(`📋 발견된 태스크 수: ${tasks.length}개`);
+
+    // 2. 연관된 태스크들 삭제
+    if (tasks.length > 0) {
+      console.log("🗑️ 연관된 태스크들 삭제 시작...");
+      for (const task of tasks) {
+        try {
+          await deleteTaskFromProject(task.id);
+          console.log(`✅ 태스크 삭제 완료: ${task.title}`);
+        } catch (error) {
+          console.error(`❌ 태스크 삭제 실패: ${task.title}`, error);
+          // 태스크 삭제 실패해도 프로젝트 삭제는 계속 진행
+        }
+      }
+      console.log("✅ 모든 연관 태스크 삭제 완료");
+    }
+
+    // 3. 프로젝트 자체 삭제
     const docRef = doc(db, "projects", projectId);
     await deleteDoc(docRef);
+    console.log(`✅ 프로젝트 삭제 완료 - ID: ${projectId}`);
   } catch (error) {
     console.error("Error deleting project:", error);
     throw new Error("프로젝트 삭제에 실패했습니다.");

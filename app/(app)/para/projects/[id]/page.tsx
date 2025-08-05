@@ -145,7 +145,6 @@ export default function ProjectDetailPage({
     return () => {
       // 변경 사항이 있을 때만 캐시 무효화
       if (hasChanges) {
-        console.log("🔄 변경 사항 감지됨 - 캐시 무효화 실행");
         queryClient.invalidateQueries({ queryKey: ["project", projectId] });
         queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
         queryClient.invalidateQueries({ queryKey: ["projects", user?.uid] });
@@ -162,7 +161,6 @@ export default function ProjectDetailPage({
     try {
       // 변경사항이 있을 때만 캐시 무효화
       if (hasChanges) {
-        console.log("🔄 변경사항 감지됨 - 수정 페이지 이동 시 캐시 무효화");
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
           queryClient.invalidateQueries({ queryKey: ["tasks", projectId] }),
@@ -247,13 +245,26 @@ export default function ProjectDetailPage({
       return updateTaskInProject(taskId, taskData);
     },
     onSuccess: () => {
-      setHasChanges(true); // 변경 사항 플래그 설정만
+      setHasChanges(true); // 변경 사항 플래그 설정
+      toast({
+        title: "태스크 수정 완료",
+        description: "태스크가 성공적으로 수정되었습니다.",
+      });
     },
     onError: (error) => {
       toast({
         title: "태스크 수정 실패",
         description: "태스크 수정 중 오류가 발생했습니다.",
         variant: "destructive",
+      });
+    },
+    onSettled: () => {
+      // 성공/실패와 관계없이 쿼리 무효화하여 최신 데이터 확보
+      queryClient.invalidateQueries({
+        queryKey: ["tasks", "project", projectId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["taskCounts", projectId],
       });
     },
   });
@@ -355,13 +366,6 @@ export default function ProjectDetailPage({
   const { data: taskCounts, isLoading: isTaskCountsLoading } = useQuery({
     queryKey: ["taskCounts", projectId],
     queryFn: () => getTaskCountsByProjectId(projectId),
-    enabled: !!projectId,
-  });
-
-  console.log("🔍 TaskCounts Query Status:", {
-    projectId,
-    isTaskCountsLoading,
-    taskCounts,
     enabled: !!projectId,
   });
 
@@ -569,19 +573,6 @@ export default function ProjectDetailPage({
     projectData: project,
   });
 
-  // 추가 디버깅 로그
-  console.log("🔍 Project Display Values:", {
-    projectTitle: project?.title,
-    projectTarget: project?.target,
-    projectCategory: project?.category,
-    completedTasks,
-    totalTasks,
-    calculatedRemaining:
-      project?.category === "repetitive"
-        ? Math.max(0, (project?.target || 0) - (completedTasks || 0))
-        : (totalTasks || 0) - (completedTasks || 0),
-  });
-
   // 스마트 회고 조건 (완료율 90% 미만)
   const shouldShowSmartRetrospective = progressPercentage < 90;
 
@@ -778,7 +769,6 @@ export default function ProjectDetailPage({
             } ${setRating ? "cursor-pointer hover:scale-110" : ""}`}
             onClick={() => {
               if (setRating) {
-                console.log(`별점 클릭: ${star}점`);
                 setRating(star);
               }
             }}
@@ -1129,10 +1119,9 @@ export default function ProjectDetailPage({
                 .map((task) => (
                   <Card
                     key={task.id}
-                    className={`p-3 cursor-pointer transition-all duration-200 hover:shadow-md ${
+                    className={`p-3 transition-all duration-200 hover:shadow-md ${
                       task.done ? "bg-green-50/50 dark:bg-green-900/20" : ""
                     } ${updatingTaskId === task.id ? "opacity-50" : ""}`}
-                    onClick={() => handleTaskToggle(task.id, task.done)}
                   >
                     <div className="flex items-center gap-3">
                       {/* 인덱스 번호 */}
@@ -1148,7 +1137,7 @@ export default function ProjectDetailPage({
                           e.stopPropagation();
                           handleTaskToggle(task.id, task.done);
                         }}
-                        className="flex-shrink-0 hover:scale-110 transition-transform"
+                        className="flex-shrink-0 hover:scale-110 transition-transform cursor-pointer"
                         disabled={updatingTaskId === task.id}
                       >
                         {updatingTaskId === task.id ? (
@@ -1170,14 +1159,6 @@ export default function ProjectDetailPage({
                           >
                             {task.title}
                           </p>
-                          {task.done && (
-                            <Badge
-                              variant="default"
-                              className="text-xs bg-green-100 text-green-800 border-green-200 dark:bg-green-900 dark:text-green-200"
-                            >
-                              완료
-                            </Badge>
-                          )}
                         </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <div className="flex items-center gap-1">
@@ -1556,7 +1537,6 @@ export default function ProjectDetailPage({
                   id="bookmarked"
                   checked={bookmarked}
                   onCheckedChange={(checked) => {
-                    console.log(`북마크 상태 변경: ${checked}`);
                     setBookmarked(checked as boolean);
                   }}
                 />
