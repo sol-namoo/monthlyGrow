@@ -139,7 +139,7 @@ function NewProjectPageContent() {
   const [showLoopConnectionDialog, setShowLoopConnectionDialog] =
     useState(false);
   const [selectedLoopIds, setSelectedLoopIds] = useState<string[]>([]);
-  
+
   // 태스크 삭제 관련 상태
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [tempDeletedIndexes, setTempDeletedIndexes] = useState<number[]>([]);
@@ -990,62 +990,62 @@ function NewProjectPageContent() {
         </Card>
 
         <Card className="p-6">
-                      <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold">태스크 목록</h2>
-                <span className="text-sm text-muted-foreground">
-                  ({fields.length}개)
-                </span>
-              </div>
-              {form.watch("category") === "task_based" && (
-                <div className="flex gap-2">
-                  {selectedTasks.length > 0 && (
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => {
-                        // 선택된 태스크들 삭제
-                        const selectedIndexes = selectedTasks
-                          .map((taskId) =>
-                            fields.findIndex((field) => field.id === taskId)
-                          )
-                          .filter((index) => index !== -1)
-                          .sort((a, b) => b - a); // 뒤에서부터 삭제
-
-                        // 임시로 삭제된 인덱스들을 추적
-                        setTempDeletedIndexes((prev) => {
-                          const newIndexes = [...prev, ...selectedIndexes];
-                          const uniqueIndexes = [...new Set(newIndexes)]; // 중복 제거
-                          return uniqueIndexes;
-                        });
-
-                        // 선택 상태 초기화
-                        setSelectedTasks([]);
-
-                        const deletedCount = selectedTasks.length;
-                        toast({
-                          title: "태스크 삭제됨",
-                          description: `${deletedCount}개 태스크가 삭제되었습니다.`,
-                        });
-                      }}
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      삭제 ({selectedTasks.length})
-                    </Button>
-                  )}
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold">태스크 목록</h2>
+              <span className="text-sm text-muted-foreground">
+                ({fields.length}개)
+              </span>
+            </div>
+            {form.watch("category") === "task_based" && (
+              <div className="flex gap-2">
+                {selectedTasks.length > 0 && (
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="destructive"
                     size="sm"
-                    onClick={addTask}
+                    onClick={() => {
+                      // 선택된 태스크들 삭제
+                      const selectedIndexes = selectedTasks
+                        .map((taskId) =>
+                          fields.findIndex((field) => field.id === taskId)
+                        )
+                        .filter((index) => index !== -1)
+                        .sort((a, b) => b - a); // 뒤에서부터 삭제
+
+                      // 임시로 삭제된 인덱스들을 추적
+                      setTempDeletedIndexes((prev) => {
+                        const newIndexes = [...prev, ...selectedIndexes];
+                        const uniqueIndexes = [...new Set(newIndexes)]; // 중복 제거
+                        return uniqueIndexes;
+                      });
+
+                      // 선택 상태 초기화
+                      setSelectedTasks([]);
+
+                      const deletedCount = selectedTasks.length;
+                      toast({
+                        title: "태스크 삭제됨",
+                        description: `${deletedCount}개 태스크가 삭제되었습니다.`,
+                      });
+                    }}
                   >
-                    <Plus className="mr-2 h-4 w-4" />
-                    태스크 추가
+                    <X className="h-4 w-4 mr-2" />
+                    삭제 ({selectedTasks.length})
                   </Button>
-                </div>
-              )}
-            </div>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addTask}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  태스크 추가
+                </Button>
+              </div>
+            )}
+          </div>
 
           {form.watch("category") === "repetitive" && (
             <div className="mb-4 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg">
@@ -1132,90 +1132,91 @@ function NewProjectPageContent() {
                     프로젝트 달성을 위한 구체적인 태스크를 추가해보세요
                   </p>
                 </div>
-                          ) : (
-              <div className="max-h-[calc(100vh-120px)] overflow-y-auto space-y-2 pr-2">
-                {fields.map((field, index) => (
-                  <div key={field.id} className="group">
-                    {/* 선택 체크박스 (카드 위쪽) */}
-                    <div className="flex justify-start mb-2">
-                      <Checkbox
-                        checked={selectedTasks.includes(field.id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedTasks((prev) => [...prev, field.id]);
-                          } else {
-                            setSelectedTasks((prev) =>
-                              prev.filter((id) => id !== field.id)
-                            );
-                          }
-                        }}
-                      />
-                    </div>
+              ) : (
+                <div className="max-h-[calc(100vh-120px)] overflow-y-auto space-y-2 pr-2">
+                  {fields.map((field, index) => (
+                    <div key={field.id} className="group">
+                      {/* 선택 체크박스 (카드 위쪽) */}
+                      <div className="flex justify-start mb-2">
+                        <Checkbox
+                          checked={selectedTasks.includes(field.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedTasks((prev) => [...prev, field.id]);
+                            } else {
+                              setSelectedTasks((prev) =>
+                                prev.filter((id) => id !== field.id)
+                              );
+                            }
+                          }}
+                        />
+                      </div>
 
-                    {/* 태스크 카드 */}
-                    <div className="p-4 border rounded-xl bg-card shadow-sm hover:shadow-md transition-all duration-200 group-hover:border-primary/20">
-                      <div className="space-y-4">
-                        {/* 첫 번째 줄: 제목 */}
-                        <div className="flex items-center gap-3">
-                          <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
-                            <span className="text-xs font-medium text-muted-foreground">
-                              {index + 1}
-                            </span>
-                          </div>
-                          <Input
-                            {...form.register(`tasks.${index}.title`)}
-                            placeholder="태스크 제목"
-                            className="flex-1 min-w-0"
-                          />
-                        </div>
-
-                        {/* 두 번째 줄: 날짜, 시간 */}
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      {/* 태스크 카드 */}
+                      <div className="p-4 border rounded-xl bg-card shadow-sm hover:shadow-md transition-all duration-200 group-hover:border-primary/20">
+                        <div className="space-y-4">
+                          {/* 첫 번째 줄: 제목 */}
+                          <div className="flex items-center gap-3">
+                            <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+                              <span className="text-xs font-medium text-muted-foreground">
+                                {index + 1}
+                              </span>
+                            </div>
                             <Input
-                              type="date"
-                              {...form.register(`tasks.${index}.date`)}
-                              className="w-auto text-sm min-w-0"
-                              min={form.watch("startDate")}
-                              max={form.watch("dueDate")}
+                              {...form.register(`tasks.${index}.title`)}
+                              placeholder="태스크 제목"
+                              className="flex-1 min-w-0"
                             />
                           </div>
 
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                            <Input
-                              type="number"
-                              {...form.register(`tasks.${index}.duration`, {
-                                valueAsNumber: true,
-                              })}
-                              placeholder="시간"
-                              min="1"
-                              className="w-16 text-sm"
-                            />
-                            <span className="text-sm text-muted-foreground">
-                              시간
-                            </span>
-                          </div>
-                        </div>
+                          {/* 두 번째 줄: 날짜, 시간 */}
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                              <Input
+                                type="date"
+                                {...form.register(`tasks.${index}.date`)}
+                                className="w-auto text-sm min-w-0"
+                                min={form.watch("startDate")}
+                                max={form.watch("dueDate")}
+                              />
+                            </div>
 
-                        {/* 에러 메시지 표시 */}
-                        {form.formState.errors.tasks?.[index] && (
-                          <div className="text-sm text-red-500">
-                            {Object.values(
-                              form.formState.errors.tasks[index] || {}
-                            ).map((error: any, errorIndex: number) => (
-                              <p key={errorIndex}>{error?.message}</p>
-                            ))}
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <Clock className="h-4 w-4 text-muted-foreground" />
+                              <Input
+                                type="number"
+                                {...form.register(`tasks.${index}.duration`, {
+                                  valueAsNumber: true,
+                                })}
+                                placeholder="시간"
+                                min="1"
+                                className="w-16 text-sm"
+                              />
+                              <span className="text-sm text-muted-foreground">
+                                시간
+                              </span>
+                            </div>
                           </div>
-                        )}
+
+                          {/* 에러 메시지 표시 */}
+                          {form.formState.errors.tasks?.[index] && (
+                            <div className="text-sm text-red-500">
+                              {Object.values(
+                                form.formState.errors.tasks[index] || {}
+                              ).map((error: any, errorIndex: number) => (
+                                <p key={errorIndex}>{error?.message}</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </Card>
 
         {/* 루프 연결 섹션 */}
