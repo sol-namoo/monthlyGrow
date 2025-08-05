@@ -66,7 +66,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 const taskFormSchema = z.object({
   title: z.string().min(1, "태스크 제목을 입력해주세요"),
   date: z.string().min(1, "날짜를 선택해주세요"),
-  duration: z.number().min(1, "소요 시간을 입력해주세요"),
+  duration: z
+    .number()
+    .min(0, "소요 시간은 0 이상이어야 합니다")
+    .multipleOf(0.1, "소요 시간은 소수점 첫째 자리까지 입력 가능합니다"),
 });
 
 type TaskFormData = z.infer<typeof taskFormSchema>;
@@ -1038,7 +1041,7 @@ export default function ProjectDetailPage({
             </div>
 
             {project.category === "repetitive" && (
-              <div className="mb-4 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg border border-border">
+              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
                 <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200 text-sm">
                   <Info className="h-4 w-4" />
                   <span className="font-medium">프로젝트 정보</span>
@@ -1115,7 +1118,12 @@ export default function ProjectDetailPage({
                           </div>
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            <span>{task.duration}시간</span>
+                            <span>
+                              {typeof task.duration === "string"
+                                ? parseFloat(task.duration)
+                                : task.duration}
+                              시간
+                            </span>
                           </div>
                         </div>
                       </div>

@@ -23,6 +23,12 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { RecommendationBadge } from "@/components/ui/recommendation-badge";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
   AlertCircle,
   Plus,
   Trash2,
@@ -32,6 +38,7 @@ import {
   ChevronLeft,
   Briefcase,
   X,
+  Info,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -55,6 +62,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 
 // 폼 스키마 정의
@@ -77,10 +85,16 @@ const projectFormSchema = z
     tasks: z
       .array(
         z.object({
-          id: z.number(),
+          id: z.any(), // 시스템에서 자동 생성하므로 검증 불필요
           title: z.string().min(1, "태스크 제목을 입력해주세요"),
           date: z.string(),
-          duration: z.number().min(1),
+          duration: z
+            .number()
+            .min(0, "소요 시간은 0 이상이어야 합니다")
+            .multipleOf(
+              0.1,
+              "소요 시간은 소수점 첫째 자리까지 입력 가능합니다"
+            ),
           done: z.boolean(),
         })
       )
@@ -143,6 +157,14 @@ function NewProjectPageContent() {
   // 태스크 삭제 관련 상태
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [tempDeletedIndexes, setTempDeletedIndexes] = useState<number[]>([]);
+
+  // 프로젝트 유형 변경 다이얼로그 상태
+  const [showCategoryChangeDialog, setShowCategoryChangeDialog] =
+    useState(false);
+  const [pendingCategoryChange, setPendingCategoryChange] = useState<
+    "repetitive" | "task_based" | null
+  >(null);
+
   const router = useRouter();
   const { toast } = useToast();
   const searchParams = useSearchParams();
@@ -242,10 +264,8 @@ function NewProjectPageContent() {
         );
         replace(sortedTasks);
       }
-    } else if (category === "task_based") {
-      // 작업형으로 변경되면 태스크 목록 초기화
-      replace([]);
     }
+    // 작업형 프로젝트에서는 목표 설정 시 태스크 목록을 초기화하지 않음
   }, [
     form.watch("category"),
     form.watch("targetCount"),
@@ -305,6 +325,69 @@ function NewProjectPageContent() {
       }
     : null;
 
+  // 프로젝트 유형 변경 핸들러
+  const handleCategoryChange = (newCategory: "repetitive" | "task_based") => {
+    const currentCategory = form.watch("category");
+    const currentTasks = form.watch("tasks") || [];
+
+    // 같은 카테고리면 변경하지 않음
+    if (currentCategory === newCategory) return;
+
+    // 기존 태스크가 있고, 프로젝트 유형을 변경하는 경우 다이얼로그 표시
+    if (currentTasks.length > 0) {
+      setPendingCategoryChange(newCategory);
+      setShowCategoryChangeDialog(true);
+      return;
+    }
+
+    // 태스크가 없는 경우 바로 변경
+    applyCategoryChange(newCategory);
+  };
+
+  // 실제 카테고리 변경 적용
+  const applyCategoryChange = (newCategory: "repetitive" | "task_based") => {
+    form.setValue("category", newCategory);
+    setSelectedCategory(newCategory);
+
+    if (newCategory === "repetitive") {
+      // 반복형으로 변경 시 기존 태스크 초기화 (다이얼로그에서 선택한 경우 제외)
+      replace([]);
+    }
+    // 작업형으로 변경 시 기존 태스크 유지
+  };
+
+  // 다이얼로그에서 태스크 유지 선택
+  const handleKeepTasks = () => {
+    if (pendingCategoryChange) {
+      const currentTasks = form.watch("tasks") || [];
+      form.setValue("category", pendingCategoryChange);
+      setSelectedCategory(pendingCategoryChange);
+
+      // 반복형으로 변경하는 경우 목표 횟수를 기존 태스크 개수로 조정
+      if (pendingCategoryChange === "repetitive") {
+        form.setValue("targetCount", currentTasks.length.toString());
+      }
+    }
+    setShowCategoryChangeDialog(false);
+    setPendingCategoryChange(null);
+  };
+
+  // 다이얼로그에서 태스크 초기화 선택
+  const handleClearTasks = () => {
+    if (pendingCategoryChange) {
+      form.setValue("category", pendingCategoryChange);
+      setSelectedCategory(pendingCategoryChange);
+
+      // 반복형으로 변경하는 경우 태스크 초기화
+      if (pendingCategoryChange === "repetitive") {
+        replace([]);
+        form.setValue("targetCount", "");
+      }
+    }
+    setShowCategoryChangeDialog(false);
+    setPendingCategoryChange(null);
+  };
+
   // 루프 선택/해제 핸들러
   const toggleLoopSelection = (loopId: string) => {
     setSelectedLoopIds((prev) =>
@@ -357,10 +440,10 @@ function NewProjectPageContent() {
       const title = existingTask?.title || `${i + 1}회차`;
 
       tasks.push({
-        id: i + 1,
+        id: (i + 1).toString(),
         title: title,
         date: taskDate.toISOString().split("T")[0], // YYYY-MM-DD 형식
-        duration: 1,
+        duration: 1.0,
         done: false,
       });
     }
@@ -373,7 +456,7 @@ function NewProjectPageContent() {
     const tasks = [];
     for (let i = 0; i < targetCount; i++) {
       tasks.push({
-        id: i + 1,
+        id: (i + 1).toString(),
         title: "",
         date: startDate || "",
         duration: 1,
@@ -384,10 +467,17 @@ function NewProjectPageContent() {
   };
 
   const addTask = () => {
-    const newId = Math.max(...fields.map((t) => t.id), 0) + 1;
+    const newId =
+      Math.max(
+        ...fields.map((t) =>
+          typeof t.id === "string" ? parseInt(t.id) : t.id
+        ),
+        0
+      ) + 1;
     const startDate = form.watch("startDate");
+    console.log("🔍 addTask - duration type:", typeof 1);
     append({
-      id: newId,
+      id: newId.toString(),
       title: "",
       date: startDate || "",
       duration: 1,
@@ -398,6 +488,15 @@ function NewProjectPageContent() {
   const onSubmit = async (data: ProjectFormData) => {
     try {
       console.log("폼 제출 시작:", data);
+      console.log(
+        "🔍 Tasks duration values:",
+        data.tasks?.map((task, index) => ({
+          taskIndex: index + 1,
+          duration: task.duration,
+          type: typeof task.duration,
+          isNaN: isNaN(task.duration),
+        }))
+      );
 
       // areaId는 필수이므로 그대로 사용
       const areaId = data.area;
@@ -452,7 +551,7 @@ function NewProjectPageContent() {
             id: `task_${i + 1}`,
             title: `${i + 1}회차`,
             date: taskDate,
-            duration: 1, // 기본 1시간
+            duration: 1.0, // 기본 1시간
             done: false,
             projectId: "", // 생성 후 업데이트
             userId: user!.uid,
@@ -480,17 +579,36 @@ function NewProjectPageContent() {
         tasks = generateRepetitiveTasks(targetCount, startDate, endDate);
       } else {
         // 작업형 프로젝트: 사용자가 입력한 태스크만 사용 (자동 생성 없음)
-        tasks = (data.tasks || []).map((task, index) => ({
-          id: `task_${index + 1}`,
-          title: task.title,
-          date: createValidDate(task.date),
-          duration: task.duration,
-          done: task.done,
-          projectId: "", // 생성 후 업데이트
-          userId: user!.uid,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }));
+        tasks = (data.tasks || []).map((task, index) => {
+          // duration 안전하게 처리
+          let safeDuration = 1; // 기본값
+          if (typeof task.duration === "string") {
+            const parsed = parseFloat(task.duration);
+            safeDuration = isNaN(parsed) ? 1 : Math.max(0, parsed);
+          } else if (typeof task.duration === "number") {
+            safeDuration = isNaN(task.duration)
+              ? 1
+              : Math.max(0, task.duration);
+          }
+
+          console.log(`🔍 Task ${index + 1} duration processing:`, {
+            original: task.duration,
+            type: typeof task.duration,
+            safe: safeDuration,
+          });
+
+          return {
+            id: `task_${index + 1}`,
+            title: task.title,
+            date: createValidDate(task.date),
+            duration: safeDuration,
+            done: task.done,
+            projectId: "", // 생성 후 업데이트
+            userId: user!.uid,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+        });
       }
 
       // 선택된 루프들을 ConnectedLoop 형식으로 변환
@@ -668,8 +786,8 @@ function NewProjectPageContent() {
           목표를 자유롭게 등록해보세요.
         </p>
         {returnUrl && (
-          <div className="mt-4 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg">
-            <p className="text-xs text-blue-700">
+          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <p className="text-xs text-blue-700 dark:text-blue-300">
               프로젝트 생성 완료 후 루프 생성 페이지로 돌아갑니다.
             </p>
           </div>
@@ -699,50 +817,47 @@ function NewProjectPageContent() {
               <RadioGroup
                 value={form.watch("category")}
                 onValueChange={(value: "repetitive" | "task_based") => {
-                  form.setValue("category", value);
-                  setSelectedCategory(value);
+                  handleCategoryChange(value);
                 }}
                 className="mt-2"
               >
                 <div className="space-y-3">
-                  <div className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                    <RadioGroupItem
-                      value="repetitive"
-                      id="repetitive"
-                      className="mt-1"
-                    />
-                    <div className="flex-1">
-                      <Label
-                        htmlFor="repetitive"
-                        className="text-sm font-medium cursor-pointer"
-                      >
-                        반복형 프로젝트
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        동일한 행동을 여러 번 반복하는 프로젝트 (운동, 독서,
-                        습관 등)
-                      </p>
+                  <Label htmlFor="repetitive" className="block cursor-pointer">
+                    <div className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                      <RadioGroupItem
+                        value="repetitive"
+                        id="repetitive"
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <div className="text-sm font-medium">
+                          반복형 프로젝트
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          동일한 행동을 여러 번 반복하는 프로젝트 (운동, 독서,
+                          습관 등)
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                    <RadioGroupItem
-                      value="task_based"
-                      id="task_based"
-                      className="mt-1"
-                    />
-                    <div className="flex-1">
-                      <Label
-                        htmlFor="task_based"
-                        className="text-sm font-medium cursor-pointer"
-                      >
-                        작업형 프로젝트
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        다양한 업무를 단계별로 완료하는 프로젝트 (개발, 학습,
-                        창작 등)
-                      </p>
+                  </Label>
+                  <Label htmlFor="task_based" className="block cursor-pointer">
+                    <div className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                      <RadioGroupItem
+                        value="task_based"
+                        id="task_based"
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <div className="text-sm font-medium">
+                          작업형 프로젝트
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          다양한 업무를 단계별로 완료하는 프로젝트 (개발, 학습,
+                          창작 등)
+                        </p>
+                      </div>
                     </div>
-                  </div>
+                  </Label>
                 </div>
               </RadioGroup>
               {form.formState.errors.category && (
@@ -866,11 +981,6 @@ function NewProjectPageContent() {
               </div>
             </div>
 
-            <RecommendationBadge
-              type="info"
-              message="권장: 3개월 이내로 설정하면 효과적으로 관리할 수 있어요"
-            />
-
             {duration > 0 && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4" />
@@ -949,13 +1059,6 @@ function NewProjectPageContent() {
               <p className="mt-1 text-xs text-muted-foreground">
                 {getTargetDescription(form.watch("category"))}
               </p>
-              {form.watch("category") === "repetitive" && (
-                <RecommendationBadge
-                  type="info"
-                  message="권장: 일주일에 2회 이상이면 루프 집중에 도움이 돼요"
-                  className="mt-2"
-                />
-              )}
               {form.formState.errors.targetCount && (
                 <p className="mt-1 text-sm text-red-500">
                   {form.formState.errors.targetCount.message}
@@ -986,6 +1089,35 @@ function NewProjectPageContent() {
                 </AlertDescription>
               </Alert>
             )}
+
+            {/* 권장사항 아코디언 */}
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem
+                value="recommendations"
+                className="border rounded-lg"
+              >
+                <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                  <div className="flex items-center gap-2">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">권장사항</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4">
+                  <div className="space-y-3">
+                    <RecommendationBadge
+                      type="info"
+                      message="프로젝트 기간: 3개월 이내로 설정하면 효과적으로 관리할 수 있어요"
+                    />
+                    {form.watch("category") === "repetitive" && (
+                      <RecommendationBadge
+                        type="info"
+                        message="목표 설정: 일주일에 2회 이상이면 루프 집중에 도움이 돼요"
+                      />
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </div>
         </Card>
 
@@ -1049,11 +1181,11 @@ function NewProjectPageContent() {
 
           {form.watch("category") === "repetitive" && (
             <div className="mb-4 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg">
-              <p className="text-sm text-blue-700">
+              <p className="text-sm text-muted-foreground">
                 💡 반복형 프로젝트는 목표 횟수에 따라 태스크가 자동으로
                 생성됩니다.
               </p>
-              <p className="text-sm text-blue-700 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 🎯 목표 달성 후 초과 달성 태스크를 추가할 수 있어요
               </p>
             </div>
@@ -1081,41 +1213,59 @@ function NewProjectPageContent() {
                       {fields.length}개 태스크
                     </span>
                   </div>
-                  <div className="grid gap-3">
+                  <div className="max-h-[calc(100vh-120px)] overflow-y-auto space-y-2 pr-2">
                     {fields.map((field, index) => (
-                      <div
-                        key={field.id}
-                        className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg"
-                      >
-                        <div className="flex-shrink-0 w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                          <span className="text-xs font-medium text-primary">
-                            {index + 1}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <Input
-                              {...form.register(`tasks.${index}.title`)}
-                              placeholder={`${index + 1}회차`}
-                              className="flex-1 text-sm"
-                            />
-                          </div>
-                          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                            <span>📅 {form.watch(`tasks.${index}.date`)}</span>
-                            <span>
-                              ⏱️ {form.watch(`tasks.${index}.duration`)}시간
-                            </span>
+                      <div key={field.id} className="group">
+                        {/* 태스크 카드 */}
+                        <div className="p-4 border rounded-xl bg-card shadow-sm hover:shadow-md transition-all duration-200 group-hover:border-primary/20">
+                          <div className="space-y-4">
+                            {/* 첫 번째 줄: 제목 */}
+                            <div className="flex items-center gap-3">
+                              <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+                                <span className="text-xs font-medium text-muted-foreground">
+                                  {index + 1}
+                                </span>
+                              </div>
+                              <Input
+                                {...form.register(`tasks.${index}.title`)}
+                                placeholder={`${index + 1}회차`}
+                                className="flex-1 min-w-0"
+                              />
+                            </div>
+
+                            {/* 두 번째 줄: 날짜, 시간 */}
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <Input
+                                  type="date"
+                                  {...form.register(`tasks.${index}.date`)}
+                                  className="w-auto text-sm min-w-0"
+                                  min={form.watch("startDate")}
+                                  max={form.watch("dueDate")}
+                                />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  {...form.register(`tasks.${index}.duration`, {
+                                    valueAsNumber: true,
+                                  })}
+                                  className="w-20 text-sm"
+                                  placeholder="소요시간"
+                                />
+                                <span className="text-xs text-muted-foreground">
+                                  시간
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
                     ))}
-                  </div>
-                  <div className="text-xs text-muted-foreground p-2 bg-muted/50 dark:bg-muted/20 rounded">
-                    💡 태스크 제목을 수정할 수 있습니다. 날짜와 소요시간은
-                    자동으로 계산됩니다.
-                  </div>
-                  <div className="text-xs text-muted-foreground p-2 bg-muted/50 dark:bg-muted/20 rounded">
-                    🎯 목표 달성 후 초과 달성 태스크를 추가할 수 있어요
                   </div>
                 </div>
               )}
@@ -1182,18 +1332,62 @@ function NewProjectPageContent() {
                               />
                             </div>
 
-                            <div className="flex items-center gap-2 flex-shrink-0">
+                            <div className="flex items-center gap-2">
                               <Clock className="h-4 w-4 text-muted-foreground" />
                               <Input
                                 type="number"
                                 {...form.register(`tasks.${index}.duration`, {
                                   valueAsNumber: true,
+                                  onChange: (e) => {
+                                    console.log(
+                                      `🔍 Task ${index + 1} duration onChange:`,
+                                      {
+                                        rawValue: e.target.value,
+                                        type: typeof e.target.value,
+                                        parsed: parseFloat(e.target.value),
+                                        isNaN: isNaN(
+                                          parseFloat(e.target.value)
+                                        ),
+                                      }
+                                    );
+                                  },
+                                  onBlur: (e) => {
+                                    console.log(
+                                      `🔍 Task ${index + 1} duration onBlur:`,
+                                      {
+                                        rawValue: e.target.value,
+                                        type: typeof e.target.value,
+                                        parsed: parseFloat(e.target.value),
+                                        isNaN: isNaN(
+                                          parseFloat(e.target.value)
+                                        ),
+                                      }
+                                    );
+                                    // 에러 상태 확인
+                                    setTimeout(() => {
+                                      const errors = form.formState.errors;
+                                      const currentValues = form.getValues();
+                                      console.log(
+                                        `🔍 Task ${
+                                          index + 1
+                                        } errors after onBlur:`,
+                                        {
+                                          taskErrors: errors.tasks?.[index],
+                                          currentTaskValue:
+                                            currentValues.tasks?.[index]
+                                              ?.duration,
+                                          allErrors: errors,
+                                        }
+                                      );
+                                    }, 100);
+                                  },
                                 })}
-                                placeholder="시간"
-                                min="1"
-                                className="w-16 text-sm"
+                                placeholder="소요시간"
+                                min="0"
+                                step="0.1"
+                                className="w-20 text-sm"
                               />
-                              <span className="text-sm text-muted-foreground">
+                              <span className="text-xs text-muted-foreground">
                                 시간
                               </span>
                             </div>
@@ -1293,6 +1487,52 @@ function NewProjectPageContent() {
         </div>
       </form>
 
+      {/* 프로젝트 유형 변경 다이얼로그 */}
+      <Dialog
+        open={showCategoryChangeDialog}
+        onOpenChange={setShowCategoryChangeDialog}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>프로젝트 유형 변경</DialogTitle>
+            <DialogDescription>
+              프로젝트 유형을 변경하시겠습니까? 기존에 생성된 태스크를 어떻게
+              처리할지 선택해주세요.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 bg-muted/50 rounded-lg">
+              <p className="text-sm font-medium mb-2">현재 상황</p>
+              <p className="text-sm text-muted-foreground">
+                현재 {form.watch("tasks")?.length || 0}개의 태스크가 생성되어
+                있습니다.
+              </p>
+            </div>
+            <div className="space-y-3">
+              <div className="p-3 border rounded-lg">
+                <h4 className="font-medium mb-1">태스크 유지하기</h4>
+                <p className="text-sm text-muted-foreground">
+                  기존 태스크를 그대로 유지하고, 목표 횟수를 태스크 개수로 자동
+                  조정합니다.
+                </p>
+              </div>
+              <div className="p-3 border rounded-lg">
+                <h4 className="font-medium mb-1">태스크 초기화</h4>
+                <p className="text-sm text-muted-foreground">
+                  기존 태스크를 모두 삭제하고 새로 시작합니다.
+                </p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleClearTasks}>
+              태스크 초기화
+            </Button>
+            <Button onClick={handleKeepTasks}>태스크 유지하기</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* 루프 연결 대화상자 */}
       <Dialog
         open={showLoopConnectionDialog}
@@ -1316,8 +1556,8 @@ function NewProjectPageContent() {
                 <p className="text-xs text-muted-foreground mt-2">
                   6개월 이내의 루프만 연결할 수 있습니다.
                 </p>
-                <div className="mt-4 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg">
-                  <p className="text-xs text-blue-700">
+                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
                     💡 <strong>팁:</strong> AI 플래닝 기능(준비중)을 사용하면
                     장기 목표에 맞는 여러 루프를 자동으로 생성할 수 있습니다.
                   </p>

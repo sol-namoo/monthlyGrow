@@ -72,10 +72,13 @@ const editProjectFormSchema = z
     total: z.number().min(0, "목표를 입력해주세요"),
     tasks: z.array(
       z.object({
-        id: z.number(),
+        id: z.any(), // 시스템에서 자동 생성하므로 검증 불필요
         title: z.string().min(1, "태스크 제목을 입력해주세요"),
         date: z.string().min(1, "태스크 날짜를 입력해주세요"),
-        duration: z.number().min(1, "소요 시간을 입력해주세요"),
+        duration: z
+          .number()
+          .min(0, "소요 시간은 0 이상이어야 합니다")
+          .multipleOf(0.1, "소요 시간은 소수점 첫째 자리까지 입력 가능합니다"),
         done: z.boolean(),
       })
     ),
@@ -299,7 +302,7 @@ export default function EditProjectPage({
     if (form && !tasksLoading && fields.length === 0) {
       // 초기 로드 시에만 태스크 데이터를 폼에 설정
       const formattedTasks = tasks.map((task, index) => ({
-        id: index + 1, // 폼 필드용 인덱스 사용
+        id: (index + 1).toString(), // 폼 필드용 인덱스 사용
         title: task.title,
         date: formatDateForInput(task.date),
         duration: task.duration,
@@ -324,9 +327,15 @@ export default function EditProjectPage({
 
   // 태스크 추가/삭제 헬퍼 함수
   const addTask = () => {
-    const newId = Math.max(...fields.map((t) => t.id), 0) + 1;
+    const newId =
+      Math.max(
+        ...fields.map((t) =>
+          typeof t.id === "string" ? parseInt(t.id) : t.id
+        ),
+        0
+      ) + 1;
     append({
-      id: newId,
+      id: newId.toString(),
       title: "",
       date: formatDateForInput(new Date()),
       duration: 1,
@@ -377,7 +386,7 @@ export default function EditProjectPage({
       const title = existingTask?.title || `${i + 1}회차`;
 
       tasks.push({
-        id: i + 1,
+        id: (i + 1).toString(),
         title: title,
         date: taskDate.toISOString().split("T")[0], // YYYY-MM-DD 형식
         duration: 1,
@@ -415,7 +424,19 @@ export default function EditProjectPage({
           projectId: project.id,
           title: task.title,
           date: new Date(task.date),
-          duration: task.duration,
+          duration: (() => {
+            // duration 안전하게 처리
+            let safeDuration = 1; // 기본값
+            if (typeof task.duration === "string") {
+              const parsed = parseFloat(task.duration);
+              safeDuration = isNaN(parsed) ? 1 : Math.max(0, parsed);
+            } else if (typeof task.duration === "number") {
+              safeDuration = isNaN(task.duration)
+                ? 1
+                : Math.max(0, task.duration);
+            }
+            return safeDuration;
+          })(),
           done: task.done,
           createdAt: new Date(), // 새로 추가된 태스크의 경우
           updatedAt: new Date(),
@@ -947,11 +968,11 @@ export default function EditProjectPage({
 
           {form.watch("category") === "repetitive" && (
             <div className="mb-4 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg">
-              <p className="text-sm text-blue-700">
+              <p className="text-sm text-muted-foreground">
                 💡 반복형 프로젝트는 목표 횟수에 따라 태스크가 자동으로
                 생성됩니다.
               </p>
-              <p className="text-sm text-blue-700 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 🎯 목표 달성 후 초과 달성 태스크를 추가할 수 있어요
               </p>
             </div>
@@ -1052,9 +1073,36 @@ export default function EditProjectPage({
                               type="number"
                               {...form.register(`tasks.${index}.duration`, {
                                 valueAsNumber: true,
+                                onChange: (e) => {
+                                  console.log(
+                                    `🔍 Edit Task ${
+                                      index + 1
+                                    } duration onChange:`,
+                                    {
+                                      rawValue: e.target.value,
+                                      type: typeof e.target.value,
+                                      parsed: parseFloat(e.target.value),
+                                      isNaN: isNaN(parseFloat(e.target.value)),
+                                    }
+                                  );
+                                },
+                                onBlur: (e) => {
+                                  console.log(
+                                    `🔍 Edit Task ${
+                                      index + 1
+                                    } duration onBlur:`,
+                                    {
+                                      rawValue: e.target.value,
+                                      type: typeof e.target.value,
+                                      parsed: parseFloat(e.target.value),
+                                      isNaN: isNaN(parseFloat(e.target.value)),
+                                    }
+                                  );
+                                },
                               })}
                               placeholder="시간"
-                              min="1"
+                              min="0"
+                              step="0.1"
                               className="w-16 text-sm"
                               readOnly={
                                 form.watch("category") === "repetitive" &&
@@ -1183,8 +1231,8 @@ export default function EditProjectPage({
                 <p className="text-xs text-muted-foreground mt-2">
                   프로젝트 기간과 겹치는 루프만 연결할 수 있습니다.
                 </p>
-                <div className="mt-4 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg">
-                  <p className="text-xs text-blue-700">
+                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
                     💡 <strong>팁:</strong> 루프를 먼저 생성하거나 프로젝트
                     기간을 조정해보세요.
                   </p>
