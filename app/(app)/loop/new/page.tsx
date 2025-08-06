@@ -524,8 +524,8 @@ function NewLoopPageContent() {
         description: `${data.title} 루프가 생성되었습니다.`,
       });
 
-      // 루프 목록 페이지로 이동
-      router.push("/loop");
+      // 루프 상세 페이지로 이동 (replace로 히스토리 대체)
+      router.replace(`/loop/${newLoopId.id}`);
     } catch (error) {
       console.error("루프 생성 중 오류:", error);
       toast({

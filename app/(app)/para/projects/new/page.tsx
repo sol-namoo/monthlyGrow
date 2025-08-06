@@ -667,10 +667,10 @@ function NewProjectPageContent() {
       if (returnUrl) {
         const separator = returnUrl.includes("?") ? "&" : "?";
         const urlWithProjectId = `${returnUrl}${separator}newProjectId=${newProject.id}`;
-        router.push(urlWithProjectId);
+        router.replace(urlWithProjectId);
       } else {
-        // 일반적인 경우는 PARA projects 페이지로 이동
-        router.push("/para?tab=projects");
+        // 일반적인 경우는 프로젝트 상세 페이지로 이동 (replace로 히스토리 대체)
+        router.replace(`/para/projects/${newProject.id}`);
       }
     } catch (error) {
       toast({

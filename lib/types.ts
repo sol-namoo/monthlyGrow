@@ -24,13 +24,6 @@ export interface Resource {
   updatedAt: Date;
 }
 
-export interface ConnectedLoop {
-  id: string;
-  title: string;
-  startDate: Date;
-  endDate: Date;
-}
-
 export interface Project {
   id: string;
   userId: string;
@@ -46,7 +39,8 @@ export interface Project {
   createdAt: Date;
   updatedAt: Date;
   loopId?: string; // 현재 연결된 루프 ID (legacy)
-  connectedLoops?: ConnectedLoop[]; // 연결된 루프 정보
+  connectedLoops?: string[]; // 연결된 루프 ID 배열
+
   addedMidway?: boolean; // 루프 중간에 추가된 프로젝트 여부
   retrospective?: Retrospective;
   notes: Note[];
@@ -81,7 +75,7 @@ export interface Loop {
   startDate: Date;
   endDate: Date;
   focusAreas: string[]; // Area ID 배열
-  projectIds: string[]; // Project ID 배열
+  projectIds?: string[]; // 연결된 프로젝트 ID 배열
   reward?: string;
   createdAt: Date;
   updatedAt: Date;

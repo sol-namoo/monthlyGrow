@@ -47,8 +47,10 @@ import {
   addTaskToProject,
   updateTaskInProject,
   deleteTaskFromProject,
+  fetchAreaById,
+  fetchLoopsByIds,
 } from "@/lib/firebase";
-import { formatDate, formatDateForInput } from "@/lib/utils";
+import { formatDate, formatDateForInput, getLoopStatus } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -217,6 +219,9 @@ export default function ProjectDetailPage({
     },
     onSuccess: () => {
       setHasChanges(true); // 변경 사항 플래그 설정만
+      // 태스크 변경 시 루프 태스크 카운트 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ["loopTaskCounts"] });
+      queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
       toast({
         title: "태스크 추가 완료",
         description: "새 태스크가 성공적으로 추가되었습니다.",
@@ -266,6 +271,8 @@ export default function ProjectDetailPage({
       queryClient.invalidateQueries({
         queryKey: ["taskCounts", projectId],
       });
+      queryClient.invalidateQueries({ queryKey: ["loopTaskCounts"] });
+      queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
     },
   });
 
@@ -311,6 +318,9 @@ export default function ProjectDetailPage({
     },
     onSuccess: () => {
       setHasChanges(true); // 변경 사항 플래그 설정
+      // 태스크 변경 시 루프 태스크 카운트 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ["loopTaskCounts"] });
+      queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
       toast({
         title: "태스크 삭제 완료",
         description: "태스크가 성공적으로 삭제되었습니다.",
@@ -324,6 +334,9 @@ export default function ProjectDetailPage({
       queryClient.invalidateQueries({
         queryKey: ["taskCounts", projectId],
       });
+      // 태스크 변경 시 루프 태스크 카운트 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ["loopTaskCounts"] });
+      queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
     },
   });
 
@@ -360,6 +373,24 @@ export default function ProjectDetailPage({
     queryKey: ["project", projectId],
     queryFn: () => fetchProjectById(projectId),
     enabled: !!projectId,
+  });
+
+  // Area 정보 가져오기
+  const { data: area } = useQuery({
+    queryKey: ["area", project?.areaId],
+    queryFn: () => fetchAreaById(project?.areaId || ""),
+    enabled: !!project?.areaId,
+  });
+
+  // 연결된 루프 정보 가져오기
+  const { data: connectedLoops = [] } = useQuery({
+    queryKey: ["connectedLoops", project?.id],
+    queryFn: async () => {
+      if (!project || !project.connectedLoops) return [];
+      const loopIds = project.connectedLoops as string[];
+      return await fetchLoopsByIds(loopIds);
+    },
+    enabled: !!project && !!project.connectedLoops,
   });
 
   // 태스크 개수만 가져오기 (성능 최적화용) - 우선 로드
@@ -632,6 +663,9 @@ export default function ProjectDetailPage({
       {
         onSuccess: () => {
           setHasChanges(true); // 변경 사항 플래그 설정만
+          // 태스크 변경 시 루프 태스크 카운트 캐시 무효화
+          queryClient.invalidateQueries({ queryKey: ["loopTaskCounts"] });
+          queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
         },
         onError: (error, variables, context) => {
           // 오류 시 이전 데이터로 복원
@@ -641,6 +675,9 @@ export default function ProjectDetailPage({
           queryClient.invalidateQueries({
             queryKey: ["taskCounts", projectId],
           });
+          // 태스크 변경 시 루프 태스크 카운트 캐시 무효화
+          queryClient.invalidateQueries({ queryKey: ["loopTaskCounts"] });
+          queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
           toast({
             title: "태스크 상태 변경 실패",
             description: "태스크 상태 변경 중 오류가 발생했습니다.",
@@ -828,7 +865,13 @@ export default function ProjectDetailPage({
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-2">
           <h1 className="text-2xl font-bold">{project.title}</h1>
-          <Badge variant="secondary">{project.area}</Badge>
+          {area ? (
+            <Badge variant="secondary">{area.name}</Badge>
+          ) : project.areaId ? (
+            <Badge variant="outline">Area 정보 로딩 중...</Badge>
+          ) : (
+            <Badge variant="outline">Area 없음</Badge>
+          )}
         </div>
 
         <p className="text-muted-foreground mb-4">{project.description}</p>
@@ -901,14 +944,14 @@ export default function ProjectDetailPage({
           <div>
             <span className="text-sm font-medium">연결된 루프</span>
             <div className="mt-2 space-y-2">
-              {project.connectedLoops && project.connectedLoops.length > 0 ? (
-                project.connectedLoops.map((loop) => (
+              {connectedLoops && connectedLoops.length > 0 ? (
+                connectedLoops.map((loop) => (
                   <div
                     key={loop.id}
                     className="flex items-center gap-3 p-2 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors"
                   >
                     <RotateCcw className="h-4 w-4 text-blue-600 flex-shrink-0" />
-                    <div className="flex flex-row justify-between flex-1 min-w-0">
+                    <div className="flex flex-col flex-1 min-w-0">
                       <Link
                         href={`/loop/${loop.id}`}
                         className="flex items-center gap-2 group"
@@ -918,6 +961,28 @@ export default function ProjectDetailPage({
                         </span>
                         <ExternalLink className="h-3 w-3 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </Link>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-muted-foreground">
+                          {formatDate(loop.startDate)} ~{" "}
+                          {formatDate(loop.endDate)}
+                        </span>
+                        <Badge
+                          variant={
+                            getLoopStatus(loop) === "in_progress"
+                              ? "default"
+                              : getLoopStatus(loop) === "ended"
+                              ? "secondary"
+                              : "outline"
+                          }
+                          className="text-xs"
+                        >
+                          {getLoopStatus(loop) === "in_progress"
+                            ? "진행 중"
+                            : getLoopStatus(loop) === "ended"
+                            ? "완료됨"
+                            : "예정"}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
                 ))
@@ -930,17 +995,16 @@ export default function ProjectDetailPage({
               )}
             </div>
           </div>
-          {project.connectedLoops && project.connectedLoops.length > 0 && (
+          {connectedLoops && connectedLoops.length > 0 && (
             <div className="space-y-3">
-              {project.connectedLoops.length >= 3 &&
+              {connectedLoops.length >= 3 &&
                 projectWithStatus?.status === "in_progress" && (
                   <Alert variant="warning" className="mb-4">
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>장기 프로젝트 안내</AlertTitle>
                     <AlertDescription>
-                      이 프로젝트는 {project.connectedLoops.length}개의 루프에
-                      연결되어 있습니다. 정리하거나 회고를 작성해보는 건
-                      어떨까요?
+                      이 프로젝트는 {connectedLoops.length}개의 루프에 연결되어
+                      있습니다. 정리하거나 회고를 작성해보는 건 어떨까요?
                     </AlertDescription>
                   </Alert>
                 )}
@@ -1070,7 +1134,13 @@ export default function ProjectDetailPage({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">연결된 Area</span>
-                  <span>{project.area}</span>
+                  <span>
+                    {area
+                      ? area.name
+                      : project.areaId
+                      ? "Area 정보 로딩 중..."
+                      : "연결된 Area 없음"}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">생성일</span>
@@ -1080,8 +1150,62 @@ export default function ProjectDetailPage({
                   <span className="text-muted-foreground">수정일</span>
                   <span>{formatDate(project.updatedAt)}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">연결된 루프</span>
+                  <span>
+                    {connectedLoops && connectedLoops.length > 0
+                      ? `${connectedLoops.length}개`
+                      : "연결된 루프 없음"}
+                  </span>
+                </div>
               </div>
             </Card>
+
+            {/* 연결된 루프 정보 */}
+            {connectedLoops && connectedLoops.length > 0 && (
+              <Card className="p-4">
+                <h3 className="font-semibold mb-3">연결된 루프</h3>
+                <div className="space-y-2">
+                  {connectedLoops.map((loop) => (
+                    <div
+                      key={loop.id}
+                      className="flex items-center justify-between p-2 rounded-md bg-muted/30"
+                    >
+                      <div className="flex items-center gap-2">
+                        <RotateCcw className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm font-medium">
+                          {loop.title}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            getLoopStatus(loop) === "in_progress"
+                              ? "default"
+                              : getLoopStatus(loop) === "ended"
+                              ? "secondary"
+                              : "outline"
+                          }
+                          className="text-xs"
+                        >
+                          {getLoopStatus(loop) === "in_progress"
+                            ? "진행 중"
+                            : getLoopStatus(loop) === "ended"
+                            ? "완료됨"
+                            : "예정"}
+                        </Badge>
+                        <Link
+                          href={`/loop/${loop.id}`}
+                          className="text-blue-600 hover:text-blue-700"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
           </div>
         </TabsContent>
 

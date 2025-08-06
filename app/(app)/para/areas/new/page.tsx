@@ -155,10 +155,10 @@ function NewAreaPageContent() {
       // 루프 생성 페이지에서 왔다면 다시 루프 생성 페이지로 돌아가기
       const returnUrl = searchParams.get("returnUrl");
       if (returnUrl) {
-        router.push(returnUrl);
+        router.replace(returnUrl);
       } else {
-        // 일반적인 경우는 PARA areas 페이지로 이동
-        router.push("/para/areas");
+        // 일반적인 경우는 Area 상세 페이지로 이동 (replace로 히스토리 대체)
+        router.replace(`/para/areas/${newArea.id}`);
       }
     } catch (error) {
       console.error("Area 생성 실패:", error);

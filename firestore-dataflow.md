@@ -105,7 +105,7 @@ User (개인화된 데이터)
   createdAt: Date;
   updatedAt: Date;
   loopId?: string;        // 현재 연결된 루프 ID (legacy)
-  connectedLoops?: ConnectedLoop[]; // 연결된 루프 정보
+  connectedLoops?: string[]; // 연결된 루프 ID 배열
   addedMidway?: boolean;  // 루프 중간 추가 여부
   tasks: Task[];          // 세부 작업들
   retrospective?: Retrospective; // 프로젝트 회고

@@ -38,6 +38,8 @@ import {
   fetchAllLoopsByUserId,
   fetchProjectsByLoopId,
   getTaskCountsForMultipleProjects,
+  fetchProjectCountsByLoopIds,
+  fetchLoopsWithProjectCounts,
 } from "@/lib/firebase";
 import { formatDate, formatDateNumeric, getLoopStatus } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -60,60 +62,141 @@ function LoopPageContent() {
     setCurrentTab(searchParams.get("tab") || "active");
   }, [searchParams]);
 
-  // Firestore에서 데이터 가져오기
+  // Firestore에서 데이터 가져오기 - 임시로 이전 방식 사용
   const { data: loops = [], isLoading: loopsLoading } = useQuery({
     queryKey: ["loops", user?.uid],
     queryFn: () => fetchAllLoopsByUserId(user?.uid || ""),
     enabled: !!user?.uid,
   });
 
-  // 각 루프의 프로젝트 데이터 가져오기
-  const { data: loopProjects = {}, isLoading: projectsLoading } = useQuery({
-    queryKey: ["loopProjects", user?.uid],
-    queryFn: async () => {
-      const projectsMap: { [loopId: string]: any[] } = {};
-      for (const loop of loops) {
-        const projects = await fetchProjectsByLoopId(loop.id);
-        projectsMap[loop.id] = projects;
-      }
-      return projectsMap;
-    },
-    enabled: !!user?.uid && loops.length > 0,
-  });
+  // 각 루프의 프로젝트 개수만 효율적으로 가져오기
+  const { data: loopProjectCounts = {}, isLoading: projectCountsLoading } =
+    useQuery({
+      queryKey: ["loopProjectCounts", user?.uid],
+      queryFn: async () => {
+        if (!user?.uid || loops.length === 0) return {};
+        const loopIds = loops.map((loop) => loop.id);
+        console.log("🔍 프로젝트 개수 조회 - 루프 IDs:", loopIds);
+        const counts = await fetchProjectCountsByLoopIds(loopIds, user.uid);
+        console.log("📊 프로젝트 개수 결과:", counts);
+        return counts;
+      },
+      enabled: !!user?.uid && loops.length > 0,
+    });
 
-  // 각 루프의 태스크 개수 데이터 가져오기
+  // 디버깅: 각 루프의 프로젝트 상태 출력
+  useEffect(() => {
+    if (loops.length > 0) {
+      console.log("🔍 루프별 프로젝트 상태:");
+      loops.forEach((loop) => {
+        const projectCount = loopProjectCounts[loop.id] || 0;
+        const status = getLoopStatus(loop);
+        console.log(`- ${loop.title} (${status}): ${projectCount}개 프로젝트`);
+      });
+    }
+  }, [loops, loopProjectCounts]);
+
+  // 디버깅: 실제 루프별 프로젝트 쿼리 결과 확인
+  useEffect(() => {
+    if (user?.uid && loops.length > 0) {
+      console.log("🔍 루프별 프로젝트 쿼리 디버깅 시작");
+      console.log("총 루프 수:", loops.length);
+
+      loops.forEach(async (loop) => {
+        console.log(`\n📊 루프 "${loop.title}" (${loop.id}) 조회 중...`);
+
+        try {
+          // 실제 쿼리 실행
+          const projects = await fetchProjectsByLoopId(loop.id, user.uid);
+          console.log(`- 연결된 프로젝트 수: ${projects.length}개`);
+
+          if (projects.length > 0) {
+            console.log("- 연결된 프로젝트들:");
+            projects.forEach((project, index) => {
+              console.log(
+                `  ${index + 1}. ${project.title} (ID: ${project.id})`
+              );
+              console.log(`     connectedLoops:`, project.connectedLoops);
+            });
+          } else {
+            console.log("- 연결된 프로젝트 없음");
+          }
+        } catch (error) {
+          console.error(`❌ 루프 "${loop.title}" 조회 실패:`, error);
+        }
+      });
+    }
+  }, [user?.uid, loops]);
+
+  // 각 루프의 태스크 개수 데이터 가져오기 (현재 탭의 루프만)
   const { data: loopTaskCounts = {}, isLoading: taskCountsLoading } = useQuery({
-    queryKey: ["loopTaskCounts", user?.uid],
+    queryKey: [
+      "loopTaskCounts",
+      user?.uid,
+      currentTab,
+      loops.length,
+      Object.keys(loopProjectCounts).join(","),
+    ],
     queryFn: async () => {
       const taskCountsMap: {
         [loopId: string]: { totalTasks: number; completedTasks: number };
       } = {};
-      for (const loop of loops) {
-        const projects = loopProjects[loop.id] || [];
-        if (projects.length > 0) {
-          const projectIds = projects.map((p) => p.id);
-          const taskCounts = await getTaskCountsForMultipleProjects(projectIds);
-          const totalTasks = Object.values(taskCounts).reduce(
-            (sum, counts) => sum + counts.totalTasks,
-            0
-          );
-          const completedTasks = Object.values(taskCounts).reduce(
-            (sum, counts) => sum + counts.completedTasks,
-            0
-          );
-          taskCountsMap[loop.id] = { totalTasks, completedTasks };
+
+      // 현재 탭에 해당하는 루프만 처리
+      let targetLoops: Loop[] = [];
+
+      if (currentTab === "active") {
+        const currentLoop = loops.find(
+          (loop) => getLoopStatus(loop) === "in_progress"
+        );
+        if (currentLoop) targetLoops = [currentLoop];
+      } else if (currentTab === "future") {
+        targetLoops = loops.filter((loop) => getLoopStatus(loop) === "planned");
+      } else if (currentTab === "past") {
+        targetLoops = loops.filter((loop) => getLoopStatus(loop) === "ended");
+      }
+
+      for (const loop of targetLoops) {
+        const projectCount = loopProjectCounts[loop.id] || 0;
+
+        if (projectCount > 0) {
+          // 프로젝트가 있을 때만 상세 조회
+          const projects = await fetchProjectsByLoopId(loop.id, user?.uid);
+          if (projects.length > 0) {
+            const projectIds = projects.map((p) => p.id);
+            const taskCounts = await getTaskCountsForMultipleProjects(
+              projectIds
+            );
+            const totalTasks = Object.values(taskCounts).reduce(
+              (sum, counts) => sum + counts.totalTasks,
+              0
+            );
+            const completedTasks = Object.values(taskCounts).reduce(
+              (sum, counts) => sum + counts.completedTasks,
+              0
+            );
+            taskCountsMap[loop.id] = { totalTasks, completedTasks };
+          } else {
+            taskCountsMap[loop.id] = { totalTasks: 0, completedTasks: 0 };
+          }
         } else {
           taskCountsMap[loop.id] = { totalTasks: 0, completedTasks: 0 };
         }
       }
       return taskCountsMap;
     },
-    enabled:
-      !!user?.uid && loops.length > 0 && Object.keys(loopProjects).length > 0,
+    enabled: !!user?.uid && loops.length > 0 && !projectCountsLoading,
+    staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
+    refetchOnWindowFocus: true, // 윈도우 포커스 시 재페칭
   });
 
   // 로딩 상태
-  if (userLoading || loopsLoading || projectsLoading || taskCountsLoading) {
+  if (
+    userLoading ||
+    loopsLoading ||
+    projectCountsLoading ||
+    taskCountsLoading
+  ) {
     return (
       <div className="container max-w-md px-4 py-6">
         <div className="mb-6">
@@ -164,7 +247,7 @@ function LoopPageContent() {
   };
 
   const getProjectCount = (loop: Loop) => {
-    return loopProjects[loop.id]?.length || 0;
+    return loopProjectCounts[loop.id] || 0;
   };
 
   const handleTabChange = (value: string) => {
@@ -311,9 +394,16 @@ function LoopPageContent() {
                     <h4 className="mb-2 font-medium">
                       프로젝트 ({getProjectCount(currentLoop)}개)
                     </h4>
-                    <p className="text-sm text-muted-foreground">
-                      🔗 프로젝트 {getProjectCount(currentLoop)}개 연결됨
-                    </p>
+                    {getProjectCount(currentLoop) > 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        🔗 프로젝트 {getProjectCount(currentLoop)}개 연결됨
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        📝 아직 연결된 프로젝트가 없어요. 루프 수정에서
+                        프로젝트를 연결해보세요.
+                      </p>
+                    )}
                   </div>
                 </Card>
               </Link>
@@ -391,6 +481,12 @@ function LoopPageContent() {
                             연결된 프로젝트: {getProjectCount(loop)}개
                           </span>
                         </div>
+                        {getProjectCount(loop) === 0 && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            📝 프로젝트를 연결하면 더 구체적인 목표를 세울 수
+                            있어요
+                          </p>
+                        )}
                       </div>
                     </Card>
                   </Link>

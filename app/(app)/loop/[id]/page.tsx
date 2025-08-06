@@ -216,15 +216,15 @@ export function LoopDetailPage({
   // 실제 프로젝트 데이터 가져오기
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["projects", "loop", id],
-    queryFn: () => fetchProjectsByLoopId(id),
-    enabled: !!id && !!loop?.projectIds,
+    queryFn: () => fetchProjectsByLoopId(id, user?.uid),
+    enabled: !!id && !!user?.uid,
   });
 
   // 프로젝트별 태스크 개수 가져오기
   const { data: projectTaskCounts = {} } = useQuery({
     queryKey: ["projectTaskCounts", "loop", id],
-    queryFn: () => getTaskCountsForMultipleProjects(loop?.projectIds || []),
-    enabled: !!loop?.projectIds && loop.projectIds.length > 0,
+    queryFn: () => getTaskCountsForMultipleProjects(projects.map((p) => p.id)),
+    enabled: !!projects && projects.length > 0,
   });
 
   // 가상의 노트 데이터
@@ -1169,6 +1169,25 @@ export function LoopDetailPage({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 루프 삭제 확인 다이얼로그 */}
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="루프 삭제"
+        description={
+          getLoopStatus(loop) === "ended"
+            ? "이 루프를 삭제하시겠습니까? 삭제해도 해당 월의 정보는 연간 통계에 여전히 반영됩니다."
+            : "이 루프를 삭제하시겠습니까? 연결된 프로젝트와 태스크도 함께 삭제됩니다."
+        }
+        onConfirm={() => {
+          deleteLoopMutation.mutate();
+          setShowDeleteDialog(false);
+        }}
+        confirmText="삭제"
+        cancelText="취소"
+        variant="destructive"
+      />
     </div>
   );
 }

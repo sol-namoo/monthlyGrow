@@ -36,6 +36,7 @@ import {
   getTaskCountsByProjectId,
   getTaskCountsForMultipleProjects,
   fetchYearlyActivityStats,
+  fetchProjectsByLoopId,
 } from "@/lib/firebase";
 import { getLoopStatus, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
@@ -95,6 +96,25 @@ export default function HomePage() {
     enabled: !!user,
   });
 
+  // 현재 진행 중인 루프를 날짜 기반으로 선택
+  const currentLoop =
+    loops && loops.length > 0
+      ? loops.find((loop) => getLoopStatus(loop) === "in_progress") || null
+      : null;
+
+  // 현재 루프의 프로젝트만 효율적으로 가져오기
+  const {
+    data: currentLoopProjects = [],
+    isLoading: currentLoopProjectsLoading,
+  } = useQuery({
+    queryKey: ["currentLoopProjects", user?.uid, currentLoop?.id],
+    queryFn: () => {
+      if (!user?.uid || !currentLoop?.id) return [];
+      return fetchProjectsByLoopId(currentLoop.id, user.uid);
+    },
+    enabled: !!user?.uid && !!currentLoop?.id,
+  });
+
   const { data: resources = [] } = useQuery({
     queryKey: ["resources", user?.uid],
     queryFn: () => (user ? fetchAllResourcesByUserId(user.uid) : []),
@@ -146,24 +166,14 @@ export default function HomePage() {
     }
   }, [user?.uid, areas, projects, loops, resources]);
 
-  const isLoading = loading || projectsLoading || loopsLoading;
+  const isLoading =
+    loading || projectsLoading || loopsLoading || currentLoopProjectsLoading;
 
   if (loading || isLoading) return <div>로딩 중...</div>;
 
   if (!user) {
     return null;
   }
-
-  // 현재 진행 중인 루프를 날짜 기반으로 선택
-  const currentLoop =
-    loops && loops.length > 0
-      ? loops.find((loop) => getLoopStatus(loop) === "in_progress") || null
-      : null;
-  // 현재 루프에 연결된 프로젝트만 필터링
-  const currentLoopProjects =
-    currentLoop && projects
-      ? projects.filter((p) => currentLoop.projectIds?.includes(p.id))
-      : [];
 
   // progress, total, daysLeft, changeRate 등 계산
   const progress =

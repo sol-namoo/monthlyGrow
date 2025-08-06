@@ -145,7 +145,7 @@ export const connectPendingProjectsToNewLoop = async (
     try {
       // 기존 connectedLoops에 새 루프 추가
       const connectedLoops = project.connectedLoops || [];
-      const updatedLoops = [...connectedLoops, { loopId: newLoopId }];
+      const updatedLoops = [...connectedLoops, { id: newLoopId }];
 
       const projectRef = db.collection("projects").doc(project.id);
       await projectRef.update({
@@ -184,11 +184,10 @@ export const connectPendingProjectsToNewLoop = async (
 const findIncompleteProjectsInLoop = async (loopId: string) => {
   const projectsQuery = db
     .collection("projects")
-    .where("connectedLoops", "array-contains", { loopId })
     .where("status", "!=", "completed");
 
   const querySnapshot = await projectsQuery.get();
-  return querySnapshot.docs.map((doc) => {
+  const allProjects = querySnapshot.docs.map((doc) => {
     const data = doc.data();
     return {
       id: doc.id,
@@ -198,6 +197,12 @@ const findIncompleteProjectsInLoop = async (loopId: string) => {
       createdAt: data.createdAt.toDate(),
       updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
     };
+  });
+
+  // connectedLoops에서 해당 loopId를 가진 프로젝트들만 필터링
+  return allProjects.filter((project) => {
+    const connectedLoops = project.connectedLoops || [];
+    return connectedLoops.some((loop: any) => loop.id === loopId);
   });
 };
 

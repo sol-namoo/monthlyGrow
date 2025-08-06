@@ -568,7 +568,7 @@ export default function EditProjectPage({
         queryClient.invalidateQueries({ queryKey: ["taskCounts", projectId] }),
       ]);
 
-      router.push(`/para/projects/${project.id}`);
+      router.replace(`/para/projects/${project.id}`);
     } catch (error) {
       console.error("프로젝트 수정 실패:", error);
       toast({

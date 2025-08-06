@@ -361,17 +361,90 @@ export const fetchProjectsByAreaId = async (
 };
 
 export const fetchProjectsByLoopId = async (
-  loopId: string
+  loopId: string,
+  userId?: string
 ): Promise<Project[]> => {
-  const loop = await fetchLoopById(loopId);
-  if (!loop || !loop.projectIds) {
-    return [];
-  }
-  const projectsPromises = loop.projectIds.map((projectId: string) =>
-    fetchProjectById(projectId)
+  // userId가 없으면 loopId에서 추출 시도
+  const targetUserId = userId || loopId.split("_")[0];
+
+  // 모든 프로젝트를 가져온 후 클라이언트 사이드에서 필터링
+  const q = query(
+    collection(db, "projects"),
+    where("userId", "==", targetUserId)
   );
-  const projects = await Promise.all(projectsPromises);
-  return projects;
+
+  const querySnapshot = await getDocs(q);
+  const projects = querySnapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as Project[];
+
+  // connectedLoops 배열에서 해당 loopId를 가진 프로젝트들만 필터링
+  return projects.filter((project) => {
+    const connectedLoops = (project as any).connectedLoops || [];
+    return connectedLoops.includes(loopId);
+  });
+};
+
+// 루프별 프로젝트 개수만 효율적으로 조회하는 함수
+export const fetchProjectCountsByLoopIds = async (
+  loopIds: string[],
+  userId: string
+): Promise<{ [loopId: string]: number }> => {
+  if (loopIds.length === 0) return {};
+
+  const counts: { [loopId: string]: number } = {};
+
+  console.log("🔍 fetchProjectCountsByLoopIds 시작");
+  console.log("조회할 루프 IDs:", loopIds);
+  console.log("사용자 ID:", userId);
+
+  // 모든 프로젝트를 한 번에 가져오기
+  const allProjectsQuery = query(
+    collection(db, "projects"),
+    where("userId", "==", userId)
+  );
+  const allProjectsSnapshot = await getDocs(allProjectsQuery);
+  const allProjects = allProjectsSnapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as Project[];
+
+  console.log(`총 ${allProjects.length}개 프로젝트 조회됨`);
+
+  // 각 루프별로 프로젝트 개수 계산
+  for (const loopId of loopIds) {
+    console.log(`\n📊 루프 ${loopId} 계산 중...`);
+
+    const connectedProjects = allProjects.filter((project) => {
+      const connectedLoops = (project as any).connectedLoops || [];
+      return connectedLoops.includes(loopId);
+    });
+
+    console.log(
+      `루프 ${loopId} 결과:`,
+      connectedProjects.length,
+      "개 프로젝트"
+    );
+
+    // 실제 프로젝트 데이터 확인
+    if (connectedProjects.length > 0) {
+      console.log("연결된 프로젝트들:");
+      connectedProjects.forEach((project) => {
+        console.log(
+          `- ${project.title}: connectedLoops =`,
+          (project as any).connectedLoops
+        );
+      });
+    } else {
+      console.log("연결된 프로젝트 없음");
+    }
+
+    counts[loopId] = connectedProjects.length;
+  }
+
+  console.log("최종 결과:", counts);
+  return counts;
 };
 
 // Tasks
@@ -428,8 +501,6 @@ export const getTaskCountsForMultipleProjects = async (
 ): Promise<{
   [projectId: string]: { totalTasks: number; completedTasks: number };
 }> => {
-  console.log("🔥 Firestore: Batch counting tasks for projectIds:", projectIds);
-
   if (projectIds.length === 0) return {};
 
   // 모든 프로젝트의 태스크를 한 번에 가져오기
@@ -522,18 +593,11 @@ export const fetchAllLoopsByUserId = async (
     const data = doc.data();
     return {
       id: doc.id,
-      userId: data.userId,
-      title: data.title,
+      ...data,
       startDate: data.startDate.toDate(),
       endDate: data.endDate.toDate(),
-      // status 필드 제거 - 클라이언트에서 날짜 기반으로 계산
-      focusAreas: data.focusAreas,
-      projectIds: data.projectIds,
       createdAt: data.createdAt.toDate(),
       updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-      doneCount: data.doneCount,
-      targetCount: data.targetCount,
-      reward: data.reward,
     } as Loop;
   });
 };
@@ -668,12 +732,12 @@ export const moveProjectToLoop = async (
   }
 
   const projectData = projectSnap.data();
-  const connectedLoops = projectData.connectedLoops || [];
+  const connectedLoops = (projectData as any).connectedLoops || [];
 
   // 기존 루프 연결 제거하고 새 루프 연결 추가
   const updatedLoops = connectedLoops
-    .filter((loop: any) => loop.loopId !== fromLoopId)
-    .concat([{ loopId: toLoopId }]);
+    .filter((loopId: string) => loopId !== fromLoopId)
+    .concat([toLoopId]);
 
   await updateDoc(projectRef, {
     connectedLoops: updatedLoops,
@@ -684,29 +748,40 @@ export const moveProjectToLoop = async (
     updatedAt: new Date(),
   });
 
-  // 기존 루프의 projectIds에서 제거
-  const fromLoopRef = doc(db, "loops", fromLoopId);
-  const fromLoopSnap = await getDoc(fromLoopRef);
-  if (fromLoopSnap.exists()) {
-    const fromLoopData = fromLoopSnap.data();
-    const updatedProjectIds = (fromLoopData.projectIds || []).filter(
-      (id: string) => id !== projectId
-    );
-    await updateDoc(fromLoopRef, {
-      projectIds: updatedProjectIds,
-      updatedAt: new Date(),
-    });
-  }
+  // 프로젝트의 connectedLoops 업데이트 (중복 제거)
+  const projectSnap2 = await getDoc(projectRef);
+  if (projectSnap2.exists()) {
+    const projectData2 = projectSnap2.data();
+    const currentConnectedLoops = projectData2.connectedLoops || [];
 
-  // 새 루프의 projectIds에 추가
-  const toLoopRef = doc(db, "loops", toLoopId);
-  const toLoopSnap = await getDoc(toLoopRef);
-  if (toLoopSnap.exists()) {
-    const toLoopData = toLoopSnap.data();
-    const currentProjectIds = toLoopData.projectIds || [];
-    if (!currentProjectIds.includes(projectId)) {
-      await updateDoc(toLoopRef, {
-        projectIds: [...currentProjectIds, projectId],
+    // 기존 루프에서 제거
+    const filteredLoops = currentConnectedLoops.filter(
+      (loop: any) => loop.id !== fromLoopId
+    );
+
+    // 새 루프 정보 가져오기
+    const toLoopRef = doc(db, "loops", toLoopId);
+    const toLoopSnap = await getDoc(toLoopRef);
+    if (toLoopSnap.exists()) {
+      const toLoopData = toLoopSnap.data();
+      const newLoopInfo = {
+        id: toLoopId,
+        title: toLoopData.title,
+        startDate: toLoopData.startDate.toDate(),
+        endDate: toLoopData.endDate.toDate(),
+      };
+
+      // 새 루프가 이미 연결되어 있지 않으면 추가
+      const isAlreadyConnected = filteredLoops.some(
+        (loop: any) => loop.id === toLoopId
+      );
+
+      const updatedConnectedLoops = isAlreadyConnected
+        ? filteredLoops
+        : [...filteredLoops, newLoopInfo];
+
+      await updateDoc(projectRef, {
+        connectedLoops: updatedConnectedLoops,
         updatedAt: new Date(),
       });
     }
@@ -996,7 +1071,7 @@ export const createProject = async (
     createdAt: new Date(),
     updatedAt: new Date(),
     loopId: projectData.loopId,
-    connectedLoops: projectData.connectedLoops || [],
+
     addedMidway: projectData.addedMidway,
     retrospective: projectData.retrospective,
     notes: projectData.notes || [],
@@ -1589,8 +1664,8 @@ export const connectPendingProjectsToNewLoop = async (
   for (const project of pendingProjects) {
     try {
       // 기존 connectedLoops에 새 루프 추가
-      const connectedLoops = project.connectedLoops || [];
-      const updatedLoops = [...connectedLoops, { loopId: newLoopId }];
+      const connectedLoops = (project as any).connectedLoops || [];
+      const updatedLoops = [...connectedLoops, newLoopId];
 
       const projectRef = doc(db, "projects", project.id);
       await updateDoc(projectRef, {
@@ -1600,18 +1675,33 @@ export const connectPendingProjectsToNewLoop = async (
         updatedAt: new Date(),
       });
 
-      // 새 루프의 projectIds에 추가
+      // 새 루프 정보 가져오기
       const loopRef = doc(db, "loops", newLoopId);
       const loopSnap = await getDoc(loopRef);
       if (loopSnap.exists()) {
         const loopData = loopSnap.data();
-        const currentProjectIds = loopData.projectIds || [];
-        if (!currentProjectIds.includes(project.id)) {
-          await updateDoc(loopRef, {
-            projectIds: [...currentProjectIds, project.id],
-            updatedAt: new Date(),
-          });
-        }
+        const newLoopInfo = {
+          id: newLoopId,
+          title: loopData.title,
+          startDate: loopData.startDate.toDate(),
+          endDate: loopData.endDate.toDate(),
+        };
+
+        // 새 루프가 이미 연결되어 있지 않으면 추가
+        const isAlreadyConnected = updatedLoops.some(
+          (loop: any) => loop.id === newLoopId
+        );
+
+        const finalConnectedLoops = isAlreadyConnected
+          ? updatedLoops
+          : [...updatedLoops, newLoopInfo];
+
+        await updateDoc(projectRef, {
+          connectedLoops: finalConnectedLoops,
+          migrationStatus: "migrated",
+          carriedOverAt: new Date(),
+          updatedAt: new Date(),
+        });
       }
 
       console.log(`Connected pending project ${project.title} to new loop`);
@@ -2300,4 +2390,97 @@ export const fetchArchiveCountByUserId = async (
     console.error("Error fetching archive count:", error);
     throw new Error("아카이브 개수 조회에 실패했습니다.");
   }
+};
+
+// 루프와 프로젝트 개수를 한 번에 효율적으로 조회하는 함수
+export const fetchLoopsWithProjectCounts = async (
+  userId: string
+): Promise<(Loop & { projectCount: number })[]> => {
+  // 1. 모든 루프 조회
+  const loops = await fetchAllLoopsByUserId(userId);
+
+  if (loops.length === 0) return [];
+
+  // 2. 모든 프로젝트를 한 번에 조회하여 루프별 개수 계산
+  const projectsQuery = query(
+    collection(db, "projects"),
+    where("userId", "==", userId)
+  );
+  const projectsSnapshot = await getDocs(projectsQuery);
+
+  // 3. 루프별 프로젝트 개수 계산
+  const projectCounts: { [loopId: string]: number } = {};
+
+  console.log("🔍 프로젝트 개수 계산 시작");
+  console.log("총 프로젝트 수:", projectsSnapshot.size);
+
+  projectsSnapshot.docs.forEach((doc) => {
+    const projectData = doc.data();
+    const connectedLoops = projectData.connectedLoops || [];
+
+    console.log(
+      `프로젝트 "${projectData.title}"의 connectedLoops:`,
+      connectedLoops
+    );
+
+    // 이제 단순 ID 배열이므로 직접 사용
+    connectedLoops.forEach((loopId: string) => {
+      console.log("루프 ID:", loopId);
+      if (loopId) {
+        projectCounts[loopId] = (projectCounts[loopId] || 0) + 1;
+        console.log(
+          `루프 ${loopId}에 프로젝트 추가. 현재 개수: ${projectCounts[loopId]}`
+        );
+      }
+    });
+  });
+
+  console.log("최종 프로젝트 개수:", projectCounts);
+
+  // 4. 루프에 프로젝트 개수 추가
+  return loops.map((loop) => ({
+    ...loop,
+    projectCount: projectCounts[loop.id] || 0,
+  }));
+};
+
+// 루프 ID 배열로 루프 정보 가져오기
+export const fetchLoopsByIds = async (loopIds: string[]): Promise<Loop[]> => {
+  if (loopIds.length === 0) return [];
+
+  const connectedLoops: Loop[] = [];
+
+  // 배치로 루프 정보 가져오기 (Firestore는 'in' 쿼리에서 최대 10개만 지원)
+  const batchSize = 10;
+  for (let i = 0; i < loopIds.length; i += batchSize) {
+    const batch = loopIds.slice(i, i + batchSize);
+
+    const q = query(collection(db, "loops"), where("__name__", "in", batch));
+
+    const querySnapshot = await getDocs(q);
+    querySnapshot.docs.forEach((doc) => {
+      const loopData = doc.data();
+      connectedLoops.push({
+        id: doc.id,
+        userId: loopData.userId,
+        title: loopData.title,
+        startDate: loopData.startDate.toDate(),
+        endDate: loopData.endDate.toDate(),
+        focusAreas: loopData.focusAreas || [],
+        projectIds: loopData.projectIds || [],
+        reward: loopData.reward,
+        createdAt: loopData.createdAt.toDate(),
+        updatedAt: loopData.updatedAt.toDate(),
+        doneCount: loopData.doneCount || 0,
+        targetCount: loopData.targetCount || 0,
+        retrospective: loopData.retrospective,
+        note: loopData.note,
+      });
+    });
+  }
+
+  // 날짜순으로 정렬
+  connectedLoops.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+
+  return connectedLoops;
 };

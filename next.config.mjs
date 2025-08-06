@@ -9,6 +9,17 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-}
+  webpack: (config) => {
+    // @opentelemetry.js 모듈 문제 해결
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      net: false,
+      tls: false,
+    };
 
-export default nextConfig
+    return config;
+  },
+};
+
+export default nextConfig;

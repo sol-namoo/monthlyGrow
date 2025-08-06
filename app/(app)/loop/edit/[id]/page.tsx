@@ -129,7 +129,7 @@ export default function EditLoopPage({
         title: "루프 수정 완료",
         description: "루프가 성공적으로 수정되었습니다.",
       });
-      router.push(`/loop/${loopId}`);
+      router.replace(`/loop/${loopId}`);
     },
     onError: (error: Error) => {
       console.error("루프 수정 실패:", error);

@@ -255,8 +255,8 @@ function EditAreaPageContent({ params }: { params: Promise<{ id: string }> }) {
         description: `${formData.name} 영역이 업데이트되었습니다.`,
       });
 
-      // 영역 상세 페이지로 이동
-      router.push(`/para/areas/${id}`);
+      // 영역 상세 페이지로 이동 (replace로 히스토리 대체)
+      router.replace(`/para/areas/${id}`);
     } catch (error) {
       console.error("Area 수정 실패:", error);
       toast({
