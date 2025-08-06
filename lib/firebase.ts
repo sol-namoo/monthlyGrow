@@ -256,6 +256,7 @@ export const fetchAllProjectsByUserId = async (
 ): Promise<Project[]> => {
   const q = query(collection(db, "projects"), where("userId", "==", userId));
   const querySnapshot = await getDocs(q);
+
   return querySnapshot.docs.map((doc) => {
     const data = doc.data();
     return {
@@ -605,6 +606,7 @@ export const fetchAllLoopsByUserId = async (
 export const fetchLoopById = async (loopId: string): Promise<Loop> => {
   const docRef = doc(db, "loops", loopId);
   const docSnap = await getDoc(docRef);
+
   if (docSnap.exists()) {
     const data = docSnap.data();
     return {

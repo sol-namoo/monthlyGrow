@@ -190,15 +190,10 @@ function LoopPageContent() {
     refetchOnWindowFocus: true, // 윈도우 포커스 시 재페칭
   });
 
-  // 로딩 상태
-  if (
-    userLoading ||
-    loopsLoading ||
-    projectCountsLoading ||
-    taskCountsLoading
-  ) {
+  // 초기 로딩 상태 (사용자 인증, 루프 목록 로딩)
+  if (userLoading || loopsLoading) {
     return (
-      <div className="container max-w-md px-4 py-6">
+      <div className="container max-w-md px-4 py-6 pb-20">
         <div className="mb-6">
           <Skeleton className="h-8 w-48 mb-4" />
           <Skeleton className="h-4 w-full mb-2" />
@@ -354,10 +349,14 @@ function LoopPageContent() {
                     <div className="mb-1 flex justify-between text-sm">
                       <span>달성률: {getCompletionRate(currentLoop)}%</span>
                       <span>
-                        {(() => {
-                          const counts = getTaskCounts(currentLoop);
-                          return `${counts.completed}/${counts.total}`;
-                        })()}
+                        {taskCountsLoading ? (
+                          <Skeleton className="h-4 w-12" />
+                        ) : (
+                          (() => {
+                            const counts = getTaskCounts(currentLoop);
+                            return `${counts.completed}/${counts.total}`;
+                          })()
+                        )}
                       </span>
                     </div>
                     <div className="progress-bar">
@@ -394,7 +393,9 @@ function LoopPageContent() {
                     <h4 className="mb-2 font-medium">
                       프로젝트 ({getProjectCount(currentLoop)}개)
                     </h4>
-                    {getProjectCount(currentLoop) > 0 ? (
+                    {projectCountsLoading ? (
+                      <Skeleton className="h-4 w-32" />
+                    ) : getProjectCount(currentLoop) > 0 ? (
                       <p className="text-sm text-muted-foreground">
                         🔗 프로젝트 {getProjectCount(currentLoop)}개 연결됨
                       </p>
@@ -478,15 +479,22 @@ function LoopPageContent() {
                         <div className="mb-1 flex justify-between text-sm">
                           <span>목표: {loop.targetCount}회</span>
                           <span>
-                            연결된 프로젝트: {getProjectCount(loop)}개
+                            연결된 프로젝트:{" "}
+                            {projectCountsLoading ? (
+                              <Skeleton className="h-4 w-8" />
+                            ) : (
+                              `${getProjectCount(loop)}개`
+                            )}
                           </span>
                         </div>
-                        {getProjectCount(loop) === 0 && (
+                        {projectCountsLoading ? (
+                          <Skeleton className="h-4 w-48" />
+                        ) : getProjectCount(loop) === 0 ? (
                           <p className="text-xs text-muted-foreground mt-1">
                             📝 프로젝트를 연결하면 더 구체적인 목표를 세울 수
                             있어요
                           </p>
-                        )}
+                        ) : null}
                       </div>
                     </Card>
                   </Link>
@@ -549,10 +557,14 @@ function LoopPageContent() {
                         <div className="mb-1 flex justify-between text-sm">
                           <span>달성률: {getCompletionRate(loop)}%</span>
                           <span>
-                            {(() => {
-                              const counts = getTaskCounts(loop);
-                              return `${counts.completed}/${counts.total}`;
-                            })()}
+                            {taskCountsLoading ? (
+                              <Skeleton className="h-4 w-12" />
+                            ) : (
+                              (() => {
+                                const counts = getTaskCounts(loop);
+                                return `${counts.completed}/${counts.total}`;
+                              })()
+                            )}
                           </span>
                         </div>
                         <div className="progress-bar">
@@ -564,7 +576,14 @@ function LoopPageContent() {
                       </div>
 
                       <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>연결된 프로젝트: {getProjectCount(loop)}개</span>
+                        <span>
+                          연결된 프로젝트:{" "}
+                          {projectCountsLoading ? (
+                            <Skeleton className="h-4 w-8" />
+                          ) : (
+                            `${getProjectCount(loop)}개`
+                          )}
+                        </span>
                         {renderStars(loop.retrospective?.userRating)}
                       </div>
                     </Card>

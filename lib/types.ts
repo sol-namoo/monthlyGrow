@@ -75,7 +75,6 @@ export interface Loop {
   startDate: Date;
   endDate: Date;
   focusAreas: string[]; // Area ID 배열
-  projectIds?: string[]; // 연결된 프로젝트 ID 배열
   reward?: string;
   createdAt: Date;
   updatedAt: Date;

@@ -759,55 +759,38 @@ function NewLoopPageContent() {
           {areas.length > 0 ? (
             <>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-                {areas.map((area) => {
-                  const IconComponent = getIconComponent(
-                    area.icon || "compass"
-                  );
+                {areas
+                  .filter((area) => area.name !== "미분류")
+                  .map((area) => {
+                    const IconComponent = getIconComponent(
+                      area.icon || "compass"
+                    );
 
-                  return (
-                    <div
-                      key={area.id}
-                      className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border p-2 text-center transition-colors ${
-                        form.watch("selectedAreas").includes(area.id)
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                      onClick={() => toggleArea(area.id)}
-                    >
+                    return (
                       <div
-                        className="mb-1 rounded-full p-1"
-                        style={{
-                          backgroundColor: `${area.color || "#6b7280"}20`,
-                        }}
+                        key={area.id}
+                        className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border p-2 text-center transition-colors ${
+                          form.watch("selectedAreas").includes(area.id)
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                        onClick={() => toggleArea(area.id)}
                       >
-                        <IconComponent
-                          className="h-3 w-3"
-                          style={{ color: area.color || "#6b7280" }}
-                        />
+                        <div
+                          className="mb-1 rounded-full p-1"
+                          style={{
+                            backgroundColor: `${area.color || "#6b7280"}20`,
+                          }}
+                        >
+                          <IconComponent
+                            className="h-3 w-3"
+                            style={{ color: area.color || "#6b7280" }}
+                          />
+                        </div>
+                        <span className="text-xs">{area.name}</span>
                       </div>
-                      <span className="text-xs">{area.name}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {form.watch("selectedAreas").map((areaId) => {
-                  const area = areas.find((a) => a.id === areaId);
-                  const IconComponent = getIconComponent(
-                    area?.icon || "compass"
-                  );
-
-                  return (
-                    <Badge
-                      key={areaId}
-                      variant="secondary"
-                      className="flex items-center gap-1"
-                    >
-                      <IconComponent className="h-3 w-3" />
-                      {area?.name}
-                    </Badge>
-                  );
-                })}
+                    );
+                  })}
               </div>
             </>
           ) : (

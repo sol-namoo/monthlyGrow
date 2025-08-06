@@ -454,7 +454,22 @@ function ParaPageContent() {
                           {project.title}
                         </h3>
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs">
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${
+                              (() => {
+                                if (project.areaId) {
+                                  const area = areas.find(
+                                    (a) => a.id === project.areaId
+                                  );
+                                  return area ? area.name : "미분류";
+                                }
+                                return "미분류";
+                              })() === "미분류"
+                                ? "border-red-300 text-red-700"
+                                : ""
+                            }`}
+                          >
                             {(() => {
                               if (project.areaId) {
                                 const area = areas.find(
@@ -735,7 +750,14 @@ function ParaPageContent() {
                   >
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-lg font-bold">{resource.name}</h3>
-                      <Badge variant="outline" className="text-xs">
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${
+                          resource.area?.name === "미분류"
+                            ? "border-red-300 text-red-700"
+                            : ""
+                        }`}
+                      >
                         {resource.area?.name || "기타"}
                       </Badge>
                     </div>

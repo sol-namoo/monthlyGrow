@@ -174,12 +174,21 @@ export default function ResourceDetailPage({
 
         {/* 자료 정보 */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold mb-2">{resource.name}</h1>
-          {resource.area && (
-            <Badge variant="secondary" className="mb-3">
-              {resource.area.name}
-            </Badge>
-          )}
+          <div className="flex items-center gap-2 mb-2">
+            <h1 className="text-2xl font-bold">{resource.name}</h1>
+            {resource.area && (
+              <Badge
+                variant="outline"
+                className={`text-xs ${
+                  resource.area.name === "미분류"
+                    ? "border-red-300 text-red-700"
+                    : ""
+                }`}
+              >
+                {resource.area.name}
+              </Badge>
+            )}
+          </div>
           {resource.description && (
             <p className="text-sm text-muted-foreground mb-4">
               {resource.description}

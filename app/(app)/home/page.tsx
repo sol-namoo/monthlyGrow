@@ -176,11 +176,21 @@ export default function HomePage() {
   }
 
   // progress, total, daysLeft, changeRate 등 계산
+  // 현재 루프의 프로젝트들에서 실제 완료된 태스크 수 계산
+  const actualDoneCount = currentLoopProjects.reduce(
+    (sum, project) => sum + (project.completedTasks || 0),
+    0
+  );
+  const actualTotalCount = currentLoopProjects.reduce(
+    (sum, project) => sum + (project.target || 0),
+    0
+  );
+
   const progress =
-    currentLoop && currentLoop.targetCount > 0
-      ? Math.round((currentLoop.doneCount / currentLoop.targetCount) * 100)
+    actualTotalCount > 0
+      ? Math.round((actualDoneCount / actualTotalCount) * 100)
       : 0;
-  const total = currentLoop?.targetCount || 0;
+  const total = actualTotalCount;
   const startDate = currentLoop?.startDate
     ? formatDate(currentLoop.startDate)
     : "-";
@@ -266,7 +276,7 @@ export default function HomePage() {
               <div className="mb-1 flex justify-between text-sm">
                 <span>진행률: {progress}%</span>
                 <span>
-                  {currentLoop?.doneCount || 0}/{total}
+                  {actualDoneCount}/{total}
                 </span>
               </div>
               <div className="progress-bar">
@@ -366,19 +376,12 @@ export default function HomePage() {
                         <span className="text-xs text-muted-foreground">
                           Area: {getAreaName(project.areaId)}
                         </span>
-                        {project.addedMidway ? (
+                        {project.addedMidway && (
                           <Badge
                             variant="outline"
                             className="bg-amber-100 text-amber-800 text-xs"
                           >
                             🔥 루프 중 추가됨
-                          </Badge>
-                        ) : (
-                          <Badge
-                            variant="outline"
-                            className="bg-primary/10 text-xs"
-                          >
-                            현재 루프 연결됨
                           </Badge>
                         )}
                       </div>

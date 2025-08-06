@@ -186,6 +186,17 @@ function NewProjectPageContent() {
   const addedMidway = searchParams.get("addedMidway") === "true";
   const returnUrl = searchParams.get("returnUrl");
 
+  // returnUrl에서 루프 ID 추출 (루프 수정 페이지에서 온 경우)
+  const extractLoopIdFromReturnUrl = () => {
+    if (returnUrl) {
+      const match = returnUrl.match(/\/loop\/edit\/([^/?]+)/);
+      return match ? match[1] : null;
+    }
+    return null;
+  };
+
+  const returnUrlLoopId = extractLoopIdFromReturnUrl();
+
   // 사용자의 모든 루프 가져오기
   const { data: allLoops = [], isLoading: loopsLoading } = useQuery({
     queryKey: ["loops", user?.uid],
@@ -250,6 +261,16 @@ function NewProjectPageContent() {
       form.setValue("area", areas[0].id);
     }
   }, [areas, form]);
+
+  // returnUrl에서 추출한 루프 ID가 있으면 자동으로 선택
+  useEffect(() => {
+    if (returnUrlLoopId && allLoops.length > 0) {
+      const targetLoop = allLoops.find((loop) => loop.id === returnUrlLoopId);
+      if (targetLoop && !selectedLoopIds.includes(returnUrlLoopId)) {
+        setSelectedLoopIds((prev) => [...prev, returnUrlLoopId]);
+      }
+    }
+  }, [returnUrlLoopId, allLoops, selectedLoopIds]);
 
   // 반복형 프로젝트에서 카테고리나 날짜 변경 시 태스크 목록 자동 업데이트
   useEffect(() => {

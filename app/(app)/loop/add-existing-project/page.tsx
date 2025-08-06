@@ -166,7 +166,13 @@ function AddExistingProjectPageContent() {
                     </p>
                   </div>
                 </div>
-                <Badge variant="outline">{project.area}</Badge>
+                <Badge
+                  variant={
+                    project.area === "미분류" ? "destructive" : "outline"
+                  }
+                >
+                  {project.area}
+                </Badge>
               </div>
 
               <div className="mt-2">

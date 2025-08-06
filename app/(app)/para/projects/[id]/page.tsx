@@ -866,11 +866,15 @@ export default function ProjectDetailPage({
         <div className="flex items-center gap-2 mb-2">
           <h1 className="text-2xl font-bold">{project.title}</h1>
           {area ? (
-            <Badge variant="secondary">{area.name}</Badge>
+            <Badge
+              variant={area.name === "미분류" ? "destructive" : "secondary"}
+            >
+              {area.name}
+            </Badge>
           ) : project.areaId ? (
             <Badge variant="outline">Area 정보 로딩 중...</Badge>
           ) : (
-            <Badge variant="outline">Area 없음</Badge>
+            <Badge variant="destructive">Area 없음</Badge>
           )}
         </div>
 

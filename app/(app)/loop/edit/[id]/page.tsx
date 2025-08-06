@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChevronLeft, Calendar, Info, X, Plus, Search } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,9 +29,37 @@ import {
   fetchLoopById,
   fetchAllAreasByUserId,
   updateLoop,
+  fetchProjectsByLoopId,
   fetchAllProjectsByUserId,
 } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
+import { RecommendationBadge } from "@/components/ui/recommendation-badge";
+import {
+  Compass,
+  Heart,
+  Briefcase,
+  Users,
+  DollarSign,
+  Brain,
+  Gamepad2,
+  BookOpen,
+  Palette,
+} from "lucide-react";
+
+// 아이콘 컴포넌트 매핑 함수
+const getIconComponent = (iconName: string) => {
+  const iconMap: { [key: string]: React.ComponentType<any> } = {
+    heart: Heart,
+    briefcase: Briefcase,
+    users: Users,
+    dollarSign: DollarSign,
+    brain: Brain,
+    gamepad2: Gamepad2,
+    bookOpen: BookOpen,
+    palette: Palette,
+  };
+  return iconMap[iconName] || Compass;
+};
 
 // 로딩 스켈레톤 컴포넌트
 function EditLoopSkeleton() {
@@ -59,6 +87,7 @@ export default function EditLoopPage({
 }) {
   const router = useRouter();
   const { id: loopId } = use(params);
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [user] = useAuthState(auth);
   const queryClient = useQueryClient();
@@ -66,64 +95,122 @@ export default function EditLoopPage({
   // 현재 날짜 정보
   const currentDate = new Date();
 
-  // 실제 루프 데이터 가져오기
+  // 통합된 데이터 페칭 - 캐시 최적화
   const {
-    data: loop,
+    data: editLoopData,
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["loop", loopId],
-    queryFn: () => fetchLoopById(loopId),
-    enabled: !!loopId,
+    queryKey: ["editLoopData", loopId, user?.uid],
+    queryFn: async () => {
+      if (!user?.uid || !loopId) return null;
+
+      // 병렬로 모든 데이터 가져오기
+      const [loop, areas, connectedProjects, allProjects] = await Promise.all([
+        fetchLoopById(loopId),
+        fetchAllAreasByUserId(user.uid),
+        fetchProjectsByLoopId(loopId, user.uid),
+        fetchAllProjectsByUserId(user.uid),
+      ]);
+
+      return {
+        loop,
+        areas: areas || [],
+        connectedProjects: connectedProjects || [],
+        allProjects: allProjects || [],
+      };
+    },
+    enabled: !!user?.uid && !!loopId,
+    staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
+    gcTime: 10 * 60 * 1000, // 10분간 메모리에 유지
   });
 
-  // 사용자의 모든 Area 가져오기
-  const { data: areas = [] } = useQuery({
-    queryKey: ["areas", user?.uid],
-    queryFn: () => fetchAllAreasByUserId(user?.uid || ""),
-    enabled: !!user?.uid,
-  });
-
-  // 사용자의 모든 프로젝트 가져오기
-  const { data: allProjects = [] } = useQuery({
-    queryKey: ["projects", user?.uid],
-    queryFn: () => fetchAllProjectsByUserId(user?.uid || ""),
-    enabled: !!user?.uid,
-  });
+  // 데이터 추출
+  const loop = editLoopData?.loop;
+  const areas = editLoopData?.areas || [];
+  const connectedProjects = editLoopData?.connectedProjects || [];
+  const allProjects = editLoopData?.allProjects || [];
+  const projectsLoading = isLoading;
 
   // 수정 가능한 필드 상태
   const [title, setTitle] = useState("");
   const [reward, setReward] = useState("");
   const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>([]);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
 
   // 프로젝트 추가 모달 상태
   const [showAddProjectModal, setShowAddProjectModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
 
-  // 루프 데이터가 로드되면 폼 초기화
+  // 새로 생성된 프로젝트 자동 연결 처리
+  useEffect(() => {
+    const newProjectId = searchParams.get("newProjectId");
+    if (newProjectId && !selectedProjectIds.includes(newProjectId)) {
+      // 새로 생성된 프로젝트를 선택된 프로젝트 목록에 추가
+      setSelectedProjectIds((prev) => [...prev, newProjectId]);
+
+      // URL에서 newProjectId 파라미터 제거
+      const url = new URL(window.location.href);
+      url.searchParams.delete("newProjectId");
+      router.replace(url.pathname + url.search);
+
+      toast({
+        title: "프로젝트 연결됨",
+        description: "새로 생성된 프로젝트가 루프에 연결되었습니다.",
+      });
+    }
+  }, [searchParams, selectedProjectIds, router, toast]);
+
+  // 루프 데이터와 연결된 프로젝트가 로드되면 폼 초기화
   useEffect(() => {
     if (loop) {
       setTitle(loop.title || "");
       setReward(loop.reward || "");
 
+      // 종료일이 월의 마지막 날이 아닌 경우 자동으로 수정
+      const endDate = new Date(loop.endDate);
+      const year = endDate.getFullYear();
+      const month = endDate.getMonth();
+      const lastDayOfMonth = new Date(year, month + 1, 0);
+
+      if (endDate.getDate() !== lastDayOfMonth.getDate()) {
+        // 올바른 종료일로 루프 업데이트
+        const correctedEndDate = lastDayOfMonth;
+        updateLoop(loopId, { endDate: correctedEndDate }).then(() => {
+          // 통합된 쿼리 무효화
+          queryClient.invalidateQueries({
+            queryKey: ["editLoopData", loopId, user?.uid],
+          });
+        });
+      }
+
       // 기존 focusAreas (이름 기반) 데이터를 ID로 변환
       if (loop.focusAreas && loop.focusAreas.length > 0) {
         const areaIds = loop.focusAreas
-          .map((areaName) => areas.find((area) => area.name === areaName)?.id)
-          .filter((id) => id) as string[];
+          .map(
+            (areaName: string) =>
+              areas.find((area: any) => area.name === areaName)?.id
+          )
+          .filter((id: any) => id) as string[];
         setSelectedAreaIds(areaIds);
       } else {
         setSelectedAreaIds([]);
       }
+
+      // 연결된 프로젝트 IDs 설정
+      const projectIds = connectedProjects.map((p: any) => p.id);
+      setSelectedProjectIds(projectIds);
     }
-  }, [loop, areas]);
+  }, [loop, areas, connectedProjects, loopId, queryClient]);
 
   // 루프 업데이트 mutation
   const updateLoopMutation = useMutation({
     mutationFn: (updatedData: any) => updateLoop(loopId, updatedData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["loop", loopId] });
+      // 통합된 쿼리 무효화
+      queryClient.invalidateQueries({
+        queryKey: ["editLoopData", loopId, user?.uid],
+      });
       queryClient.invalidateQueries({ queryKey: ["loops"] });
       toast({
         title: "루프 수정 완료",
@@ -141,24 +228,8 @@ export default function EditLoopPage({
     },
   });
 
-  // 루프 생성 후 3일 이내인지 확인
-  const isWithinThreeDays = () => {
-    if (!loop?.createdAt) return false;
-    const createdDate = new Date(loop.createdAt);
-    const threeDaysAfter = new Date(createdDate);
-    threeDaysAfter.setDate(createdDate.getDate() + 3);
-    return currentDate <= threeDaysAfter;
-  };
-
-  // 루프 시작일이 지났는지 확인
-  const hasLoopStarted = () => {
-    if (!loop?.startDate) return false;
-    const startDate = new Date(loop.startDate);
-    return currentDate >= startDate;
-  };
-
-  // 수정 가능 여부 확인
-  const canEditAreas = isWithinThreeDays() && !hasLoopStarted();
+  // 중점 영역은 언제든지 수정 가능
+  const canEditAreas = true;
 
   // Area 선택/해제 핸들러
   const handleAreaToggle = (areaId: string) => {
@@ -171,16 +242,24 @@ export default function EditLoopPage({
 
   // 프로젝트 선택/해제 핸들러
   const handleProjectToggle = (projectId: string) => {
-    setSelectedProjectIds((prev) =>
-      prev.includes(projectId)
+    setSelectedProjectIds((prev) => {
+      const newIds = prev.includes(projectId)
         ? prev.filter((id) => id !== projectId)
-        : [...prev, projectId]
-    );
+        : [...prev, projectId];
+
+      // 디버깅용 로그 (개발 환경에서만)
+      if (process.env.NODE_ENV === "development") {
+        console.log("프로젝트 토글:", projectId);
+        console.log("선택된 프로젝트 IDs:", newIds);
+      }
+
+      return newIds;
+    });
   };
 
   // 프로젝트 추가 모달 열기
   const handleOpenAddProjectModal = () => {
-    setSelectedProjectIds(loop?.projectIds || []);
+    setSelectedProjectIds(connectedProjects.map((p: any) => p.id));
     setSearchTerm("");
     setShowAddProjectModal(true);
   };
@@ -208,15 +287,14 @@ export default function EditLoopPage({
     const updatedData = {
       title: title.trim(),
       reward: reward.trim(),
-      ...(canEditAreas && { focusAreas: selectedAreaIds }),
-      projectIds: selectedProjectIds, // 프로젝트 변경사항도 포함
+      focusAreas: selectedAreaIds,
     };
 
     updateLoopMutation.mutate(updatedData);
   };
 
   // 로딩 상태
-  if (isLoading) {
+  if (isLoading || projectsLoading) {
     return <EditLoopSkeleton />;
   }
 
@@ -294,106 +372,126 @@ export default function EditLoopPage({
           <h1 className="text-2xl font-bold">루프 수정</h1>
         </div>
 
-        <Alert className="mb-6">
-          <Info className="h-4 w-4" />
-          <AlertTitle>루프 수정 정책</AlertTitle>
-          <AlertDescription>
-            루프 제목과 보상은 언제든지 수정할 수 있습니다. 중점 Areas는 루프
-            시작 전에만 수정 가능합니다. 시작일과 종료일은 수정할 수 없습니다.
-          </AlertDescription>
-        </Alert>
+        <div className="mb-6 space-y-2">
+          <RecommendationBadge
+            type="info"
+            message="루프 제목, 보상, 중점 영역은 언제든지 수정할 수 있습니다"
+          />
+        </div>
 
-        <form onSubmit={handleSubmit}>
-          <Card className="mb-6 p-4">
-            <div className="mb-4">
-              <Label htmlFor="title">루프 제목</Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="mt-1"
-                required
-              />
-            </div>
-
-            <div className="mb-4">
-              <Label htmlFor="reward">달성 보상</Label>
-              <Input
-                id="reward"
-                value={reward}
-                onChange={(e) => setReward(e.target.value)}
-                className="mt-1"
-                required
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                루프를 완료했을 때 자신에게 줄 보상을 설정하세요.
-              </p>
-            </div>
-
-            <div className="mb-4">
-              <Label>루프 기간</Label>
-              <div className="mt-1 flex items-center gap-2 rounded-md border bg-muted/30 p-3 text-sm">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span>
-                  {formatDate(loop.startDate)} ~ {formatDate(loop.endDate)}
-                </span>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* 기본 정보 */}
+          <Card className="p-6">
+            <h2 className="mb-4 text-lg font-semibold">기본 정보</h2>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="title">루프 제목</Label>
+                <Input
+                  id="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="예: 1월 건강 루프"
+                  className="mt-1"
+                  required
+                />
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                루프 기간은 수정할 수 없습니다.
-              </p>
+
+              <div>
+                <Label htmlFor="reward">달성 보상</Label>
+                <Input
+                  id="reward"
+                  value={reward}
+                  onChange={(e) => setReward(e.target.value)}
+                  placeholder="예: 새로운 운동화 구매"
+                  className="mt-1"
+                  required
+                />
+                <p className="text-sm text-muted-foreground mt-1">
+                  💡 루프를 완료했을 때 자신에게 줄 보상을 설정하세요.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>시작일</Label>
+                  <div className="mt-1 flex items-center gap-2 rounded-md border bg-muted/30 p-3 text-sm">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span>{formatDate(loop.startDate)}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    루프 기간은 수정할 수 없습니다
+                  </p>
+                </div>
+
+                <div>
+                  <Label>종료일</Label>
+                  <div className="mt-1 flex items-center gap-2 rounded-md border bg-muted/30 p-3 text-sm">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span>{formatDate(loop.endDate)}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    해당 월의 마지막 날까지
+                  </p>
+                </div>
+              </div>
             </div>
           </Card>
 
-          <Card className="mb-6 p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">중점 Areas</h2>
-              {!canEditAreas && (
-                <Badge
-                  variant="outline"
-                  className="bg-amber-100 text-amber-800"
-                >
-                  수정 불가
-                </Badge>
+          {/* 중점 Areas */}
+          <Card className="p-6">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold">중점 Areas (최대 4개)</h2>
+            </div>
+
+            <div className="mb-4 space-y-2">
+              <RecommendationBadge
+                type="info"
+                message="권장: 2개 영역에 집중하면 루프의 효과를 높일 수 있어요"
+              />
+              {selectedAreaIds.length > 2 && (
+                <RecommendationBadge
+                  type="warning"
+                  message="많은 영역을 선택하면 집중도가 떨어질 수 있습니다"
+                />
               )}
             </div>
 
-            {canEditAreas ? (
+            {areas.length > 0 ? (
               <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {areas.map((area) => (
-                    <Badge
-                      key={area.id}
-                      variant={
-                        selectedAreaIds.includes(area.id)
-                          ? "default"
-                          : "outline"
-                      }
-                      className={`cursor-pointer transition-colors ${
-                        selectedAreaIds.includes(area.id)
-                          ? "bg-primary text-primary-foreground"
-                          : "hover:bg-secondary"
-                      }`}
-                      onClick={() => handleAreaToggle(area.id)}
-                    >
-                      {area.name}
-                      {selectedAreaIds.includes(area.id) && (
-                        <X className="ml-1 h-3 w-3" />
-                      )}
-                    </Badge>
-                  ))}
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                  {areas
+                    .filter((area) => area.name !== "미분류")
+                    .map((area) => {
+                      const IconComponent = getIconComponent(
+                        area.icon || "compass"
+                      );
+
+                      return (
+                        <div
+                          key={area.id}
+                          className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border p-2 text-center transition-colors ${
+                            selectedAreaIds.includes(area.id)
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                          onClick={() => handleAreaToggle(area.id)}
+                        >
+                          <div
+                            className="mb-1 rounded-full p-1"
+                            style={{
+                              backgroundColor: `${area.color || "#6b7280"}20`,
+                            }}
+                          >
+                            <IconComponent
+                              className="h-3 w-3"
+                              style={{ color: area.color || "#6b7280" }}
+                            />
+                          </div>
+                          <span className="text-xs">{area.name}</span>
+                        </div>
+                      );
+                    })}
                 </div>
-                {areas.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    생성된 Area가 없습니다.{" "}
-                    <Link
-                      href="/para/areas/new"
-                      className="text-primary hover:underline"
-                    >
-                      Area를 먼저 생성
-                    </Link>
-                    해주세요.
-                  </p>
-                )}
               </div>
             ) : (
               <div className="flex flex-wrap gap-2">
@@ -403,15 +501,21 @@ export default function EditLoopPage({
                   );
 
                   if (focusAreas.length > 0) {
-                    return focusAreas.map((area) => (
-                      <Badge
-                        key={area.id}
-                        variant="secondary"
-                        className="opacity-70"
-                      >
-                        {area.name}
-                      </Badge>
-                    ));
+                    return focusAreas.map((area) => {
+                      const IconComponent = getIconComponent(
+                        area.icon || "compass"
+                      );
+                      return (
+                        <Badge
+                          key={area.id}
+                          variant="secondary"
+                          className="opacity-70 flex items-center gap-1"
+                        >
+                          <IconComponent className="h-3 w-3" />
+                          {area.name}
+                        </Badge>
+                      );
+                    });
                   } else {
                     return (
                       <span className="text-xs text-muted-foreground">
@@ -422,35 +526,107 @@ export default function EditLoopPage({
                 })()}
               </div>
             )}
-
-            {!canEditAreas && (
-              <p className="mt-3 text-xs text-muted-foreground">
-                중점 Areas는 루프 시작 전에만 수정할 수 있습니다.
-              </p>
-            )}
           </Card>
 
-          <Card className="mb-6 p-4">
-            <h2 className="mb-4 text-lg font-semibold">연결된 프로젝트</h2>
+          {/* 프로젝트 연결 */}
+          <Card className="p-6">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold mb-2">프로젝트 연결</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                이 루프와 연결할 프로젝트를 선택하거나 새 프로젝트를
+                만들어보세요. 프로젝트는 나중에 추가할 수도 있습니다.
+              </p>
+            </div>
 
-            {(() => {
-              // 루프에 연결된 프로젝트들 필터링
-              const connectedProjects = allProjects.filter((project) =>
-                loop.projectIds?.includes(project.id)
-              );
+            <div className="space-y-3 mb-4">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleOpenAddProjectModal}
+                  className="flex-1"
+                >
+                  기존 프로젝트 선택
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    // 새 프로젝트 생성 페이지로 이동 (현재 루프 ID 포함)
+                    const returnUrl = `${window.location.origin}/loop/edit/${loopId}`;
+                    router.push(
+                      `/para/projects/new?returnUrl=${encodeURIComponent(
+                        returnUrl
+                      )}`
+                    );
+                  }}
+                  className="flex-1"
+                >
+                  <Plus className="mr-2 h-4 w-4" />새 프로젝트 만들기
+                </Button>
+              </div>
+            </div>
 
-              if (connectedProjects.length > 0) {
-                return (
-                  <div className="space-y-2">
-                    {connectedProjects.map((project) => (
+            {/* 선택된 프로젝트 표시 */}
+            {selectedProjectIds.length > 0 && (
+              <div className="space-y-3 mb-4 p-3 bg-muted/30 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium">연결된 프로젝트</h3>
+                  <Badge variant="secondary" className="text-xs">
+                    {selectedProjectIds.length}개
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  {selectedProjectIds.map((projectId) => {
+                    // connectedProjects에서 먼저 찾고, 없으면 allProjects에서 찾기
+                    const project =
+                      connectedProjects.find((p) => p.id === projectId) ||
+                      allProjects.find((p) => p.id === projectId);
+
+                    // 디버깅용 로그 (개발 환경에서만)
+                    if (process.env.NODE_ENV === "development" && !project) {
+                      console.log("프로젝트를 찾을 수 없음:", projectId);
+                      console.log(
+                        "connectedProjects:",
+                        connectedProjects.map((p) => ({
+                          id: p.id,
+                          title: p.title,
+                        }))
+                      );
+                      console.log(
+                        "allProjects:",
+                        allProjects.map((p) => ({ id: p.id, title: p.title }))
+                      );
+                    }
+
+                    if (!project) {
+                      return (
+                        <div
+                          key={projectId}
+                          className="flex items-center justify-between p-2 bg-background rounded border"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">
+                              삭제된 프로젝트
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              프로젝트가 삭제되었습니다
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
                       <div
-                        key={project.id}
-                        className="rounded-lg bg-secondary p-3 text-sm"
+                        key={projectId}
+                        className="flex items-center justify-between p-2 bg-background rounded border"
                       >
-                        <div className="mb-1 flex justify-between">
-                          <span className="font-medium">{project.title}</span>
-                          <span className="text-muted-foreground">
+                        <div>
+                          <p className="text-sm font-medium">{project.title}</p>
+                          <p className="text-xs text-muted-foreground">
                             {(() => {
+                              // 프로젝트의 area ID를 사용해서 실제 area 이름 찾기
                               if (project.areaId) {
                                 const area = areas.find(
                                   (a) => a.id === project.areaId
@@ -459,89 +635,67 @@ export default function EditLoopPage({
                               }
                               return "미분류";
                             })()}
-                          </span>
+                          </p>
                         </div>
-                        <p className="text-xs text-muted-foreground mb-2 line-clamp-1">
-                          {project.description || "설명 없음"}
-                        </p>
-                        <div className="progress-bar">
-                          <div
-                            className="progress-value"
-                            style={{ width: "60%" }}
-                          ></div>
-                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedProjectIds(
+                              selectedProjectIds.filter(
+                                (id) => id !== projectId
+                              )
+                            );
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
-                    ))}
-                  </div>
-                );
-              } else if (loop.projectIds && loop.projectIds.length > 0) {
-                // 프로젝트 ID는 있지만 해당 프로젝트를 찾을 수 없는 경우
-                return (
-                  <div className="space-y-2">
-                    {loop.projectIds.map((projectId, index) => (
-                      <div
-                        key={projectId}
-                        className="rounded-lg bg-secondary p-3 text-sm"
-                      >
-                        <div className="mb-1 flex justify-between">
-                          <span>프로젝트 {index + 1}</span>
-                          <span className="text-muted-foreground">삭제됨</span>
-                        </div>
-                        <div className="progress-bar">
-                          <div
-                            className="progress-value"
-                            style={{ width: "0%" }}
-                          ></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              } else {
-                return (
-                  <div className="text-center py-4">
-                    <p className="text-muted-foreground mb-2">
-                      연결된 프로젝트가 없습니다.
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      type="button"
-                      onClick={handleOpenAddProjectModal}
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      프로젝트 추가
-                    </Button>
-                  </div>
-                );
-              }
-            })()}
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
-            <div className="mt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                type="button"
-                onClick={handleOpenAddProjectModal}
-                className="w-full bg-transparent"
-              >
-                프로젝트 추가/제거
-              </Button>
+            {/* 프로젝트가 없을 때 안내 */}
+            {selectedProjectIds.length === 0 && (
+              <div className="text-center py-6">
+                <div className="mb-3 flex justify-center">
+                  <div className="rounded-full bg-muted/50 p-3">
+                    <Briefcase className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  아직 연결된 프로젝트가 없습니다
+                </p>
+              </div>
+            )}
+
+            <div className="mt-4 space-y-2">
+              <RecommendationBadge
+                type="info"
+                message="권장: 2~3개 프로젝트에 집중하면 루프의 효과를 높일 수 있어요"
+              />
+
+              {selectedProjectIds.length > 3 && (
+                <RecommendationBadge
+                  type="warning"
+                  message="많은 프로젝트를 선택하면 집중도가 떨어질 수 있습니다"
+                />
+              )}
             </div>
           </Card>
 
-          <div className="flex gap-3">
-            <Button
-              type="submit"
-              className="flex-1"
-              disabled={updateLoopMutation.isPending}
-            >
-              {updateLoopMutation.isPending ? "저장 중..." : "변경사항 저장"}
-            </Button>
-            <Button variant="outline" asChild className="flex-1 bg-transparent">
-              <Link href={`/loop/${loopId}`}>취소</Link>
-            </Button>
-          </div>
+          {/* 제출 버튼 */}
+          <Button
+            type="submit"
+            className="w-full"
+            size="lg"
+            disabled={updateLoopMutation.isPending}
+          >
+            {updateLoopMutation.isPending ? "저장 중..." : "변경사항 저장"}
+          </Button>
         </form>
 
         {/* 프로젝트 추가/제거 모달 */}
@@ -610,7 +764,9 @@ export default function EditLoopPage({
 
                   return filteredProjects.map((project) => {
                     const isSelected = selectedProjectIds.includes(project.id);
-                    const isConnected = loop?.projectIds?.includes(project.id);
+                    const isConnected = connectedProjects.some(
+                      (p) => p.id === project.id
+                    );
 
                     return (
                       <div
@@ -635,7 +791,17 @@ export default function EditLoopPage({
                             {project.description || "설명 없음"}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Area: {project.area || "미분류"}
+                            Area:{" "}
+                            {(() => {
+                              // 프로젝트의 area ID를 사용해서 실제 area 이름 찾기
+                              if (project.areaId) {
+                                const area = areas.find(
+                                  (a) => a.id === project.areaId
+                                );
+                                return area ? area.name : "미분류";
+                              }
+                              return "미분류";
+                            })()}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
