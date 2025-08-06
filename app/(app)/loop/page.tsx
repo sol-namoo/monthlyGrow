@@ -396,11 +396,11 @@ function LoopPageContent() {
                     {projectCountsLoading ? (
                       <Skeleton className="h-4 w-32" />
                     ) : getProjectCount(currentLoop) > 0 ? (
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         🔗 프로젝트 {getProjectCount(currentLoop)}개 연결됨
                       </p>
                     ) : (
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         📝 아직 연결된 프로젝트가 없어요. 루프 수정에서
                         프로젝트를 연결해보세요.
                       </p>
@@ -416,7 +416,7 @@ function LoopPageContent() {
                   </div>
                 </div>
                 <h3 className="mb-2 text-lg font-bold">현재 루프가 없어요</h3>
-                <p className="mb-6 text-sm text-muted-foreground max-w-sm mx-auto">
+                <p className="mb-6 text-xs text-muted-foreground max-w-sm mx-auto">
                   새로운 월간 루프를 만들어서 체계적인 성장을 시작해보세요.
                 </p>
                 <Button onClick={() => handleCreateLoop(0)}>

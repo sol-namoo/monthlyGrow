@@ -36,13 +36,8 @@ export function RecommendationBadge({
 
   return (
     <div
-      className={cn(
-        "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm",
-        getStyles(),
-        className
-      )}
+      className={cn("rounded-lg border p-4 text-xs", getStyles(), className)}
     >
-      {getIcon()}
       <span>{message}</span>
     </div>
   );

@@ -667,7 +667,7 @@ function NewLoopPageContent() {
                   {form.formState.errors.selectedMonth.message}
                 </p>
               )}
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 💡 루프는 최대 6개월 후까지 생성할 수 있습니다
               </p>
             </div>
@@ -695,7 +695,7 @@ function NewLoopPageContent() {
                 placeholder="예: 새로운 운동화 구매"
                 className="mt-1"
               />
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 💡 기본 보상 설정이 비활성화되어 있습니다. 설정에서 활성화하면
                 새 루프 생성 시 자동으로 보상이 채워집니다.
               </p>

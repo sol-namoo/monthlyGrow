@@ -637,10 +637,10 @@ export function LoopDetailPage({
             <p className="text-muted-foreground mb-2">
               이 루프에 연결된 프로젝트가 없어요
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               연결된 프로젝트가 없으면 달성률을 측정할 수 없어요
             </p>
-            <p className="text-sm text-muted-foreground mt-2">
+            <p className="text-xs text-muted-foreground mt-2">
               프로젝트를 연결하려면 상단의 "루프 수정" 버튼을 사용하세요
             </p>
           </div>

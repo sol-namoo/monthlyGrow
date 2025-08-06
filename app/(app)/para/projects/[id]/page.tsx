@@ -30,7 +30,11 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import type { Retrospective } from "@/lib/types";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  CustomAlert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/custom-alert";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { getProjectStatus } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1003,14 +1007,14 @@ export default function ProjectDetailPage({
             <div className="space-y-3">
               {connectedLoops.length >= 3 &&
                 projectWithStatus?.status === "in_progress" && (
-                  <Alert variant="warning" className="mb-4">
+                  <CustomAlert variant="warning" className="mb-4">
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>장기 프로젝트 안내</AlertTitle>
                     <AlertDescription>
                       이 프로젝트는 {connectedLoops.length}개의 루프에 연결되어
                       있습니다. 정리하거나 회고를 작성해보는 건 어떨까요?
                     </AlertDescription>
-                  </Alert>
+                  </CustomAlert>
                 )}
             </div>
           )}
@@ -1109,7 +1113,7 @@ export default function ProjectDetailPage({
                       </div>
                     ))
                 ) : (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     아직 활동이 없습니다.
                   </p>
                 )}

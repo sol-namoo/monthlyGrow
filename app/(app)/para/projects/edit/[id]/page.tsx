@@ -58,7 +58,11 @@ import {
   addTaskToProject,
   updateTaskInProject,
 } from "@/lib/firebase";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  CustomAlert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/custom-alert";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 // 프로젝트 편집 폼 스키마 정의
@@ -232,8 +236,12 @@ export default function EditProjectPage({
 
     const projectStart = new Date(form.watch("startDate"));
     const projectEnd = new Date(form.watch("endDate"));
-    const sixMonthsLater = new Date();
-    sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
+
+    // 현재 날짜 정보
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+    const sixMonthsLater = new Date(currentYear, currentMonth + 6, 0);
 
     return allLoops.filter((loop) => {
       const loopStart = new Date(loop.startDate);
@@ -821,7 +829,23 @@ export default function EditProjectPage({
 
               <div>
                 <Label htmlFor="endDate">목표 완료일</Label>
-                <Input id="endDate" type="date" {...form.register("endDate")} />
+                <Input
+                  id="endDate"
+                  type="date"
+                  {...form.register("endDate")}
+                  max={(() => {
+                    // 이번달 이후 6개월까지만 가능 (루프 생성 가능 월과 동일)
+                    const currentDate = new Date();
+                    const currentYear = currentDate.getFullYear();
+                    const currentMonth = currentDate.getMonth();
+                    const sixMonthsLater = new Date(
+                      currentYear,
+                      currentMonth + 6,
+                      0
+                    );
+                    return sixMonthsLater.toISOString().split("T")[0];
+                  })()}
+                />
                 {form.formState.errors.endDate && (
                   <p className="mt-1 text-sm text-red-500">
                     {form.formState.errors.endDate.message}
@@ -830,20 +854,23 @@ export default function EditProjectPage({
               </div>
             </div>
 
-            {projectWithStatus.status !== "planned" && (
-              <div className="p-3 bg-muted/50 dark:bg-muted/20 rounded-lg border border-border">
-                <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200 text-sm">
-                  <Info className="h-4 w-4" />
-                  <span className="font-medium">프로젝트 정보</span>
-                </div>
-                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                  프로젝트가 시작된 후에는 시작일을 변경할 수 없습니다.
-                </p>
-              </div>
-            )}
+            <CustomAlert variant="info">
+              <Info className="h-4 w-4" />
+              <AlertTitle>기간 정보</AlertTitle>
+              <AlertDescription>
+                {projectWithStatus.status !== "planned" && (
+                  <>
+                    프로젝트가 시작된 후에는 시작일을 변경할 수 없습니다.
+                    <br />
+                  </>
+                )}
+                종료일은 이번달 이후 6개월까지만 설정 가능합니다 (루프 생성 가능
+                월과 동일)
+              </AlertDescription>
+            </CustomAlert>
 
             {duration > 0 && (
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Clock className="h-4 w-4" />
                 <span>프로젝트 기간: {duration}일</span>
               </div>

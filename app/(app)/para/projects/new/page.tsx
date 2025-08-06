@@ -19,7 +19,11 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  CustomAlert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/custom-alert";
 import { Badge } from "@/components/ui/badge";
 import { RecommendationBadge } from "@/components/ui/recommendation-badge";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
@@ -211,11 +215,6 @@ function NewProjectPageContent() {
     enabled: !!user?.uid,
   });
 
-  // 선택된 루프들 계산
-  const selectedLoops = allLoops.filter((loop) =>
-    selectedLoopIds.includes(loop.id)
-  );
-
   // 기본 날짜 값 계산
   const getDefaultDates = () => {
     const today = new Date();
@@ -255,6 +254,50 @@ function NewProjectPageContent() {
     name: "tasks",
   });
 
+  // 프로젝트 기간과 겹치는 루프만 필터링 (현재 달로부터 6개월 이후까지의 기간과 겹치는 것만)
+  const getOverlappingLoops = () => {
+    const startDate = form.watch("startDate");
+    const dueDate = form.watch("dueDate");
+
+    if (!startDate || !dueDate) {
+      // 날짜가 없으면 현재 달로부터 6개월 이후까지의 기간과 겹치는 루프만 반환
+      const currentDate = new Date();
+      const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth();
+      const sixMonthsLater = new Date(currentYear, currentMonth + 6, 0);
+
+      return allLoops.filter((loop) => {
+        const loopStart = new Date(loop.startDate);
+        const loopEnd = new Date(loop.endDate);
+
+        // 루프가 6개월 이후 범위와 겹치는지 확인
+        return loopStart <= sixMonthsLater && loopEnd >= currentDate;
+      });
+    }
+
+    const projectStart = new Date(startDate);
+    const projectEnd = new Date(dueDate);
+
+    return allLoops.filter((loop) => {
+      const loopStart = new Date(loop.startDate);
+      const loopEnd = new Date(loop.endDate);
+
+      // 프로젝트 기간과 루프 기간이 겹치는지 확인
+      return (
+        (projectStart <= loopEnd && projectEnd >= loopStart) ||
+        // returnUrl에서 추출한 루프는 항상 포함 (자동 선택용)
+        loop.id === returnUrlLoopId
+      );
+    });
+  };
+
+  const overlappingLoops = getOverlappingLoops();
+
+  // 선택된 루프들 계산
+  const selectedLoops = overlappingLoops.filter((loop) =>
+    selectedLoopIds.includes(loop.id)
+  );
+
   // 영역이 로드되면 첫 번째 영역(미분류)을 기본값으로 설정
   useEffect(() => {
     if (areas.length > 0) {
@@ -264,13 +307,15 @@ function NewProjectPageContent() {
 
   // returnUrl에서 추출한 루프 ID가 있으면 자동으로 선택
   useEffect(() => {
-    if (returnUrlLoopId && allLoops.length > 0) {
-      const targetLoop = allLoops.find((loop) => loop.id === returnUrlLoopId);
+    if (returnUrlLoopId && overlappingLoops.length > 0) {
+      const targetLoop = overlappingLoops.find(
+        (loop) => loop.id === returnUrlLoopId
+      );
       if (targetLoop && !selectedLoopIds.includes(returnUrlLoopId)) {
         setSelectedLoopIds((prev) => [...prev, returnUrlLoopId]);
       }
     }
-  }, [returnUrlLoopId, allLoops, selectedLoopIds]);
+  }, [returnUrlLoopId, overlappingLoops, selectedLoopIds]);
 
   // 반복형 프로젝트에서 카테고리나 날짜 변경 시 태스크 목록 자동 업데이트
   useEffect(() => {
@@ -306,29 +351,11 @@ function NewProjectPageContent() {
     replace,
   ]);
 
-  // 프로젝트 기간과 겹치는 루프만 필터링
-  const availableLoopsForConnection = allLoops.filter((loop) => {
-    const projectStartDate = form.watch("startDate");
-    const projectEndDate = form.watch("dueDate");
-
-    // 프로젝트 날짜가 설정되지 않았으면 모든 활성 루프 표시
-    if (!projectStartDate || !projectEndDate) {
-      const status = getLoopStatus(loop);
-      return status === "in_progress" || status === "planned";
-    }
-
-    const projStart = new Date(projectStartDate);
-    const projEnd = new Date(projectEndDate);
-    const loopStart = new Date(loop.startDate);
-    const loopEnd = new Date(loop.endDate);
+  // 프로젝트 기간과 겹치는 루프만 필터링 (연결용)
+  const availableLoopsForConnection = overlappingLoops.filter((loop) => {
     const status = getLoopStatus(loop);
-
-    // 과거 루프 제외 + 프로젝트 기간과 하루라도 겹치는 루프
-    return (
-      (status === "in_progress" || status === "planned") &&
-      loopStart <= projEnd &&
-      loopEnd >= projStart
-    );
+    // 과거 루프 제외 + 활성 루프만
+    return status === "in_progress" || status === "planned";
   });
 
   // 프로젝트 유형별 헬퍼 함수
@@ -965,6 +992,18 @@ function NewProjectPageContent() {
                     },
                   })}
                   min={form.watch("startDate") || undefined}
+                  max={(() => {
+                    // 이번달 이후 6개월까지만 가능 (루프 생성 가능 월과 동일)
+                    const currentDate = new Date();
+                    const currentYear = currentDate.getFullYear();
+                    const currentMonth = currentDate.getMonth();
+                    const sixMonthsLater = new Date(
+                      currentYear,
+                      currentMonth + 6,
+                      0
+                    );
+                    return sixMonthsLater.toISOString().split("T")[0];
+                  })()}
                 />
                 {form.formState.errors.dueDate && (
                   <p className="mt-1 text-sm text-red-500">
@@ -975,7 +1014,7 @@ function NewProjectPageContent() {
             </div>
 
             {duration > 0 && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Calendar className="h-4 w-4" />
                 <span>예상 기간: {duration}일</span>
                 {duration > 56 && (
@@ -984,15 +1023,23 @@ function NewProjectPageContent() {
               </div>
             )}
 
+            <CustomAlert variant="info">
+              <Info className="h-4 w-4" />
+              <AlertTitle>기간 정보</AlertTitle>
+              <AlertDescription>
+                종료일은 이번달 이후 6개월까지만 설정 가능합니다
+              </AlertDescription>
+            </CustomAlert>
+
             {duration > 56 && (
-              <Alert>
+              <CustomAlert variant="warning">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>장기 프로젝트 안내</AlertTitle>
                 <AlertDescription>
                   8주 이상의 장기 프로젝트입니다. 루프 단위로 나누어 진행하는
                   것을 권장합니다.
                 </AlertDescription>
-              </Alert>
+              </CustomAlert>
             )}
 
             <div>
@@ -1060,7 +1107,7 @@ function NewProjectPageContent() {
             </div>
 
             {weeklyAverage > 0 && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Target className="h-4 w-4" />
                 <span>
                   주당 평균: {weeklyAverage}
@@ -1073,14 +1120,14 @@ function NewProjectPageContent() {
             )}
 
             {weeklyAverage < 2 && weeklyAverage > 0 && (
-              <Alert>
+              <CustomAlert variant="warning">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>활동 빈도 낮음</AlertTitle>
                 <AlertDescription>
                   주당 평균이 2회 미만입니다. 더 자주 활동할 수 있도록 목표를
                   조정해보세요.
                 </AlertDescription>
-              </Alert>
+              </CustomAlert>
             )}
 
             {/* 권장사항 아코디언 */}
@@ -1091,8 +1138,8 @@ function NewProjectPageContent() {
               >
                 <AccordionTrigger className="px-4 py-3 hover:no-underline">
                   <div className="flex items-center gap-2">
-                    <Info className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">권장사항</span>
+                    <Info className="h-3 w-3 text-muted-foreground" />
+                    <span className="font-medium text-sm">권장사항</span>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="px-4 pb-4">

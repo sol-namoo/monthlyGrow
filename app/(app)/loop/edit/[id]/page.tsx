@@ -7,7 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, Calendar, Info, X, Plus, Search } from "lucide-react";
+import {
+  ChevronLeft,
+  Calendar,
+  Info,
+  X,
+  Plus,
+  Search,
+  AlertCircle,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -140,6 +148,7 @@ export default function EditLoopPage({
 
   // 프로젝트 추가 모달 상태
   const [showAddProjectModal, setShowAddProjectModal] = useState(false);
+  const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   // 새로 생성된 프로젝트 자동 연결 처리
@@ -406,7 +415,7 @@ export default function EditLoopPage({
                   className="mt-1"
                   required
                 />
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   💡 루프를 완료했을 때 자신에게 줄 보상을 설정하세요.
                 </p>
               </div>
@@ -551,15 +560,7 @@ export default function EditLoopPage({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => {
-                    // 새 프로젝트 생성 페이지로 이동 (현재 루프 ID 포함)
-                    const returnUrl = `${window.location.origin}/loop/edit/${loopId}`;
-                    router.push(
-                      `/para/projects/new?returnUrl=${encodeURIComponent(
-                        returnUrl
-                      )}`
-                    );
-                  }}
+                  onClick={() => setShowNewProjectDialog(true)}
                   className="flex-1"
                 >
                   <Plus className="mr-2 h-4 w-4" />새 프로젝트 만들기
@@ -848,6 +849,78 @@ export default function EditLoopPage({
                 }
               >
                 {updateLoopMutation.isPending ? "저장 중..." : "저장"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* 새 프로젝트 만들기 안내 다이얼로그 */}
+        <Dialog
+          open={showNewProjectDialog}
+          onOpenChange={setShowNewProjectDialog}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>새 프로젝트 만들기</DialogTitle>
+              <DialogDescription>
+                새 프로젝트를 만들어 루프에 연결하시겠습니까?
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3">
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg border border-border">
+                  <div className="rounded-full bg-blue-100 dark:bg-blue-900 p-1 mt-0.5">
+                    <Plus className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-blue-900 dark:text-blue-200 mb-1">
+                      새 프로젝트 생성
+                    </h4>
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      프로젝트 생성 페이지로 이동하여 새 프로젝트를 만들고, 완료
+                      후 이 루프 수정 페이지로 돌아와서 연결할 수 있습니다.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-700">
+                  <div className="rounded-full bg-amber-100 dark:bg-amber-900 p-1 mt-0.5">
+                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-amber-900 dark:text-amber-200 mb-1">
+                      참고 사항
+                    </h4>
+                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                      현재 수정 중인 루프 정보는 저장되므로 안심하고 이동하세요.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-2">
+                <Button asChild>
+                  <Link
+                    href={`/para/projects/new?returnUrl=${encodeURIComponent(
+                      window.location.href
+                    )}`}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />새 프로젝트 만들기
+                  </Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href="/para?tab=projects">기존 프로젝트 목록 보기</Link>
+                </Button>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="secondary"
+                onClick={() => setShowNewProjectDialog(false)}
+              >
+                취소
               </Button>
             </DialogFooter>
           </DialogContent>

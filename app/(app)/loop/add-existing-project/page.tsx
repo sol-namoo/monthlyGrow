@@ -11,7 +11,11 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import Loading from "@/components/feedback/Loading";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  CustomAlert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/custom-alert";
 import { AlertCircle } from "lucide-react";
 
 function AddExistingProjectPageContent() {
@@ -111,7 +115,7 @@ function AddExistingProjectPageContent() {
       </Card>
 
       {!canAddMoreProjects && (
-        <Alert variant="destructive" className="mb-6">
+        <CustomAlert variant="warning" className="mb-6">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>주의사항</AlertTitle>
           <AlertDescription>
@@ -119,7 +123,7 @@ function AddExistingProjectPageContent() {
             유지됩니다. 프로젝트의 시작일과 목표 완료일이 루프 기간과 맞지 않을
             수 있습니다.
           </AlertDescription>
-        </Alert>
+        </CustomAlert>
       )}
 
       <div className="mb-4 flex items-center justify-between">
