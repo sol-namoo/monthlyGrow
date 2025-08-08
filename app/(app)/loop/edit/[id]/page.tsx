@@ -40,6 +40,7 @@ import {
   updateLoop,
   fetchProjectsByLoopId,
   fetchAllProjectsByUserId,
+  fetchUnconnectedProjects,
 } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { RecommendationBadge } from "@/components/ui/recommendation-badge";
@@ -115,19 +116,20 @@ export default function EditLoopPage({
     queryFn: async () => {
       if (!user?.uid || !loopId) return null;
 
-      // 병렬로 모든 데이터 가져오기
-      const [loop, areas, connectedProjects, allProjects] = await Promise.all([
-        fetchLoopById(loopId),
-        fetchAllAreasByUserId(user.uid),
-        fetchProjectsByLoopId(loopId, user.uid),
-        fetchAllProjectsByUserId(user.uid),
-      ]);
+      // 병렬로 필요한 데이터만 가져오기
+      const [loop, areas, connectedProjects, unconnectedProjects] =
+        await Promise.all([
+          fetchLoopById(loopId),
+          fetchAllAreasByUserId(user.uid),
+          fetchProjectsByLoopId(loopId, user.uid),
+          fetchUnconnectedProjects(user.uid, loopId),
+        ]);
 
       return {
         loop,
         areas: areas || [],
         connectedProjects: connectedProjects || [],
-        allProjects: allProjects || [],
+        unconnectedProjects: unconnectedProjects || [],
       };
     },
     enabled: !!user?.uid && !!loopId,
@@ -139,7 +141,7 @@ export default function EditLoopPage({
   const loop = editLoopData?.loop;
   const areas = editLoopData?.areas || [];
   const connectedProjects = editLoopData?.connectedProjects || [];
-  const allProjects = editLoopData?.allProjects || [];
+  const unconnectedProjects = editLoopData?.unconnectedProjects || [];
   const projectsLoading = isLoading;
 
   // 수정 가능한 필드 상태
@@ -598,7 +600,7 @@ export default function EditLoopPage({
                     // connectedProjects에서 먼저 찾고, 없으면 allProjects에서 찾기
                     const project =
                       connectedProjects.find((p) => p.id === projectId) ||
-                      allProjects.find((p) => p.id === projectId);
+                      unconnectedProjects.find((p) => p.id === projectId);
 
                     // 디버깅용 로그 (개발 환경에서만)
                     if (process.env.NODE_ENV === "development" && !project) {
@@ -611,8 +613,11 @@ export default function EditLoopPage({
                         }))
                       );
                       console.log(
-                        "allProjects:",
-                        allProjects.map((p) => ({ id: p.id, title: p.title }))
+                        "unconnectedProjects:",
+                        unconnectedProjects.map((p) => ({
+                          id: p.id,
+                          title: p.title,
+                        }))
                       );
                     }
 
@@ -745,7 +750,7 @@ export default function EditLoopPage({
               <div className="max-h-60 overflow-y-auto space-y-2">
                 {(() => {
                   // 검색어로 필터링
-                  const filteredProjects = allProjects.filter(
+                  const filteredProjects = unconnectedProjects.filter(
                     (project) =>
                       project.title
                         .toLowerCase()

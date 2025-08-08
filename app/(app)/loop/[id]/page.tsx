@@ -541,22 +541,41 @@ export function LoopDetailPage({
         color: "text-gray-500",
       };
 
-    if (now < startDate) {
-      return {
-        status: translate("loopDetail.project.status.planned"),
-        color: "text-blue-500",
-      };
-    } else if (now >= startDate && now <= endDate) {
-      return {
-        status: translate("loopDetail.project.status.inProgress"),
-        color: "text-green-500",
-      };
-    } else {
+    // 완료율 계산
+    const completionRate =
+      project.target && project.completedTasks
+        ? (project.completedTasks / project.target) * 100
+        : 0;
+
+    // 완료된 경우 (완료율이 100% 이상)
+    if (completionRate >= 100) {
       return {
         status: translate("loopDetail.project.status.completed"),
         color: "text-purple-500",
       };
     }
+
+    // 시작일이 미래인 경우
+    if (startDate && now < startDate) {
+      return {
+        status: translate("loopDetail.project.status.planned"),
+        color: "text-blue-500",
+      };
+    }
+
+    // 종료일이 지났지만 완료되지 않은 경우
+    if (endDate && now > endDate && completionRate < 100) {
+      return {
+        status: translate("loopDetail.project.status.overdue"),
+        color: "text-red-500",
+      };
+    }
+
+    // 진행 중인 경우
+    return {
+      status: translate("loopDetail.project.status.inProgress"),
+      color: "text-green-500",
+    };
   };
 
   // 프로젝트 기간 계산 함수

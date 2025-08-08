@@ -386,15 +386,92 @@ export const fetchProjectsByLoopId = async (
   );
 
   const querySnapshot = await getDocs(q);
-  const projects = querySnapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Project[];
+  const projects = querySnapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      startDate: data.startDate?.toDate(),
+      endDate: data.endDate?.toDate(),
+      createdAt: data.createdAt.toDate(),
+      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+    } as Project;
+  });
 
   // connectedLoops 배열에서 해당 loopId를 가진 프로젝트들만 필터링
   return projects.filter((project) => {
     const connectedLoops = (project as any).connectedLoops || [];
     return connectedLoops.includes(loopId);
+  });
+};
+
+// 현재 루프의 프로젝트만 효율적으로 가져오는 함수
+export const fetchCurrentLoopProjects = async (
+  userId: string,
+  currentLoopId?: string
+): Promise<Project[]> => {
+  if (!currentLoopId) return [];
+
+  // 현재 루프에 연결된 프로젝트들만 가져오기
+  const q = query(collection(db, "projects"), where("userId", "==", userId));
+
+  const querySnapshot = await getDocs(q);
+  const projects = querySnapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      startDate: data.startDate?.toDate(),
+      endDate: data.endDate?.toDate(),
+      createdAt: data.createdAt.toDate(),
+      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+    } as Project;
+  });
+
+  // 현재 루프에 연결된 프로젝트들만 필터링
+  return projects.filter((project) => {
+    const connectedLoops = (project as any).connectedLoops || [];
+    return (
+      connectedLoops.includes(currentLoopId) || project.loopId === currentLoopId
+    );
+  });
+};
+
+// 연결되지 않은 프로젝트들만 가져오는 함수 (루프 편집용)
+export const fetchUnconnectedProjects = async (
+  userId: string,
+  excludeLoopId?: string
+): Promise<Project[]> => {
+  const q = query(collection(db, "projects"), where("userId", "==", userId));
+
+  const querySnapshot = await getDocs(q);
+  const projects = querySnapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      startDate: data.startDate?.toDate(),
+      endDate: data.endDate?.toDate(),
+      createdAt: data.createdAt.toDate(),
+      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+    } as Project;
+  });
+
+  // 연결되지 않은 프로젝트들만 필터링
+  return projects.filter((project) => {
+    const connectedLoops = (project as any).connectedLoops || [];
+    const isConnected = connectedLoops.length > 0 || project.loopId;
+
+    // excludeLoopId가 있으면 해당 루프는 제외
+    if (excludeLoopId) {
+      return (
+        !isConnected ||
+        (!connectedLoops.includes(excludeLoopId) &&
+          project.loopId !== excludeLoopId)
+      );
+    }
+
+    return !isConnected;
   });
 };
 
@@ -1054,7 +1131,6 @@ export const createProject = async (
     originalLoopId: projectData.originalLoopId,
     carriedOverAt: projectData.carriedOverAt,
     migrationStatus: projectData.migrationStatus,
-    status: projectData.status || "in_progress",
   } as Project;
 };
 
@@ -1785,64 +1861,115 @@ export const connectPendingProjectsToNewLoop = async (
   }
 };
 
-// 자동 완료 체크 함수
-export const checkAndAutoCompleteProjects = async (
+// 상태별 프로젝트 조회 함수들 (동적 계산 기반)
+
+// 진행 중인 프로젝트들 가져오기
+export const fetchActiveProjects = async (
   userId: string
-): Promise<void> => {
+): Promise<Project[]> => {
   try {
-    // 사용자의 모든 프로젝트 가져오기
-    const projects = await fetchAllProjectsByUserId(userId);
     const today = new Date();
 
-    for (const project of projects) {
-      const endDate = new Date(project.endDate);
+    // 현재 진행 중인 프로젝트들 (시작일 <= 오늘 <= 종료일)
+    const q = query(
+      collection(db, "projects"),
+      where("userId", "==", userId),
+      where("startDate", "<=", today),
+      where("endDate", ">=", today)
+    );
 
-      // 기한이 지났고 아직 진행 중인 프로젝트 체크
-      if (endDate < today) {
-        // 프로젝트의 태스크들 가져오기
-        const tasks = await fetchAllTasksByProjectId(project.id);
-        const completedTasks = tasks.filter((task) => task.done).length;
-        const totalTasks = tasks.length;
-
-        // 실제 완료된 태스크 수를 completedTasks로 설정
-        const projectRef = doc(db, "projects", project.id);
-        await updateDoc(projectRef, {
-          completedTasks: completedTasks,
-          updatedAt: updateTimestamp(),
-        });
-
-        console.log(
-          `Auto-completed project: ${project.title} (${completedTasks}/${totalTasks} tasks completed)`
-        );
-      }
-    }
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        startDate: data.startDate?.toDate(),
+        endDate: data.endDate?.toDate(),
+        createdAt: data.createdAt.toDate(),
+        updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      } as Project;
+    });
   } catch (error) {
-    console.error("자동 완료 체크 중 오류:", error);
+    console.error("진행 중인 프로젝트 조회 중 오류:", error);
+    return [];
   }
 };
 
-// 오늘 마감인 프로젝트 체크 함수
+// 완료된 프로젝트들 가져오기
+export const fetchCompletedProjects = async (
+  userId: string
+): Promise<Project[]> => {
+  try {
+    const today = new Date();
+
+    // 완료된 프로젝트들 (종료일 < 오늘 또는 완료율 100%)
+    const q = query(
+      collection(db, "projects"),
+      where("userId", "==", userId),
+      where("endDate", "<", today)
+    );
+
+    const querySnapshot = await getDocs(q);
+    const projects = querySnapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        startDate: data.startDate?.toDate(),
+        endDate: data.endDate?.toDate(),
+        createdAt: data.createdAt.toDate(),
+        updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      } as Project;
+    });
+
+    // 완료율 100%인 프로젝트들도 포함
+    return projects.filter((project) => {
+      const completionRate =
+        project.target && project.completedTasks
+          ? (project.completedTasks / project.target) * 100
+          : 0;
+      return completionRate >= 100;
+    });
+  } catch (error) {
+    console.error("완료된 프로젝트 조회 중 오류:", error);
+    return [];
+  }
+};
+
+// 오늘 마감인 프로젝트 체크 함수 - 최적화된 버전
 export const getTodayDeadlineProjects = async (
   userId: string
 ): Promise<Project[]> => {
   try {
-    const projects = await fetchAllProjectsByUserId(userId);
     const today = new Date();
     const todayDateOnly = new Date(
       today.getFullYear(),
       today.getMonth(),
       today.getDate()
     );
+    const tomorrowDateOnly = new Date(todayDateOnly);
+    tomorrowDateOnly.setDate(tomorrowDateOnly.getDate() + 1);
 
-    return projects.filter((project) => {
-      const endDate = new Date(project.endDate);
-      const endDateOnly = new Date(
-        endDate.getFullYear(),
-        endDate.getMonth(),
-        endDate.getDate()
-      );
+    // 오늘 마감인 프로젝트만 효율적으로 가져오기
+    const q = query(
+      collection(db, "projects"),
+      where("userId", "==", userId),
+      where("endDate", ">=", todayDateOnly),
+      where("endDate", "<", tomorrowDateOnly)
+    );
 
-      return endDateOnly.getTime() === todayDateOnly.getTime();
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        startDate: data.startDate?.toDate(),
+        endDate: data.endDate?.toDate(),
+        createdAt: data.createdAt.toDate(),
+        updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      } as Project;
     });
   } catch (error) {
     console.error("오늘 마감 프로젝트 조회 중 오류:", error);
@@ -1885,9 +2012,13 @@ export const fetchYearlyActivityStats = async (
         0
       );
 
-      const completedProjects = yearProjects.filter(
-        (project) => project.status === "completed"
-      );
+      const completedProjects = yearProjects.filter((project) => {
+        const completionRate =
+          project.target && project.completedTasks
+            ? (project.completedTasks / project.target) * 100
+            : 0;
+        return completionRate >= 100;
+      });
 
       const completionRate =
         yearProjects.length > 0

@@ -140,8 +140,11 @@ export function ProjectSelectionModal({
     }
 
     // 상태 필터
-    if (statusFilter !== "all" && project.status !== statusFilter) {
-      return false;
+    if (statusFilter !== "all") {
+      const projectStatus = getProjectStatus(project);
+      if (projectStatus !== statusFilter) {
+        return false;
+      }
     }
 
     // 영역 필터

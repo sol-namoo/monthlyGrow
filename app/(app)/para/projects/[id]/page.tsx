@@ -1042,25 +1042,26 @@ export default function ProjectDetailPage({
             <div className="flex items-center gap-2">
               <Badge
                 variant={
-                  projectWithStatus?.status === "planned"
+                  getProjectStatus(project) === "scheduled"
                     ? "secondary"
-                    : projectWithStatus?.status === "in_progress"
+                    : getProjectStatus(project) === "in_progress"
                     ? "default"
                     : "outline"
                 }
               >
-                {projectWithStatus?.status === "planned"
+                {getProjectStatus(project) === "scheduled"
                   ? translate("paraProjectDetail.statusLabels.planned")
-                  : projectWithStatus?.status === "in_progress"
+                  : getProjectStatus(project) === "in_progress"
                   ? translate("paraProjectDetail.statusLabels.inProgress")
-                  : translate("paraProjectDetail.statusLabels.completed")}
+                  : getProjectStatus(project) === "completed"
+                  ? translate("paraProjectDetail.statusLabels.completed")
+                  : translate("paraProjectDetail.statusLabels.overdue")}
               </Badge>
-              {projectWithStatus?.status === "in_progress" &&
-                new Date(project.endDate) < new Date() && (
-                  <Badge variant="destructive" className="text-xs">
-                    {translate("paraProjectDetail.overdue")}
-                  </Badge>
-                )}
+              {getProjectStatus(project) === "overdue" && (
+                <Badge variant="destructive" className="text-xs">
+                  {translate("paraProjectDetail.overdue")}
+                </Badge>
+              )}
             </div>
           </div>
 
@@ -1163,7 +1164,7 @@ export default function ProjectDetailPage({
           {connectedLoops && connectedLoops.length > 0 && (
             <div className="space-y-3">
               {connectedLoops.length >= 3 &&
-                projectWithStatus?.status === "in_progress" && (
+                getProjectStatus(project) === "in_progress" && (
                   <CustomAlert variant="warning" className="mb-4">
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>

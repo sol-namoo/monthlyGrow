@@ -395,7 +395,21 @@ function EditAreaPageContent({ params }: { params: Promise<{ id: string }> }) {
                   <div className="flex flex-col">
                     <span className="font-medium">{project.name}</span>
                     <Badge variant="outline" className="mt-1 w-fit">
-                      {project.status}
+                      {(() => {
+                        const status = getProjectStatus(project);
+                        switch (status) {
+                          case "scheduled":
+                            return "예정";
+                          case "in_progress":
+                            return "진행 중";
+                          case "completed":
+                            return "완료됨";
+                          case "overdue":
+                            return "기한 지남";
+                          default:
+                            return "진행 중";
+                        }
+                      })()}
                     </Badge>
                   </div>
                   <Button

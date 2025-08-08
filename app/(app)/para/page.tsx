@@ -258,7 +258,7 @@ function ParaPageContent() {
   // 필터링된 프로젝트 목록
   const filteredProjects = projectsWithStatus.filter((project) => {
     if (projectFilter === "all") return true;
-    return project.status === projectFilter;
+    return getProjectStatus(project) === projectFilter;
   });
 
   const renderStars = (rating: number | undefined) => {
@@ -376,7 +376,7 @@ function ParaPageContent() {
                       ).replace(
                         "{count}",
                         projectsWithStatus
-                          .filter((p) => p.status === "in_progress")
+                          .filter((p) => getProjectStatus(p) === "in_progress")
                           .length.toString()
                       )
                     : translate(
@@ -516,13 +516,13 @@ function ParaPageContent() {
                           </Badge>
                           <Badge
                             variant={
-                              project.status === "completed"
+                              getProjectStatus(project) === "completed"
                                 ? "secondary"
                                 : "default"
                             }
                             className="text-xs"
                           >
-                            {project.status === "completed"
+                            {getProjectStatus(project) === "completed"
                               ? translate("para.projects.status.completed")
                               : translate("para.projects.status.inProgress")}
                           </Badge>

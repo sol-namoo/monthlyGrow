@@ -205,39 +205,93 @@ export const formatDateNumeric = (
 export function getProjectStatus(project: {
   startDate: Date;
   endDate: Date;
-}): "planned" | "in_progress" | "completed" {
+  completedTasks?: number;
+  target?: number;
+}): "scheduled" | "in_progress" | "completed" | "overdue" {
   const now = new Date();
   const startDate = new Date(project.startDate);
   const endDate = new Date(project.endDate);
 
-  if (now < startDate) {
-    return "planned";
-  } else if (now >= startDate && now <= endDate) {
-    return "in_progress";
-  } else {
+  // 시작일이 미래인 경우
+  if (startDate > now) {
+    return "scheduled";
+  }
+
+  // 완료율 계산
+  const completionRate =
+    project.target && project.completedTasks
+      ? (project.completedTasks / project.target) * 100
+      : 0;
+
+  // 완료된 경우 (완료율이 100% 이상)
+  if (completionRate >= 100) {
     return "completed";
   }
+
+  // 종료일이 지났지만 완료되지 않은 경우
+  if (endDate < now && completionRate < 100) {
+    return "overdue";
+  }
+
+  // 진행 중인 경우
+  return "in_progress";
 }
 
 export function isProjectInProgress(project: {
   startDate: Date;
   endDate: Date;
+  completedTasks?: number;
+  target?: number;
 }): boolean {
   return getProjectStatus(project) === "in_progress";
 }
 
-export function isProjectPlanned(project: {
+export function isProjectScheduled(project: {
   startDate: Date;
   endDate: Date;
+  completedTasks?: number;
+  target?: number;
 }): boolean {
-  return getProjectStatus(project) === "planned";
+  return getProjectStatus(project) === "scheduled";
 }
 
 export function isProjectCompleted(project: {
   startDate: Date;
   endDate: Date;
+  completedTasks?: number;
+  target?: number;
 }): boolean {
   return getProjectStatus(project) === "completed";
+}
+
+export function isProjectOverdue(project: {
+  startDate: Date;
+  endDate: Date;
+  completedTasks?: number;
+  target?: number;
+}): boolean {
+  return getProjectStatus(project) === "overdue";
+}
+
+// 프로젝트 완료율을 동적으로 계산하는 함수
+export function getProjectCompletionRate(project: {
+  completedTasks?: number;
+  target?: number;
+}): number {
+  if (!project.target || project.target === 0) return 0;
+  if (!project.completedTasks) return 0;
+  return Math.round((project.completedTasks / project.target) * 100);
+}
+
+// 프로젝트가 활성 상태인지 확인하는 함수
+export function isProjectActive(project: {
+  startDate: Date;
+  endDate: Date;
+  completedTasks?: number;
+  target?: number;
+}): boolean {
+  const status = getProjectStatus(project);
+  return status === "in_progress" || status === "overdue";
 }
 
 // === 루프 상태 관련 함수들 (새로 추가) ===

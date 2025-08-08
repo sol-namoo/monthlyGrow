@@ -96,10 +96,11 @@ User (개인화된 데이터)
   userId: string;
   title: string;          // 프로젝트 제목
   description: string;    // 프로젝트 설명
+  category?: "repetitive" | "task_based"; // 프로젝트 유형
   areaId?: string;        // 소속 영역 ID
   area?: string;          // 영역 이름 (denormalized)
-  progress: number;       // 현재 진행률
-  total: number;          // 목표 진행률
+  target: number;         // 목표 개수 (반복형: 목표 횟수, 작업형: 목표 작업 수)
+  completedTasks: number; // 실제 완료된 태스크 수
   startDate: Date;        // 시작일
   endDate: Date;          // 마감일
   createdAt: Date;
@@ -107,18 +108,18 @@ User (개인화된 데이터)
   loopId?: string;        // 현재 연결된 루프 ID (legacy)
   connectedLoops?: string[]; // 연결된 루프 ID 배열
   addedMidway?: boolean;  // 루프 중간 추가 여부
-  tasks: Task[];          // 세부 작업들
   retrospective?: Retrospective; // 프로젝트 회고
   notes: Note[];          // 프로젝트 노트들
 
-  // 로컬 계산 필드 (DB에 저장되지 않음)
-  status?: "planned" | "in_progress" | "completed"; // startDate와 endDate를 기반으로 클라이언트에서 계산
+  // 프로젝트 상태는 동적으로 계산됨 (DB에 저장되지 않음)
+  // getProjectStatus() 함수를 사용하여 실시간 계산
 }
 
-// 프로젝트 상태 계산 로직:
-// - planned: 오늘 < 시작일
-// - in_progress: 시작일 <= 오늘 <= 마감일
-// - completed: 오늘 > 마감일
+// 프로젝트 상태 계산 로직 (getProjectStatus 함수):
+// - scheduled: startDate > now (시작일이 미래)
+// - in_progress: startDate <= now <= endDate && completionRate < 100%
+// - completed: completionRate >= 100%
+// - overdue: endDate < now && completionRate < 100%
 ```
 
 ### 4. Loops 컬렉션

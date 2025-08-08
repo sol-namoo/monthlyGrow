@@ -298,11 +298,21 @@ export default function AreaDetailPage({
                     <div className="flex items-center justify-between">
                       <span className="font-medium">{project.title}</span>
                       <Badge variant="outline" className="text-xs">
-                        {project.status === "planned"
-                          ? "예정"
-                          : project.status === "in_progress"
-                          ? "진행 중"
-                          : "완료됨"}
+                        {(() => {
+                          const status = getProjectStatus(project);
+                          switch (status) {
+                            case "scheduled":
+                              return "예정";
+                            case "in_progress":
+                              return "진행 중";
+                            case "completed":
+                              return "완료됨";
+                            case "overdue":
+                              return "기한 지남";
+                            default:
+                              return "진행 중";
+                          }
+                        })()}
                       </Badge>
                     </div>
                   </Link>

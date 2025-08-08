@@ -44,6 +44,7 @@ import {
   connectPendingProjectsToNewLoop,
   fetchAllProjectsByUserId,
   fetchAllAreasByUserId,
+  fetchUnconnectedProjects,
   db,
 } from "@/lib/firebase";
 import {
@@ -135,12 +136,13 @@ function NewLoopPageContent() {
 
   // URL 파라미터에서 loopId와 addedMidway 값을 가져옴
 
-  // 사용자의 모든 프로젝트 가져오기
-  const { data: allProjects = [], isLoading: projectsLoading } = useQuery({
-    queryKey: ["projects", user?.uid],
-    queryFn: () => fetchAllProjectsByUserId(user?.uid || ""),
-    enabled: !!user?.uid,
-  });
+  // 사용자의 연결되지 않은 프로젝트들만 가져오기
+  const { data: unconnectedProjects = [], isLoading: projectsLoading } =
+    useQuery({
+      queryKey: ["unconnectedProjects", user?.uid],
+      queryFn: () => fetchUnconnectedProjects(user?.uid || ""),
+      enabled: !!user?.uid,
+    });
 
   // 사용자의 모든 영역 가져오기
   const { data: allAreas = [], isLoading: areasLoading } = useQuery({
@@ -895,7 +897,9 @@ function NewLoopPageContent() {
               </div>
               <div className="space-y-2">
                 {form.watch("selectedExistingProjects").map((projectId) => {
-                  const project = allProjects.find((p) => p.id === projectId);
+                  const project = unconnectedProjects.find(
+                    (p) => p.id === projectId
+                  );
                   if (!project) return null;
 
                   return (
@@ -975,7 +979,7 @@ function NewLoopPageContent() {
           onProjectToggle={toggleExistingProject}
           onConfirm={() => setShowProjectModal(false)}
           newlyCreatedProjectId={newlyCreatedProjectId}
-          projects={allProjects}
+          projects={unconnectedProjects}
           areas={allAreas}
           projectsLoading={projectsLoading}
           areasLoading={areasLoading}

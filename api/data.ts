@@ -40,6 +40,22 @@ export const getProjectsByUserId = async (
   return fetchAllProjectsByUserId(userId);
 };
 
+// 현재 루프의 프로젝트만 가져오는 함수
+export const getCurrentLoopProjects = async (
+  userId: string,
+  currentLoopId: string
+): Promise<Project[]> => {
+  return fetchCurrentLoopProjects(userId, currentLoopId);
+};
+
+// 연결되지 않은 프로젝트들만 가져오는 함수
+export const getUnconnectedProjects = async (
+  userId: string,
+  excludeLoopId?: string
+): Promise<Project[]> => {
+  return fetchUnconnectedProjects(userId, excludeLoopId);
+};
+
 // Tasks
 export const getTasksByProjectId = async (
   projectId: string

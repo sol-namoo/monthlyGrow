@@ -209,6 +209,7 @@ export const translations = {
           planned: "예정",
           inProgress: "진행 중",
           completed: "완료",
+          overdue: "기한 지남",
         },
         duration: {
           undefined: "기간 미정",
@@ -1145,6 +1146,7 @@ export const translations = {
           planned: "Planned",
           inProgress: "In Progress",
           completed: "Completed",
+          overdue: "Overdue",
         },
         duration: {
           undefined: "Duration Undefined",

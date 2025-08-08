@@ -52,8 +52,8 @@ export interface Project {
   carriedOverAt?: Date; // 이관된 날짜
   migrationStatus?: "pending" | "migrated" | "ignored"; // 이관 상태
 
-  // 프로젝트 상태 (Firestore에 저장)
-  status: "in_progress" | "completed";
+  // 프로젝트 상태는 동적으로 계산됨 (DB에 저장되지 않음)
+  // getProjectStatus() 함수를 사용하여 실시간 계산
 }
 
 export interface Task {

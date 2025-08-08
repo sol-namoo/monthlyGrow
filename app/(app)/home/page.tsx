@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { CharacterAvatar } from "@/components/character-avatar";
 import { ProgressCard } from "@/components/widgets/progress-card";
 import { StatsCard } from "@/components/widgets/stats-card";
@@ -32,11 +32,11 @@ import {
   fetchAllResourcesByUserId,
   getOrCreateUncategorizedArea,
   getTodayDeadlineProjects,
-  checkAndAutoCompleteProjects,
   getTaskCountsByProjectId,
   getTaskCountsForMultipleProjects,
   fetchYearlyActivityStats,
   fetchProjectsByLoopId,
+  fetchCurrentLoopProjects,
 } from "@/lib/firebase";
 import { getLoopStatus, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
@@ -147,12 +147,7 @@ export default function HomePage() {
     enabled: !!user,
   });
 
-  const { data: projects = [], isLoading: projectsLoading } = useQuery({
-    queryKey: ["projects", user?.uid],
-    queryFn: () => (user ? fetchAllProjectsByUserId(user.uid) : []),
-    enabled: !!user,
-  });
-
+  // 현재 루프를 먼저 가져와서 해당 루프의 프로젝트만 가져오기
   const { data: loops = [], isLoading: loopsLoading } = useQuery({
     queryKey: ["loops", user?.uid],
     queryFn: () => (user ? fetchAllLoopsByUserId(user.uid) : []),
@@ -166,12 +161,17 @@ export default function HomePage() {
       return status === "in_progress";
     }) || null;
 
-  // 현재 루프에 연결된 프로젝트들
-  const currentLoopProjects = projects.filter(
-    (project) =>
-      project.loopId === currentLoop?.id ||
-      project.connectedLoops?.includes(currentLoop?.id || "")
-  );
+  const { data: projects = [], isLoading: projectsLoading } = useQuery({
+    queryKey: ["currentLoopProjects", user?.uid, currentLoop?.id],
+    queryFn: () =>
+      user && currentLoop
+        ? fetchCurrentLoopProjects(user.uid, currentLoop.id)
+        : [],
+    enabled: !!user && !!currentLoop,
+  });
+
+  // 현재 루프에 연결된 프로젝트들 (이미 필터링된 상태)
+  const currentLoopProjects = projects;
 
   // 오늘 마감인 프로젝트들
   const { data: todayDeadlineProjects = [] } = useQuery({
@@ -184,7 +184,7 @@ export default function HomePage() {
   const { data: todayProjectTaskCounts = {} } = useQuery({
     queryKey: [
       "todayProjectTaskCounts",
-      todayDeadlineProjects.map((p) => p.id),
+      todayDeadlineProjects.map((p) => p.id).sort(), // 정렬해서 키 안정성 보장
     ],
     queryFn: () =>
       getTaskCountsForMultipleProjects(todayDeadlineProjects.map((p) => p.id)),
@@ -208,12 +208,13 @@ export default function HomePage() {
     enabled: !!user,
   });
 
-  // 자동 완료 체크
-  useEffect(() => {
-    if (user && projects.length > 0) {
-      checkAndAutoCompleteProjects(user.uid);
-    }
-  }, [user, projects]);
+  // 자동 완료 체크는 제거됨 - 프로젝트 상태는 동적으로 계산됨
+  // useEffect(() => {
+  //   if (user && !autoCompleteCheckedRef.current) {
+  //     checkAndAutoCompleteProjects(user.uid);
+  //     autoCompleteCheckedRef.current = true;
+  //   }
+  // }, [user]);
 
   // 현재 루프 정보 계산
   const startDate = currentLoop

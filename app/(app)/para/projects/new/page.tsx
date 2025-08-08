@@ -665,7 +665,6 @@ function NewProjectPageContent() {
         endDate: createValidDate(data.dueDate),
         target: parseInt(data.targetCount),
         completedTasks: 0,
-        status: "in_progress" as const,
         connectedLoops, // 선택된 루프 ID 배열
         notes: [], // 초기에는 빈 배열
         tasks,
