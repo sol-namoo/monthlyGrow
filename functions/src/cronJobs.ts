@@ -1,7 +1,7 @@
 // Cloud Functions for Firebase 크론 작업 예시
 // functions/src/cronJobs.ts
 
-import { functions } from "firebase-functions";
+import * as functions from "firebase-functions";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import {
@@ -22,19 +22,25 @@ export const checkCompletedLoops = functions
   .region("asia-northeast3") // 서울 리전
   .pubsub.schedule("0 4 1 * *") // 매월 1일 오전 4시 (KST)
   .timeZone("Asia/Seoul")
-  .onRun(async (context) => {
+  .onRun(async (context: functions.EventContext) => {
     console.log("Starting monthly loop completion check...");
 
     try {
-      // 어제 날짜 계산
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      yesterday.setHours(23, 59, 59, 999); // 어제 마지막 시간
+      // 지난 달 완료된 루프 찾기 (매월 1일 실행이므로 지난 달 루프들)
+      const lastMonth = new Date();
+      lastMonth.setMonth(lastMonth.getMonth() - 1);
+      lastMonth.setDate(1);
+      lastMonth.setHours(0, 0, 0, 0);
 
-      // 어제 완료된 모든 루프 찾기
+      const thisMonth = new Date();
+      thisMonth.setDate(1);
+      thisMonth.setHours(0, 0, 0, 0);
+
+      // 지난 달에 완료된 모든 루프 찾기
       const loopsSnapshot = await db
         .collection("loops")
-        .where("endDate", "<=", yesterday)
+        .where("endDate", ">=", lastMonth)
+        .where("endDate", "<", thisMonth)
         .get();
 
       const processedUsers = new Set<string>();
@@ -108,43 +114,48 @@ export const checkCompletedLoops = functions
  */
 export const testProjectMigration = functions
   .region("asia-northeast3")
-  .https.onRequest(async (req, res) => {
-    if (process.env.NODE_ENV === "production") {
-      res.status(403).send("This function is only available in development");
-      return;
-    }
+  .https.onRequest(
+    async (req: functions.https.Request, res: functions.Response) => {
+      if (process.env.NODE_ENV === "production") {
+        res.status(403).send("This function is only available in development");
+        return;
+      }
 
-    const { userId, loopId } = req.query;
+      const { userId, loopId } = req.query;
 
-    if (!userId || !loopId) {
-      res.status(400).send("Missing userId or loopId parameter");
-      return;
-    }
+      if (!userId || !loopId) {
+        res.status(400).send("Missing userId or loopId parameter");
+        return;
+      }
 
-    try {
-      // 이월 설정 확인
-      const carryOverEnabled = await isCarryOverEnabled(userId as string);
+      try {
+        // 이월 설정 확인
+        const carryOverEnabled = await isCarryOverEnabled(userId as string);
 
-      if (carryOverEnabled) {
-        await autoMigrateIncompleteProjects(userId as string, loopId as string);
-        res.json({
-          success: true,
-          message: `Migration completed for user ${userId}, loop ${loopId}`,
-        });
-      } else {
-        res.json({
-          success: true,
-          message: `Carry over is disabled for user ${userId}. Migration skipped.`,
+        if (carryOverEnabled) {
+          await autoMigrateIncompleteProjects(
+            userId as string,
+            loopId as string
+          );
+          res.json({
+            success: true,
+            message: `Migration completed for user ${userId}, loop ${loopId}`,
+          });
+        } else {
+          res.json({
+            success: true,
+            message: `Carry over is disabled for user ${userId}. Migration skipped.`,
+          });
+        }
+      } catch (error) {
+        console.error("Test migration failed:", error);
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
         });
       }
-    } catch (error) {
-      console.error("Test migration failed:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
     }
-  });
+  );
 
 /**
  * 비용 예상:

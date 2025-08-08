@@ -358,6 +358,12 @@ function NewProjectPageContent() {
     return status === "in_progress" || status === "planned";
   });
 
+  // 루프에 연결된 프로젝트 개수 계산 (현재 선택된 루프들 기준)
+  const getConnectedProjectCount = (loopId: string) => {
+    // 현재 선택된 루프들 중에서 해당 루프가 포함되어 있는지 확인
+    return selectedLoopIds.includes(loopId) ? 1 : 0;
+  };
+
   // 프로젝트 유형별 헬퍼 함수
   const getUnitLabel = (category: "repetitive" | "task_based") => {
     return category === "repetitive" ? "회" : "개 작업";
@@ -648,12 +654,7 @@ function NewProjectPageContent() {
       }
 
       // 선택된 루프들을 ConnectedLoop 형식으로 변환
-      const connectedLoops = selectedLoops.map((loop) => ({
-        id: loop.id,
-        title: loop.title,
-        startDate: new Date(loop.startDate),
-        endDate: new Date(loop.endDate),
-      }));
+      const connectedLoops = selectedLoops.map((loop) => loop.id);
 
       const projectData = {
         title: data.title,
@@ -665,7 +666,7 @@ function NewProjectPageContent() {
         target: parseInt(data.targetCount),
         completedTasks: 0,
         status: "in_progress" as const,
-        connectedLoops, // 선택된 루프 정보
+        connectedLoops, // 선택된 루프 ID 배열
         notes: [], // 초기에는 빈 배열
         tasks,
         userId: user!.uid,
@@ -1610,7 +1611,7 @@ function NewProjectPageContent() {
                         {formatDate(loop.endDate)}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        연결된 프로젝트: {loop.projectIds?.length || 0}개
+                        연결된 프로젝트: {getConnectedProjectCount(loop.id)}개
                       </p>
                     </div>
                   ))}

@@ -2,6 +2,7 @@
 
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 import {
   getAuth,
   GoogleAuthProvider,
@@ -27,12 +28,19 @@ import {
   limit,
 } from "firebase/firestore";
 import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+} from "firebase/storage";
+import {
   Area,
   Resource,
   Project,
   Task,
   Loop,
   Retrospective,
+  Note,
   User,
   UserProfile,
   UserSettings,
@@ -58,6 +66,9 @@ export const db = getFirestore(app);
 // Initialize Auth
 export const auth = getAuth(app);
 export const googleAuthProvider = new GoogleAuthProvider();
+
+// Initialize Storage
+export const storage = getStorage(app);
 
 // Set persistence to LOCAL (localStorage)
 setPersistence(auth, browserLocalPersistence).catch((error) => {
@@ -648,7 +659,7 @@ export const findLoopByMonth = async (
         startDate: data.startDate.toDate(),
         endDate: data.endDate.toDate(),
         focusAreas: data.focusAreas,
-        projectIds: data.projectIds,
+        // projectIds는 더 이상 사용하지 않음 (connectedLoops로 대체)
         createdAt: data.createdAt.toDate(),
         updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
         doneCount: data.doneCount,
@@ -667,7 +678,7 @@ export const findIncompleteProjectsInLoop = async (
 ): Promise<Project[]> => {
   const q = query(
     collection(db, "projects"),
-    where("connectedLoops", "array-contains", { loopId })
+    where("connectedLoops", "array-contains", loopId)
   );
   const querySnapshot = await getDocs(q);
 
@@ -736,58 +747,20 @@ export const moveProjectToLoop = async (
   const projectData = projectSnap.data();
   const connectedLoops = (projectData as any).connectedLoops || [];
 
-  // 기존 루프 연결 제거하고 새 루프 연결 추가
-  const updatedLoops = connectedLoops
+  // 기존 루프에서 제거하고 새 루프에 추가
+  const updatedConnectedLoops = connectedLoops
     .filter((loopId: string) => loopId !== fromLoopId)
     .concat([toLoopId]);
 
+  // 프로젝트 업데이트
   await updateDoc(projectRef, {
-    connectedLoops: updatedLoops,
+    connectedLoops: updatedConnectedLoops,
     isCarriedOver: true,
     originalLoopId: fromLoopId,
     carriedOverAt: new Date(),
     migrationStatus: "migrated",
     updatedAt: new Date(),
   });
-
-  // 프로젝트의 connectedLoops 업데이트 (중복 제거)
-  const projectSnap2 = await getDoc(projectRef);
-  if (projectSnap2.exists()) {
-    const projectData2 = projectSnap2.data();
-    const currentConnectedLoops = projectData2.connectedLoops || [];
-
-    // 기존 루프에서 제거
-    const filteredLoops = currentConnectedLoops.filter(
-      (loop: any) => loop.id !== fromLoopId
-    );
-
-    // 새 루프 정보 가져오기
-    const toLoopRef = doc(db, "loops", toLoopId);
-    const toLoopSnap = await getDoc(toLoopRef);
-    if (toLoopSnap.exists()) {
-      const toLoopData = toLoopSnap.data();
-      const newLoopInfo = {
-        id: toLoopId,
-        title: toLoopData.title,
-        startDate: toLoopData.startDate.toDate(),
-        endDate: toLoopData.endDate.toDate(),
-      };
-
-      // 새 루프가 이미 연결되어 있지 않으면 추가
-      const isAlreadyConnected = filteredLoops.some(
-        (loop: any) => loop.id === toLoopId
-      );
-
-      const updatedConnectedLoops = isAlreadyConnected
-        ? filteredLoops
-        : [...filteredLoops, newLoopInfo];
-
-      await updateDoc(projectRef, {
-        connectedLoops: updatedConnectedLoops,
-        updatedAt: new Date(),
-      });
-    }
-  }
 };
 
 // Retrospectives
@@ -1294,6 +1267,39 @@ export const updateRetrospective = async (
   });
 };
 
+// Notes
+export const createNote = async (
+  noteData: Omit<Note, "id" | "createdAt" | "updatedAt">
+): Promise<Note> => {
+  const baseData = createBaseData(noteData.userId);
+  const newNote = {
+    ...noteData,
+    ...baseData,
+  };
+
+  const docRef = await addDoc(collection(db, "notes"), newNote);
+
+  // Note 타입에 맞는 객체로 변환하여 반환
+  return {
+    id: docRef.id,
+    userId: noteData.userId,
+    content: noteData.content,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as Note;
+};
+
+export const updateNote = async (
+  noteId: string,
+  updateData: Partial<Omit<Note, "id" | "userId" | "createdAt">>
+): Promise<void> => {
+  const docRef = doc(db, "notes", noteId);
+  await updateDoc(docRef, {
+    ...updateData,
+    updatedAt: updateTimestamp(),
+  });
+};
+
 // --- User Functions ---
 
 export const fetchUserById = async (userId: string): Promise<User> => {
@@ -1441,6 +1447,72 @@ export const updateUserDisplayName = async (
 
   await updateProfile(currentUser, {
     displayName: displayName,
+  });
+};
+
+// 프로필 사진 업로드 함수
+export const uploadProfilePicture = async (
+  file: File,
+  userId: string
+): Promise<string> => {
+  try {
+    // 파일 확장자 확인
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif"];
+    if (!allowedTypes.includes(file.type)) {
+      throw new Error(
+        "지원하지 않는 파일 형식입니다. JPEG, PNG, GIF 파일만 업로드 가능합니다."
+      );
+    }
+
+    // 파일 크기 확인 (5MB 제한)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      throw new Error(
+        "파일 크기가 너무 큽니다. 5MB 이하의 파일만 업로드 가능합니다."
+      );
+    }
+
+    // Storage 참조 생성
+    const storageRef = ref(storage, `profile-pictures/${userId}/${file.name}`);
+
+    // 파일 업로드
+    const snapshot = await uploadBytes(storageRef, file);
+
+    // 다운로드 URL 가져오기
+    const downloadURL = await getDownloadURL(snapshot.ref);
+
+    return downloadURL;
+  } catch (error) {
+    console.error("프로필 사진 업로드 실패:", error);
+    throw error;
+  }
+};
+
+// 프로필 사진 삭제 함수
+export const deleteProfilePicture = async (
+  userId: string,
+  fileName: string
+): Promise<void> => {
+  try {
+    const storageRef = ref(storage, `profile-pictures/${userId}/${fileName}`);
+    await deleteObject(storageRef);
+  } catch (error) {
+    console.error("프로필 사진 삭제 실패:", error);
+    throw error;
+  }
+};
+
+// 사용자 프로필 사진 업데이트 함수
+export const updateUserProfilePicture = async (
+  photoURL: string
+): Promise<void> => {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("사용자가 로그인되지 않았습니다.");
+  }
+
+  await updateProfile(user, {
+    photoURL,
   });
 };
 
@@ -2469,7 +2541,6 @@ export const fetchLoopsByIds = async (loopIds: string[]): Promise<Loop[]> => {
         startDate: loopData.startDate.toDate(),
         endDate: loopData.endDate.toDate(),
         focusAreas: loopData.focusAreas || [],
-        projectIds: loopData.projectIds || [],
         reward: loopData.reward,
         createdAt: loopData.createdAt.toDate(),
         updatedAt: loopData.updatedAt.toDate(),

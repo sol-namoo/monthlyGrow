@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, Globe } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useSettings } from "@/hooks/useSettings";
+import { useLanguage } from "@/hooks/useLanguage";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -11,11 +12,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 export function ThemeToggle() {
   const { setTheme, theme } = useTheme();
   const { settings, updateSettings } = useSettings();
+  const { translate, currentLanguage } = useLanguage();
 
   const handleThemeChange = async (newTheme: "light" | "dark" | "system") => {
     setTheme(newTheme);
@@ -25,6 +28,14 @@ export function ThemeToggle() {
       await updateSettings({ theme: newTheme });
     } catch (error) {
       console.error("테마 설정 저장 실패:", error);
+    }
+  };
+
+  const handleLanguageChange = async (newLanguage: "ko" | "en") => {
+    try {
+      await updateSettings({ language: newLanguage });
+    } catch (error) {
+      console.error("언어 설정 저장 실패:", error);
     }
   };
 
@@ -39,14 +50,24 @@ export function ThemeToggle() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={() => handleThemeChange("light")}>
-          라이트
+          {translate("theme.light")}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => handleThemeChange("dark")}>
-          다크
+          {translate("theme.dark")}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => handleThemeChange("system")}>
-          시스템
+          {translate("theme.system")}
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => handleLanguageChange("ko")}>
+          {translate("language.korean")}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleLanguageChange("en")}>
+          {translate("language.english")}
+        </DropdownMenuItem>
+        <div className="px-2 py-1.5 text-xs text-muted-foreground border-t mt-1">
+          {translate("theme.mobileNotice")}
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );

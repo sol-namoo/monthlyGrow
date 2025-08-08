@@ -30,7 +30,7 @@ const CustomAlert = React.forwardRef<HTMLDivElement, CustomAlertProps>(
               child.type === "svg" ||
               (child.props as any)?.className?.includes("h-4")
             ) {
-              return React.cloneElement(child, {
+              return React.cloneElement(child as React.ReactElement<any>, {
                 className:
                   (child.props as any).className?.replace(
                     "h-4 w-4",
@@ -40,13 +40,13 @@ const CustomAlert = React.forwardRef<HTMLDivElement, CustomAlertProps>(
             }
             // AlertTitle인 경우 text-sm 적용
             if (child.type === AlertTitle) {
-              return React.cloneElement(child, {
+              return React.cloneElement(child as React.ReactElement<any>, {
                 className: `text-sm ${(child.props as any).className || ""}`,
               });
             }
             // AlertDescription인 경우 text-xs 적용
             if (child.type === AlertDescription) {
-              return React.cloneElement(child, {
+              return React.cloneElement(child as React.ReactElement<any>, {
                 className: `text-xs ${(child.props as any).className || ""}`,
               });
             }

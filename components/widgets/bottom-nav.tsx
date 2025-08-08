@@ -6,18 +6,20 @@ import { Home, Target, Briefcase, Layers, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const navItems = [
-  { href: "/home", label: "홈", icon: Home },
-  { href: "/loop", label: "루프", icon: Target },
-  { href: "/para", label: "PARA", icon: Layers },
-  { href: "/settings", label: "설정", icon: Settings },
+  { href: "/home", labelKey: "bottomNav.home", icon: Home },
+  { href: "/loop", labelKey: "bottomNav.loop", icon: Target },
+  { href: "/para", labelKey: "bottomNav.para", icon: Layers },
+  { href: "/settings", labelKey: "bottomNav.settings", icon: Settings },
 ];
 
 export function BottomNav() {
   const pathname = usePathname();
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const { translate } = useLanguage();
 
   useEffect(() => {
     setMounted(true);
@@ -46,7 +48,9 @@ export function BottomNav() {
               )}
             >
               <Icon size={20} />
-              <span className="text-xs font-medium">{item.label}</span>
+              <span className="text-xs font-medium">
+                {translate(item.labelKey)}
+              </span>
             </Link>
           );
         })}

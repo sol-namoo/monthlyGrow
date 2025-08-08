@@ -11,6 +11,7 @@ import { auth } from "@/lib/firebase";
 import { usePageData } from "@/hooks/usePageData";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export default function LoopSummaryPage() {
   const [user, loading] = useAuthState(auth);
@@ -19,6 +20,7 @@ export default function LoopSummaryPage() {
   const [selectedLoopId, setSelectedLoopId] = useState<string | undefined>(
     undefined
   );
+  const { translate } = useLanguage();
 
   const { loops, isLoading: isLoadingLoops } = usePageData("home", {
     userId: user?.uid,
@@ -48,7 +50,8 @@ export default function LoopSummaryPage() {
     loopId: selectedLoopId,
   });
 
-  if (loading || isLoadingLoops || isLoading) return <div>로딩 중...</div>;
+  if (loading || isLoadingLoops || isLoading)
+    return <div>{translate("settings.loading.loading")}</div>;
 
   if (!user) {
     return null;

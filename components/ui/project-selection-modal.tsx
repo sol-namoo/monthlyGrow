@@ -32,6 +32,7 @@ import {
 import { getAuth } from "firebase/auth";
 import { Project, Area } from "@/lib/types";
 import { getProjectStatus, formatDate } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface ProjectSelectionModalProps {
   open: boolean;
@@ -71,6 +72,7 @@ export function ProjectSelectionModal({
   const [lastDoc, setLastDoc] = useState<any>(null);
   const [hasMore, setHasMore] = useState(true);
   const [allProjects, setAllProjects] = useState<any[]>([]);
+  const { translate } = useLanguage();
 
   // 외부에서 전달받은 데이터가 있으면 사용, 없으면 직접 가져오기
   const auth = getAuth();
@@ -305,7 +307,9 @@ export function ProjectSelectionModal({
                     disabled={projectsLoading}
                     className="text-xs"
                   >
-                    {projectsLoading ? "로딩 중..." : "더 보기"}
+                    {projectsLoading
+                      ? translate("settings.loading.loading")
+                      : translate("settings.loading.showMore")}
                   </Button>
                 )}
               </div>

@@ -10,13 +10,18 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { CharacterAvatar } from "@/components/character-avatar";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/hooks/useSettings";
+import { useLanguage } from "@/hooks/useLanguage";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
-import { updateUserDisplayName } from "@/lib/firebase";
+import {
+  updateUserDisplayName,
+  uploadProfilePicture,
+  updateUserProfilePicture,
+} from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { Edit2, Check, X, Save, Loader2 } from "lucide-react";
 
@@ -36,6 +41,7 @@ type SettingsFormData = z.infer<typeof settingsFormSchema>;
 export default function SettingsPage() {
   const { toast } = useToast();
   const { settings, updateSettings, isLoading } = useSettings();
+  const { translate, currentLanguage } = useLanguage();
   const [user, userLoading] = useAuthState(auth);
   const router = useRouter();
 
@@ -43,8 +49,90 @@ export default function SettingsPage() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [newDisplayName, setNewDisplayName] = useState("");
 
+  // Default reward 편집 상태
+  const [isEditingDefaultReward, setIsEditingDefaultReward] = useState(false);
+  const [newDefaultReward, setNewDefaultReward] = useState("");
+
   // 설정 저장 상태
   const [savingStates, setSavingStates] = useState<Record<string, boolean>>({});
+
+  // 프로필 사진 업로드 상태
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
+  // 번역 텍스트 메모이제이션
+  const texts = useMemo(
+    () => ({
+      // 페이지 제목
+      title: translate("settings.title"),
+      loading: translate("settings.loading"),
+
+      // 프로필 섹션
+      profile: translate("settings.profile"),
+      avatarChange: translate("settings.avatarChange"),
+      username: translate("settings.username"),
+      usernamePlaceholder: translate("settings.usernamePlaceholder"),
+      noName: translate("settings.noName"),
+      email: translate("settings.email"),
+      noEmail: translate("settings.noEmail"),
+
+      // 루프 설정 섹션
+      loopSettings: translate("settings.loopSettings"),
+      defaultReward: translate("settings.defaultReward"),
+      defaultRewardPlaceholder: translate("settings.defaultRewardPlaceholder"),
+      defaultRewardEnabled: translate("settings.defaultRewardEnabled"),
+      defaultRewardDisabled: translate("settings.defaultRewardDisabled"),
+      carryOver: translate("settings.carryOver"),
+      carryOverDescription: translate("settings.carryOverDescription"),
+
+      // 테마 설정 섹션
+      themeSettings: translate("settings.themeSettings"),
+      theme: translate("settings.theme"),
+      language: translate("settings.language"),
+
+      // 계정 섹션
+      account: translate("settings.account"),
+      logout: translate("settings.logout"),
+      logoutDescription: translate("settings.logoutDescription"),
+
+      // 테마 옵션
+      themeLight: translate("theme.light"),
+      themeDark: translate("theme.dark"),
+      themeSystem: translate("theme.system"),
+
+      // 언어 옵션
+      languageKorean: translate("language.korean"),
+      languageEnglish: translate("language.english"),
+
+      // 토스트 메시지
+      save: translate("settings.save"),
+      saveSuccess: translate("settings.saveSuccess"),
+      saveSuccessDescription: translate("settings.saveSuccessDescription"),
+      saveError: translate("settings.saveError"),
+      saveErrorDescription: translate("settings.saveErrorDescription"),
+      nameRequired: translate("settings.nameRequired"),
+      nameRequiredDescription: translate("settings.nameRequiredDescription"),
+      nameChangeSuccess: translate("settings.nameChangeSuccess"),
+      nameChangeSuccessDescription: translate(
+        "settings.nameChangeSuccessDescription"
+      ),
+      nameChangeError: translate("settings.nameChangeError"),
+      nameChangeErrorDescription: translate(
+        "settings.nameChangeErrorDescription"
+      ),
+      logoutSuccess: translate("settings.logoutSuccess"),
+      logoutSuccessDescription: translate("settings.logoutSuccessDescription"),
+      logoutError: translate("settings.logoutError"),
+      logoutErrorDescription: translate("settings.logoutErrorDescription"),
+      // 에러 메시지
+      errorSettingsSave: translate("settings.errorMessage.settingsSave"),
+      errorNameChange: translate("settings.errorMessage.nameChange"),
+      errorDefaultRewardSave: translate(
+        "settings.errorMessage.defaultRewardSave"
+      ),
+      errorLogout: translate("settings.errorMessage.logout"),
+    }),
+    [translate]
+  );
 
   const form = useForm<SettingsFormData>({
     resolver: zodResolver(settingsFormSchema),
@@ -69,11 +157,11 @@ export default function SettingsPage() {
         console.log(`Setting saved successfully: ${key} = ${value}`);
 
         toast({
-          title: successMessage || "설정 저장 완료",
-          description: "설정이 Firestore에 저장되었습니다.",
+          title: successMessage || texts.saveSuccess,
+          description: texts.saveSuccessDescription,
         });
       } catch (error: any) {
-        console.error("설정 저장 실패:", error);
+        console.error(texts.errorSettingsSave + ":", error);
         console.error("Error details:", {
           key,
           value,
@@ -81,15 +169,15 @@ export default function SettingsPage() {
           stack: error?.stack,
         });
         toast({
-          title: "설정 저장 실패",
-          description: "Firestore에 설정을 저장하는 중 오류가 발생했습니다.",
+          title: texts.saveError,
+          description: texts.saveErrorDescription,
           variant: "destructive",
         });
       } finally {
         setSavingStates((prev) => ({ ...prev, [key]: false }));
       }
     },
-    [updateSettings, toast]
+    [updateSettings, toast, texts]
   );
 
   // 사용자 이름 편집 시작
@@ -108,8 +196,8 @@ export default function SettingsPage() {
   const saveDisplayName = async () => {
     if (!newDisplayName.trim()) {
       toast({
-        title: "이름을 입력해주세요",
-        description: "사용자 이름은 비워둘 수 없습니다.",
+        title: texts.nameRequired,
+        description: texts.nameRequiredDescription,
         variant: "destructive",
       });
       return;
@@ -121,16 +209,43 @@ export default function SettingsPage() {
       setNewDisplayName("");
 
       toast({
-        title: "이름 변경 완료",
-        description: "사용자 이름이 성공적으로 변경되었습니다.",
+        title: texts.nameChangeSuccess,
+        description: texts.nameChangeSuccessDescription,
       });
     } catch (error) {
-      console.error("이름 변경 실패:", error);
+      console.error(texts.errorNameChange + ":", error);
       toast({
-        title: "이름 변경 실패",
-        description: "이름 변경 중 오류가 발생했습니다.",
+        title: texts.nameChangeError,
+        description: texts.nameChangeErrorDescription,
         variant: "destructive",
       });
+    }
+  };
+
+  // Default reward 편집 시작
+  const startEditingDefaultReward = () => {
+    setNewDefaultReward(form.getValues("defaultReward") || "");
+    setIsEditingDefaultReward(true);
+  };
+
+  // Default reward 편집 취소
+  const cancelEditingDefaultReward = () => {
+    setIsEditingDefaultReward(false);
+    setNewDefaultReward("");
+  };
+
+  // Default reward 저장
+  const saveDefaultReward = async () => {
+    try {
+      await saveSetting(
+        "defaultReward",
+        newDefaultReward.trim(),
+        texts.defaultReward + " " + texts.saveSuccess
+      );
+      setIsEditingDefaultReward(false);
+      setNewDefaultReward("");
+    } catch (error) {
+      console.error(texts.errorDefaultRewardSave + ":", error);
     }
   };
 
@@ -138,45 +253,108 @@ export default function SettingsPage() {
     try {
       await signOut(auth);
       toast({
-        title: "로그아웃 완료",
-        description: "성공적으로 로그아웃되었습니다.",
+        title: texts.logoutSuccess,
+        description: texts.logoutSuccessDescription,
       });
       router.push("/login");
     } catch (error) {
-      console.error("로그아웃 실패:", error);
+      console.error(texts.errorLogout + ":", error);
       toast({
-        title: "로그아웃 실패",
-        description: "로그아웃 중 오류가 발생했습니다.",
+        title: texts.logoutError,
+        description: texts.logoutErrorDescription,
         variant: "destructive",
       });
+    }
+  };
+
+  // 프로필 사진 업로드 함수
+  const handleProfilePictureUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      // 파일 업로드
+      const downloadURL = await uploadProfilePicture(file, user.uid);
+
+      // 사용자 프로필 업데이트
+      await updateUserProfilePicture(downloadURL);
+
+      toast({
+        title: translate("settings.profilePictureUpload.success"),
+        description: translate(
+          "settings.profilePictureUpload.successDescription"
+        ),
+      });
+    } catch (error) {
+      console.error("프로필 사진 업로드 실패:", error);
+      toast({
+        title: translate("settings.profilePictureUpload.error"),
+        description:
+          error instanceof Error
+            ? error.message
+            : "알 수 없는 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploadingPhoto(false);
     }
   };
 
   if (isLoading || userLoading) {
     return (
       <div className="container max-w-md px-4 py-6">
-        <div className="text-center">로딩 중...</div>
+        <div className="text-center">{texts.loading}</div>
       </div>
     );
   }
 
   return (
     <div className="container max-w-md px-4 py-6">
-      <h1 className="mb-6 text-2xl font-bold">설정</h1>
+      <h1 className="mb-6 text-2xl font-bold">{texts.title}</h1>
 
       <div className="space-y-8">
         <section>
-          <h2 className="mb-4 text-xl font-bold">프로필</h2>
+          <h2 className="mb-4 text-xl font-bold">{texts.profile}</h2>
           <Card className="p-4">
             <div className="mb-6 flex flex-col items-center">
               <CharacterAvatar size="lg" level={5} className="mb-4" />
-              <Button variant="outline" size="sm">
-                아바타 변경
-              </Button>
+              <div className="flex flex-col items-center gap-2">
+                <input
+                  type="file"
+                  id="profile-picture-upload"
+                  accept="image/jpeg,image/jpg,image/png,image/gif"
+                  onChange={handleProfilePictureUpload}
+                  className="hidden"
+                  disabled={isUploadingPhoto}
+                />
+                <label
+                  htmlFor="profile-picture-upload"
+                  className="cursor-pointer"
+                >
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isUploadingPhoto}
+                    className="flex items-center gap-2"
+                  >
+                    {isUploadingPhoto ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {translate("settings.profilePictureUpload.uploading")}
+                      </>
+                    ) : (
+                      texts.avatarChange
+                    )}
+                  </Button>
+                </label>
+              </div>
             </div>
 
             <div className="mb-4">
-              <Label htmlFor="username">사용자 이름</Label>
+              <Label htmlFor="username">{texts.username}</Label>
               {isEditingName ? (
                 <div className="mt-1 flex items-center gap-2">
                   <Input
@@ -184,7 +362,7 @@ export default function SettingsPage() {
                     value={newDisplayName}
                     onChange={(e) => setNewDisplayName(e.target.value)}
                     className="flex-1"
-                    placeholder="사용자 이름을 입력하세요"
+                    placeholder={texts.usernamePlaceholder}
                   />
                   <Button
                     type="button"
@@ -208,7 +386,7 @@ export default function SettingsPage() {
                 <div className="mt-1 flex items-center gap-2">
                   <Input
                     id="username"
-                    value={user?.displayName || "이름 없음"}
+                    value={user?.displayName || texts.noName}
                     className="flex-1"
                     readOnly
                     disabled
@@ -227,11 +405,11 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <Label htmlFor="email">이메일</Label>
+              <Label htmlFor="email">{texts.email}</Label>
               <Input
                 id="email"
                 type="email"
-                value={user?.email || "이메일 없음"}
+                value={user?.email || texts.noEmail}
                 className="mt-1"
                 readOnly
                 disabled
@@ -241,11 +419,13 @@ export default function SettingsPage() {
         </section>
 
         <section>
-          <h2 className="mb-4 text-xl font-bold">루프 설정</h2>
+          <h2 className="mb-4 text-xl font-bold">{texts.loopSettings}</h2>
           <Card className="p-4">
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2">
-                <Label htmlFor="defaultRewardEnabled">기본 보상 설정</Label>
+                <Label htmlFor="defaultRewardEnabled">
+                  {texts.defaultReward}
+                </Label>
                 <Switch
                   id="defaultRewardEnabled"
                   checked={form.watch("defaultRewardEnabled")}
@@ -254,42 +434,82 @@ export default function SettingsPage() {
                     await saveSetting(
                       "defaultRewardEnabled",
                       checked,
-                      "기본 보상 설정이 저장되었습니다."
+                      texts.defaultReward + " " + texts.saveSuccess
                     );
                   }}
                   disabled={savingStates["defaultRewardEnabled"]}
                 />
               </div>
-              <Textarea
-                id="defaultReward"
-                {...form.register("defaultReward")}
-                className="mt-1"
-                placeholder="루프 완료 시 기본 보상을 입력하세요"
-                disabled={
-                  !form.watch("defaultRewardEnabled") ||
-                  savingStates["defaultReward"]
-                }
-                onBlur={async () => {
-                  const value = form.getValues("defaultReward");
-                  await saveSetting(
-                    "defaultReward",
-                    value,
-                    "기본 보상이 저장되었습니다."
-                  );
-                }}
-              />
+              {form.watch("defaultRewardEnabled") && (
+                <div className="space-y-2">
+                  {isEditingDefaultReward ? (
+                    <div className="flex items-center gap-2">
+                      <Textarea
+                        id="defaultReward"
+                        value={newDefaultReward}
+                        onChange={(e) => setNewDefaultReward(e.target.value)}
+                        className="flex-1"
+                        placeholder={texts.defaultRewardPlaceholder}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={saveDefaultReward}
+                        className="px-2"
+                        disabled={savingStates["defaultReward"]}
+                      >
+                        {savingStates["defaultReward"] ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Check className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={cancelEditingDefaultReward}
+                        className="px-2"
+                        disabled={savingStates["defaultReward"]}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Textarea
+                        id="defaultReward"
+                        value={form.watch("defaultReward") || ""}
+                        className="flex-1"
+                        readOnly
+                        disabled
+                        placeholder={texts.defaultRewardPlaceholder}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={startEditingDefaultReward}
+                        className="px-2"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
               <p className="mt-1 text-xs text-muted-foreground">
                 {form.watch("defaultRewardEnabled")
-                  ? "새 루프 생성 시 기본으로 설정될 보상입니다."
-                  : "기본 보상 설정이 비활성화되어 있습니다. 활성화하면 새 루프 생성 시 자동으로 보상이 채워집니다."}
+                  ? texts.defaultRewardEnabled
+                  : texts.defaultRewardDisabled}
               </p>
             </div>
 
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="carryOver">미완료 항목 이월</Label>
+                <Label htmlFor="carryOver">{texts.carryOver}</Label>
                 <p className="text-xs text-muted-foreground">
-                  완료하지 못한 항목을 다음 루프로 이월합니다.
+                  {texts.carryOverDescription}
                 </p>
               </div>
               <Switch
@@ -300,7 +520,7 @@ export default function SettingsPage() {
                   await saveSetting(
                     "carryOver",
                     checked,
-                    "이월 설정이 저장되었습니다."
+                    texts.carryOver + " " + texts.saveSuccess
                   );
                 }}
                 disabled={savingStates["carryOver"]}
@@ -309,70 +529,12 @@ export default function SettingsPage() {
           </Card>
         </section>
 
-        {/* AI 설정 - 임시 주석처리
         <section>
-          <h2 className="mb-4 text-xl font-bold">AI 설정</h2>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="aiRecommendations">AI 추천 허용</Label>
-                <p className="text-xs text-muted-foreground">
-                  AI가 루프와 프로젝트에 대한 추천을 제공합니다.
-                </p>
-              </div>
-              <Switch
-                id="aiRecommendations"
-                checked={form.watch("aiRecommendations")}
-                onCheckedChange={async (checked) => {
-                  form.setValue("aiRecommendations", checked);
-                  await saveSetting(
-                    "aiRecommendations",
-                    checked,
-                    "AI 설정이 저장되었습니다."
-                  );
-                }}
-                disabled={savingStates["aiRecommendations"]}
-              />
-            </div>
-          </Card>
-        </section>
-        */}
-
-        {/* 알림 설정 - 임시 주석처리
-        <section>
-          <h2 className="mb-4 text-xl font-bold">알림 설정</h2>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="notifications">알림 허용</Label>
-                <p className="text-xs text-muted-foreground">
-                  루프와 프로젝트 관련 알림을 받습니다.
-                </p>
-              </div>
-              <Switch
-                id="notifications"
-                checked={form.watch("notifications")}
-                onCheckedChange={async (checked) => {
-                  form.setValue("notifications", checked);
-                  await saveSetting(
-                    "notifications",
-                    checked,
-                    "알림 설정이 저장되었습니다."
-                  );
-                }}
-                disabled={savingStates["notifications"]}
-              />
-            </div>
-          </Card>
-        </section>
-        */}
-
-        <section>
-          <h2 className="mb-4 text-xl font-bold">테마 설정</h2>
+          <h2 className="mb-4 text-xl font-bold">{texts.themeSettings}</h2>
           <Card className="p-4">
             <div className="space-y-4">
               <div>
-                <Label htmlFor="theme">테마</Label>
+                <Label htmlFor="theme">{texts.theme}</Label>
                 <select
                   id="theme"
                   value={form.watch("theme")}
@@ -386,21 +548,24 @@ export default function SettingsPage() {
                       await saveSetting(
                         "theme",
                         value,
-                        "테마 설정이 저장되었습니다."
+                        texts.theme + " " + texts.saveSuccess
                       );
                     }
                   }}
                   disabled={savingStates["theme"]}
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >
-                  <option value="light">라이트</option>
-                  <option value="dark">다크</option>
-                  <option value="system">시스템</option>
+                  <option value="light">{texts.themeLight}</option>
+                  <option value="dark">{texts.themeDark}</option>
+                  <option value="system">{texts.themeSystem}</option>
                 </select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {translate("theme.mobileNotice")}
+                </p>
               </div>
 
               <div>
-                <Label htmlFor="language">언어</Label>
+                <Label htmlFor="language">{texts.language}</Label>
                 <select
                   id="language"
                   value={form.watch("language")}
@@ -414,15 +579,15 @@ export default function SettingsPage() {
                       await saveSetting(
                         "language",
                         value,
-                        "언어 설정이 저장되었습니다."
+                        texts.language + " " + texts.saveSuccess
                       );
                     }
                   }}
                   disabled={savingStates["language"]}
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >
-                  <option value="ko">한국어</option>
-                  <option value="en">English</option>
+                  <option value="ko">{texts.languageKorean}</option>
+                  <option value="en">{texts.languageEnglish}</option>
                 </select>
               </div>
             </div>
@@ -432,13 +597,15 @@ export default function SettingsPage() {
 
       {/* 로그아웃 섹션 */}
       <section className="mt-8">
-        <h2 className="mb-4 text-xl font-bold text-foreground">계정</h2>
+        <h2 className="mb-4 text-xl font-bold text-foreground">
+          {texts.account}
+        </h2>
         <Card className="p-4 border-border">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-medium text-foreground">로그아웃</h3>
+              <h3 className="font-medium text-foreground">{texts.logout}</h3>
               <p className="text-sm text-muted-foreground">
-                현재 계정에서 로그아웃합니다.
+                {texts.logoutDescription}
               </p>
             </div>
             <Button
@@ -447,7 +614,7 @@ export default function SettingsPage() {
               disabled={userLoading}
               className="text-muted-foreground hover:text-foreground"
             >
-              로그아웃
+              {texts.logout}
             </Button>
           </div>
         </Card>

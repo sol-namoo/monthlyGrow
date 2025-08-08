@@ -72,12 +72,14 @@ import {
 } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatDateShort } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 function ParaPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab") || "projects";
   const [user, userLoading] = useAuthState(auth);
+  const { translate, currentLanguage } = useLanguage();
 
   const handleTabChange = (value: string) => {
     router.push(`/para?tab=${value}`, { scroll: false });
@@ -312,25 +314,34 @@ function ParaPageContent() {
 
   return (
     <div className="container max-w-md px-4 py-6 pb-20">
-      <h1 className="text-2xl font-bold mb-6">PARA</h1>
+      <h1 className="text-2xl font-bold mb-6">{translate("para.title")}</h1>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-6">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="projects">Projects</TabsTrigger>
-          <TabsTrigger value="areas">Areas</TabsTrigger>
-          <TabsTrigger value="resources">Resources</TabsTrigger>
-          <TabsTrigger value="archives">Archives</TabsTrigger>
+          <TabsTrigger value="projects">
+            {translate("para.tabs.projects")}
+          </TabsTrigger>
+          <TabsTrigger value="areas">
+            {translate("para.tabs.areas")}
+          </TabsTrigger>
+          <TabsTrigger value="resources">
+            {translate("para.tabs.resources")}
+          </TabsTrigger>
+          <TabsTrigger value="archives">
+            {translate("para.tabs.archives")}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="projects" className="mt-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Briefcase className="h-4 w-4" />
-              <span>실제 행동 단위인 프로젝트</span>
+              <span>{translate("para.projects.description")}</span>
             </div>
             <Button size="sm" asChild>
               <Link href="/para/projects/new">
-                <Plus className="mr-2 h-4 w-4" />새 프로젝트
+                <Plus className="mr-2 h-4 w-4" />
+                {translate("para.projects.newProject")}
               </Link>
             </Button>
           </div>
@@ -346,39 +357,52 @@ function ParaPageContent() {
                     <Filter className="mr-2 h-4 w-4 text-primary" />
                   )}
                   {projectFilter === "all"
-                    ? `전체 (${filteredProjects.length}개)`
+                    ? translate("para.projects.filter.allWithCount").replace(
+                        "{count}",
+                        filteredProjects.length.toString()
+                      )
                     : projectFilter === "planned"
-                    ? `예정 (${
-                        projectsWithStatus.filter((p) => p.status === "planned")
-                          .length
-                      }개)`
+                    ? translate(
+                        "para.projects.filter.plannedWithCount"
+                      ).replace(
+                        "{count}",
+                        projectsWithStatus
+                          .filter((p) => p.status === "planned")
+                          .length.toString()
+                      )
                     : projectFilter === "in_progress"
-                    ? `진행 중 (${
-                        projectsWithStatus.filter(
-                          (p) => p.status === "in_progress"
-                        ).length
-                      }개)`
-                    : `완료됨 (${
-                        projectsWithStatus.filter(
-                          (p) => p.status === "completed"
-                        ).length
-                      }개)`}
+                    ? translate(
+                        "para.projects.filter.inProgressWithCount"
+                      ).replace(
+                        "{count}",
+                        projectsWithStatus
+                          .filter((p) => p.status === "in_progress")
+                          .length.toString()
+                      )
+                    : translate(
+                        "para.projects.filter.completedWithCount"
+                      ).replace(
+                        "{count}",
+                        projectsWithStatus
+                          .filter((p) => p.status === "completed")
+                          .length.toString()
+                      )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem onClick={() => setProjectFilter("all")}>
-                  전체
+                  {translate("para.projects.filter.all")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setProjectFilter("planned")}>
-                  예정
+                  {translate("para.projects.filter.planned")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setProjectFilter("in_progress")}
                 >
-                  진행 중
+                  {translate("para.projects.filter.inProgress")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setProjectFilter("completed")}>
-                  완료됨
+                  {translate("para.projects.filter.completed")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -392,23 +416,26 @@ function ParaPageContent() {
                   ) : (
                     <Clock className="mr-2 h-4 w-4" />
                   )}
-                  {projectSortBy === "latest" && "최신순"}
-                  {projectSortBy === "oldest" && "생성순"}
-                  {projectSortBy === "name" && "이름순"}
+                  {projectSortBy === "latest" &&
+                    translate("para.projects.sort.latest")}
+                  {projectSortBy === "oldest" &&
+                    translate("para.projects.sort.oldest")}
+                  {projectSortBy === "name" &&
+                    translate("para.projects.sort.name")}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem onClick={() => setProjectSortBy("latest")}>
                   <ArrowUpDown className="mr-2 h-4 w-4" />
-                  최신순
+                  {translate("para.projects.sort.latest")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setProjectSortBy("oldest")}>
                   <Clock className="mr-2 h-4 w-4" />
-                  생성순
+                  {translate("para.projects.sort.oldest")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setProjectSortBy("name")}>
                   <FileText className="mr-2 h-4 w-4" />
-                  이름순
+                  {translate("para.projects.sort.name")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -429,13 +456,16 @@ function ParaPageContent() {
                     <Briefcase className="h-8 w-8 text-muted-foreground/50" />
                   </div>
                 </div>
-                <h3 className="text-lg font-bold mb-2">프로젝트가 없어요</h3>
+                <h3 className="text-lg font-bold mb-2">
+                  {translate("para.projects.noProjects.title")}
+                </h3>
                 <p className="text-muted-foreground mb-4">
-                  목표를 달성하기 위한 프로젝트를 만들어보세요.
+                  {translate("para.projects.noProjects.description")}
                 </p>
                 <Button asChild className="w-full max-w-xs">
                   <Link href="/para/projects/new">
-                    <Plus className="mr-2 h-4 w-4" />새 프로젝트 만들기
+                    <Plus className="mr-2 h-4 w-4" />
+                    {translate("para.projects.noProjects.button")}
                   </Link>
                 </Button>
               </Card>
@@ -462,10 +492,12 @@ function ParaPageContent() {
                                   const area = areas.find(
                                     (a) => a.id === project.areaId
                                   );
-                                  return area ? area.name : "미분류";
+                                  return area
+                                    ? area.name
+                                    : translate("para.projects.uncategorized");
                                 }
-                                return "미분류";
-                              })() === "미분류"
+                                return translate("para.projects.uncategorized");
+                              })() === translate("para.projects.uncategorized")
                                 ? "border-red-300 text-red-700"
                                 : ""
                             }`}
@@ -475,9 +507,11 @@ function ParaPageContent() {
                                 const area = areas.find(
                                   (a) => a.id === project.areaId
                                 );
-                                return area ? area.name : "미분류";
+                                return area
+                                  ? area.name
+                                  : translate("para.projects.uncategorized");
                               }
-                              return "미분류";
+                              return translate("para.projects.uncategorized");
                             })()}
                           </Badge>
                           <Badge
@@ -489,8 +523,8 @@ function ParaPageContent() {
                             className="text-xs"
                           >
                             {project.status === "completed"
-                              ? "완료됨"
-                              : "진행 중"}
+                              ? translate("para.projects.status.completed")
+                              : translate("para.projects.status.inProgress")}
                           </Badge>
                         </div>
                       </div>
@@ -506,8 +540,8 @@ function ParaPageContent() {
                           <span>
                             {project.startDate && project.endDate && (
                               <>
-                                {formatDate(project.startDate)} ~{" "}
-                                {formatDate(project.endDate)}
+                                {formatDate(project.startDate, currentLanguage)}{" "}
+                                ~ {formatDate(project.endDate, currentLanguage)}
                               </>
                             )}
                           </span>
@@ -553,10 +587,10 @@ function ParaPageContent() {
                       {isFetchingNextProjects ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          로딩 중...
+                          {translate("para.projects.loading")}
                         </>
                       ) : (
-                        "더보기"
+                        translate("para.projects.loadMore")
                       )}
                     </Button>
                   </div>
@@ -570,14 +604,18 @@ function ParaPageContent() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Compass className="h-4 w-4" />
-              <span>장기적 관심 영역</span>
+              <span>{translate("para.areas.description")}</span>
               <span className="text-xs text-muted-foreground">
-                ({areas.length}개)
+                {translate("para.areas.count").replace(
+                  "{count}",
+                  areas.length.toString()
+                )}
               </span>
             </div>
             <Button size="sm" asChild>
               <Link href="/para/areas/new">
-                <Plus className="mr-2 h-4 w-4" />새 영역
+                <Plus className="mr-2 h-4 w-4" />
+                {translate("para.areas.newArea")}
               </Link>
             </Button>
           </div>
@@ -588,13 +626,16 @@ function ParaPageContent() {
                   <Compass className="h-8 w-8 text-muted-foreground/50" />
                 </div>
               </div>
-              <h3 className="text-lg font-bold mb-2">활동 영역이 없어요</h3>
+              <h3 className="text-lg font-bold mb-2">
+                {translate("para.areas.noAreas.title")}
+              </h3>
               <p className="text-muted-foreground mb-4">
-                건강, 커리어, 자기계발 등 관심 있는 영역을 만들어보세요.
+                {translate("para.areas.noAreas.description")}
               </p>
               <Button asChild className="w-full max-w-xs">
                 <Link href="/para/areas/new">
-                  <Plus className="mr-2 h-4 w-4" />새 영역 만들기
+                  <Plus className="mr-2 h-4 w-4" />
+                  {translate("para.areas.noAreas.button")}
                 </Link>
               </Button>
             </Card>
@@ -648,10 +689,16 @@ function ParaPageContent() {
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant="secondary" className="text-xs">
-                            프로젝트 {counts.projectCount}개
+                            {translate("para.areas.projectCount").replace(
+                              "{count}",
+                              counts.projectCount.toString()
+                            )}
                           </Badge>
                           <Badge variant="secondary" className="text-xs">
-                            자료 {counts.resourceCount}개
+                            {translate("para.areas.resourceCount").replace(
+                              "{count}",
+                              counts.resourceCount.toString()
+                            )}
                           </Badge>
                         </div>
                       </div>
@@ -673,14 +720,18 @@ function ParaPageContent() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Folder className="h-4 w-4" />
-              <span>아이디어와 참고 자료</span>
+              <span>{translate("para.resources.description")}</span>
               <span className="text-xs text-muted-foreground">
-                ({allResources.length}개)
+                {translate("para.resources.count").replace(
+                  "{count}",
+                  allResources.length.toString()
+                )}
               </span>
             </div>
             <Button asChild size="sm">
               <Link href="/para/resources/new">
-                <Plus className="mr-2 h-4 w-4" />새 자료 추가
+                <Plus className="mr-2 h-4 w-4" />
+                {translate("para.resources.newResource")}
               </Link>
             </Button>
           </div>
@@ -695,23 +746,26 @@ function ParaPageContent() {
                   ) : (
                     <Clock className="mr-2 h-4 w-4" />
                   )}
-                  {resourceSortBy === "latest" && "최신순"}
-                  {resourceSortBy === "oldest" && "생성순"}
-                  {resourceSortBy === "name" && "이름순"}
+                  {resourceSortBy === "latest" &&
+                    translate("para.resources.sort.latest")}
+                  {resourceSortBy === "oldest" &&
+                    translate("para.resources.sort.oldest")}
+                  {resourceSortBy === "name" &&
+                    translate("para.resources.sort.name")}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem onClick={() => setResourceSortBy("latest")}>
                   <ArrowUpDown className="mr-2 h-4 w-4" />
-                  최신순
+                  {translate("para.resources.sort.latest")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setResourceSortBy("oldest")}>
                   <Clock className="mr-2 h-4 w-4" />
-                  생성순
+                  {translate("para.resources.sort.oldest")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setResourceSortBy("name")}>
                   <FileText className="mr-2 h-4 w-4" />
-                  이름순
+                  {translate("para.resources.sort.name")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -730,13 +784,16 @@ function ParaPageContent() {
                   <Folder className="h-8 w-8 text-muted-foreground/50" />
                 </div>
               </div>
-              <h3 className="text-lg font-bold mb-2">참고 자료가 없어요</h3>
+              <h3 className="text-lg font-bold mb-2">
+                {translate("para.resources.noResources.title")}
+              </h3>
               <p className="text-muted-foreground mb-4">
-                유용한 링크, 아이디어, 참고 자료를 저장해보세요.
+                {translate("para.resources.noResources.description")}
               </p>
               <Button asChild className="w-full max-w-xs">
                 <Link href="/para/resources/new">
-                  <Plus className="mr-2 h-4 w-4" />새 자료 추가하기
+                  <Plus className="mr-2 h-4 w-4" />
+                  {translate("para.resources.noResources.button")}
                 </Link>
               </Button>
             </Card>
@@ -758,7 +815,8 @@ function ParaPageContent() {
                             : ""
                         }`}
                       >
-                        {resource.area?.name || "기타"}
+                        {resource.area?.name ||
+                          translate("para.resources.other")}
                       </Badge>
                     </div>
                     <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
@@ -767,7 +825,9 @@ function ParaPageContent() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3" />
-                        <span>{formatDate(resource.createdAt)}</span>
+                        <span>
+                          {formatDate(resource.createdAt, currentLanguage)}
+                        </span>
                       </div>
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     </div>
@@ -786,10 +846,10 @@ function ParaPageContent() {
                     {isFetchingNextResources ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        로딩 중...
+                        {translate("para.resources.loading")}
                       </>
                     ) : (
-                      "더보기"
+                      translate("para.resources.loadMore")
                     )}
                   </Button>
                 </div>
@@ -802,9 +862,12 @@ function ParaPageContent() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground h-9">
               <Archive className="h-4 w-4" />
-              <span>완료된 항목에 대한 회고</span>
+              <span>{translate("para.archives.description")}</span>
               <span className="text-xs text-muted-foreground">
-                ({allArchives.length}개)
+                {translate("para.archives.count").replace(
+                  "{count}",
+                  allArchives.length.toString()
+                )}
               </span>
             </div>
           </div>
@@ -819,21 +882,21 @@ function ParaPageContent() {
                     <Filter className="mr-2 h-4 w-4 text-primary" />
                   )}
                   {filterType === "all"
-                    ? "전체"
+                    ? translate("para.archives.filter.all")
                     : filterType === "loop"
-                    ? "루프 회고"
-                    : "프로젝트 회고"}
+                    ? translate("para.archives.filter.loop")
+                    : translate("para.archives.filter.project")}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem onClick={() => setFilterType("all")}>
-                  전체
+                  {translate("para.archives.filter.all")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setFilterType("loop")}>
-                  루프 회고
+                  {translate("para.archives.filter.loop")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setFilterType("project")}>
-                  프로젝트 회고
+                  {translate("para.archives.filter.project")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -847,17 +910,19 @@ function ParaPageContent() {
                   ) : (
                     <Star className="mr-2 h-4 w-4" />
                   )}
-                  {archiveSortBy === "latest" ? "최신순" : "회고 별점순"}
+                  {archiveSortBy === "latest"
+                    ? translate("para.archives.sort.latest")
+                    : translate("para.archives.sort.rating")}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem onClick={() => setArchiveSortBy("latest")}>
                   <ArrowUpDown className="mr-2 h-4 w-4" />
-                  최신순
+                  {translate("para.archives.sort.latest")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setArchiveSortBy("rating")}>
                   <Star className="mr-2 h-4 w-4" />
-                  회고 별점순
+                  {translate("para.archives.sort.rating")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -871,7 +936,7 @@ function ParaPageContent() {
           ) : allArchives.length === 0 ? (
             <Card className="p-6 text-center border-dashed">
               <p className="text-muted-foreground">
-                아직 보관된 회고가 없어요.
+                {translate("para.archives.noArchives")}
               </p>
             </Card>
           ) : (
@@ -891,7 +956,7 @@ function ParaPageContent() {
                     >
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-lg font-bold">
-                          {archive.title || "제목 없음"}
+                          {archive.title || translate("para.archives.noTitle")}
                         </h3>
                         <Badge
                           className={`text-xs ${
@@ -900,16 +965,21 @@ function ParaPageContent() {
                               : "bg-purple-100 text-purple-800"
                           }`}
                         >
-                          {archive.loopId ? "루프 회고" : "프로젝트 회고"}
+                          {archive.loopId
+                            ? translate("para.archives.loopRetrospective")
+                            : translate("para.archives.projectRetrospective")}
                         </Badge>
                       </div>
                       <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
-                        {archive.summary || "요약 없음"}
+                        {archive.summary ||
+                          translate("para.archives.noSummary")}
                       </p>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Clock className="h-3 w-3" />
-                          <span>{formatDate(archive.createdAt)}</span>
+                          <span>
+                            {formatDate(archive.createdAt, currentLanguage)}
+                          </span>
                           {renderStars(archive.userRating)}
                           {archive.bookmarked && (
                             <Bookmark className="h-3 w-3 text-yellow-500 fill-yellow-500" />
@@ -932,10 +1002,10 @@ function ParaPageContent() {
                     {isFetchingNextArchives ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        로딩 중...
+                        {translate("para.archives.loading")}
                       </>
                     ) : (
-                      "더보기"
+                      translate("para.archives.loadMore")
                     )}
                   </Button>
                 </div>

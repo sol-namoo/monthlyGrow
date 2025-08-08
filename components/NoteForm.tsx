@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // 노트 폼 스키마 정의
 const noteFormSchema = z.object({
@@ -19,6 +20,8 @@ interface NoteFormProps {
 }
 
 export function NoteForm({ onClose, onSave }: NoteFormProps) {
+  const { translate } = useLanguage();
+
   const form = useForm<NoteFormData>({
     resolver: zodResolver(noteFormSchema),
     defaultValues: {
@@ -35,29 +38,33 @@ export function NoteForm({ onClose, onSave }: NoteFormProps) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-md">
-        <h3 className="text-lg font-semibold mb-4">노트 작성</h3>
+        <h3 className="text-lg font-semibold mb-4">
+          {translate("noteForm.title")}
+        </h3>
 
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
           <div>
-            <label className="text-sm font-medium">노트 내용</label>
+            <label className="text-sm font-medium">
+              {translate("noteForm.content")}
+            </label>
             <Textarea
               {...form.register("content")}
-              placeholder="기록하고 싶은 내용을 작성해주세요"
+              placeholder={translate("noteForm.placeholder")}
               rows={4}
             />
             {form.formState.errors.content && (
               <p className="text-sm text-red-500 mt-1">
-                {form.formState.errors.content.message}
+                {translate("noteForm.contentRequired")}
               </p>
             )}
           </div>
 
           <div className="flex gap-2">
             <Button type="submit" className="flex-1">
-              저장
+              {translate("noteForm.save")}
             </Button>
             <Button type="button" variant="outline" onClick={onClose}>
-              취소
+              {translate("noteForm.cancel")}
             </Button>
           </div>
         </form>

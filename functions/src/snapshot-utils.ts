@@ -1,8 +1,18 @@
+// Cloud Functions용 스냅샷 유틸리티 함수들
+// functions/src/snapshot-utils.ts
+
 import { getFirestore } from "firebase-admin/firestore";
 
 const db = getFirestore();
 
-// Firebase Functions용 스냅샷 생성 함수
+// 타입 정의
+interface Area {
+  id: string;
+  name: string;
+  [key: string]: any;
+}
+
+// 사용자 활동 스냅샷 생성
 export const createActivitySnapshotForUser = async (
   userId: string,
   year: number,
@@ -116,7 +126,7 @@ export const createActivitySnapshotForUser = async (
         );
 
         areaStats[area.id] = {
-          name: area.name,
+          name: (area as unknown as Area).name,
           focusTime: areaFocusTime,
           completionRate: areaCompletionRate,
           projectCount: areaProjects.length,

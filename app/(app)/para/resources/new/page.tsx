@@ -25,6 +25,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchAllAreasByUserId, auth } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // 폼 스키마 정의
 const resourceFormSchema = z.object({
@@ -42,6 +43,7 @@ export default function NewResourcePage() {
   const { toast } = useToast();
   const [user, userLoading] = useAuthState(auth);
   const [isSubmitting, setIsSubmitting] = useState(false); // Resource 생성 중 로딩 상태
+  const { translate } = useLanguage();
 
   // react-hook-form 설정
   const form = useForm<ResourceFormData>({
@@ -106,7 +108,9 @@ export default function NewResourcePage() {
           </Button>
           <h1 className="text-2xl font-bold">자료 추가하기</h1>
         </div>
-        <div className="text-center text-muted-foreground">로딩 중...</div>
+        <div className="text-center text-muted-foreground">
+          {translate("settings.loading.loading")}
+        </div>
       </div>
     );
   }

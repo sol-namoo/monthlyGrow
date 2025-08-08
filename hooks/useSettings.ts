@@ -4,6 +4,7 @@ import { auth } from "@/lib/firebase";
 import { fetchUserById, updateUserSettings } from "@/lib/firebase";
 import { UserSettings } from "@/lib/types";
 import { useTheme } from "next-themes";
+import { detectBrowserLanguage } from "@/lib/language-detection";
 
 const defaultSettings: UserSettings = {
   defaultReward: "",
@@ -12,7 +13,7 @@ const defaultSettings: UserSettings = {
   aiRecommendations: true,
   notifications: true,
   theme: "system",
-  language: "ko",
+  language: "en", // 기본값을 영어로 변경
 };
 
 export function useSettings() {
@@ -26,6 +27,9 @@ export function useSettings() {
   useEffect(() => {
     const loadSettings = async () => {
       if (!user?.uid) {
+        // 로그인하지 않은 경우 브라우저 언어 감지
+        const detectedLang = detectBrowserLanguage();
+        setSettings({ ...defaultSettings, language: detectedLang });
         setIsLoading(false);
         return;
       }
@@ -33,6 +37,12 @@ export function useSettings() {
       try {
         const userData = await fetchUserById(user.uid);
         const userSettings = userData.settings || defaultSettings;
+
+        // 언어 설정이 없는 경우 브라우저 언어 감지
+        if (!userSettings.language) {
+          userSettings.language = detectBrowserLanguage();
+        }
+
         setSettings(userSettings);
 
         // 초기 로드 시에만 테마 동기화 (이미 설정된 테마와 다를 때만)
@@ -46,7 +56,8 @@ export function useSettings() {
         setIsInitialized(true);
       } catch (error) {
         console.error("설정 불러오기 실패:", error);
-        setSettings(defaultSettings);
+        const detectedLang = detectBrowserLanguage();
+        setSettings({ ...defaultSettings, language: detectedLang });
         if (!isInitialized) {
           setTheme(defaultSettings.theme);
         }

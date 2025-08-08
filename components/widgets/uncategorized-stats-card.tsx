@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FolderOpen, AlertTriangle, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface UncategorizedStatsCardProps {
   uncategorizedProjects: number;
@@ -20,6 +21,7 @@ export function UncategorizedStatsCard({
   totalAreas,
 }: UncategorizedStatsCardProps) {
   const { theme } = useTheme();
+  const { translate } = useLanguage();
   const totalUncategorized = uncategorizedProjects + uncategorizedResources;
   const hasUncategorized = totalUncategorized > 0;
   const isHighCount = totalUncategorized >= 5;
@@ -46,7 +48,7 @@ export function UncategorizedStatsCard({
           }}
         >
           <FolderOpen className="h-4 w-4" />
-          미분류 항목 관리
+          {translate("home.uncategorized.title")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -70,8 +72,10 @@ export function UncategorizedStatsCard({
                 color: isDark ? "#e9d5ff" : "#6b21a8",
               }}
             >
-              미분류 항목이 {totalUncategorized}개 있습니다. 영역별로 분류하면
-              더 체계적으로 관리할 수 있어요!
+              {translate("home.uncategorized.alertMessage").replace(
+                "{count}",
+                totalUncategorized.toString()
+              )}
             </AlertDescription>
           </Alert>
         )}
@@ -92,7 +96,7 @@ export function UncategorizedStatsCard({
                 color: isDark ? "#c4b5fd" : "#7c3aed",
               }}
             >
-              미분류 프로젝트
+              {translate("home.uncategorized.projects")}
             </div>
           </div>
           <div className="text-center">
@@ -110,7 +114,7 @@ export function UncategorizedStatsCard({
                 color: isDark ? "#c4b5fd" : "#7c3aed",
               }}
             >
-              미분류 리소스
+              {translate("home.uncategorized.resources")}
             </div>
           </div>
         </div>
@@ -122,7 +126,9 @@ export function UncategorizedStatsCard({
               color: isDark ? "#c4b5fd" : "#7c3aed",
             }}
           >
-            총 {totalAreas}개 영역 중 {totalUncategorized}개 항목 분류 필요
+            {translate("home.uncategorized.summary")
+              .replace("{totalAreas}", totalAreas.toString())
+              .replace("{totalUncategorized}", totalUncategorized.toString())}
           </div>
           <Button
             asChild
@@ -136,7 +142,7 @@ export function UncategorizedStatsCard({
             }}
           >
             <Link href="/para">
-              분류하기
+              {translate("home.uncategorized.classify")}
               <ArrowRight className="ml-1 h-3 w-3" />
             </Link>
           </Button>

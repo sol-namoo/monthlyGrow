@@ -5,6 +5,27 @@ import { getFirestore } from "firebase-admin/firestore";
 
 const db = getFirestore();
 
+// 타입 정의
+interface Project {
+  id: string;
+  title: string;
+  connectedLoops?: any[];
+  migrationStatus?: string;
+  originalLoopId?: string;
+  [key: string]: any;
+}
+
+interface Loop {
+  id: string;
+  title: string;
+  startDate: any;
+  endDate: any;
+  projectIds?: string[];
+  [key: string]: any;
+}
+
+// Area 타입은 snapshot-utils.ts에서 사용됨
+
 // 사용자 설정 가져오기
 export const fetchUserSettings = async (userId: string) => {
   try {
@@ -64,20 +85,30 @@ export const autoMigrateIncompleteProjects = async (
     return;
   }
 
-  // 2. 다음 달 루프 찾기 (진행 중이거나 예정된 루프)
+  // 2. 다음 달 루프 찾기 (이번 달 루프가 없으면 다음 달 루프에 추가)
   const allLoops = await fetchAllLoopsByUserId(userId);
 
-  const sortedLoops = allLoops
+  // 현재 날짜 기준으로 다음 달 루프 찾기
+  const now = new Date();
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+  const targetLoops = allLoops
     .filter((loop) => {
+      const loopStartDate = new Date(loop.startDate);
       const status = getLoopStatus(loop);
-      return status === "in_progress" || status === "planned";
+      // 다음 달에 시작하는 루프이거나 현재 진행 중인 루프
+      // (이번 달 루프가 없으면 다음 달 루프에 추가)
+      return (
+        (loopStartDate >= nextMonth || status === "in_progress") &&
+        status !== "ended"
+      );
     })
     .sort(
       (a, b) =>
         new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
     );
 
-  const targetLoop = sortedLoops[0]; // 가장 빠른 미래 루프
+  const targetLoop = targetLoops[0]; // 가장 빠른 미래 루프
 
   if (!targetLoop) {
     // 다음 달 루프가 없으면 프로젝트에 이관 대기 상태로 마킹
@@ -100,7 +131,9 @@ export const autoMigrateIncompleteProjects = async (
     try {
       await moveProjectToLoop(project.id, completedLoopId, targetLoop.id);
       console.log(
-        `Migrated project ${project.title} to loop ${targetLoop.title}`
+        `Migrated project ${(project as unknown as Project).title} to loop ${
+          (targetLoop as unknown as Loop).title
+        }`
       );
     } catch (error) {
       console.error(`Failed to migrate project ${project.id}:`, error);
@@ -144,7 +177,8 @@ export const connectPendingProjectsToNewLoop = async (
   for (const project of pendingProjects) {
     try {
       // 기존 connectedLoops에 새 루프 추가
-      const connectedLoops = project.connectedLoops || [];
+      const connectedLoops =
+        (project as unknown as Project).connectedLoops || [];
       const updatedLoops = [...connectedLoops, { id: newLoopId }];
 
       const projectRef = db.collection("projects").doc(project.id);
@@ -155,24 +189,17 @@ export const connectPendingProjectsToNewLoop = async (
         updatedAt: new Date(),
       });
 
-      // 새 루프의 projectIds에 추가
-      const loopRef = db.collection("loops").doc(newLoopId);
-      const loopDoc = await loopRef.get();
-
-      if (loopDoc.exists) {
-        const loopData = loopDoc.data();
-        const projectIds = loopData?.projectIds || [];
-
-        if (!projectIds.includes(project.id)) {
-          await loopRef.update({
-            projectIds: [...projectIds, project.id],
-            updatedAt: new Date(),
-          });
-        }
-      }
+      // 프로젝트를 새 루프에 연결 (projectIds는 더 이상 사용하지 않음)
+      console.log(
+        `Connected pending project ${
+          (project as unknown as Project).title
+        } to new loop ${newLoopId}`
+      );
 
       console.log(
-        `Connected pending project ${project.title} to new loop ${newLoopId}`
+        `Connected pending project ${
+          (project as unknown as Project).title
+        } to new loop ${newLoopId}`
       );
     } catch (error) {
       console.error(`Failed to connect project ${project.id}:`, error);
@@ -201,7 +228,7 @@ const findIncompleteProjectsInLoop = async (loopId: string) => {
 
   // connectedLoops에서 해당 loopId를 가진 프로젝트들만 필터링
   return allProjects.filter((project) => {
-    const connectedLoops = project.connectedLoops || [];
+    const connectedLoops = (project as unknown as Project).connectedLoops || [];
     return connectedLoops.some((loop: any) => loop.id === loopId);
   });
 };
@@ -224,7 +251,7 @@ const fetchAllLoopsByUserId = async (userId: string) => {
   });
 };
 
-// 프로젝트를 루프 간 이동
+// 프로젝트를 루프 간 이동 (추가 방식)
 const moveProjectToLoop = async (
   projectId: string,
   fromLoopId: string,
@@ -237,34 +264,39 @@ const moveProjectToLoop = async (
     throw new Error(`Project ${projectId} not found`);
   }
 
-  const projectData = projectDoc.data();
+  const projectData = projectDoc.data() as Project;
   const connectedLoops = projectData?.connectedLoops || [];
 
-  // 기존 루프에서 제거하고 새 루프에 추가
-  const updatedLoops = connectedLoops
-    .filter((loop: any) => loop.loopId !== fromLoopId)
-    .concat({ loopId: toLoopId });
+  // 새 루프가 이미 연결되어 있는지 확인
+  const isAlreadyConnected = connectedLoops.some((loop: any) =>
+    typeof loop === "string" ? loop === toLoopId : loop.id === toLoopId
+  );
 
-  await projectRef.update({
-    connectedLoops: updatedLoops,
-    migrationStatus: "migrated",
-    carriedOverAt: new Date(),
-    updatedAt: new Date(),
-  });
+  if (!isAlreadyConnected) {
+    // 새 루프에 추가 (기존 연결은 유지)
+    const updatedLoops = [...connectedLoops, toLoopId];
 
-  // 대상 루프의 projectIds에 추가
-  const targetLoopRef = db.collection("loops").doc(toLoopId);
-  const targetLoopDoc = await targetLoopRef.get();
+    await projectRef.update({
+      connectedLoops: updatedLoops,
+      migrationStatus: "migrated",
+      carriedOverAt: new Date(),
+      updatedAt: new Date(),
+    });
 
-  if (targetLoopDoc.exists) {
-    const targetLoopData = targetLoopDoc.data();
-    const projectIds = targetLoopData?.projectIds || [];
+    // 대상 루프의 projectIds에 추가
+    const targetLoopRef = db.collection("loops").doc(toLoopId);
+    const targetLoopDoc = await targetLoopRef.get();
 
-    if (!projectIds.includes(projectId)) {
-      await targetLoopRef.update({
-        projectIds: [...projectIds, projectId],
-        updatedAt: new Date(),
-      });
+    if (targetLoopDoc.exists) {
+      const targetLoopData = targetLoopDoc.data();
+      const projectIds = targetLoopData?.projectIds || [];
+
+      if (!projectIds.includes(projectId)) {
+        await targetLoopRef.update({
+          projectIds: [...projectIds, projectId],
+          updatedAt: new Date(),
+        });
+      }
     }
   }
 };

@@ -41,13 +41,15 @@ import {
   fetchProjectCountsByLoopIds,
   fetchLoopsWithProjectCounts,
 } from "@/lib/firebase";
-import { formatDate, formatDateNumeric, getLoopStatus } from "@/lib/utils";
+import { formatDate, getLoopStatus } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLanguage } from "@/hooks/useLanguage";
 
 function LoopPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, userLoading] = useAuthState(auth);
+  const { translate, currentLanguage } = useLanguage();
 
   // 상태 관리
   const [sortBy, setSortBy] = useState<"latest" | "oldest" | "completionRate">(
@@ -275,14 +277,16 @@ function LoopPageContent() {
   return (
     <div className="container max-w-md px-4 py-6 pb-20">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">월간 루프</h1>
+        <h1 className="text-2xl font-bold">{translate("loop.title")}</h1>
       </div>
 
       <Tabs value={currentTab} onValueChange={handleTabChange} className="mb-6">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="active">진행 중</TabsTrigger>
+          <TabsTrigger value="active">
+            {translate("loop.tabs.active")}
+          </TabsTrigger>
           <TabsTrigger value="future" className="relative">
-            미래 계획
+            {translate("loop.tabs.future")}
             {futureLoops.length > 0 && (
               <Badge variant="secondary" className="ml-1 h-4 w-4 p-0 text-xs">
                 {futureLoops.length}
@@ -290,7 +294,7 @@ function LoopPageContent() {
             )}
           </TabsTrigger>
           <TabsTrigger value="past" className="relative">
-            지난 루프
+            {translate("loop.tabs.past")}
             {pastLoops.length > 0 && (
               <Badge variant="secondary" className="ml-1 h-4 w-4 p-0 text-xs">
                 {pastLoops.length}
@@ -303,14 +307,13 @@ function LoopPageContent() {
           {/* 현재 루프 섹션 */}
           <section>
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold">현재 루프</h2>
               {currentLoop && (
                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
                   <Clock className="h-4 w-4" />
                   <span>
                     {getLoopStatus(currentLoop) === "ended"
-                      ? "완료됨"
-                      : "진행 중"}
+                      ? translate("loop.currentLoop.status.completed")
+                      : translate("loop.currentLoop.status.inProgress")}
                   </span>
                 </div>
               )}
@@ -342,12 +345,18 @@ function LoopPageContent() {
 
                   <div className="mb-4 flex items-center gap-2 text-sm">
                     <Gift className="h-4 w-4 text-purple-500" />
-                    <span>보상: {currentLoop.reward}</span>
+                    <span>
+                      {translate("loop.currentLoop.reward")}:{" "}
+                      {currentLoop.reward}
+                    </span>
                   </div>
 
                   <div className="mb-4">
                     <div className="mb-1 flex justify-between text-sm">
-                      <span>달성률: {getCompletionRate(currentLoop)}%</span>
+                      <span>
+                        {translate("loop.currentLoop.completionRate")}:{" "}
+                        {getCompletionRate(currentLoop)}%
+                      </span>
                       <span>
                         {taskCountsLoading ? (
                           <Skeleton className="h-4 w-12" />
@@ -370,13 +379,15 @@ function LoopPageContent() {
                   <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="h-4 w-4" />
                     <span>
-                      {formatDateNumeric(currentLoop.startDate)} ~{" "}
-                      {formatDateNumeric(currentLoop.endDate)}
+                      {formatDate(currentLoop.startDate, currentLanguage)} ~{" "}
+                      {formatDate(currentLoop.endDate, currentLanguage)}
                     </span>
                   </div>
 
                   <div className="mb-4">
-                    <h4 className="mb-2 font-medium">중점 Areas</h4>
+                    <h4 className="mb-2 font-medium">
+                      {translate("loop.currentLoop.focusAreas")}
+                    </h4>
                     <div className="flex flex-wrap gap-2">
                       {currentLoop.focusAreas?.map((areaId) => (
                         <span
@@ -391,18 +402,23 @@ function LoopPageContent() {
 
                   <div>
                     <h4 className="mb-2 font-medium">
-                      프로젝트 ({getProjectCount(currentLoop)}개)
+                      {translate("loop.currentLoop.projects")} (
+                      {getProjectCount(currentLoop)}개)
                     </h4>
                     {projectCountsLoading ? (
                       <Skeleton className="h-4 w-32" />
                     ) : getProjectCount(currentLoop) > 0 ? (
                       <p className="text-xs text-muted-foreground">
-                        🔗 프로젝트 {getProjectCount(currentLoop)}개 연결됨
+                        {translate(
+                          "loop.currentLoop.projectsConnected"
+                        ).replace(
+                          "{count}",
+                          getProjectCount(currentLoop).toString()
+                        )}
                       </p>
                     ) : (
                       <p className="text-xs text-muted-foreground">
-                        📝 아직 연결된 프로젝트가 없어요. 루프 수정에서
-                        프로젝트를 연결해보세요.
+                        {translate("loop.currentLoop.noProjects")}
                       </p>
                     )}
                   </div>
@@ -415,12 +431,15 @@ function LoopPageContent() {
                     <Target className="h-8 w-8 text-primary" />
                   </div>
                 </div>
-                <h3 className="mb-2 text-lg font-bold">현재 루프가 없어요</h3>
+                <h3 className="mb-2 text-lg font-bold">
+                  {translate("loop.currentLoop.noLoop.title")}
+                </h3>
                 <p className="mb-6 text-xs text-muted-foreground max-w-sm mx-auto">
-                  새로운 월간 루프를 만들어서 체계적인 성장을 시작해보세요.
+                  {translate("loop.currentLoop.noLoop.description")}
                 </p>
                 <Button onClick={() => handleCreateLoop(0)}>
-                  <Plus className="mr-2 h-4 w-4" />새 루프 만들기
+                  <Plus className="mr-2 h-4 w-4" />
+                  {translate("loop.currentLoop.noLoop.button")}
                 </Button>
               </Card>
             )}
@@ -430,9 +449,15 @@ function LoopPageContent() {
         <TabsContent value="future" className="mt-6 space-y-8">
           {/* 미래 루프 헤더 */}
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold">미래 계획</h2>
+            <div className="text-sm text-muted-foreground">
+              {translate("loop.futureLoops.totalCount").replace(
+                "{count}",
+                futureLoops.length.toString()
+              )}
+            </div>
             <Button onClick={() => handleCreateLoop(1)}>
-              <Plus className="mr-2 h-4 w-4" />새 루프 만들기
+              <Plus className="mr-2 h-4 w-4" />
+              {translate("loop.futureLoops.button")}
             </Button>
           </div>
 
@@ -451,7 +476,7 @@ function LoopPageContent() {
                             className="bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700"
                           >
                             {new Date(loop.startDate).toLocaleDateString(
-                              "ko-KR",
+                              currentLanguage === "ko" ? "ko-KR" : "en-UK",
                               {
                                 month: "long",
                               }
@@ -463,27 +488,40 @@ function LoopPageContent() {
 
                       <div className="mb-4 flex items-center gap-2 text-sm">
                         <Gift className="h-4 w-4 text-purple-500 dark:text-purple-400" />
-                        <span>보상: {loop.reward}</span>
+                        <span>
+                          {translate("loop.futureLoops.reward")}: {loop.reward}
+                        </span>
                       </div>
 
                       <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
                         <Clock className="h-4 w-4" />
                         <span>
-                          {formatDateNumeric(loop.startDate)} ~{" "}
-                          {formatDateNumeric(loop.endDate)}
+                          {formatDate(loop.startDate, currentLanguage)} ~{" "}
+                          {formatDate(loop.endDate, currentLanguage)}
                         </span>
                       </div>
 
                       <div className="mb-4">
-                        <h4 className="mb-2 font-medium">목표</h4>
+                        <h4 className="mb-2 font-medium">
+                          {translate("loop.futureLoops.target")}
+                        </h4>
                         <div className="mb-1 flex justify-between text-sm">
-                          <span>목표: {loop.targetCount}회</span>
                           <span>
-                            연결된 프로젝트:{" "}
+                            {translate("loop.futureLoops.targetCount").replace(
+                              "{count}",
+                              loop.targetCount.toString()
+                            )}
+                          </span>
+                          <span>
                             {projectCountsLoading ? (
                               <Skeleton className="h-4 w-8" />
                             ) : (
-                              `${getProjectCount(loop)}개`
+                              translate(
+                                "loop.futureLoops.connectedProjects"
+                              ).replace(
+                                "{count}",
+                                getProjectCount(loop).toString()
+                              )
                             )}
                           </span>
                         </div>
@@ -491,8 +529,7 @@ function LoopPageContent() {
                           <Skeleton className="h-4 w-48" />
                         ) : getProjectCount(loop) === 0 ? (
                           <p className="text-xs text-muted-foreground mt-1">
-                            📝 프로젝트를 연결하면 더 구체적인 목표를 세울 수
-                            있어요
+                            {translate("loop.futureLoops.noProjects")}
                           </p>
                         ) : null}
                       </div>
@@ -508,12 +545,15 @@ function LoopPageContent() {
                   <Sparkles className="h-8 w-8 text-primary" />
                 </div>
               </div>
-              <h3 className="mb-2 text-lg font-bold">미래 루프가 없어요</h3>
+              <h3 className="mb-2 text-lg font-bold">
+                {translate("loop.futureLoops.noLoops.title")}
+              </h3>
               <p className="mb-6 text-sm text-muted-foreground max-w-sm mx-auto">
-                6개월 앞까지의 루프를 미리 만들어서 장기 계획을 세워보세요.
+                {translate("loop.futureLoops.noLoops.description")}
               </p>
               <Button onClick={() => handleCreateLoop(1)}>
-                <Plus className="mr-2 h-4 w-4" />첫 번째 미래 루프 만들기
+                <Plus className="mr-2 h-4 w-4" />
+                {translate("loop.futureLoops.noLoops.button")}
               </Button>
             </Card>
           )}
@@ -522,9 +562,11 @@ function LoopPageContent() {
         <TabsContent value="past" className="mt-6 space-y-8">
           {/* 지난 루프 헤더 */}
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold">지난 루프</h2>
             <div className="text-sm text-muted-foreground">
-              총 {pastLoops.length}개
+              {translate("loop.pastLoops.totalCount").replace(
+                "{count}",
+                pastLoops.length.toString()
+              )}
             </div>
           </div>
 
@@ -539,7 +581,10 @@ function LoopPageContent() {
                         <h3 className="text-lg font-bold">{loop.title}</h3>
                         <div className="flex items-center gap-2">
                           <Badge variant="secondary">
-                            {getCompletionRate(loop)}% 달성
+                            {translate("loop.pastLoops.achievement").replace(
+                              "{rate}",
+                              getCompletionRate(loop).toString()
+                            )}
                           </Badge>
                           <ChevronRight className="h-5 w-5 text-muted-foreground" />
                         </div>
@@ -548,14 +593,17 @@ function LoopPageContent() {
                       <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
                         <Clock className="h-4 w-4" />
                         <span>
-                          {formatDateNumeric(loop.startDate)} ~{" "}
-                          {formatDateNumeric(loop.endDate)}
+                          {formatDate(loop.startDate, currentLanguage)} ~{" "}
+                          {formatDate(loop.endDate, currentLanguage)}
                         </span>
                       </div>
 
                       <div className="mb-4">
                         <div className="mb-1 flex justify-between text-sm">
-                          <span>달성률: {getCompletionRate(loop)}%</span>
+                          <span>
+                            {translate("loop.pastLoops.completionRate")}:{" "}
+                            {getCompletionRate(loop)}%
+                          </span>
                           <span>
                             {taskCountsLoading ? (
                               <Skeleton className="h-4 w-12" />
@@ -577,11 +625,15 @@ function LoopPageContent() {
 
                       <div className="flex items-center justify-between text-sm text-muted-foreground">
                         <span>
-                          연결된 프로젝트:{" "}
                           {projectCountsLoading ? (
                             <Skeleton className="h-4 w-8" />
                           ) : (
-                            `${getProjectCount(loop)}개`
+                            translate(
+                              "loop.pastLoops.connectedProjects"
+                            ).replace(
+                              "{count}",
+                              getProjectCount(loop).toString()
+                            )
                           )}
                         </span>
                         {renderStars(loop.retrospective?.userRating)}
@@ -599,10 +651,10 @@ function LoopPageContent() {
                 </div>
               </div>
               <h3 className="mb-2 text-lg font-bold">
-                아직 완료된 루프가 없어요
+                {translate("loop.pastLoops.noLoops.title")}
               </h3>
               <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                첫 번째 루프를 시작해서 성취의 기록을 만들어보세요.
+                {translate("loop.pastLoops.noLoops.description")}
               </p>
             </Card>
           )}

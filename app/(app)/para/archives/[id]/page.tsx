@@ -10,10 +10,11 @@ import type { Retrospective } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
-import { fetchRetrospectiveById } from "@/lib/firebase";
+import { fetchRetrospectiveById, fetchLoopById } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatDate } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // 로딩 스켈레톤 컴포넌트
 function ArchiveDetailSkeleton() {
@@ -45,6 +46,7 @@ export default function ArchiveDetailPage({
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("official");
+  const { translate } = useLanguage();
 
   // Next.js 15에서는 params가 Promise이므로 unwrap
   const resolvedParams = use(params as unknown as Promise<{ id: string }>);
@@ -59,6 +61,17 @@ export default function ArchiveDetailPage({
     queryKey: ["retrospective", id],
     queryFn: () => fetchRetrospectiveById(id),
     enabled: !!id,
+  });
+
+  // 노트 탭이 활성화되었을 때만 루프 정보를 가져오기
+  const {
+    data: loop,
+    isLoading: loopLoading,
+    error: loopError,
+  } = useQuery({
+    queryKey: ["loop", retrospective?.loopId],
+    queryFn: () => fetchLoopById(retrospective!.loopId!),
+    enabled: !!retrospective?.loopId && activeTab === "freeform",
   });
 
   // 에러 상태
@@ -169,11 +182,50 @@ export default function ArchiveDetailPage({
           </div>
         </div>
 
+        {/* 연관된 루프/프로젝트 링크 */}
+        <div className="mb-6">
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium mb-1">
+                  {retrospective.loopId
+                    ? translate("paraArchiveDetail.relatedItem.loop")
+                    : translate("paraArchiveDetail.relatedItem.project")}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {retrospective.loopId
+                    ? translate("paraArchiveDetail.relatedItem.loopDescription")
+                    : translate(
+                        "paraArchiveDetail.relatedItem.projectDescription"
+                      )}
+                </p>
+              </div>
+              <Button variant="outline" size="sm" asChild>
+                <Link
+                  href={
+                    retrospective.loopId
+                      ? `/loop/${retrospective.loopId}`
+                      : `/para/projects/${retrospective.projectId}`
+                  }
+                >
+                  {retrospective.loopId
+                    ? translate("paraArchiveDetail.relatedItem.viewLoop")
+                    : translate("paraArchiveDetail.relatedItem.viewProject")}
+                </Link>
+              </Button>
+            </div>
+          </Card>
+        </div>
+
         {/* 탭 컨텐츠 */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="official">공식 회고</TabsTrigger>
-            <TabsTrigger value="freeform">자유 회고</TabsTrigger>
+            <TabsTrigger value="official">
+              {translate("paraArchiveDetail.tabs.retrospective")}
+            </TabsTrigger>
+            <TabsTrigger value="freeform">
+              {translate("paraArchiveDetail.tabs.note")}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="official" className="space-y-4">
@@ -181,7 +233,9 @@ export default function ArchiveDetailPage({
             {retrospective.bestMoment && (
               <Card>
                 <div className="p-4">
-                  <h3 className="font-medium mb-2">가장 좋았던 순간</h3>
+                  <h3 className="font-medium mb-2">
+                    {translate("paraArchiveDetail.retrospective.bestMoment")}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
                     {retrospective.bestMoment}
                   </p>
@@ -192,7 +246,11 @@ export default function ArchiveDetailPage({
             {retrospective.routineAdherence && (
               <Card>
                 <div className="p-4">
-                  <h3 className="font-medium mb-2">루틴 준수율</h3>
+                  <h3 className="font-medium mb-2">
+                    {translate(
+                      "paraArchiveDetail.retrospective.routineAdherence"
+                    )}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
                     {retrospective.routineAdherence}
                   </p>
@@ -280,19 +338,35 @@ export default function ArchiveDetailPage({
           </TabsContent>
 
           <TabsContent value="freeform">
-            {retrospective.content ? (
+            {loopLoading ? (
+              <div className="text-center py-8">
+                <Skeleton className="h-4 w-32 mx-auto mb-2" />
+                <Skeleton className="h-4 w-48 mx-auto" />
+              </div>
+            ) : loopError ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-muted-foreground">
+                  노트를 불러오는 중 오류가 발생했습니다.
+                </p>
+              </div>
+            ) : loop?.note ? (
               <Card>
                 <div className="p-4">
-                  <h3 className="font-medium mb-2">자유 회고</h3>
+                  <h3 className="font-medium mb-2">
+                    {translate("paraArchiveDetail.retrospective.note")}
+                  </h3>
                   <div className="whitespace-pre-wrap text-sm text-muted-foreground">
-                    {retrospective.content}
+                    {loop.note.content}
                   </div>
+                  <p className="text-xs text-muted-foreground mt-3">
+                    {formatDate(loop.note.createdAt)}
+                  </p>
                 </div>
               </Card>
             ) : (
               <div className="text-center py-8">
                 <p className="text-sm text-muted-foreground">
-                  자유 회고가 없습니다.
+                  {translate("paraArchiveDetail.notes.noContent")}
                 </p>
               </div>
             )}

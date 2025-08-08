@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { CharacterAvatar } from "@/components/character-avatar";
 import { ProgressCard } from "@/components/widgets/progress-card";
 import { StatsCard } from "@/components/widgets/stats-card";
@@ -41,24 +41,87 @@ import {
 import { getLoopStatus, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export default function HomePage() {
   const [user, loading] = useAuthState(auth);
   const [showAllProjects, setShowAllProjects] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const { translate, currentLanguage } = useLanguage();
+
+  // 번역 텍스트 메모이제이션
+  const texts = useMemo(
+    () => ({
+      // 인사말
+      greeting: translate("home.greeting"),
+      greetingSuffix: translate("home.greetingSuffix"),
+      noName: translate("home.noName"),
+      encouragement: translate("home.encouragement"),
+      improvement: translate("home.improvement"),
+      improvementSuffix: translate("home.improvementSuffix"),
+
+      // 탭
+      summaryTab: translate("home.tabs.summary"),
+      dashboardTab: translate("home.tabs.dashboard"),
+
+      // 현재 루프
+      currentLoop: translate("home.currentLoop"),
+      noLoop: translate("home.noLoop"),
+      reward: translate("home.reward"),
+      noReward: translate("home.noReward"),
+      progress: translate("home.progress"),
+      progressSuffix: translate("home.progressSuffix"),
+      daysLeft: translate("home.daysLeft"),
+
+      // 오늘 마감
+      todayDeadline: translate("home.todayDeadline"),
+      todayDeadlineDescription: translate("home.todayDeadlineDescription"),
+      completed: translate("home.completed"),
+      inProgress: translate("home.inProgress"),
+
+      // 프로젝트
+      currentLoopProjects: translate("home.currentLoopProjects"),
+      noProjects: translate("home.noProjects"),
+      noProjectsDescription: translate("home.noProjectsDescription"),
+      addProject: translate("home.addProject"),
+      area: translate("home.area"),
+      addedMidway: translate("home.addedMidway"),
+      showMore: translate("home.showMore"),
+      showMoreSuffix: translate("home.showMoreSuffix"),
+
+      // 대시보드
+      yearlyStats: translate("home.yearlyStats"),
+      yearlyStatsDescription: translate("home.yearlyStatsDescription"),
+      focusTime: translate("home.focusTime"),
+      hours: translate("home.hours"),
+      completionRate: translate("home.completionRate"),
+      completedLoops: translate("home.completedLoops"),
+      completedLoopsDescription: translate("home.completedLoopsDescription"),
+      totalRewards: translate("home.totalRewards"),
+      totalRewardsDescription: translate("home.totalRewardsDescription"),
+      areaActivity: translate("home.areaActivity"),
+      loopComparison: translate("home.loopComparison"),
+      dashboardUpdate: translate("home.dashboardUpdate"),
+
+      // 로그인
+      loginRequired: translate("home.loginRequired"),
+      loginRequiredDescription: translate("home.loginRequiredDescription"),
+    }),
+    [translate]
+  );
 
   // 로그인 상태 확인 및 리다이렉션
   useEffect(() => {
     if (!loading && !user) {
       toast({
-        title: "로그인이 필요합니다",
-        description: "로그인 페이지로 이동합니다.",
+        title: texts.loginRequired,
+        description: texts.loginRequiredDescription,
         variant: "destructive",
       });
       router.push("/login");
     }
-  }, [user, loading, toast, router]);
+  }, [user, loading, toast, router, texts]);
 
   // Firestore에서 직접 데이터 가져오기
   const { data: areas = [] } = useQuery({
@@ -98,28 +161,17 @@ export default function HomePage() {
 
   // 현재 진행 중인 루프를 날짜 기반으로 선택
   const currentLoop =
-    loops && loops.length > 0
-      ? loops.find((loop) => getLoopStatus(loop) === "in_progress") || null
-      : null;
+    loops.find((loop) => {
+      const status = getLoopStatus(loop);
+      return status === "in_progress";
+    }) || null;
 
-  // 현재 루프의 프로젝트만 효율적으로 가져오기
-  const {
-    data: currentLoopProjects = [],
-    isLoading: currentLoopProjectsLoading,
-  } = useQuery({
-    queryKey: ["currentLoopProjects", user?.uid, currentLoop?.id],
-    queryFn: () => {
-      if (!user?.uid || !currentLoop?.id) return [];
-      return fetchProjectsByLoopId(currentLoop.id, user.uid);
-    },
-    enabled: !!user?.uid && !!currentLoop?.id,
-  });
-
-  const { data: resources = [] } = useQuery({
-    queryKey: ["resources", user?.uid],
-    queryFn: () => (user ? fetchAllResourcesByUserId(user.uid) : []),
-    enabled: !!user,
-  });
+  // 현재 루프에 연결된 프로젝트들
+  const currentLoopProjects = projects.filter(
+    (project) =>
+      project.loopId === currentLoop?.id ||
+      project.connectedLoops?.includes(currentLoop?.id || "")
+  );
 
   // 오늘 마감인 프로젝트들
   const { data: todayDeadlineProjects = [] } = useQuery({
@@ -128,19 +180,18 @@ export default function HomePage() {
     enabled: !!user,
   });
 
-  // 오늘 마감 프로젝트의 태스크 개수 가져오기 (배치 최적화)
+  // 오늘 마감 프로젝트들의 태스크 통계
   const { data: todayProjectTaskCounts = {} } = useQuery({
-    queryKey: ["todayProjectTaskCounts", user?.uid],
-    queryFn: async () => {
-      if (!user?.uid || todayDeadlineProjects.length === 0) return {};
-
-      const projectIds = todayDeadlineProjects.map((project) => project.id);
-      return await getTaskCountsForMultipleProjects(projectIds);
-    },
-    enabled: !!user && todayDeadlineProjects.length > 0,
+    queryKey: [
+      "todayProjectTaskCounts",
+      todayDeadlineProjects.map((p) => p.id),
+    ],
+    queryFn: () =>
+      getTaskCountsForMultipleProjects(todayDeadlineProjects.map((p) => p.id)),
+    enabled: todayDeadlineProjects.length > 0,
   });
 
-  // 연간 통계 데이터
+  // 연간 통계
   const { data: yearlyStats } = useQuery({
     queryKey: ["yearlyStats", user?.uid],
     queryFn: () =>
@@ -150,53 +201,42 @@ export default function HomePage() {
     enabled: !!user,
   });
 
-  // 브라우저 콘솔에서 사용할 수 있도록 전역 함수로 등록 (개발용)
+  // 리소스 데이터
+  const { data: resources = [] } = useQuery({
+    queryKey: ["resources", user?.uid],
+    queryFn: () => (user ? fetchAllResourcesByUserId(user.uid) : []),
+    enabled: !!user,
+  });
+
+  // 자동 완료 체크
   useEffect(() => {
-    if (
-      typeof window !== "undefined" &&
-      user?.uid &&
-      process.env.NODE_ENV === "development"
-    ) {
-      // 개발 환경에서만 디버깅 함수들을 전역에 등록
-      (window as any).debugUser = user;
-      (window as any).debugAreas = areas;
-      (window as any).debugProjects = projects;
-      (window as any).debugLoops = loops;
-      (window as any).debugResources = resources;
+    if (user && projects.length > 0) {
+      checkAndAutoCompleteProjects(user.uid);
     }
-  }, [user?.uid, areas, projects, loops, resources]);
+  }, [user, projects]);
 
-  const isLoading =
-    loading || projectsLoading || loopsLoading || currentLoopProjectsLoading;
+  // 현재 루프 정보 계산
+  const startDate = currentLoop
+    ? formatDate(new Date(currentLoop.startDate), currentLanguage)
+    : "";
+  const endDate = currentLoop
+    ? formatDate(new Date(currentLoop.endDate), currentLanguage)
+    : "";
 
-  if (loading || isLoading) return <div>로딩 중...</div>;
-
-  if (!user) {
-    return null;
-  }
-
-  // progress, total, daysLeft, changeRate 등 계산
-  // 현재 루프의 프로젝트들에서 실제 완료된 태스크 수 계산
+  const total = currentLoopProjects.reduce(
+    (sum, project) => sum + project.target,
+    0
+  );
   const actualDoneCount = currentLoopProjects.reduce(
-    (sum, project) => sum + (project.completedTasks || 0),
+    (sum, project) => sum + project.completedTasks,
     0
   );
-  const actualTotalCount = currentLoopProjects.reduce(
-    (sum, project) => sum + (project.target || 0),
-    0
-  );
+  const progress = total > 0 ? Math.round((actualDoneCount / total) * 100) : 0;
 
-  const progress =
-    actualTotalCount > 0
-      ? Math.round((actualDoneCount / actualTotalCount) * 100)
-      : 0;
-  const total = actualTotalCount;
-  const startDate = currentLoop?.startDate
-    ? formatDate(currentLoop.startDate)
-    : "-";
-  const endDate = currentLoop?.endDate ? formatDate(currentLoop.endDate) : "-";
+  // 남은 일수 계산
   const today = new Date();
-  const daysLeft = currentLoop?.endDate
+  today.setHours(0, 0, 0, 0);
+  const daysLeft = currentLoop
     ? Math.max(
         0,
         Math.ceil(
@@ -232,21 +272,25 @@ export default function HomePage() {
         <CharacterAvatar level={5} />
         <div>
           <h1 className="text-2xl font-bold">
-            안녕하세요,{" "}
-            {user?.displayName || user?.email?.split("@")[0] || "루퍼"}님!
+            {texts.greeting}{" "}
+            {user?.displayName || user?.email?.split("@")[0] || texts.noName}
+            {texts.greetingSuffix}
           </h1>
-          <p className="text-muted-foreground">오늘도 성장하는 하루 되세요.</p>
+          <p className="text-muted-foreground">{texts.encouragement}</p>
           <div className="mt-1 flex items-center gap-1 text-xs text-green-600">
             <TrendingUp className="h-3 w-3" />
-            <span>전월 대비 {changeRate}% 향상</span>
+            <span>
+              {texts.improvement} {changeRate}
+              {texts.improvementSuffix}
+            </span>
           </div>
         </div>
       </div>
 
       <Tabs defaultValue="summary" className="mb-6">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="summary">요약 보기</TabsTrigger>
-          <TabsTrigger value="dashboard">활동 대시보드</TabsTrigger>
+          <TabsTrigger value="summary">{texts.summaryTab}</TabsTrigger>
+          <TabsTrigger value="dashboard">{texts.dashboardTab}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="summary" className="mt-4 space-y-6">
@@ -259,22 +303,28 @@ export default function HomePage() {
 
           <section>
             <div className="mb-4 flex items-center">
-              <h2 className="text-xl font-bold">현재 루프</h2>
+              <h2 className="text-xl font-bold">{texts.currentLoop}</h2>
             </div>
 
             <Card className="relative overflow-hidden border-2 border-primary/20 p-4">
               <div className="absolute right-0 top-0 rounded-bl-lg bg-primary/10 px-2 py-1 text-xs">
-                D-{daysLeft}
+                {texts.daysLeft}
+                {daysLeft}
               </div>
               <h3 className="mb-2 text-lg font-bold">
-                {currentLoop?.title || "루프 없음"}
+                {currentLoop?.title || texts.noLoop}
               </h3>
               <div className="mb-4 flex items-center gap-2 text-sm">
                 <Star className="h-4 w-4 text-yellow-500" />
-                <span>🎁 보상: {currentLoop?.reward || "없음"}</span>
+                <span>
+                  {texts.reward}: {currentLoop?.reward || texts.noReward}
+                </span>
               </div>
               <div className="mb-1 flex justify-between text-sm">
-                <span>진행률: {progress}%</span>
+                <span>
+                  {texts.progress}: {progress}
+                  {texts.progressSuffix}
+                </span>
                 <span>
                   {actualDoneCount}/{total}
                 </span>
@@ -291,10 +341,6 @@ export default function HomePage() {
                   {startDate} ~ {endDate}
                 </span>
               </div>
-              <div className="mt-2 flex items-center gap-1 text-xs text-green-600">
-                <TrendingUp className="h-3 w-3" />
-                <span>전월 대비 {changeRate}% 향상</span>
-              </div>
             </Card>
           </section>
 
@@ -304,10 +350,13 @@ export default function HomePage() {
               <Card className="border-orange-200 bg-orange-50/50 p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Clock className="h-4 w-4 text-orange-600" />
-                  <h3 className="font-medium text-orange-800">오늘 마감</h3>
+                  <h3 className="font-medium text-orange-800">
+                    {texts.todayDeadline}
+                  </h3>
                 </div>
                 <p className="text-sm text-orange-700 mb-3">
-                  {todayDeadlineProjects.length}개 프로젝트가 오늘 마감입니다.
+                  {todayDeadlineProjects.length}
+                  {texts.todayDeadlineDescription}
                 </p>
                 <div className="space-y-2">
                   {todayDeadlineProjects.slice(0, 3).map((project) => (
@@ -325,9 +374,9 @@ export default function HomePage() {
                         {(() => {
                           const taskCount = todayProjectTaskCounts[project.id];
                           if (taskCount) {
-                            return `${taskCount.completedTasks}/${taskCount.totalTasks} 완료`;
+                            return `${taskCount.completedTasks}/${taskCount.totalTasks} ${texts.completed}`;
                           }
-                          return "진행 중";
+                          return texts.inProgress;
                         })()}
                       </Badge>
                     </div>
@@ -340,26 +389,21 @@ export default function HomePage() {
           {/* 현재 루프 프로젝트들 */}
           <section>
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold">현재 루프 프로젝트</h2>
-              <Link href="/loop/new">
-                <Button size="sm" className="h-8">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </Link>
+              <h2 className="text-xl font-bold">{texts.currentLoopProjects}</h2>
             </div>
 
             <div className="space-y-3">
               {currentLoopProjects.length === 0 ? (
                 <Card className="p-4 text-center">
                   <div className="mb-2 text-4xl">🎯</div>
-                  <h3 className="mb-1 font-medium">프로젝트가 없습니다</h3>
+                  <h3 className="mb-1 font-medium">{texts.noProjects}</h3>
                   <p className="text-sm text-muted-foreground mb-3">
-                    현재 루프에 연결된 프로젝트가 없습니다.
+                    {texts.noProjectsDescription}
                   </p>
                   <Link href="/para/projects/new">
                     <Button size="sm">
                       <Plus className="h-4 w-4 mr-1" />
-                      프로젝트 추가
+                      {texts.addProject}
                     </Button>
                   </Link>
                 </Card>
@@ -374,14 +418,14 @@ export default function HomePage() {
                     >
                       <div className="mt-2 flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
-                          Area: {getAreaName(project.areaId)}
+                          {texts.area}: {getAreaName(project.areaId)}
                         </span>
                         {project.addedMidway && (
                           <Badge
                             variant="outline"
                             className="bg-amber-100 text-amber-800 text-xs"
                           >
-                            🔥 루프 중 추가됨
+                            {texts.addedMidway}
                           </Badge>
                         )}
                       </div>
@@ -394,7 +438,8 @@ export default function HomePage() {
                       className="mt-2 w-full"
                       onClick={() => setShowAllProjects(true)}
                     >
-                      더보기 ({currentLoopProjects.length - 3}개)
+                      {texts.showMore} ({currentLoopProjects.length - 3}
+                      {texts.showMoreSuffix})
                     </Button>
                   )}
                 </>
@@ -405,19 +450,21 @@ export default function HomePage() {
 
         <TabsContent value="dashboard" className="mt-4 space-y-6">
           <div className="rounded-lg border bg-muted/20 p-4 mb-4">
-            <h2 className="text-lg font-bold mb-2">📊 연간 활동 통계</h2>
+            <h2 className="text-lg font-bold mb-2">{texts.yearlyStats}</h2>
             <p className="text-sm text-muted-foreground">
-              올해 설정한 목표와 달성한 성과를 확인하세요.
+              {texts.yearlyStatsDescription}
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <StatsCard
-              title="집중 시간"
+              title={texts.focusTime}
               value={
                 yearlyStats
-                  ? `${Math.round(yearlyStats.totalFocusTime / 60)}시간`
-                  : "0시간"
+                  ? `${Math.round(yearlyStats.totalFocusTime / 60)}${
+                      texts.hours
+                    }`
+                  : `0${texts.hours}`
               }
               description={
                 <div className="flex items-center gap-1 text-green-600">
@@ -433,7 +480,7 @@ export default function HomePage() {
               icon={<Clock className="h-4 w-4 text-muted-foreground" />}
             />
             <StatsCard
-              title="완료율"
+              title={texts.completionRate}
               value={
                 yearlyStats
                   ? `${Math.round(yearlyStats.averageCompletionRate)}%`
@@ -456,21 +503,21 @@ export default function HomePage() {
 
           <div className="grid grid-cols-2 gap-4">
             <StatsCard
-              title="누적 루프"
+              title={texts.completedLoops}
               value={yearlyStats?.completedLoops || 0}
-              description="완료한 루프 수"
+              description={texts.completedLoopsDescription}
               icon={<Target className="h-4 w-4 text-muted-foreground" />}
             />
             <StatsCard
-              title="받은 보상"
+              title={texts.totalRewards}
               value={yearlyStats?.totalRewards || 0}
-              description="달성한 보상 수"
+              description={texts.totalRewardsDescription}
               icon={<Award className="h-4 w-4 text-muted-foreground" />}
             />
           </div>
 
           <Card className="p-4">
-            <h3 className="mb-4 font-bold">Area 활동 비중</h3>
+            <h3 className="mb-4 font-bold">{texts.areaActivity}</h3>
             <div className="h-64">
               <AreaActivityChart
                 data={
@@ -490,7 +537,7 @@ export default function HomePage() {
           </Card>
 
           <Card className="p-4">
-            <h3 className="mb-4 font-bold">루프 비교</h3>
+            <h3 className="mb-4 font-bold">{texts.loopComparison}</h3>
             <div className="h-64">
               <LoopComparisonChart
                 data={
@@ -509,9 +556,7 @@ export default function HomePage() {
           </Card>
 
           <div className="text-center text-xs text-muted-foreground mt-4">
-            <p>
-              📊 활동 대시보드는 매월 1일 오전 4시에 자동으로 업데이트됩니다.
-            </p>
+            <p>{texts.dashboardUpdate}</p>
           </div>
         </TabsContent>
       </Tabs>

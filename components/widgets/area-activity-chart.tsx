@@ -1,16 +1,25 @@
-"use client"
+"use client";
 
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts"
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Legend,
+  Tooltip,
+} from "recharts";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface AreaActivityChartProps {
   data: {
-    name: string
-    value: number
-  }[]
+    name: string;
+    value: number;
+  }[];
 }
 
 export function AreaActivityChart({ data }: AreaActivityChartProps) {
-  const COLORS = ["#8b5cf6", "#6366f1", "#ec4899", "#f97316"]
+  const { translate } = useLanguage();
+  const COLORS = ["#8b5cf6", "#6366f1", "#ec4899", "#f97316"];
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -24,15 +33,23 @@ export function AreaActivityChart({ data }: AreaActivityChartProps) {
           fill="#8884d8"
           paddingAngle={5}
           dataKey="value"
-          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+          label={({ name, percent }) =>
+            `${name} ${(percent * 100).toFixed(0)}%`
+          }
         >
           {data.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
           ))}
         </Pie>
-        <Tooltip formatter={(value: number) => [`${value}%`, "비중"]} labelFormatter={(name) => `${name}`} />
+        <Tooltip
+          formatter={(value: number) => [
+            `${value}%`,
+            translate("charts.areaActivity"),
+          ]}
+          labelFormatter={(name) => `${name}`}
+        />
         <Legend />
       </PieChart>
     </ResponsiveContainer>
-  )
+  );
 }

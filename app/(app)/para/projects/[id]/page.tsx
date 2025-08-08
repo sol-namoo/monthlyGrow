@@ -22,6 +22,8 @@ import {
   ExternalLink,
   Edit2,
   Info,
+  FileText,
+  PenTool,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -35,6 +37,7 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/custom-alert";
+import { Alert } from "@/components/ui/alert";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { getProjectStatus } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -53,7 +56,13 @@ import {
   deleteTaskFromProject,
   fetchAreaById,
   fetchLoopsByIds,
+  createRetrospective,
+  updateRetrospective,
+  createNote,
+  updateNote,
+  updateProject,
 } from "@/lib/firebase";
+import { useLanguage } from "@/hooks/useLanguage";
 import { formatDate, formatDateForInput, getLoopStatus } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -117,6 +126,7 @@ export default function ProjectDetailPage({
   const { id: projectId } = resolvedParams;
   const { toast } = useToast();
   const [user, userLoading] = useAuthState(auth);
+  const { translate, currentLanguage } = useLanguage();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showTaskDialog, setShowTaskDialog] = useState(false);
   const [showEditTaskDialog, setShowEditTaskDialog] = useState(false);
@@ -195,16 +205,16 @@ export default function ProjectDetailPage({
       // 성공 시 캐시 무효화 및 목록 페이지로 이동
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       toast({
-        title: "프로젝트 삭제 완료",
-        description: "프로젝트가 성공적으로 삭제되었습니다.",
+        title: translate("paraProjectDetail.delete.success.title"),
+        description: translate("paraProjectDetail.delete.success.description"),
       });
       router.push("/para?tab=projects");
     },
     onError: (error: Error) => {
       console.error("프로젝트 삭제 실패:", error);
       toast({
-        title: "삭제 실패",
-        description: "프로젝트 삭제에 실패했습니다.",
+        title: translate("paraProjectDetail.delete.error.title"),
+        description: translate("paraProjectDetail.delete.error.description"),
         variant: "destructive",
       });
     },
@@ -227,16 +237,18 @@ export default function ProjectDetailPage({
       queryClient.invalidateQueries({ queryKey: ["loopTaskCounts"] });
       queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
       toast({
-        title: "태스크 추가 완료",
-        description: "새 태스크가 성공적으로 추가되었습니다.",
+        title: translate("paraProjectDetail.task.add.success.title"),
+        description: translate(
+          "paraProjectDetail.task.add.success.description"
+        ),
       });
       setShowTaskDialog(false);
       taskForm.reset();
     },
     onError: (error) => {
       toast({
-        title: "태스크 추가 실패",
-        description: "태스크 추가 중 오류가 발생했습니다.",
+        title: translate("paraProjectDetail.task.add.error.title"),
+        description: translate("paraProjectDetail.task.add.error.description"),
         variant: "destructive",
       });
     },
@@ -256,14 +268,16 @@ export default function ProjectDetailPage({
     onSuccess: () => {
       setHasChanges(true); // 변경 사항 플래그 설정
       toast({
-        title: "태스크 수정 완료",
-        description: "태스크가 성공적으로 수정되었습니다.",
+        title: translate("paraProjectDetail.task.edit.success.title"),
+        description: translate(
+          "paraProjectDetail.task.edit.success.description"
+        ),
       });
     },
     onError: (error) => {
       toast({
-        title: "태스크 수정 실패",
-        description: "태스크 수정 중 오류가 발생했습니다.",
+        title: translate("paraProjectDetail.task.edit.error.title"),
+        description: translate("paraProjectDetail.task.edit.error.description"),
         variant: "destructive",
       });
     },
@@ -344,6 +358,119 @@ export default function ProjectDetailPage({
     },
   });
 
+  // undefined 값들을 필터링하는 유틸리티 함수
+  const filterUndefinedValues = (obj: any) => {
+    const filtered: any = {};
+    Object.keys(obj).forEach((key) => {
+      if (obj[key] !== undefined && obj[key] !== null && obj[key] !== "") {
+        filtered[key] = obj[key];
+      }
+    });
+    return filtered;
+  };
+
+  // 회고 저장 mutation
+  const saveRetrospectiveMutation = useMutation({
+    mutationFn: async (retrospectiveData: Retrospective) => {
+      // undefined 값들을 필터링
+      const filteredData = filterUndefinedValues({
+        bestMoment: retrospectiveData.bestMoment,
+        routineAdherence: retrospectiveData.routineAdherence,
+        unexpectedObstacles: retrospectiveData.unexpectedObstacles,
+        nextLoopApplication: retrospectiveData.nextLoopApplication,
+        userRating: retrospectiveData.userRating,
+        bookmarked: retrospectiveData.bookmarked,
+        title: retrospectiveData.title,
+        summary: retrospectiveData.summary,
+        content: retrospectiveData.content,
+      });
+
+      if (project?.retrospective?.id) {
+        // 기존 회고가 있으면 업데이트
+        await updateRetrospective(project.retrospective.id, filteredData);
+      } else {
+        // 새 회고 생성 (프로젝트 회고용 필드만 포함)
+        const newRetrospective = await createRetrospective({
+          userId: user?.uid || "",
+          projectId: project?.id || "",
+          ...filteredData,
+          // loopId는 프로젝트 회고에서는 사용하지 않으므로 제외
+        });
+
+        // 프로젝트에 회고 연결 (필요한 필드만 포함)
+        await updateProject(project?.id || "", {
+          retrospective: {
+            id: newRetrospective.id,
+            userId: newRetrospective.userId,
+            projectId: newRetrospective.projectId,
+            createdAt: newRetrospective.createdAt,
+            updatedAt: newRetrospective.updatedAt,
+            ...filteredData,
+          },
+        });
+      }
+    },
+    onSuccess: () => {
+      // 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast({
+        title: "회고 저장 완료",
+        description: "회고가 성공적으로 저장되었습니다.",
+      });
+      setShowRetrospectiveDialog(false);
+    },
+    onError: (error: Error) => {
+      console.error("회고 저장 실패:", error);
+      toast({
+        title: "회고 저장 실패",
+        description: "회고 저장 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // 노트 저장 mutation
+  const saveNoteMutation = useMutation({
+    mutationFn: async (noteContent: string) => {
+      if (project?.notes && project.notes.length > 0) {
+        // 기존 노트가 있으면 업데이트
+        await updateNote(project.notes[0].id, {
+          content: noteContent,
+        });
+      } else {
+        // 새 노트 생성
+        const newNote = await createNote({
+          userId: user?.uid || "",
+          content: noteContent,
+        });
+
+        // 프로젝트에 노트 연결
+        await updateProject(project?.id || "", {
+          notes: [newNote],
+        });
+      }
+    },
+    onSuccess: () => {
+      // 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast({
+        title: "노트 저장 완료",
+        description: "노트가 성공적으로 저장되었습니다.",
+      });
+      setShowAddNoteDialog(false);
+    },
+    onError: (error: Error) => {
+      console.error("노트 저장 실패:", error);
+      toast({
+        title: "노트 저장 실패",
+        description: "노트 저장 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // 모든 useState들을 useQuery 전에 호출
   const [activeTab, setActiveTab] = useState("overview");
   const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
@@ -357,6 +484,12 @@ export default function ProjectDetailPage({
   const [userRating, setUserRating] = useState<number | undefined>(undefined);
   const [bookmarked, setBookmarked] = useState(false);
   const [hoverRating, setHoverRating] = useState<number | undefined>(undefined);
+
+  // 루프 상세 페이지와 동일한 회고 변수들 추가
+  const [bestMoment, setBestMoment] = useState("");
+  const [routineAdherence, setRoutineAdherence] = useState("");
+  const [unexpectedObstacles, setUnexpectedObstacles] = useState("");
+  const [nextLoopApplication, setNextLoopApplication] = useState("");
 
   // 스마트 회고 상태
   const [planningNeedsImprovement, setPlanningNeedsImprovement] =
@@ -391,8 +524,21 @@ export default function ProjectDetailPage({
     queryKey: ["connectedLoops", project?.id],
     queryFn: async () => {
       if (!project || !project.connectedLoops) return [];
-      const loopIds = project.connectedLoops as string[];
-      return await fetchLoopsByIds(loopIds);
+
+      // connectedLoops가 객체 배열인지 문자열 배열인지 확인
+      const loopIds = Array.isArray(project.connectedLoops)
+        ? project.connectedLoops.map((loop: any) =>
+            typeof loop === "string" ? loop : loop.id
+          )
+        : [];
+
+      console.log("프로젝트 connectedLoops:", project.connectedLoops);
+      console.log("추출된 loopIds:", loopIds);
+
+      const loops = await fetchLoopsByIds(loopIds);
+      console.log("가져온 루프들:", loops);
+
+      return loops;
     },
     enabled: !!project && !!project.connectedLoops,
   });
@@ -426,13 +572,10 @@ export default function ProjectDetailPage({
   useEffect(() => {
     if (showRetrospectiveDialog && project?.retrospective) {
       // 기존 회고 데이터가 있으면 폼에 로드
-      setGoalAchieved(project.retrospective.goalAchieved || "");
-      setMemorableTask(project.retrospective.memorableTask || "");
-      setStuckPoints(project.retrospective.stuckPoints || "");
-      setNewLearnings(project.retrospective.newLearnings || "");
-      setNextProjectImprovements(
-        project.retrospective.nextProjectImprovements || ""
-      );
+      setBestMoment(project.retrospective.bestMoment || "");
+      setRoutineAdherence(project.retrospective.routineAdherence || "");
+      setUnexpectedObstacles(project.retrospective.unexpectedObstacles || "");
+      setNextLoopApplication(project.retrospective.nextLoopApplication || "");
       setUserRating(project.retrospective.userRating);
       setBookmarked(project.retrospective.bookmarked || false);
 
@@ -452,11 +595,10 @@ export default function ProjectDetailPage({
       }
     } else if (!showRetrospectiveDialog) {
       // 모달이 닫힐 때 폼 초기화
-      setGoalAchieved("");
-      setMemorableTask("");
-      setStuckPoints("");
-      setNewLearnings("");
-      setNextProjectImprovements("");
+      setBestMoment("");
+      setRoutineAdherence("");
+      setUnexpectedObstacles("");
+      setNextLoopApplication("");
       setUserRating(undefined);
       setBookmarked(false);
       setHoverRating(undefined);
@@ -739,7 +881,6 @@ export default function ProjectDetailPage({
       return;
     }
 
-    // TODO: 실제 DB 저장 로직 구현
     const newRetrospective: Retrospective = {
       id: project.retrospective?.id || `new-project-retro-${Date.now()}`,
       projectId: project.id,
@@ -748,14 +889,12 @@ export default function ProjectDetailPage({
       updatedAt: new Date(),
       title: project.title,
       summary:
-        goalAchieved.substring(0, 100) +
-        (goalAchieved.length > 100 ? "..." : ""),
-      goalAchieved,
-      memorableTask,
-      stuckPoints,
-      newLearnings,
-      nextProjectImprovements,
-      content: `목표 달성: ${goalAchieved}\n\n기억에 남는 작업: ${memorableTask}\n\n막힌 부분: ${stuckPoints}\n\n새로운 배움: ${newLearnings}\n\n다음 프로젝트 개선점: ${nextProjectImprovements}`,
+        bestMoment.substring(0, 100) + (bestMoment.length > 100 ? "..." : ""),
+      bestMoment,
+      routineAdherence,
+      unexpectedObstacles,
+      nextLoopApplication,
+      content: `가장 좋았던 순간: ${bestMoment}\n\n일정 준수: ${routineAdherence}\n\n예상치 못한 장애물: ${unexpectedObstacles}\n\n다음 루프 적용점: ${nextLoopApplication}`,
       userRating,
       bookmarked,
       // 스마트 회고 데이터 (완료율 90% 미만 시에만 포함)
@@ -768,30 +907,21 @@ export default function ProjectDetailPage({
       }),
     };
 
-    console.log("프로젝트 회고 저장:", newRetrospective);
-    toast({
-      title: "프로젝트 회고 저장 완료",
-      description: "프로젝트 회고가 성공적으로 저장되었습니다.",
-    });
-    setShowRetrospectiveDialog(false); // 저장 후 모달 닫기
+    // 실제 mutation을 사용하여 저장
+    saveRetrospectiveMutation.mutate(newRetrospective);
   };
 
   const handleSaveNote = () => {
     if (!noteContent.trim()) {
       toast({
-        title: "노트 저장 실패",
-        description: "노트 내용을 입력해주세요.",
+        title: translate("paraProjectDetail.note.saveError"),
+        description: translate("paraProjectDetail.note.contentRequired"),
         variant: "destructive",
       });
       return;
     }
-    // TODO: 노트 추가/수정 로직 구현
-    toast({
-      title: "노트 저장 성공",
-      description: "노트가 성공적으로 저장되었습니다.",
-    });
-    setNoteContent("");
-    setShowAddNoteDialog(false);
+    // 실제 mutation을 사용하여 저장
+    saveNoteMutation.mutate(noteContent);
   };
 
   const renderStarRating = (
@@ -841,7 +971,10 @@ export default function ProjectDetailPage({
       }`}
     >
       {/* 로딩 오버레이 */}
-      <LoadingOverlay isVisible={isNavigating} message="페이지 이동 중..." />
+      <LoadingOverlay
+        isVisible={isNavigating}
+        message={translate("loading.navigating")}
+      />
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-6">
         <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
@@ -876,9 +1009,13 @@ export default function ProjectDetailPage({
               {area.name}
             </Badge>
           ) : project.areaId ? (
-            <Badge variant="outline">Area 정보 로딩 중...</Badge>
+            <Badge variant="outline">
+              {translate("paraProjectDetail.areaLoading")}
+            </Badge>
           ) : (
-            <Badge variant="destructive">Area 없음</Badge>
+            <Badge variant="destructive">
+              {translate("paraProjectDetail.noArea")}
+            </Badge>
           )}
         </div>
 
@@ -887,16 +1024,21 @@ export default function ProjectDetailPage({
         {/* 상태 및 진행률 */}
         <div className="space-y-3">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-sm font-medium">기간</span>
+            <span className="text-sm font-medium">
+              {translate("paraProjectDetail.duration")}
+            </span>
             <div className="flex items-center gap-1">
               <Calendar className="h-4 w-4" />
               <span>
-                {formatDate(project.startDate)} ~ {formatDate(project.endDate)}
+                {formatDate(project.startDate, currentLanguage)} ~{" "}
+                {formatDate(project.endDate, currentLanguage)}
               </span>
             </div>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">진행 상태</span>
+            <span className="text-sm font-medium">
+              {translate("paraProjectDetail.status")}
+            </span>
             <div className="flex items-center gap-2">
               <Badge
                 variant={
@@ -908,15 +1050,15 @@ export default function ProjectDetailPage({
                 }
               >
                 {projectWithStatus?.status === "planned"
-                  ? "예정"
+                  ? translate("paraProjectDetail.statusLabels.planned")
                   : projectWithStatus?.status === "in_progress"
-                  ? "진행 중"
-                  : "완료됨"}
+                  ? translate("paraProjectDetail.statusLabels.inProgress")
+                  : translate("paraProjectDetail.statusLabels.completed")}
               </Badge>
               {projectWithStatus?.status === "in_progress" &&
                 new Date(project.endDate) < new Date() && (
                   <Badge variant="destructive" className="text-xs">
-                    기한 초과
+                    {translate("paraProjectDetail.overdue")}
                   </Badge>
                 )}
             </div>
@@ -924,16 +1066,23 @@ export default function ProjectDetailPage({
 
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">
-              목표 {project.category === "repetitive" ? "횟수" : "태스크 수"}
+              {translate("paraProjectDetail.target")}{" "}
+              {project.category === "repetitive"
+                ? translate("paraProjectDetail.targetLabels.count")
+                : translate("paraProjectDetail.targetLabels.tasks")}
             </span>
             <span className="text-sm text-muted-foreground">
               {project.target || 0}
-              {project.category === "repetitive" ? "회" : "개"}
+              {project.category === "repetitive"
+                ? translate("paraProjectDetail.targetLabels.times")
+                : translate("paraProjectDetail.targetLabels.items")}
             </span>
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">진행률</span>
+            <span className="text-sm font-medium">
+              {translate("paraProjectDetail.progress")}
+            </span>
             <span className="text-sm text-muted-foreground">
               {progressPercentage || 0}%
             </span>
@@ -950,7 +1099,9 @@ export default function ProjectDetailPage({
 
           {/* 연결된 루프 */}
           <div>
-            <span className="text-sm font-medium">연결된 루프</span>
+            <span className="text-sm font-medium">
+              {translate("paraProjectDetail.connectedLoops")}
+            </span>
             <div className="mt-2 space-y-2">
               {connectedLoops && connectedLoops.length > 0 ? (
                 connectedLoops.map((loop) => (
@@ -971,8 +1122,8 @@ export default function ProjectDetailPage({
                       </Link>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs text-muted-foreground">
-                          {formatDate(loop.startDate)} ~{" "}
-                          {formatDate(loop.endDate)}
+                          {formatDate(loop.startDate, currentLanguage)} ~{" "}
+                          {formatDate(loop.endDate, currentLanguage)}
                         </span>
                         <Badge
                           variant={
@@ -985,10 +1136,16 @@ export default function ProjectDetailPage({
                           className="text-xs"
                         >
                           {getLoopStatus(loop) === "in_progress"
-                            ? "진행 중"
+                            ? translate(
+                                "paraProjectDetail.statusLabels.inProgress"
+                              )
                             : getLoopStatus(loop) === "ended"
-                            ? "완료됨"
-                            : "예정"}
+                            ? translate(
+                                "paraProjectDetail.statusLabels.completed"
+                              )
+                            : translate(
+                                "paraProjectDetail.statusLabels.planned"
+                              )}
                         </Badge>
                       </div>
                     </div>
@@ -997,7 +1154,7 @@ export default function ProjectDetailPage({
               ) : (
                 <Card className="p-4 text-center">
                   <p className="text-muted-foreground">
-                    아직 연결된 루프가 없습니다.
+                    {translate("paraProjectDetail.noConnectedLoops")}
                   </p>
                 </Card>
               )}
@@ -1009,10 +1166,13 @@ export default function ProjectDetailPage({
                 projectWithStatus?.status === "in_progress" && (
                   <CustomAlert variant="warning" className="mb-4">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>장기 프로젝트 안내</AlertTitle>
+                    <AlertTitle>
+                      {translate("paraProjectDetail.longTermProject.title")}
+                    </AlertTitle>
                     <AlertDescription>
-                      이 프로젝트는 {connectedLoops.length}개의 루프에 연결되어
-                      있습니다. 정리하거나 회고를 작성해보는 건 어떨까요?
+                      {translate(
+                        "paraProjectDetail.longTermProject.description"
+                      ).replace("{count}", connectedLoops.length.toString())}
                     </AlertDescription>
                   </CustomAlert>
                 )}
@@ -1023,10 +1183,19 @@ export default function ProjectDetailPage({
 
       {/* 탭 영역 */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview">개요</TabsTrigger>
-          <TabsTrigger value="tasks">태스크</TabsTrigger>
-          <TabsTrigger value="retrospective-notes">회고·노트</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview">
+            {translate("paraProjectDetail.tabs.overview")}
+          </TabsTrigger>
+          <TabsTrigger value="tasks">
+            {translate("paraProjectDetail.tabs.tasks")}
+          </TabsTrigger>
+          <TabsTrigger value="retrospective">
+            {translate("paraProjectDetail.tabs.retrospective")}
+          </TabsTrigger>
+          <TabsTrigger value="note">
+            {translate("paraProjectDetail.tabs.note")}
+          </TabsTrigger>
         </TabsList>
 
         {/* 개요 탭 */}
@@ -1034,42 +1203,59 @@ export default function ProjectDetailPage({
           <div className="space-y-4">
             {/* 세부 진행 상황 */}
             <Card className="p-4 mb-4">
-              <h3 className="font-semibold mb-3">진행 현황</h3>
+              <h3 className="font-semibold mb-3">
+                {translate("paraProjectDetail.progressStatus")}
+              </h3>
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">
-                    완료된{" "}
-                    {project.category === "repetitive" ? "횟수" : "태스크"}
+                    {translate("paraProjectDetail.completed")}{" "}
+                    {project.category === "repetitive"
+                      ? translate("paraProjectDetail.targetLabels.count")
+                      : translate("paraProjectDetail.targetLabels.tasks")}
                   </span>
                   <span className="font-medium">
                     {project.category === "repetitive"
                       ? completedTasks || 0
                       : completedTasks || 0}
-                    {project.category === "repetitive" ? "회" : "개"}
+                    {project.category === "repetitive"
+                      ? translate("paraProjectDetail.targetLabels.times")
+                      : translate("paraProjectDetail.targetLabels.items")}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">
-                    남은 {project.category === "repetitive" ? "횟수" : "태스크"}
+                    {translate("paraProjectDetail.remaining")}{" "}
+                    {project.category === "repetitive"
+                      ? translate("paraProjectDetail.targetLabels.count")
+                      : translate("paraProjectDetail.targetLabels.tasks")}
                   </span>
                   <span className="font-medium">
                     {project.category === "repetitive"
                       ? Math.max(0, targetCount - (completedTasks || 0))
                       : (totalTasks || 0) - (completedTasks || 0)}
-                    {project.category === "repetitive" ? "회" : "개"}
+                    {project.category === "repetitive"
+                      ? translate("paraProjectDetail.targetLabels.times")
+                      : translate("paraProjectDetail.targetLabels.items")}
                   </span>
                 </div>
                 <hr />
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">완료된 시간</span>
+                  <span className="text-muted-foreground">
+                    {translate("paraProjectDetail.completedTime")}
+                  </span>
                   <span className="font-medium">
-                    {timeStats?.completedTime || 0}시간
+                    {timeStats?.completedTime || 0}
+                    {translate("paraProjectDetail.hours")}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">남은 시간</span>
+                  <span className="text-muted-foreground">
+                    {translate("paraProjectDetail.remainingTime")}
+                  </span>
                   <span className="font-medium">
-                    {timeStats?.remainingTime || 0}시간
+                    {timeStats?.remainingTime || 0}
+                    {translate("paraProjectDetail.hours")}
                   </span>
                 </div>
               </div>
@@ -1077,7 +1263,9 @@ export default function ProjectDetailPage({
 
             {/* 최근 활동 */}
             <Card className="p-4">
-              <h3 className="font-semibold mb-3">최근 활동</h3>
+              <h3 className="font-semibold mb-3">
+                {translate("paraProjectDetail.recentActivity")}
+              </h3>
               <div className="space-y-2">
                 {tasks && tasks.length > 0 ? (
                   tasks
@@ -1108,13 +1296,13 @@ export default function ProjectDetailPage({
                           {task.title}
                         </span>
                         <span className="text-muted-foreground ml-auto">
-                          {formatDate(task.updatedAt)}
+                          {formatDate(task.updatedAt, currentLanguage)}
                         </span>
                       </div>
                     ))
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    아직 활동이 없습니다.
+                    {translate("paraProjectDetail.noActivity")}
                   </p>
                 )}
               </div>
@@ -1122,98 +1310,72 @@ export default function ProjectDetailPage({
 
             {/* 프로젝트 정보 */}
             <Card className="p-4">
-              <h3 className="font-semibold mb-3">프로젝트 정보</h3>
+              <h3 className="font-semibold mb-3">
+                {translate("paraProjectDetail.projectInfo")}
+              </h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">프로젝트 유형</span>
+                  <span className="text-muted-foreground">
+                    {translate("paraProjectDetail.projectType")}
+                  </span>
                   <span>
-                    {project.category === "repetitive" ? "반복형" : "작업형"}
+                    {project.category === "repetitive"
+                      ? translate(
+                          "paraProjectDetail.projectTypeLabels.repetitive"
+                        )
+                      : translate("paraProjectDetail.projectTypeLabels.task")}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">
-                    목표{" "}
-                    {project.category === "repetitive" ? "횟수" : "태스크 수"}
+                    {translate("paraProjectDetail.target")}{" "}
+                    {project.category === "repetitive"
+                      ? translate("paraProjectDetail.targetLabels.count")
+                      : translate("paraProjectDetail.targetLabels.tasks")}
                   </span>
                   <span>
                     {project.target || 0}
-                    {project.category === "repetitive" ? "회" : "개"}
+                    {project.category === "repetitive"
+                      ? translate("paraProjectDetail.targetLabels.times")
+                      : translate("paraProjectDetail.targetLabels.items")}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">연결된 Area</span>
+                  <span className="text-muted-foreground">
+                    {translate("paraProjectDetail.connectedArea")}
+                  </span>
                   <span>
                     {area
                       ? area.name
                       : project.areaId
-                      ? "Area 정보 로딩 중..."
+                      ? translate("settings.loading.areaInfo")
                       : "연결된 Area 없음"}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">생성일</span>
-                  <span>{formatDate(project.createdAt)}</span>
+                  <span className="text-muted-foreground">
+                    {translate("paraProjectDetail.createdAt")}
+                  </span>
+                  <span>{formatDate(project.createdAt, currentLanguage)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">수정일</span>
-                  <span>{formatDate(project.updatedAt)}</span>
+                  <span className="text-muted-foreground">
+                    {translate("paraProjectDetail.updatedAt")}
+                  </span>
+                  <span>{formatDate(project.updatedAt, currentLanguage)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">연결된 루프</span>
+                  <span className="text-muted-foreground">
+                    {translate("paraProjectDetail.connectedLoops")}
+                  </span>
                   <span>
                     {connectedLoops && connectedLoops.length > 0
                       ? `${connectedLoops.length}개`
-                      : "연결된 루프 없음"}
+                      : translate("paraProjectDetail.noConnectedLoops")}
                   </span>
                 </div>
               </div>
             </Card>
-
-            {/* 연결된 루프 정보 */}
-            {connectedLoops && connectedLoops.length > 0 && (
-              <Card className="p-4">
-                <h3 className="font-semibold mb-3">연결된 루프</h3>
-                <div className="space-y-2">
-                  {connectedLoops.map((loop) => (
-                    <div
-                      key={loop.id}
-                      className="flex items-center justify-between p-2 rounded-md bg-muted/30"
-                    >
-                      <div className="flex items-center gap-2">
-                        <RotateCcw className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm font-medium">
-                          {loop.title}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant={
-                            getLoopStatus(loop) === "in_progress"
-                              ? "default"
-                              : getLoopStatus(loop) === "ended"
-                              ? "secondary"
-                              : "outline"
-                          }
-                          className="text-xs"
-                        >
-                          {getLoopStatus(loop) === "in_progress"
-                            ? "진행 중"
-                            : getLoopStatus(loop) === "ended"
-                            ? "완료됨"
-                            : "예정"}
-                        </Badge>
-                        <Link
-                          href={`/loop/${loop.id}`}
-                          className="text-blue-600 hover:text-blue-700"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
           </div>
         </TabsContent>
 
@@ -1221,11 +1383,13 @@ export default function ProjectDetailPage({
         <TabsContent value="tasks" className="mt-4">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold">태스크 목록</h3>
+              <h3 className="font-semibold">
+                {translate("paraProjectDetail.taskList")}
+              </h3>
               {project.category === "task_based" && (
                 <Button size="sm" variant="outline" onClick={openTaskDialog}>
                   <Plus className="h-4 w-4 mr-2" />
-                  추가
+                  {translate("paraProjectDetail.add")}
                 </Button>
               )}
             </div>
@@ -1295,7 +1459,9 @@ export default function ProjectDetailPage({
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
-                            <span>{formatDate(task.date)}</span>
+                            <span>
+                              {formatDate(task.date, currentLanguage)}
+                            </span>
                           </div>
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
@@ -1340,16 +1506,16 @@ export default function ProjectDetailPage({
           </div>
         </TabsContent>
 
-        {/* 회고·노트 탭  */}
-        <TabsContent value="retrospective-notes" className="mt-4">
-          <h2 className="mb-4 text-xl font-bold">프로젝트 회고</h2>
+        {/* 회고 탭 */}
+        <TabsContent value="retrospective" className="mt-4">
           {project.retrospective ? (
-            <Card className="p-4 mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-medium">
-                  {project.retrospective.title || "회고 작성 완료"}
-                </h3>
-                <div className="flex items-center gap-2 text-lg font-bold text-primary">
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-medium">
+                  {project.retrospective.title ||
+                    translate("paraProjectDetail.retrospective.completed")}
+                </h4>
+                <div className="flex items-center gap-2">
                   {project.retrospective.bookmarked && (
                     <Bookmark className="h-4 w-4 text-yellow-500 fill-yellow-500" />
                   )}
@@ -1360,80 +1526,72 @@ export default function ProjectDetailPage({
                 {project.retrospective.summary ||
                   project.retrospective.content ||
                   project.retrospective.goalAchieved ||
-                  "작성된 회고 요약이 없습니다."}
+                  translate("paraProjectDetail.retrospective.noSummary")}
               </p>
               <div className="flex justify-end">
                 <Button variant="outline" size="sm" asChild>
                   <Link href={`/para/archives/${project.retrospective.id}`}>
-                    회고 상세 보기
+                    {translate("paraProjectDetail.retrospective.viewDetail")}
                   </Link>
                 </Button>
               </div>
             </Card>
           ) : (
-            <Card className="p-4 text-center mb-6">
-              <h3 className="font-medium mb-4">
+            <div className="rounded-lg border border-dashed p-8 text-center">
+              <p className="text-muted-foreground mb-2">
+                {translate("paraProjectDetail.retrospective.noContent")}
+              </p>
+              <p className="text-sm text-muted-foreground mb-4">
                 {projectWithStatus?.status === "completed"
-                  ? "이 프로젝트를 회고하고, 다음 단계를 계획하세요."
-                  : "프로젝트가 완료되면 회고를 작성할 수 있습니다."}
-              </h3>
-              {projectWithStatus?.status === "completed" ? (
-                <Button onClick={() => setShowRetrospectiveDialog(true)}>
-                  회고 작성
-                </Button>
-              ) : (
-                <div className="text-sm text-muted-foreground">
-                  진행률: {progressPercentage}%
-                </div>
-              )}
-            </Card>
-          )}
-
-          <section>
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-semibold">노트</h3>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAddNoteDialog(true)}
-              >
-                {project.notes && project.notes.length > 0 ? (
-                  <>
-                    <Edit className="mr-1 h-4 w-4" />
-                    노트 수정
-                  </>
-                ) : (
-                  <>
-                    <Plus className="mr-1 h-4 w-4" />
-                    노트 작성
-                  </>
-                )}
+                  ? translate("paraProjectDetail.retrospective.description")
+                  : translate(
+                      "paraProjectDetail.retrospective.inProgressDescription"
+                    )}
+              </p>
+              <Button onClick={() => setShowRetrospectiveDialog(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                {translate("paraProjectDetail.retrospective.writeTitle")}
               </Button>
             </div>
+          )}
+        </TabsContent>
 
-            {project.notes && project.notes.length > 0 ? (
-              <Card className="p-4">
-                <p className="text-sm mb-2">{project.notes[0].content}</p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  <span>{formatDate(project.notes[0].createdAt)}</span>
-                </div>
-              </Card>
-            ) : (
-              <div className="rounded-lg border border-dashed p-8 text-center">
-                <p className="text-muted-foreground mb-2">
-                  작성된 노트가 없습니다.
-                </p>
-                <p className="text-sm text-muted-foreground mb-4">
-                  프로젝트 진행 과정을 기록해보세요.
-                </p>
-                <Button onClick={() => setShowAddNoteDialog(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  노트 작성하기
+        {/* 노트 탭 */}
+        <TabsContent value="note" className="mt-4">
+          {project.notes && project.notes.length > 0 ? (
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-medium">
+                  {translate("paraProjectDetail.note.title")}
+                </h4>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAddNoteDialog(true)}
+                >
+                  <Edit className="mr-1 h-4 w-4" />
+                  {translate("paraProjectDetail.note.edit")}
                 </Button>
               </div>
-            )}
-          </section>
+              <p className="text-sm mb-3">{project.notes[0].content}</p>
+              <p className="text-xs text-muted-foreground">
+                {formatDate(project.notes[0].createdAt, currentLanguage)}
+              </p>
+            </Card>
+          ) : (
+            <div className="rounded-lg border border-dashed p-8 text-center">
+              <p className="text-muted-foreground mb-2">
+                {translate("paraProjectDetail.note.noNote")}
+              </p>
+              <p className="text-sm text-muted-foreground mb-4">
+                {translate("paraProjectDetail.note.description")}
+              </p>
+              <Button onClick={() => setShowAddNoteDialog(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                {translate("paraProjectDetail.note.addButton")}
+              </Button>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
@@ -1462,17 +1620,19 @@ export default function ProjectDetailPage({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              프로젝트 노트{" "}
-              {project.notes && project.notes.length > 0 ? "수정" : "작성"}
+              {translate("paraProjectDetail.note.title")}{" "}
+              {project.notes && project.notes.length > 0
+                ? translate("paraProjectDetail.note.edit")
+                : translate("paraProjectDetail.note.add")}
             </DialogTitle>
             <DialogDescription>
-              프로젝트 진행 중 느낀 점이나 배운 점을 자유롭게 기록하세요.
+              {translate("paraProjectDetail.note.description")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="py-4">
             <Textarea
-              placeholder="프로젝트 노트를 작성해보세요..."
+              placeholder={translate("paraProjectDetail.note.placeholder")}
               value={noteContent}
               onChange={(e) => setNoteContent(e.target.value)}
               className="min-h-[150px]"
@@ -1484,9 +1644,11 @@ export default function ProjectDetailPage({
               variant="secondary"
               onClick={() => setShowAddNoteDialog(false)}
             >
-              취소
+              {translate("common.cancel")}
             </Button>
-            <Button onClick={handleSaveNote}>저장하기</Button>
+            <Button onClick={handleSaveNote}>
+              {translate("paraProjectDetail.note.save")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1498,91 +1660,93 @@ export default function ProjectDetailPage({
       >
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>프로젝트 회고 작성</DialogTitle>
+            <DialogTitle>
+              {translate("paraProjectDetail.retrospective.title")}
+            </DialogTitle>
             <DialogDescription>
-              이 프로젝트를 돌아보고 다음 프로젝트에 적용할 점을 정리하세요.
+              {translate("paraProjectDetail.retrospective.description")}
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh] pr-4">
             <div className="grid gap-4 py-4">
               <div>
                 <label
-                  htmlFor="goalAchieved"
-                  className="block text-sm font-medium text-gray-700"
+                  htmlFor="bestMoment"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  목표 달성 정도는?
+                  {translate(
+                    "paraProjectDetail.retrospective.bestMoment.label"
+                  )}
                 </label>
                 <Textarea
-                  id="goalAchieved"
+                  id="bestMoment"
                   className="mt-1"
                   rows={2}
-                  value={goalAchieved}
-                  onChange={(e) => setGoalAchieved(e.target.value)}
-                  placeholder="예: 목표의 90%를 달성했습니다. 운동 습관화라는 목표를 성공적으로 이루었습니다."
+                  value={bestMoment}
+                  onChange={(e) => setBestMoment(e.target.value)}
+                  placeholder={translate(
+                    "paraProjectDetail.retrospective.bestMoment.placeholder"
+                  )}
                 />
               </div>
               <div>
                 <label
-                  htmlFor="memorableTask"
-                  className="block text-sm font-medium text-gray-700"
+                  htmlFor="routineAdherence"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  가장 기억에 남는 작업은?
+                  {translate(
+                    "paraProjectDetail.retrospective.routineAdherence.label"
+                  )}
                 </label>
                 <Textarea
-                  id="memorableTask"
+                  id="routineAdherence"
                   className="mt-1"
                   rows={2}
-                  value={memorableTask}
-                  onChange={(e) => setMemorableTask(e.target.value)}
-                  placeholder="예: 매일 아침 일찍 일어나 운동을 시작하는 것이 가장 기억에 남습니다."
+                  value={routineAdherence}
+                  onChange={(e) => setRoutineAdherence(e.target.value)}
+                  placeholder={translate(
+                    "paraProjectDetail.retrospective.routineAdherence.placeholder"
+                  )}
                 />
               </div>
               <div>
                 <label
-                  htmlFor="stuckPoints"
-                  className="block text-sm font-medium text-gray-700"
+                  htmlFor="unexpectedObstacles"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  어떤 부분에서 막혔나요?
+                  {translate(
+                    "paraProjectDetail.retrospective.unexpectedObstacles.label"
+                  )}
                 </label>
                 <Textarea
-                  id="stuckPoints"
+                  id="unexpectedObstacles"
                   className="mt-1"
                   rows={2}
-                  value={stuckPoints}
-                  onChange={(e) => setStuckPoints(e.target.value)}
-                  placeholder="예: 주말에 늦잠을 자서 운동을 거르는 경우가 있었습니다."
+                  value={unexpectedObstacles}
+                  onChange={(e) => setUnexpectedObstacles(e.target.value)}
+                  placeholder={translate(
+                    "paraProjectDetail.retrospective.unexpectedObstacles.placeholder"
+                  )}
                 />
               </div>
               <div>
                 <label
-                  htmlFor="newLearnings"
-                  className="block text-sm font-medium text-gray-700"
+                  htmlFor="nextLoopApplication"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  새롭게 배운 점은?
+                  {translate(
+                    "paraProjectDetail.retrospective.nextLoopApplication.label"
+                  )}
                 </label>
                 <Textarea
-                  id="newLearnings"
+                  id="nextLoopApplication"
                   className="mt-1"
                   rows={2}
-                  value={newLearnings}
-                  onChange={(e) => setNewLearnings(e.target.value)}
-                  placeholder="예: 작은 습관이라도 꾸준히 하는 것이 중요하다는 것을 깨달았습니다."
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="nextProjectImprovements"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  다음 프로젝트에 적용할 점은?
-                </label>
-                <Textarea
-                  id="nextProjectImprovements"
-                  className="mt-1"
-                  rows={2}
-                  value={nextProjectImprovements}
-                  onChange={(e) => setNextProjectImprovements(e.target.value)}
-                  placeholder="예: 다음 프로젝트에서는 주말에도 루틴을 유지할 수 있는 방법을 찾아야겠습니다."
+                  value={nextLoopApplication}
+                  onChange={(e) => setNextLoopApplication(e.target.value)}
+                  placeholder={translate(
+                    "paraProjectDetail.retrospective.nextLoopApplication.placeholder"
+                  )}
                 />
               </div>
 
@@ -1590,11 +1754,13 @@ export default function ProjectDetailPage({
               {shouldShowSmartRetrospective && (
                 <div className="border-t pt-4 mt-4">
                   <div className="mb-3">
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">
-                      계획한 태스크를 다 끝내지 못했는데
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      {translate("paraProjectDetail.smartRetrospective.title")}
                     </h4>
-                    <p className="text-xs text-gray-500 mb-3">
-                      다음 중 어떤 부분에 개선이 필요한지 선택해주세요
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                      {translate(
+                        "paraProjectDetail.smartRetrospective.description"
+                      )}
                     </p>
                   </div>
 
@@ -1612,11 +1778,14 @@ export default function ProjectDetailPage({
                           htmlFor="planningNeedsImprovement"
                           className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer"
                         >
-                          계획에 개선이 필요한지
+                          {translate(
+                            "paraProjectDetail.smartRetrospective.planningNeedsImprovement"
+                          )}
                         </label>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          목표 설정이나 일정 계획이 현실적이지 않았을 수
-                          있습니다
+                          {translate(
+                            "paraProjectDetail.smartRetrospective.planningDescription"
+                          )}
                         </p>
                       </div>
                     </div>
@@ -1634,25 +1803,32 @@ export default function ProjectDetailPage({
                           htmlFor="executionNeedsImprovement"
                           className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer"
                         >
-                          실행 방식에 개선이 필요한지
+                          {translate(
+                            "paraProjectDetail.smartRetrospective.executionNeedsImprovement"
+                          )}
                         </label>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          실제 실행 과정에서 효율성이나 지속성이 부족했을 수
-                          있습니다
+                          {translate(
+                            "paraProjectDetail.smartRetrospective.executionDescription"
+                          )}
                         </p>
                       </div>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        기타 이유
+                        {translate(
+                          "paraProjectDetail.smartRetrospective.otherReason"
+                        )}
                       </label>
                       <Textarea
                         className="mt-1"
                         rows={2}
                         value={otherReason}
                         onChange={(e) => setOtherReason(e.target.value)}
-                        placeholder="다른 이유가 있다면 자유롭게 작성해주세요"
+                        placeholder={translate(
+                          "paraProjectDetail.smartRetrospective.otherReasonPlaceholder"
+                        )}
                       />
                     </div>
                   </div>
@@ -1660,7 +1836,7 @@ export default function ProjectDetailPage({
               )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  이 프로젝트는 나에게 도움이 되었나요?
+                  {translate("paraProjectDetail.retrospective.helpful.label")}
                 </label>
                 {renderStarRating(userRating, setUserRating)}
               </div>
@@ -1677,10 +1853,14 @@ export default function ProjectDetailPage({
                     htmlFor="bookmarked"
                     className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer"
                   >
-                    다시 읽고 싶은 회고로 표시
+                    {translate(
+                      "paraProjectDetail.retrospective.bookmark.label"
+                    )}
                   </label>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    중요한 회고는 북마크하여 나중에 쉽게 찾을 수 있습니다
+                    {translate(
+                      "paraProjectDetail.retrospective.bookmark.description"
+                    )}
                   </p>
                 </div>
                 {bookmarked && (
@@ -1698,7 +1878,9 @@ export default function ProjectDetailPage({
             >
               취소
             </Button>
-            <Button onClick={handleSaveRetrospective}>회고 저장</Button>
+            <Button onClick={handleSaveRetrospective}>
+              {translate("paraProjectDetail.retrospective.save")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1741,8 +1923,9 @@ export default function ProjectDetailPage({
                 {...taskForm.register("date")}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                프로젝트 기간: {formatDate(project.startDate)} ~{" "}
-                {formatDate(project.endDate)}
+                {translate("paraProjectDetail.duration")}:{" "}
+                {formatDate(project.startDate, currentLanguage)} ~{" "}
+                {formatDate(project.endDate, currentLanguage)}
               </p>
               {taskForm.formState.errors.date && (
                 <p className="text-sm text-red-500 mt-1">
@@ -1752,7 +1935,9 @@ export default function ProjectDetailPage({
             </div>
 
             <div>
-              <Label htmlFor="task-duration">소요 시간 (시간)</Label>
+              <Label htmlFor="task-duration">
+                {translate("paraProjectDetail.taskForm.duration")}
+              </Label>
               <Input
                 id="task-duration"
                 type="number"
@@ -1774,10 +1959,12 @@ export default function ProjectDetailPage({
                 variant="outline"
                 onClick={() => setShowTaskDialog(false)}
               >
-                취소
+                {translate("paraProjectDetail.taskForm.cancel")}
               </Button>
               <Button type="submit" disabled={addTaskMutation.isPending}>
-                {addTaskMutation.isPending ? "추가 중..." : "태스크 추가"}
+                {addTaskMutation.isPending
+                  ? translate("paraProjectDetail.taskForm.adding")
+                  : translate("paraProjectDetail.taskForm.addTitle")}
               </Button>
             </DialogFooter>
           </form>
@@ -1788,8 +1975,12 @@ export default function ProjectDetailPage({
       <Dialog open={showEditTaskDialog} onOpenChange={setShowEditTaskDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>태스크 수정</DialogTitle>
-            <DialogDescription>태스크 정보를 수정하세요.</DialogDescription>
+            <DialogTitle>
+              {translate("paraProjectDetail.taskForm.editTitle")}
+            </DialogTitle>
+            <DialogDescription>
+              {translate("paraProjectDetail.taskForm.editDescription")}
+            </DialogDescription>
           </DialogHeader>
 
           <form
@@ -1797,10 +1988,14 @@ export default function ProjectDetailPage({
             className="space-y-4"
           >
             <div>
-              <Label htmlFor="edit-task-title">태스크 제목</Label>
+              <Label htmlFor="edit-task-title">
+                {translate("paraProjectDetail.taskForm.title")}
+              </Label>
               <Input
                 id="edit-task-title"
-                placeholder="태스크 제목을 입력하세요"
+                placeholder={translate(
+                  "paraProjectDetail.taskForm.titlePlaceholder"
+                )}
                 {...editTaskForm.register("title")}
               />
               {editTaskForm.formState.errors.title && (
@@ -1811,7 +2006,9 @@ export default function ProjectDetailPage({
             </div>
 
             <div>
-              <Label htmlFor="edit-task-date">날짜</Label>
+              <Label htmlFor="edit-task-date">
+                {translate("paraProjectDetail.taskForm.date")}
+              </Label>
               <Input
                 id="edit-task-date"
                 type="date"
@@ -1820,8 +2017,9 @@ export default function ProjectDetailPage({
                 {...editTaskForm.register("date")}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                프로젝트 기간: {formatDate(project.startDate)} ~{" "}
-                {formatDate(project.endDate)}
+                {translate("paraProjectDetail.duration")}:{" "}
+                {formatDate(project.startDate, currentLanguage)} ~{" "}
+                {formatDate(project.endDate, currentLanguage)}
               </p>
               {editTaskForm.formState.errors.date && (
                 <p className="text-sm text-red-500 mt-1">
@@ -1831,7 +2029,9 @@ export default function ProjectDetailPage({
             </div>
 
             <div>
-              <Label htmlFor="edit-task-duration">소요 시간 (시간)</Label>
+              <Label htmlFor="edit-task-duration">
+                {translate("paraProjectDetail.taskForm.duration")}
+              </Label>
               <Input
                 id="edit-task-duration"
                 type="number"
@@ -1860,7 +2060,9 @@ export default function ProjectDetailPage({
                 취소
               </Button>
               <Button type="submit" disabled={updateTaskMutation.isPending}>
-                {updateTaskMutation.isPending ? "수정 중..." : "태스크 수정"}
+                {updateTaskMutation.isPending
+                  ? translate("paraProjectDetail.taskForm.editing")
+                  : translate("paraProjectDetail.taskForm.save")}
               </Button>
             </DialogFooter>
           </form>

@@ -14,6 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Search } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface SelectItem {
   id: string;
@@ -47,6 +48,7 @@ export function SelectItemsDialog({
   const [searchTerm, setSearchTerm] = useState("");
   const [currentSelection, setCurrentSelection] =
     useState<string[]>(selectedItemIds);
+  const { translate } = useLanguage();
 
   useEffect(() => {
     setCurrentSelection(selectedItemIds);
@@ -104,12 +106,12 @@ export function SelectItemsDialog({
                     )}
                     {item.type && (
                       <span className="text-xs text-muted-foreground">
-                        유형: {item.type}
+                        {translate("common.type")}: {item.type}
                       </span>
                     )}
                     {item.status && (
                       <span className="text-xs text-muted-foreground">
-                        상태: {item.status}
+                        {translate("common.status")}: {item.status}
                       </span>
                     )}
                   </Label>
@@ -117,16 +119,16 @@ export function SelectItemsDialog({
               ))
             ) : (
               <p className="text-sm text-muted-foreground text-center py-4">
-                검색 결과가 없습니다.
+                {translate("common.noSearchResults")}
               </p>
             )}
           </div>
         </ScrollArea>
         <DialogFooter className="mt-4">
           <Button variant="outline" onClick={onClose}>
-            취소
+            {translate("common.cancel")}
           </Button>
-          <Button onClick={handleSave}>저장</Button>
+          <Button onClick={handleSave}>{translate("common.save")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

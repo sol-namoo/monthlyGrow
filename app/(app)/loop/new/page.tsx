@@ -46,7 +46,14 @@ import {
   fetchAllAreasByUserId,
   db,
 } from "@/lib/firebase";
-import { addDoc, collection } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  writeBatch,
+  doc,
+  getDoc,
+  Timestamp,
+} from "firebase/firestore";
 import { RecommendationBadge } from "@/components/ui/recommendation-badge";
 import { ProjectSelectionModal } from "@/components/ui/project-selection-modal";
 import {
@@ -62,6 +69,7 @@ import Loading from "@/components/feedback/Loading";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { formatDateForInput } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // 기본 폼 스키마 정의
 const loopFormSchema = z
@@ -111,13 +119,14 @@ function NewLoopPageContent() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const [user, userLoading] = useAuthState(auth);
+  const { translate, currentLanguage } = useLanguage();
 
   // 로그인 상태 확인 및 리다이렉션
   useEffect(() => {
     if (!userLoading && !user) {
       toast({
-        title: "로그인이 필요합니다",
-        description: "로그인 페이지로 이동합니다.",
+        title: translate("loopNew.loginRequired.title"),
+        description: translate("loopNew.loginRequired.description"),
         variant: "destructive",
       });
       router.push("/login");
@@ -507,7 +516,7 @@ function NewLoopPageContent() {
         reward: data.reward,
         startDate: new Date(data.startDate),
         endDate: new Date(data.endDate),
-        projectIds: data.selectedExistingProjects,
+        // projectIds는 더 이상 사용하지 않음 (connectedLoops로 대체)
         retrospective: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -515,6 +524,30 @@ function NewLoopPageContent() {
 
       // Firebase에 루프 추가
       const newLoopId = await addDoc(collection(db, "loops"), loopData);
+
+      // 선택된 기존 프로젝트들을 새 루프에 연결
+      if (data.selectedExistingProjects.length > 0) {
+        const batch = writeBatch(db);
+
+        for (const projectId of data.selectedExistingProjects) {
+          const projectRef = doc(db, "projects", projectId);
+          const projectDoc = await getDoc(projectRef);
+
+          if (projectDoc.exists()) {
+            const projectData = projectDoc.data();
+            const connectedLoops = projectData.connectedLoops || [];
+
+            if (!connectedLoops.includes(newLoopId.id)) {
+              batch.update(projectRef, {
+                connectedLoops: [...connectedLoops, newLoopId.id],
+                updatedAt: Timestamp.now(),
+              });
+            }
+          }
+        }
+
+        await batch.commit();
+      }
 
       // 대기 중인 프로젝트들을 새 루프에 자동 연결
       await connectPendingProjectsToNewLoop(user.uid, newLoopId.id);
@@ -567,7 +600,9 @@ function NewLoopPageContent() {
               <ChevronLeft className="h-5 w-5" />
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold">{monthName} 루프 생성</h1>
+          <h1 className="text-2xl font-bold">
+            {monthName} {translate("loopNew.title")}
+          </h1>
         </div>
 
         <div className="text-center py-12">
@@ -618,17 +653,21 @@ function NewLoopPageContent() {
             <ChevronLeft className="h-5 w-5" />
           </Link>
         </Button>
-        <h1 className="text-2xl font-bold">루프 생성</h1>
+        <h1 className="text-2xl font-bold">{translate("loopNew.title")}</h1>
       </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         {/* 기본 정보 */}
         <Card className="p-6">
-          <h2 className="mb-4 text-lg font-semibold">기본 정보</h2>
+          <h2 className="mb-4 text-lg font-semibold">
+            {translate("loopNew.basicInfo.title")}
+          </h2>
           <div className="space-y-4">
             {/* 월 선택 */}
             <div>
-              <Label htmlFor="selectedMonth">루프 월 선택</Label>
+              <Label htmlFor="selectedMonth">
+                {translate("loopNew.basicInfo.monthSelection")}
+              </Label>
               <Select
                 value={form.watch("selectedMonth")}
                 onValueChange={(value) => {
@@ -640,7 +679,11 @@ function NewLoopPageContent() {
                 }}
               >
                 <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="루프를 진행할 월을 선택하세요" />
+                  <SelectValue
+                    placeholder={translate(
+                      "loopNew.basicInfo.monthPlaceholder"
+                    )}
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {getAvailableMonths().map((month) => (

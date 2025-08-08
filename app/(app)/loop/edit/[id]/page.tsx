@@ -33,6 +33,7 @@ import { formatDate, getLoopStatus } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   fetchLoopById,
   fetchAllAreasByUserId,
@@ -98,6 +99,7 @@ export default function EditLoopPage({
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const [user] = useAuthState(auth);
+  const { translate, currentLanguage } = useLanguage();
   const queryClient = useQueryClient();
 
   // 현재 날짜 정보
@@ -286,8 +288,8 @@ export default function EditLoopPage({
 
     if (!title.trim()) {
       toast({
-        title: "입력 오류",
-        description: "루프 제목을 입력해주세요.",
+        title: translate("loopEdit.validation.title"),
+        description: translate("loopEdit.validation.titleRequired"),
         variant: "destructive",
       });
       return;
@@ -317,12 +319,12 @@ export default function EditLoopPage({
               <ChevronLeft className="h-5 w-5" />
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold">루프 수정</h1>
+          <h1 className="text-2xl font-bold">{translate("loopEdit.title")}</h1>
         </div>
 
         <Alert>
           <AlertDescription>
-            루프를 불러오는 중 오류가 발생했습니다. 다시 시도해주세요.
+            {translate("loopEdit.error.loading")}
           </AlertDescription>
         </Alert>
       </div>
@@ -339,9 +341,11 @@ export default function EditLoopPage({
               <ChevronLeft className="h-5 w-5" />
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold">루프 수정</h1>
+          <h1 className="text-2xl font-bold">{translate("loopEdit.title")}</h1>
         </div>
-        <p className="text-muted-foreground">루프를 찾을 수 없습니다.</p>
+        <p className="text-muted-foreground">
+          {translate("loopEdit.error.notFound")}
+        </p>
       </div>
     );
   }
@@ -359,11 +363,13 @@ export default function EditLoopPage({
               <ChevronLeft className="h-5 w-5" />
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold">루프 수정</h1>
+          <h1 className="text-2xl font-bold">{translate("loopEdit.title")}</h1>
         </div>
 
         <Alert>
-          <AlertDescription>완료된 루프는 수정할 수 없습니다.</AlertDescription>
+          <AlertDescription>
+            {translate("loopEdit.error.completed")}
+          </AlertDescription>
         </Alert>
       </div>
     );
@@ -378,68 +384,78 @@ export default function EditLoopPage({
               <ChevronLeft className="h-5 w-5" />
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold">루프 수정</h1>
+          <h1 className="text-2xl font-bold">{translate("loopEdit.title")}</h1>
         </div>
 
         <div className="mb-6 space-y-2">
           <RecommendationBadge
             type="info"
-            message="루프 제목, 보상, 중점 영역은 언제든지 수정할 수 있습니다"
+            message={translate("loopEdit.basicInfo.recommendation")}
           />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* 기본 정보 */}
           <Card className="p-6">
-            <h2 className="mb-4 text-lg font-semibold">기본 정보</h2>
+            <h2 className="mb-4 text-lg font-semibold">
+              {translate("loopEdit.basicInfo.title")}
+            </h2>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="title">루프 제목</Label>
+                <Label htmlFor="title">
+                  {translate("loopEdit.basicInfo.loopTitle")}
+                </Label>
                 <Input
                   id="title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="예: 1월 건강 루프"
+                  placeholder={translate(
+                    "loopEdit.basicInfo.loopTitlePlaceholder"
+                  )}
                   className="mt-1"
                   required
                 />
               </div>
 
               <div>
-                <Label htmlFor="reward">달성 보상</Label>
+                <Label htmlFor="reward">
+                  {translate("loopEdit.basicInfo.reward")}
+                </Label>
                 <Input
                   id="reward"
                   value={reward}
                   onChange={(e) => setReward(e.target.value)}
-                  placeholder="예: 새로운 운동화 구매"
+                  placeholder={translate(
+                    "loopEdit.basicInfo.rewardPlaceholder"
+                  )}
                   className="mt-1"
                   required
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  💡 루프를 완료했을 때 자신에게 줄 보상을 설정하세요.
+                  {translate("loopEdit.basicInfo.rewardHint")}
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>시작일</Label>
+                  <Label>{translate("loopEdit.basicInfo.startDate")}</Label>
                   <div className="mt-1 flex items-center gap-2 rounded-md border bg-muted/30 p-3 text-sm">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span>{formatDate(loop.startDate)}</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    루프 기간은 수정할 수 없습니다
+                    {translate("loopEdit.basicInfo.dateHint")}
                   </p>
                 </div>
 
                 <div>
-                  <Label>종료일</Label>
+                  <Label>{translate("loopEdit.basicInfo.endDate")}</Label>
                   <div className="mt-1 flex items-center gap-2 rounded-md border bg-muted/30 p-3 text-sm">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span>{formatDate(loop.endDate)}</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    해당 월의 마지막 날까지
+                    {translate("loopEdit.basicInfo.endDateHint")}
                   </p>
                 </div>
               </div>

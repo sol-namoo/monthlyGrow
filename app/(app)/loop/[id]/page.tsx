@@ -49,6 +49,11 @@ import {
   fetchAllAreasByUserId,
   fetchProjectsByLoopId,
   getTaskCountsForMultipleProjects,
+  createRetrospective,
+  updateRetrospective,
+  createNote,
+  updateNote,
+  updateLoop,
 } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
@@ -59,6 +64,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // 로딩 스켈레톤 컴포넌트
 function LoopDetailSkeleton() {
@@ -93,6 +99,7 @@ export function LoopDetailPage({
   const { toast } = useToast();
   const router = useRouter();
   const [user] = useAuthState(auth);
+  const { translate, currentLanguage } = useLanguage();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
@@ -112,9 +119,21 @@ export function LoopDetailPage({
 
   const queryClient = useQueryClient();
 
-  // 미완료 프로젝트 확인
+  // 미완료 프로젝트 확인 (직전 달 루프에서만)
   const checkIncompleteProjects = async () => {
     if (!loop) return;
+
+    // 현재 달과 직전 달만 체크 (2달 전부터는 제외)
+    const now = new Date();
+    const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    const loopStartDate = new Date(loop.startDate);
+
+    // 루프가 현재 달이나 직전 달이 아니면 모달을 열지 않음
+    if (loopStartDate < lastMonth) {
+      return;
+    }
 
     try {
       const incomplete = await findIncompleteProjectsInLoop(loop.id);
@@ -138,8 +157,10 @@ export function LoopDetailPage({
       }
 
       toast({
-        title: "프로젝트 이동 완료",
-        description: `${incompleteProjects.length}개의 미완료 프로젝트가 다음 루프로 이동되었습니다.`,
+        title: translate("loopDetail.projectMigration.success.title"),
+        description: translate(
+          "loopDetail.projectMigration.success.description"
+        ).replace("{count}", incompleteProjects.length.toString()),
       });
 
       // 캐시 무효화
@@ -152,8 +173,8 @@ export function LoopDetailPage({
     } catch (error) {
       console.error("프로젝트 이동 중 오류:", error);
       toast({
-        title: "이동 실패",
-        description: "프로젝트 이동 중 오류가 발생했습니다.",
+        title: translate("loopDetail.projectMigration.error.title"),
+        description: translate("loopDetail.projectMigration.error.description"),
         variant: "destructive",
       });
     }
@@ -166,16 +187,129 @@ export function LoopDetailPage({
       // 성공 시 캐시 무효화 및 목록 페이지로 이동
       queryClient.invalidateQueries({ queryKey: ["loops"] });
       toast({
-        title: "루프 삭제 완료",
-        description: "루프가 성공적으로 삭제되었습니다.",
+        title: translate("loopDetail.delete.success.title"),
+        description: translate("loopDetail.delete.success.description"),
       });
       router.push("/loop");
     },
     onError: (error: Error) => {
       console.error("루프 삭제 실패:", error);
       toast({
-        title: "삭제 실패",
-        description: "루프 삭제에 실패했습니다.",
+        title: translate("loopDetail.delete.error.title"),
+        description: translate("loopDetail.delete.error.description"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  // undefined 값들을 필터링하는 유틸리티 함수
+  const filterUndefinedValues = (obj: any) => {
+    const filtered: any = {};
+    Object.keys(obj).forEach((key) => {
+      if (obj[key] !== undefined && obj[key] !== null && obj[key] !== "") {
+        filtered[key] = obj[key];
+      }
+    });
+    return filtered;
+  };
+
+  // 회고 저장 mutation
+  const saveRetrospectiveMutation = useMutation({
+    mutationFn: async (retrospectiveData: Retrospective) => {
+      // undefined 값들을 필터링
+      const filteredData = filterUndefinedValues({
+        bestMoment: retrospectiveData.bestMoment,
+        routineAdherence: retrospectiveData.routineAdherence,
+        unexpectedObstacles: retrospectiveData.unexpectedObstacles,
+        nextLoopApplication: retrospectiveData.nextLoopApplication,
+        userRating: retrospectiveData.userRating,
+        bookmarked: retrospectiveData.bookmarked,
+        title: retrospectiveData.title,
+        summary: retrospectiveData.summary,
+        content: retrospectiveData.content,
+      });
+
+      if (loop?.retrospective?.id) {
+        // 기존 회고가 있으면 업데이트
+        await updateRetrospective(loop.retrospective.id, filteredData);
+      } else {
+        // 새 회고 생성 (루프 회고용 필드만 포함)
+        const newRetrospective = await createRetrospective({
+          userId: user?.uid || "",
+          loopId: loop?.id || "",
+          ...filteredData,
+          // projectId는 루프 회고에서는 사용하지 않으므로 제외
+        });
+
+        // 루프에 회고 연결 (필요한 필드만 포함)
+        await updateLoop(loop?.id || "", {
+          retrospective: {
+            id: newRetrospective.id,
+            userId: newRetrospective.userId,
+            loopId: newRetrospective.loopId,
+            createdAt: newRetrospective.createdAt,
+            updatedAt: newRetrospective.updatedAt,
+            ...filteredData,
+          },
+        });
+      }
+    },
+    onSuccess: () => {
+      // 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ["loop", id] });
+      queryClient.invalidateQueries({ queryKey: ["loops"] });
+      toast({
+        title: "회고 저장 완료",
+        description: "회고가 성공적으로 저장되었습니다.",
+      });
+      setShowRetrospectiveDialog(false);
+    },
+    onError: (error: Error) => {
+      console.error("회고 저장 실패:", error);
+      toast({
+        title: "회고 저장 실패",
+        description: "회고 저장 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // 노트 저장 mutation
+  const saveNoteMutation = useMutation({
+    mutationFn: async (noteContent: string) => {
+      if (loop?.note?.id) {
+        // 기존 노트가 있으면 업데이트
+        await updateNote(loop.note.id, {
+          content: noteContent,
+        });
+      } else {
+        // 새 노트 생성
+        const newNote = await createNote({
+          userId: user?.uid || "",
+          content: noteContent,
+        });
+
+        // 루프에 노트 연결
+        await updateLoop(loop?.id || "", {
+          note: newNote,
+        });
+      }
+    },
+    onSuccess: () => {
+      // 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ["loop", id] });
+      queryClient.invalidateQueries({ queryKey: ["loops"] });
+      toast({
+        title: "노트 저장 완료",
+        description: "노트가 성공적으로 저장되었습니다.",
+      });
+      setShowAddNoteDialog(false);
+    },
+    onError: (error: Error) => {
+      console.error("노트 저장 실패:", error);
+      toast({
+        title: "노트 저장 실패",
+        description: "노트 저장 중 오류가 발생했습니다.",
         variant: "destructive",
       });
     },
@@ -227,16 +361,8 @@ export function LoopDetailPage({
     enabled: !!projects && projects.length > 0,
   });
 
-  // 가상의 노트 데이터
-  const notes = loop?.note
-    ? [
-        {
-          id: 1,
-          content: loop.note.content || "루프 진행 중 작성된 노트입니다.",
-          createdAt: new Date(),
-        },
-      ]
-    : [];
+  // 노트 데이터
+  const note = loop?.note;
 
   // useEffect는 모든 조건부 return 이전에 위치해야 함
   useEffect(() => {
@@ -262,12 +388,12 @@ export function LoopDetailPage({
 
   // 노트 모달 상태 변경 시 데이터 로드/초기화
   useEffect(() => {
-    if (showAddNoteDialog && notes && notes.length > 0) {
-      setNoteContent(notes[0].content || "");
+    if (showAddNoteDialog && note) {
+      setNoteContent(note.content || "");
     } else if (!showAddNoteDialog) {
       setNoteContent("");
     }
-  }, [showAddNoteDialog, notes]);
+  }, [showAddNoteDialog, note]);
 
   // 로딩 상태
   if (isLoading) {
@@ -362,22 +488,12 @@ export function LoopDetailPage({
       return;
     }
 
-    toast({
-      title: "노트 저장 성공",
-      description: "노트가 성공적으로 저장되었습니다.",
-    });
-    setShowAddNoteDialog(false);
+    saveNoteMutation.mutate(noteContent);
   };
 
   // 날짜 포맷팅 함수
   const formatDisplayDate = (date: Date) => {
-    return new Intl.DateTimeFormat("ko-KR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(date);
+    return formatDate(date, currentLanguage);
   };
 
   const handleSaveRetrospective = () => {
@@ -394,7 +510,7 @@ export function LoopDetailPage({
     const newRetrospective: Retrospective = {
       id: loop?.retrospective?.id || `new-retro-${Date.now()}`,
       loopId: loop?.id || "",
-      userId: "user-123",
+      userId: user?.uid || "",
       createdAt: loop?.retrospective?.createdAt || new Date(),
       updatedAt: new Date(),
       title: loop?.title || "",
@@ -404,17 +520,13 @@ export function LoopDetailPage({
       routineAdherence,
       unexpectedObstacles,
       nextLoopApplication,
-      content: `가장 좋았던 순간: ${bestMoment}\n\n루틴 준수도: ${routineAdherence}\n\n방해 요소: ${unexpectedObstacles}\n\n다음 루프 적용점: ${nextLoopApplication}`,
+      // content 필드는 노트에서만 사용하므로 회고에서는 제외
       userRating,
       bookmarked,
+      // projectId는 루프 회고에서는 사용하지 않으므로 제외
     };
 
-    console.log("회고 저장:", newRetrospective);
-    toast({
-      title: "회고 저장 완료",
-      description: "회고가 성공적으로 저장되었습니다.",
-    });
-    setShowRetrospectiveDialog(false);
+    saveRetrospectiveMutation.mutate(newRetrospective);
   };
 
   // 프로젝트 상태 계산 함수
@@ -424,14 +536,26 @@ export function LoopDetailPage({
     const endDate = project.endDate ? new Date(project.endDate) : null;
 
     if (!startDate || !endDate)
-      return { status: "미정", color: "text-gray-500" };
+      return {
+        status: translate("loopDetail.project.status.undefined"),
+        color: "text-gray-500",
+      };
 
     if (now < startDate) {
-      return { status: "예정", color: "text-blue-500" };
+      return {
+        status: translate("loopDetail.project.status.planned"),
+        color: "text-blue-500",
+      };
     } else if (now >= startDate && now <= endDate) {
-      return { status: "진행 중", color: "text-green-500" };
+      return {
+        status: translate("loopDetail.project.status.inProgress"),
+        color: "text-green-500",
+      };
     } else {
-      return { status: "완료", color: "text-purple-500" };
+      return {
+        status: translate("loopDetail.project.status.completed"),
+        color: "text-purple-500",
+      };
     }
   };
 
@@ -440,10 +564,11 @@ export function LoopDetailPage({
     const startDate = project.startDate ? new Date(project.startDate) : null;
     const endDate = project.endDate ? new Date(project.endDate) : null;
 
-    if (!startDate || !endDate) return "기간 미정";
+    if (!startDate || !endDate)
+      return translate("loopDetail.project.duration.undefined");
 
-    const start = formatDate(startDate);
-    const end = formatDate(endDate);
+    const start = formatDate(startDate, currentLanguage);
+    const end = formatDate(endDate, currentLanguage);
 
     if (start === end) {
       return start;
@@ -493,14 +618,16 @@ export function LoopDetailPage({
               <ChevronLeft className="h-5 w-5" />
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold">루프 상세</h1>
+          <h1 className="text-2xl font-bold">
+            {translate("loopDetail.title")}
+          </h1>
         </div>
         <div className="flex gap-2">
           {!isCompleted && (
             <Button variant="outline" size="sm" asChild>
               <Link href={`/loop/edit/${loop.id}`}>
                 <Edit className="mr-2 h-4 w-4" />
-                루프 수정
+                {translate("loopEdit.title")}
               </Link>
             </Button>
           )}
@@ -519,12 +646,17 @@ export function LoopDetailPage({
         <h2 className="mb-2 text-xl font-bold">{loop.title}</h2>
         <div className="mb-4 flex items-center gap-2 text-sm">
           <Gift className="h-4 w-4 text-purple-500" />
-          <span>보상: {loop.reward || "보상 없음"}</span>
+          <span>
+            {translate("loopDetail.reward")}:{" "}
+            {loop.reward || translate("loopDetail.noReward")}
+          </span>
         </div>
 
         <div className="mb-4">
           <div className="mb-1 flex justify-between text-sm">
-            <span>달성률: {completionRate}%</span>
+            <span>
+              {translate("loopDetail.completionRate")}: {completionRate}%
+            </span>
             <span>
               {projectsLoading ? (
                 <Skeleton className="h-4 w-16" />
@@ -551,7 +683,7 @@ export function LoopDetailPage({
           {projects.length === 0 && (
             <div className="mt-2 flex items-center gap-2 text-xs text-amber-600">
               <AlertCircle className="h-3 w-3" />
-              <span>연결된 프로젝트가 없으면 달성률을 측정할 수 없어요</span>
+              <span>{translate("loopDetail.noProjectsForCompletionRate")}</span>
             </div>
           )}
         </div>
@@ -564,7 +696,9 @@ export function LoopDetailPage({
         </div>
 
         <div className="mb-4">
-          <h3 className="mb-2 font-medium">중점 Areas</h3>
+          <h3 className="mb-2 font-medium">
+            {translate("loopDetail.focusAreas")}
+          </h3>
           <div className="flex flex-wrap gap-2">
             {(() => {
               // 디버깅: 현재 루프 데이터 구조 확인
@@ -749,11 +883,11 @@ export function LoopDetailPage({
               className="flex items-center gap-2"
             >
               <FileText className="h-4 w-4" />
-              회고
+              {translate("loopDetail.tabs.retrospective")}
             </TabsTrigger>
-            <TabsTrigger value="notes" className="flex items-center gap-2">
+            <TabsTrigger value="note" className="flex items-center gap-2">
               <PenTool className="h-4 w-4" />
-              노트
+              {translate("loopDetail.tabs.note")}
             </TabsTrigger>
           </TabsList>
 
@@ -761,11 +895,11 @@ export function LoopDetailPage({
           <TabsContent value="retrospective" className="mt-4">
             {loop.retrospective ? (
               <Card className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-medium">
                     {loop.retrospective.title || "회고 작성 완료"}
-                  </h3>
-                  <div className="flex items-center gap-2 text-lg font-bold text-primary">
+                  </h4>
+                  <div className="flex items-center gap-2">
                     {loop.retrospective.bookmarked && (
                       <Bookmark className="h-4 w-4 text-yellow-500 fill-yellow-500" />
                     )}
@@ -787,64 +921,60 @@ export function LoopDetailPage({
                 </div>
               </Card>
             ) : (
-              <Card className="p-4 text-center">
-                <h3 className="font-medium mb-4">
-                  이번 루프를 회고하고, 다음 단계를 계획하세요.
-                </h3>
-                {isCompleted ? (
+              <div className="rounded-lg border border-dashed p-8 text-center">
+                <p className="text-muted-foreground mb-2">
+                  {translate("loopDetail.retrospective.noContent")}
+                </p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {isCompleted
+                    ? translate("loopDetail.retrospective.description")
+                    : translate(
+                        "loopDetail.retrospective.inProgressDescription"
+                      )}
+                </p>
+                {isCompleted && (
                   <Button onClick={() => setShowRetrospectiveDialog(true)}>
-                    회고 작성
+                    <Plus className="mr-2 h-4 w-4" />
+                    {translate("loopDetail.retrospective.writeTitle")}
                   </Button>
-                ) : (
-                  <div className="text-sm text-muted-foreground">
-                    진행률: {completionRate}%
-                  </div>
                 )}
-              </Card>
+              </div>
             )}
           </TabsContent>
 
           {/* 노트 탭 */}
-          <TabsContent value="notes" className="mt-4">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-medium">루프 노트</h3>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAddNoteDialog(true)}
-              >
-                {notes && notes.length > 0 ? (
-                  <>
+          <TabsContent value="note" className="mt-4">
+            {note ? (
+              <Card className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-medium">
+                    {translate("loopDetail.note.title")}
+                  </h4>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAddNoteDialog(true)}
+                  >
                     <Edit className="mr-1 h-4 w-4" />
-                    노트 수정
-                  </>
-                ) : (
-                  <>
-                    <Plus className="mr-1 h-4 w-4" />
-                    노트 작성
-                  </>
-                )}
-              </Button>
-            </div>
-
-            {notes && notes.length > 0 ? (
-              <Card className="p-3">
-                <p className="text-sm mb-2">{notes[0].content}</p>
+                    {translate("loopDetail.note.edit")}
+                  </Button>
+                </div>
+                <p className="text-sm mb-3">{note.content}</p>
                 <p className="text-xs text-muted-foreground">
-                  {formatDisplayDate(notes[0].createdAt)}
+                  {formatDisplayDate(note.createdAt)}
                 </p>
               </Card>
             ) : (
               <div className="rounded-lg border border-dashed p-8 text-center">
                 <p className="text-muted-foreground mb-2">
-                  작성된 노트가 없어요
+                  {translate("loopDetail.note.noNote")}
                 </p>
                 <p className="text-sm text-muted-foreground mb-4">
-                  이번 루프에서 느낀 점을 기록해 보세요
+                  {translate("loopDetail.note.description")}
                 </p>
                 <Button onClick={() => setShowAddNoteDialog(true)}>
                   <Plus className="mr-2 h-4 w-4" />
-                  노트 작성하기
+                  {translate("loopDetail.note.addButton")}
                 </Button>
               </div>
             )}
@@ -896,9 +1026,7 @@ export function LoopDetailPage({
       <Dialog open={showAddNoteDialog} onOpenChange={setShowAddNoteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              루프 노트 {notes && notes.length > 0 ? "수정" : "작성"}
-            </DialogTitle>
+            <DialogTitle>루프 노트 {note ? "수정" : "작성"}</DialogTitle>
             <DialogDescription>
               루프 진행 중 느낀 점이나 배운 점을 자유롭게 기록하세요.
             </DialogDescription>
@@ -917,10 +1045,16 @@ export function LoopDetailPage({
             <Button
               variant="secondary"
               onClick={() => setShowAddNoteDialog(false)}
+              disabled={saveNoteMutation.isPending}
             >
               취소
             </Button>
-            <Button onClick={handleSaveNote}>저장하기</Button>
+            <Button
+              onClick={handleSaveNote}
+              disabled={saveNoteMutation.isPending}
+            >
+              {saveNoteMutation.isPending ? "저장 중..." : "저장하기"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -932,9 +1066,11 @@ export function LoopDetailPage({
       >
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>월간 회고 작성</DialogTitle>
+            <DialogTitle>
+              {translate("loopDetail.retrospective.title")}
+            </DialogTitle>
             <DialogDescription>
-              이번 루프를 돌아보고 다음 루프를 계획하세요.
+              {translate("loopDetail.retrospective.description")}
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh] pr-4">
@@ -942,9 +1078,9 @@ export function LoopDetailPage({
               <div>
                 <label
                   htmlFor="bestMoment"
-                  className="block text-sm font-medium text-gray-700"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  이번 루프에서 가장 좋았던 순간은?
+                  {translate("loopDetail.retrospective.bestMoment.label")}
                 </label>
                 <Textarea
                   id="bestMoment"
@@ -952,15 +1088,17 @@ export function LoopDetailPage({
                   rows={2}
                   value={bestMoment}
                   onChange={(e) => setBestMoment(e.target.value)}
-                  placeholder="예: 운동 후 기분이 좋아지는 것을 느낀 순간"
+                  placeholder={translate(
+                    "loopDetail.retrospective.bestMoment.placeholder"
+                  )}
                 />
               </div>
               <div>
                 <label
                   htmlFor="routineAdherence"
-                  className="block text-sm font-medium text-gray-700"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  계획한 루틴을 얼마나 지켰나요?
+                  {translate("loopDetail.retrospective.routineAdherence.label")}
                 </label>
                 <Textarea
                   id="routineAdherence"
@@ -968,15 +1106,19 @@ export function LoopDetailPage({
                   rows={2}
                   value={routineAdherence}
                   onChange={(e) => setRoutineAdherence(e.target.value)}
-                  placeholder="예: 평일 80%, 주말 60% 정도로 유지"
+                  placeholder={translate(
+                    "loopDetail.retrospective.routineAdherence.placeholder"
+                  )}
                 />
               </div>
               <div>
                 <label
                   htmlFor="unexpectedObstacles"
-                  className="block text-sm font-medium text-gray-700"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  예기치 못한 방해 요소는 있었나요?
+                  {translate(
+                    "loopDetail.retrospective.unexpectedObstacles.label"
+                  )}
                 </label>
                 <Textarea
                   id="unexpectedObstacles"
@@ -984,15 +1126,19 @@ export function LoopDetailPage({
                   rows={2}
                   value={unexpectedObstacles}
                   onChange={(e) => setUnexpectedObstacles(e.target.value)}
-                  placeholder="예: 주말에 늦잠을 자는 습관"
+                  placeholder={translate(
+                    "loopDetail.retrospective.unexpectedObstacles.placeholder"
+                  )}
                 />
               </div>
               <div>
                 <label
                   htmlFor="nextLoopApplication"
-                  className="block text-sm font-medium text-gray-700"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  다음 루프에 적용할 점은?
+                  {translate(
+                    "loopDetail.retrospective.nextLoopApplication.label"
+                  )}
                 </label>
                 <Textarea
                   id="nextLoopApplication"
@@ -1000,12 +1146,14 @@ export function LoopDetailPage({
                   rows={2}
                   value={nextLoopApplication}
                   onChange={(e) => setNextLoopApplication(e.target.value)}
-                  placeholder="예: 다음 루프에서는 주말 루틴도 포함해서 계획"
+                  placeholder={translate(
+                    "loopDetail.retrospective.nextLoopApplication.placeholder"
+                  )}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  이 회고는 스스로에게 도움이 되었나요?
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  {translate("loopDetail.retrospective.helpful.label")}
                 </label>
                 {renderStarRating(userRating, setUserRating)}
               </div>
@@ -1021,12 +1169,12 @@ export function LoopDetailPage({
                 <div className="flex-1">
                   <label
                     htmlFor="bookmarked"
-                    className="text-sm font-medium text-gray-900 cursor-pointer"
+                    className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer"
                   >
-                    다시 읽고 싶은 회고로 표시
+                    {translate("loopDetail.retrospective.bookmark.label")}
                   </label>
-                  <p className="text-xs text-gray-500 mt-1">
-                    중요한 회고는 북마크하여 나중에 쉽게 찾을 수 있습니다
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {translate("loopDetail.retrospective.bookmark.description")}
                   </p>
                 </div>
                 {bookmarked && (
@@ -1041,10 +1189,18 @@ export function LoopDetailPage({
             <Button
               variant="secondary"
               onClick={() => setShowRetrospectiveDialog(false)}
+              disabled={saveRetrospectiveMutation.isPending}
             >
               취소
             </Button>
-            <Button onClick={handleSaveRetrospective}>회고 저장</Button>
+            <Button
+              onClick={handleSaveRetrospective}
+              disabled={saveRetrospectiveMutation.isPending}
+            >
+              {saveRetrospectiveMutation.isPending
+                ? "저장 중..."
+                : translate("loopDetail.retrospective.save")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1070,8 +1226,8 @@ export function LoopDetailPage({
           <DialogHeader>
             <DialogTitle>미완료 프로젝트 발견</DialogTitle>
             <DialogDescription>
-              이 루프에 완료되지 않은 프로젝트가 있습니다. 다른 루프로
-              이동하시겠습니까?
+              이 루프에 완료되지 않은 프로젝트가 있습니다. 다른 루프에
+              추가하시겠습니까?
             </DialogDescription>
           </DialogHeader>
 
@@ -1164,7 +1320,7 @@ export function LoopDetailPage({
               onClick={handleProjectMigration}
               disabled={!selectedTargetLoop || incompleteProjects.length === 0}
             >
-              프로젝트 이동
+              프로젝트 추가
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1186,7 +1342,7 @@ export function LoopDetailPage({
         }}
         confirmText="삭제"
         cancelText="취소"
-        variant="destructive"
+        destructive={true}
       />
     </div>
   );
