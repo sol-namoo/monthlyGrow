@@ -5,7 +5,7 @@ import { CharacterAvatar } from "@/components/character-avatar";
 import { ProgressCard } from "@/components/widgets/progress-card";
 import { StatsCard } from "@/components/widgets/stats-card";
 import { AreaActivityChart } from "@/components/widgets/area-activity-chart";
-import { LoopComparisonChart } from "@/components/widgets/loop-comparison-chart";
+import { ChapterComparisonChart } from "@/components/widgets/chapter-comparison-chart";
 import { UncategorizedStatsCard } from "@/components/widgets/uncategorized-stats-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -28,17 +28,17 @@ import { useQuery } from "@tanstack/react-query";
 import {
   fetchAllAreasByUserId,
   fetchAllProjectsByUserId,
-  fetchAllLoopsByUserId,
+  fetchAllChaptersByUserId,
   fetchAllResourcesByUserId,
   getOrCreateUncategorizedArea,
   getTodayDeadlineProjects,
   getTaskCountsByProjectId,
   getTaskCountsForMultipleProjects,
   fetchYearlyActivityStats,
-  fetchProjectsByLoopId,
-  fetchCurrentLoopProjects,
+  fetchProjectsByChapterId,
+  fetchCurrentChapterProjects,
 } from "@/lib/firebase";
-import { getLoopStatus, formatDate } from "@/lib/utils";
+import { getChapterStatus, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -65,9 +65,9 @@ export default function HomePage() {
       summaryTab: translate("home.tabs.summary"),
       dashboardTab: translate("home.tabs.dashboard"),
 
-      // 현재 루프
-      currentLoop: translate("home.currentLoop"),
-      noLoop: translate("home.noLoop"),
+      // 현재 챕터
+      currentChapter: translate("home.currentChapter"),
+      noChapter: translate("home.noChapter"),
       reward: translate("home.reward"),
       noReward: translate("home.noReward"),
       progress: translate("home.progress"),
@@ -81,7 +81,7 @@ export default function HomePage() {
       inProgress: translate("home.inProgress"),
 
       // 프로젝트
-      currentLoopProjects: translate("home.currentLoopProjects"),
+      currentChapterProjects: translate("home.currentChapterProjects"),
       noProjects: translate("home.noProjects"),
       noProjectsDescription: translate("home.noProjectsDescription"),
       addProject: translate("home.addProject"),
@@ -96,12 +96,14 @@ export default function HomePage() {
       focusTime: translate("home.focusTime"),
       hours: translate("home.hours"),
       completionRate: translate("home.completionRate"),
-      completedLoops: translate("home.completedLoops"),
-      completedLoopsDescription: translate("home.completedLoopsDescription"),
+      completedChapters: translate("home.completedChapters"),
+      completedChaptersDescription: translate(
+        "home.completedChaptersDescription"
+      ),
       totalRewards: translate("home.totalRewards"),
       totalRewardsDescription: translate("home.totalRewardsDescription"),
       areaActivity: translate("home.areaActivity"),
-      loopComparison: translate("home.loopComparison"),
+      chapterComparison: translate("home.chapterComparison"),
       dashboardUpdate: translate("home.dashboardUpdate"),
 
       // 로그인
@@ -147,31 +149,31 @@ export default function HomePage() {
     enabled: !!user,
   });
 
-  // 현재 루프를 먼저 가져와서 해당 루프의 프로젝트만 가져오기
-  const { data: loops = [], isLoading: loopsLoading } = useQuery({
-    queryKey: ["loops", user?.uid],
-    queryFn: () => (user ? fetchAllLoopsByUserId(user.uid) : []),
+  // 현재 챕터를 먼저 가져와서 해당 챕터의 프로젝트만 가져오기
+  const { data: chapters = [], isLoading: chaptersLoading } = useQuery({
+    queryKey: ["chapters", user?.uid],
+    queryFn: () => (user ? fetchAllChaptersByUserId(user.uid) : []),
     enabled: !!user,
   });
 
-  // 현재 진행 중인 루프를 날짜 기반으로 선택
-  const currentLoop =
-    loops.find((loop) => {
-      const status = getLoopStatus(loop);
+  // 현재 진행 중인 챕터를 날짜 기반으로 선택
+  const currentChapter =
+    chapters.find((chapter) => {
+      const status = getChapterStatus(chapter);
       return status === "in_progress";
     }) || null;
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
-    queryKey: ["currentLoopProjects", user?.uid, currentLoop?.id],
+    queryKey: ["currentChapterProjects", user?.uid, currentChapter?.id],
     queryFn: () =>
-      user && currentLoop
-        ? fetchCurrentLoopProjects(user.uid, currentLoop.id)
+      user && currentChapter
+        ? fetchCurrentChapterProjects(user.uid, currentChapter.id)
         : [],
-    enabled: !!user && !!currentLoop,
+    enabled: !!user && !!currentChapter,
   });
 
-  // 현재 루프에 연결된 프로젝트들 (이미 필터링된 상태)
-  const currentLoopProjects = projects;
+  // 현재 챕터에 연결된 프로젝트들 (이미 필터링된 상태)
+  const currentChapterProjects = projects;
 
   // 오늘 마감인 프로젝트들
   const { data: todayDeadlineProjects = [] } = useQuery({
@@ -216,19 +218,19 @@ export default function HomePage() {
   //   }
   // }, [user]);
 
-  // 현재 루프 정보 계산
-  const startDate = currentLoop
-    ? formatDate(new Date(currentLoop.startDate), currentLanguage)
+  // 현재 챕터 정보 계산
+  const startDate = currentChapter
+    ? formatDate(new Date(currentChapter.startDate), currentLanguage)
     : "";
-  const endDate = currentLoop
-    ? formatDate(new Date(currentLoop.endDate), currentLanguage)
+  const endDate = currentChapter
+    ? formatDate(new Date(currentChapter.endDate), currentLanguage)
     : "";
 
-  const total = currentLoopProjects.reduce(
+  const total = currentChapterProjects.reduce(
     (sum, project) => sum + project.target,
     0
   );
-  const actualDoneCount = currentLoopProjects.reduce(
+  const actualDoneCount = currentChapterProjects.reduce(
     (sum, project) => sum + project.completedTasks,
     0
   );
@@ -237,11 +239,11 @@ export default function HomePage() {
   // 남은 일수 계산
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const daysLeft = currentLoop
+  const daysLeft = currentChapter
     ? Math.max(
         0,
         Math.ceil(
-          (new Date(currentLoop.endDate).getTime() - today.getTime()) /
+          (new Date(currentChapter.endDate).getTime() - today.getTime()) /
             (1000 * 60 * 60 * 24)
         )
       )
@@ -250,9 +252,9 @@ export default function HomePage() {
 
   // 프로젝트 표시 개수 제한 (정책: 3개 이하면 모두 표시, 4개 이상이면 3개만 표시 + 더보기 버튼)
   const displayedProjects = showAllProjects
-    ? currentLoopProjects
-    : currentLoopProjects.slice(0, 3);
-  const hasMoreProjects = currentLoopProjects.length > 3;
+    ? currentChapterProjects
+    : currentChapterProjects.slice(0, 3);
+  const hasMoreProjects = currentChapterProjects.length > 3;
 
   // areaId → area명 매핑 함수
   const getAreaName = (areaId?: string) =>
@@ -304,7 +306,7 @@ export default function HomePage() {
 
           <section>
             <div className="mb-4 flex items-center">
-              <h2 className="text-xl font-bold">{texts.currentLoop}</h2>
+              <h2 className="text-xl font-bold">{texts.currentChapter}</h2>
             </div>
 
             <Card className="relative overflow-hidden border-2 border-primary/20 p-4">
@@ -313,12 +315,12 @@ export default function HomePage() {
                 {daysLeft}
               </div>
               <h3 className="mb-2 text-lg font-bold">
-                {currentLoop?.title || texts.noLoop}
+                {currentChapter?.title || texts.noChapter}
               </h3>
               <div className="mb-4 flex items-center gap-2 text-sm">
                 <Star className="h-4 w-4 text-yellow-500" />
                 <span>
-                  {texts.reward}: {currentLoop?.reward || texts.noReward}
+                  {texts.reward}: {currentChapter?.reward || texts.noReward}
                 </span>
               </div>
               <div className="mb-1 flex justify-between text-sm">
@@ -387,14 +389,16 @@ export default function HomePage() {
             </section>
           )}
 
-          {/* 현재 루프 프로젝트들 */}
+          {/* 현재 챕터 프로젝트들 */}
           <section>
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold">{texts.currentLoopProjects}</h2>
+              <h2 className="text-xl font-bold">
+                {texts.currentChapterProjects}
+              </h2>
             </div>
 
             <div className="space-y-3">
-              {currentLoopProjects.length === 0 ? (
+              {currentChapterProjects.length === 0 ? (
                 <Card className="p-4 text-center">
                   <div className="mb-2 text-4xl">🎯</div>
                   <h3 className="mb-1 font-medium">{texts.noProjects}</h3>
@@ -439,7 +443,7 @@ export default function HomePage() {
                       className="mt-2 w-full"
                       onClick={() => setShowAllProjects(true)}
                     >
-                      {texts.showMore} ({currentLoopProjects.length - 3}
+                      {texts.showMore} ({currentChapterProjects.length - 3}
                       {texts.showMoreSuffix})
                     </Button>
                   )}
@@ -504,9 +508,9 @@ export default function HomePage() {
 
           <div className="grid grid-cols-2 gap-4">
             <StatsCard
-              title={texts.completedLoops}
-              value={yearlyStats?.completedLoops || 0}
-              description={texts.completedLoopsDescription}
+              title={texts.completedChapters}
+              value={yearlyStats?.completedChapters || 0}
+              description={texts.completedChaptersDescription}
               icon={<Target className="h-4 w-4 text-muted-foreground" />}
             />
             <StatsCard
@@ -538,9 +542,9 @@ export default function HomePage() {
           </Card>
 
           <Card className="p-4">
-            <h3 className="mb-4 font-bold">{texts.loopComparison}</h3>
+            <h3 className="mb-4 font-bold">{texts.chapterComparison}</h3>
             <div className="h-64">
-              <LoopComparisonChart
+              <ChapterComparisonChart
                 data={
                   yearlyStats?.monthlyProgress
                     ? Object.entries(yearlyStats.monthlyProgress).map(

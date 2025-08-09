@@ -2,21 +2,21 @@
 
 import { useQuery } from "@tanstack/react-query";
 import {
-  getLoop,
-  getProjectsByLoopId,
-  getSnapshotsByLoopId,
+  getChapter,
+  getProjectsByChapterId,
+  getSnapshotsByChapterId,
   getProject,
   getTasksByProjectId,
   getArea,
   getResource,
   getArchive,
   getProjectsByUserId,
-  getLoopsByUserId,
+  getChaptersByUserId,
 } from "../api/data"; // api/data.ts를 import
 
 interface Options {
   userId?: string;
-  loopId?: string;
+  chapterId?: string;
   projectId?: string;
   areaId?: string;
   resourceId?: string;
@@ -27,9 +27,9 @@ interface Options {
 export const usePageData = (
   page:
     | "home"
-    | "loopDetail"
+    | "chapterDetail"
     | "projectDetail"
-    | "newLoop"
+    | "newChapter"
     | "area"
     | "resource"
     | "archive",
@@ -46,53 +46,53 @@ export const usePageData = (
       queryFn: () => getProjectsByUserId(userId),
     });
     const {
-      data: loops,
-      isLoading: loopsLoading,
-      error: loopsError,
+      data: chapters,
+      isLoading: chaptersLoading,
+      error: chaptersError,
     } = useQuery({
-      queryKey: ["loops"],
-      queryFn: () => getLoopsByUserId(userId),
+      queryKey: ["chapters"],
+      queryFn: () => getChaptersByUserId(userId),
     });
     return {
       projects,
-      loops,
-      isLoading: loopsLoading || projectsLoading,
-      error: loopsError || projectsError,
+      chapters,
+      isLoading: chaptersLoading || projectsLoading,
+      error: chaptersError || projectsError,
     };
   }
 
-  if (page === "loopDetail") {
-    const { loopId = "" } = options;
+  if (page === "chapterDetail") {
+    const { chapterId = "" } = options;
     const {
-      data: loop,
-      isLoading: loopLoading,
-      error: loopError,
+      data: chapter,
+      isLoading: chapterLoading,
+      error: chapterError,
     } = useQuery({
-      queryKey: ["loops", loopId],
-      queryFn: () => getLoop(loopId),
+      queryKey: ["chapters", chapterId],
+      queryFn: () => getChapter(chapterId),
     });
     const {
       data: projects,
       isLoading: projectsLoading,
       error: projectsError,
     } = useQuery({
-      queryKey: ["loops", loopId, "projects"],
-      queryFn: () => getProjectsByLoopId(loopId),
+      queryKey: ["chapters", chapterId, "projects"],
+      queryFn: () => getProjectsByChapterId(chapterId),
     });
     const {
       data: snapshots,
       isLoading: snapshotsLoading,
       error: snapshotsError,
     } = useQuery({
-      queryKey: ["loops", loopId, "snapshots"],
-      queryFn: () => getSnapshotsByLoopId(loopId),
+      queryKey: ["chapters", chapterId, "snapshots"],
+      queryFn: () => getSnapshotsByChapterId(chapterId),
     });
     return {
-      loop,
+      chapter,
       projects,
       snapshots,
-      isLoading: loopLoading || projectsLoading || snapshotsLoading,
-      error: loopError || projectsError || snapshotsError,
+      isLoading: chapterLoading || projectsLoading || snapshotsLoading,
+      error: chapterError || projectsError || snapshotsError,
     };
   }
 
@@ -121,8 +121,8 @@ export const usePageData = (
       error: projectError || tasksError,
     };
   }
-  if (page === "newLoop") {
-    // TODO: implement newLoop data fetching
+  if (page === "newChapter") {
+    // TODO: implement newChapter data fetching
     const {
       data: projects,
       isLoading: projectsLoading,

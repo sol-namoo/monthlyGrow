@@ -55,7 +55,7 @@ import {
   updateTaskInProject,
   deleteTaskFromProject,
   fetchAreaById,
-  fetchLoopsByIds,
+  fetchChaptersByIds,
   createRetrospective,
   updateRetrospective,
   createNote,
@@ -63,7 +63,7 @@ import {
   updateProject,
 } from "@/lib/firebase";
 import { useLanguage } from "@/hooks/useLanguage";
-import { formatDate, formatDateForInput, getLoopStatus } from "@/lib/utils";
+import { formatDate, formatDateForInput, getChapterStatus } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -233,8 +233,8 @@ export default function ProjectDetailPage({
     },
     onSuccess: () => {
       setHasChanges(true); // 변경 사항 플래그 설정만
-      // 태스크 변경 시 루프 태스크 카운트 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: ["loopTaskCounts"] });
+      // 태스크 변경 시 챕터 태스크 카운트 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ["chapterTaskCounts"] });
       queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
       toast({
         title: translate("paraProjectDetail.task.add.success.title"),
@@ -289,7 +289,7 @@ export default function ProjectDetailPage({
       queryClient.invalidateQueries({
         queryKey: ["taskCounts", projectId],
       });
-      queryClient.invalidateQueries({ queryKey: ["loopTaskCounts"] });
+      queryClient.invalidateQueries({ queryKey: ["chapterTaskCounts"] });
       queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
     },
   });
@@ -336,8 +336,8 @@ export default function ProjectDetailPage({
     },
     onSuccess: () => {
       setHasChanges(true); // 변경 사항 플래그 설정
-      // 태스크 변경 시 루프 태스크 카운트 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: ["loopTaskCounts"] });
+      // 태스크 변경 시 챕터 태스크 카운트 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ["chapterTaskCounts"] });
       queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
       toast({
         title: "태스크 삭제 완료",
@@ -352,8 +352,8 @@ export default function ProjectDetailPage({
       queryClient.invalidateQueries({
         queryKey: ["taskCounts", projectId],
       });
-      // 태스크 변경 시 루프 태스크 카운트 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: ["loopTaskCounts"] });
+      // 태스크 변경 시 챕터 태스크 카운트 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ["chapterTaskCounts"] });
       queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
     },
   });
@@ -377,7 +377,7 @@ export default function ProjectDetailPage({
         bestMoment: retrospectiveData.bestMoment,
         routineAdherence: retrospectiveData.routineAdherence,
         unexpectedObstacles: retrospectiveData.unexpectedObstacles,
-        nextLoopApplication: retrospectiveData.nextLoopApplication,
+        nextChapterApplication: retrospectiveData.nextChapterApplication,
         userRating: retrospectiveData.userRating,
         bookmarked: retrospectiveData.bookmarked,
         title: retrospectiveData.title,
@@ -394,7 +394,7 @@ export default function ProjectDetailPage({
           userId: user?.uid || "",
           projectId: project?.id || "",
           ...filteredData,
-          // loopId는 프로젝트 회고에서는 사용하지 않으므로 제외
+          // chapterId는 프로젝트 회고에서는 사용하지 않으므로 제외
         });
 
         // 프로젝트에 회고 연결 (필요한 필드만 포함)
@@ -485,11 +485,11 @@ export default function ProjectDetailPage({
   const [bookmarked, setBookmarked] = useState(false);
   const [hoverRating, setHoverRating] = useState<number | undefined>(undefined);
 
-  // 루프 상세 페이지와 동일한 회고 변수들 추가
+  // 챕터 상세 페이지와 동일한 회고 변수들 추가
   const [bestMoment, setBestMoment] = useState("");
   const [routineAdherence, setRoutineAdherence] = useState("");
   const [unexpectedObstacles, setUnexpectedObstacles] = useState("");
-  const [nextLoopApplication, setNextLoopApplication] = useState("");
+  const [nextChapterApplication, setNextChapterApplication] = useState("");
 
   // 스마트 회고 상태
   const [planningNeedsImprovement, setPlanningNeedsImprovement] =
@@ -519,28 +519,28 @@ export default function ProjectDetailPage({
     enabled: !!project?.areaId,
   });
 
-  // 연결된 루프 정보 가져오기
-  const { data: connectedLoops = [] } = useQuery({
-    queryKey: ["connectedLoops", project?.id],
+  // 연결된 챕터 정보 가져오기
+  const { data: connectedChapters = [] } = useQuery({
+    queryKey: ["connectedChapters", project?.id],
     queryFn: async () => {
-      if (!project || !project.connectedLoops) return [];
+      if (!project || !project.connectedChapters) return [];
 
-      // connectedLoops가 객체 배열인지 문자열 배열인지 확인
-      const loopIds = Array.isArray(project.connectedLoops)
-        ? project.connectedLoops.map((loop: any) =>
-            typeof loop === "string" ? loop : loop.id
+      // connectedChapters가 객체 배열인지 문자열 배열인지 확인
+      const chapterIds = Array.isArray(project.connectedChapters)
+        ? project.connectedChapters.map((chapter: any) =>
+            typeof chapter === "string" ? chapter : chapter.id
           )
         : [];
 
-      console.log("프로젝트 connectedLoops:", project.connectedLoops);
-      console.log("추출된 loopIds:", loopIds);
+      console.log("프로젝트 connectedChapters:", project.connectedChapters);
+      console.log("추출된 chapterIds:", chapterIds);
 
-      const loops = await fetchLoopsByIds(loopIds);
-      console.log("가져온 루프들:", loops);
+      const chapters = await fetchChaptersByIds(chapterIds);
+      console.log("가져온 챕터들:", chapters);
 
-      return loops;
+      return chapters;
     },
-    enabled: !!project && !!project.connectedLoops,
+    enabled: !!project && !!project.connectedChapters,
   });
 
   // 태스크 개수만 가져오기 (성능 최적화용) - 우선 로드
@@ -575,7 +575,9 @@ export default function ProjectDetailPage({
       setBestMoment(project.retrospective.bestMoment || "");
       setRoutineAdherence(project.retrospective.routineAdherence || "");
       setUnexpectedObstacles(project.retrospective.unexpectedObstacles || "");
-      setNextLoopApplication(project.retrospective.nextLoopApplication || "");
+      setNextChapterApplication(
+        project.retrospective.nextChapterApplication || ""
+      );
       setUserRating(project.retrospective.userRating);
       setBookmarked(project.retrospective.bookmarked || false);
 
@@ -598,7 +600,7 @@ export default function ProjectDetailPage({
       setBestMoment("");
       setRoutineAdherence("");
       setUnexpectedObstacles("");
-      setNextLoopApplication("");
+      setNextChapterApplication("");
       setUserRating(undefined);
       setBookmarked(false);
       setHoverRating(undefined);
@@ -809,8 +811,8 @@ export default function ProjectDetailPage({
       {
         onSuccess: () => {
           setHasChanges(true); // 변경 사항 플래그 설정만
-          // 태스크 변경 시 루프 태스크 카운트 캐시 무효화
-          queryClient.invalidateQueries({ queryKey: ["loopTaskCounts"] });
+          // 태스크 변경 시 챕터 태스크 카운트 캐시 무효화
+          queryClient.invalidateQueries({ queryKey: ["chapterTaskCounts"] });
           queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
         },
         onError: (error, variables, context) => {
@@ -821,8 +823,8 @@ export default function ProjectDetailPage({
           queryClient.invalidateQueries({
             queryKey: ["taskCounts", projectId],
           });
-          // 태스크 변경 시 루프 태스크 카운트 캐시 무효화
-          queryClient.invalidateQueries({ queryKey: ["loopTaskCounts"] });
+          // 태스크 변경 시 챕터 태스크 카운트 캐시 무효화
+          queryClient.invalidateQueries({ queryKey: ["chapterTaskCounts"] });
           queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
           toast({
             title: "태스크 상태 변경 실패",
@@ -893,8 +895,8 @@ export default function ProjectDetailPage({
       bestMoment,
       routineAdherence,
       unexpectedObstacles,
-      nextLoopApplication,
-      content: `가장 좋았던 순간: ${bestMoment}\n\n일정 준수: ${routineAdherence}\n\n예상치 못한 장애물: ${unexpectedObstacles}\n\n다음 루프 적용점: ${nextLoopApplication}`,
+      nextChapterApplication,
+      content: `가장 좋았던 순간: ${bestMoment}\n\n일정 준수: ${routineAdherence}\n\n예상치 못한 장애물: ${unexpectedObstacles}\n\n다음 챕터 적용점: ${nextChapterApplication}`,
       userRating,
       bookmarked,
       // 스마트 회고 데이터 (완료율 90% 미만 시에만 포함)
@@ -954,13 +956,13 @@ export default function ProjectDetailPage({
     );
   };
 
-  const getLoopTitle = (loopId: string) => {
-    // TODO: 실제 루프 데이터를 가져와서 사용
-    return loopId;
+  const getChapterTitle = (chapterId: string) => {
+    // TODO: 실제 챕터 데이터를 가져와서 사용
+    return chapterId;
   };
 
-  const getLoopPeriod = (loopId: string) => {
-    // TODO: 실제 루프 데이터를 가져와서 사용
+  const getChapterPeriod = (chapterId: string) => {
+    // TODO: 실제 챕터 데이터를 가져와서 사용
     return "";
   };
 
@@ -1098,49 +1100,49 @@ export default function ProjectDetailPage({
             ></div>
           </div>
 
-          {/* 연결된 루프 */}
+          {/* 연결된 챕터 */}
           <div>
             <span className="text-sm font-medium">
-              {translate("paraProjectDetail.connectedLoops")}
+              {translate("paraProjectDetail.connectedChapters")}
             </span>
             <div className="mt-2 space-y-2">
-              {connectedLoops && connectedLoops.length > 0 ? (
-                connectedLoops.map((loop) => (
+              {connectedChapters && connectedChapters.length > 0 ? (
+                connectedChapters.map((chapter) => (
                   <div
-                    key={loop.id}
+                    key={chapter.id}
                     className="flex items-center gap-3 p-2 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors"
                   >
                     <RotateCcw className="h-4 w-4 text-blue-600 flex-shrink-0" />
                     <div className="flex flex-col flex-1 min-w-0">
                       <Link
-                        href={`/loop/${loop.id}`}
+                        href={`/chapter/${chapter.id}`}
                         className="flex items-center gap-2 group"
                       >
                         <span className="text-sm text-blue-600 font-medium group-hover:text-blue-700 transition-colors">
-                          {loop.title}
+                          {chapter.title}
                         </span>
                         <ExternalLink className="h-3 w-3 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </Link>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs text-muted-foreground">
-                          {formatDate(loop.startDate, currentLanguage)} ~{" "}
-                          {formatDate(loop.endDate, currentLanguage)}
+                          {formatDate(chapter.startDate, currentLanguage)} ~{" "}
+                          {formatDate(chapter.endDate, currentLanguage)}
                         </span>
                         <Badge
                           variant={
-                            getLoopStatus(loop) === "in_progress"
+                            getChapterStatus(chapter) === "in_progress"
                               ? "default"
-                              : getLoopStatus(loop) === "ended"
+                              : getChapterStatus(chapter) === "ended"
                               ? "secondary"
                               : "outline"
                           }
                           className="text-xs"
                         >
-                          {getLoopStatus(loop) === "in_progress"
+                          {getChapterStatus(chapter) === "in_progress"
                             ? translate(
                                 "paraProjectDetail.statusLabels.inProgress"
                               )
-                            : getLoopStatus(loop) === "ended"
+                            : getChapterStatus(chapter) === "ended"
                             ? translate(
                                 "paraProjectDetail.statusLabels.completed"
                               )
@@ -1155,15 +1157,15 @@ export default function ProjectDetailPage({
               ) : (
                 <Card className="p-4 text-center">
                   <p className="text-muted-foreground">
-                    {translate("paraProjectDetail.noConnectedLoops")}
+                    {translate("paraProjectDetail.noConnectedChapters")}
                   </p>
                 </Card>
               )}
             </div>
           </div>
-          {connectedLoops && connectedLoops.length > 0 && (
+          {connectedChapters && connectedChapters.length > 0 && (
             <div className="space-y-3">
-              {connectedLoops.length >= 3 &&
+              {connectedChapters.length >= 3 &&
                 getProjectStatus(project) === "in_progress" && (
                   <CustomAlert variant="warning" className="mb-4">
                     <AlertCircle className="h-4 w-4" />
@@ -1173,7 +1175,7 @@ export default function ProjectDetailPage({
                     <AlertDescription>
                       {translate(
                         "paraProjectDetail.longTermProject.description"
-                      ).replace("{count}", connectedLoops.length.toString())}
+                      ).replace("{count}", connectedChapters.length.toString())}
                     </AlertDescription>
                   </CustomAlert>
                 )}
@@ -1367,12 +1369,12 @@ export default function ProjectDetailPage({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">
-                    {translate("paraProjectDetail.connectedLoops")}
+                    {translate("paraProjectDetail.connectedChapters")}
                   </span>
                   <span>
-                    {connectedLoops && connectedLoops.length > 0
-                      ? `${connectedLoops.length}개`
-                      : translate("paraProjectDetail.noConnectedLoops")}
+                    {connectedChapters && connectedChapters.length > 0
+                      ? `${connectedChapters.length}개`
+                      : translate("paraProjectDetail.noConnectedChapters")}
                   </span>
                 </div>
               </div>
@@ -1732,21 +1734,21 @@ export default function ProjectDetailPage({
               </div>
               <div>
                 <label
-                  htmlFor="nextLoopApplication"
+                  htmlFor="nextChapterApplication"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
                   {translate(
-                    "paraProjectDetail.retrospective.nextLoopApplication.label"
+                    "paraProjectDetail.retrospective.nextChapterApplication.label"
                   )}
                 </label>
                 <Textarea
-                  id="nextLoopApplication"
+                  id="nextChapterApplication"
                   className="mt-1"
                   rows={2}
-                  value={nextLoopApplication}
-                  onChange={(e) => setNextLoopApplication(e.target.value)}
+                  value={nextChapterApplication}
+                  onChange={(e) => setNextChapterApplication(e.target.value)}
                   placeholder={translate(
-                    "paraProjectDetail.retrospective.nextLoopApplication.placeholder"
+                    "paraProjectDetail.retrospective.nextChapterApplication.placeholder"
                   )}
                 />
               </div>

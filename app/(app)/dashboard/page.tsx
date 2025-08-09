@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CharacterAvatar } from "@/components/character-avatar";
 import { StatsCard } from "@/components/widgets/stats-card";
 import { AreaActivityChart } from "@/components/widgets/area-activity-chart";
-import { LoopComparisonChart } from "@/components/widgets/loop-comparison-chart";
+import { ChapterComparisonChart } from "@/components/widgets/chapter-comparison-chart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,21 +21,21 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
 import {
-  fetchAllLoopsByUserId,
+  fetchAllChaptersByUserId,
   fetchAllAreasByUserId,
-  fetchProjectsByLoopId,
+  fetchProjectsByChapterId,
   getTaskCountsForMultipleProjects,
 } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getLoopStatus, formatDate } from "@/lib/utils";
+import { getChapterStatus, formatDate } from "@/lib/utils";
 
 export default function DashboardPage() {
   const [user, userLoading] = useAuthState(auth);
 
   // Firestore에서 데이터 가져오기
-  const { data: loops = [], isLoading: loopsLoading } = useQuery({
-    queryKey: ["loops", user?.uid],
-    queryFn: () => fetchAllLoopsByUserId(user?.uid || ""),
+  const { data: chapters = [], isLoading: chaptersLoading } = useQuery({
+    queryKey: ["chapters", user?.uid],
+    queryFn: () => fetchAllChaptersByUserId(user?.uid || ""),
     enabled: !!user?.uid,
   });
 
@@ -45,55 +45,60 @@ export default function DashboardPage() {
     enabled: !!user?.uid,
   });
 
-  // 각 루프의 프로젝트와 태스크 데이터 가져오기
-  const { data: loopProjects = {}, isLoading: projectsLoading } = useQuery({
-    queryKey: ["loopProjects", user?.uid],
+  // 각 챕터의 프로젝트와 태스크 데이터 가져오기
+  const { data: chapterProjects = {}, isLoading: projectsLoading } = useQuery({
+    queryKey: ["chapterProjects", user?.uid],
     queryFn: async () => {
-      const projectsMap: { [loopId: string]: any[] } = {};
-      for (const loop of loops) {
-        const projects = await fetchProjectsByLoopId(loop.id);
-        projectsMap[loop.id] = projects;
+      const projectsMap: { [chapterId: string]: any[] } = {};
+      for (const chapter of chapters) {
+        const projects = await fetchProjectsByChapterId(chapter.id);
+        projectsMap[chapter.id] = projects;
       }
       return projectsMap;
     },
-    enabled: !!user?.uid && loops.length > 0,
+    enabled: !!user?.uid && chapters.length > 0,
   });
 
-  // 각 루프의 태스크 개수 데이터 가져오기
-  const { data: loopTaskCounts = {}, isLoading: taskCountsLoading } = useQuery({
-    queryKey: ["loopTaskCounts", user?.uid],
-    queryFn: async () => {
-      const taskCountsMap: {
-        [loopId: string]: { totalTasks: number; completedTasks: number };
-      } = {};
-      for (const loop of loops) {
-        const projects = loopProjects[loop.id] || [];
-        if (projects.length > 0) {
-          const projectIds = projects.map((p) => p.id);
-          const taskCounts = await getTaskCountsForMultipleProjects(projectIds);
-          const totalTasks = Object.values(taskCounts).reduce(
-            (sum, counts) => sum + counts.totalTasks,
-            0
-          );
-          const completedTasks = Object.values(taskCounts).reduce(
-            (sum, counts) => sum + counts.completedTasks,
-            0
-          );
-          taskCountsMap[loop.id] = { totalTasks, completedTasks };
-        } else {
-          taskCountsMap[loop.id] = { totalTasks: 0, completedTasks: 0 };
+  // 각 챕터의 태스크 개수 데이터 가져오기
+  const { data: chapterTaskCounts = {}, isLoading: taskCountsLoading } =
+    useQuery({
+      queryKey: ["chapterTaskCounts", user?.uid],
+      queryFn: async () => {
+        const taskCountsMap: {
+          [chapterId: string]: { totalTasks: number; completedTasks: number };
+        } = {};
+        for (const chapter of chapters) {
+          const projects = chapterProjects[chapter.id] || [];
+          if (projects.length > 0) {
+            const projectIds = projects.map((p) => p.id);
+            const taskCounts = await getTaskCountsForMultipleProjects(
+              projectIds
+            );
+            const totalTasks = Object.values(taskCounts).reduce(
+              (sum, counts) => sum + counts.totalTasks,
+              0
+            );
+            const completedTasks = Object.values(taskCounts).reduce(
+              (sum, counts) => sum + counts.completedTasks,
+              0
+            );
+            taskCountsMap[chapter.id] = { totalTasks, completedTasks };
+          } else {
+            taskCountsMap[chapter.id] = { totalTasks: 0, completedTasks: 0 };
+          }
         }
-      }
-      return taskCountsMap;
-    },
-    enabled:
-      !!user?.uid && loops.length > 0 && Object.keys(loopProjects).length > 0,
-  });
+        return taskCountsMap;
+      },
+      enabled:
+        !!user?.uid &&
+        chapters.length > 0 &&
+        Object.keys(chapterProjects).length > 0,
+    });
 
   // 로딩 상태
   if (
     userLoading ||
-    loopsLoading ||
+    chaptersLoading ||
     areasLoading ||
     projectsLoading ||
     taskCountsLoading
@@ -114,15 +119,17 @@ export default function DashboardPage() {
     );
   }
 
-  // 현재 루프와 과거 루프 분리 (날짜 기반)
-  const currentLoop = loops.find(
-    (loop) => getLoopStatus(loop) === "in_progress"
+  // 현재 챕터와 과거 챕터 분리 (날짜 기반)
+  const currentChapter = chapters.find(
+    (chapter) => getChapterStatus(chapter) === "in_progress"
   );
-  const pastLoops = loops.filter((loop) => getLoopStatus(loop) === "ended");
+  const pastChapters = chapters.filter(
+    (chapter) => getChapterStatus(chapter) === "ended"
+  );
 
   // 실제 데이터 기반 통계 계산
-  const getLoopCompletionRate = (loop: any) => {
-    const taskCounts = loopTaskCounts[loop.id];
+  const getChapterCompletionRate = (chapter: any) => {
+    const taskCounts = chapterTaskCounts[chapter.id];
     if (taskCounts && taskCounts.totalTasks > 0) {
       return Math.round(
         (taskCounts.completedTasks / taskCounts.totalTasks) * 100
@@ -131,48 +138,50 @@ export default function DashboardPage() {
     return 0;
   };
 
-  const getLoopTaskCounts = (loop: any) => {
-    const taskCounts = loopTaskCounts[loop.id];
+  const getChapterTaskCounts = (chapter: any) => {
+    const taskCounts = chapterTaskCounts[chapter.id];
     return {
       completed: taskCounts?.completedTasks || 0,
       total: taskCounts?.totalTasks || 0,
     };
   };
 
-  const completionRate = currentLoop ? getLoopCompletionRate(currentLoop) : 0;
-  const previousLoopCompletion =
-    pastLoops.length > 0 ? getLoopCompletionRate(pastLoops[0]) : 0;
+  const completionRate = currentChapter
+    ? getChapterCompletionRate(currentChapter)
+    : 0;
+  const previousChapterCompletion =
+    pastChapters.length > 0 ? getChapterCompletionRate(pastChapters[0]) : 0;
 
-  const totalFocusTime = loops.reduce((total, loop) => {
-    const taskCounts = loopTaskCounts[loop.id];
+  const totalFocusTime = chapters.reduce((total, chapter) => {
+    const taskCounts = chapterTaskCounts[chapter.id];
     return total + (taskCounts?.completedTasks || 0);
   }, 0);
 
   const previousFocusTime =
-    pastLoops.length > 0
+    pastChapters.length > 0
       ? (() => {
-          const taskCounts = loopTaskCounts[pastLoops[0].id];
+          const taskCounts = chapterTaskCounts[pastChapters[0].id];
           return taskCounts?.completedTasks || 0;
         })()
       : 0;
 
   const stats = {
     completionRate,
-    previousLoopCompletion,
+    previousChapterCompletion,
     changeRate:
-      pastLoops.length > 0
+      pastChapters.length > 0
         ? Math.round(
-            ((completionRate - previousLoopCompletion) /
-              previousLoopCompletion) *
+            ((completionRate - previousChapterCompletion) /
+              previousChapterCompletion) *
               100
           )
         : 0,
-    totalLoops: loops.length,
-    rewardsReceived: pastLoops.filter((loop) => loop.reward).length,
+    totalChapters: chapters.length,
+    rewardsReceived: pastChapters.filter((chapter) => chapter.reward).length,
     totalFocusTime,
     previousFocusTime,
     focusTimeChange:
-      pastLoops.length > 0
+      pastChapters.length > 0
         ? Math.round(
             ((totalFocusTime - previousFocusTime) / previousFocusTime) * 100
           )
@@ -184,10 +193,10 @@ export default function DashboardPage() {
     value: Math.floor(Math.random() * 50) + 10, // 임시 데이터
   }));
 
-  const loopComparisonData = pastLoops.slice(-3).map((loop, index) => {
-    const taskCounts = loopTaskCounts[loop.id];
+  const chapterComparisonData = pastChapters.slice(-3).map((chapter, index) => {
+    const taskCounts = chapterTaskCounts[chapter.id];
     return {
-      name: `${loop.startDate.getMonth() + 1}월`,
+      name: `${chapter.startDate.getMonth() + 1}월`,
       completion:
         taskCounts && taskCounts.totalTasks > 0
           ? Math.round(
@@ -207,7 +216,7 @@ export default function DashboardPage() {
         <div>
           <h2 className="text-lg font-bold">안녕하세요, 루퍼님!</h2>
           <p className="text-sm text-muted-foreground">
-            이번 루프 달성률이{" "}
+            이번 챕터 달성률이{" "}
             <span className="font-medium text-primary">65%</span>에 도달했어요.
           </p>
           <div className="mt-1 flex items-center gap-1 text-xs text-green-600">
@@ -227,15 +236,16 @@ export default function DashboardPage() {
           <Card className="p-4">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="font-bold">
-                {currentLoop?.title || "현재 루프 없음"}
+                {currentChapter?.title || "현재 챕터 없음"}
               </h3>
               <Badge variant="outline">
                 D-
-                {currentLoop
+                {currentChapter
                   ? Math.max(
                       0,
                       Math.ceil(
-                        (currentLoop.endDate.getTime() - new Date().getTime()) /
+                        (currentChapter.endDate.getTime() -
+                          new Date().getTime()) /
                           (1000 * 60 * 60 * 24)
                       )
                     )
@@ -248,8 +258,8 @@ export default function DashboardPage() {
                 <span>달성률: {stats.completionRate}%</span>
                 <span>
                   {(() => {
-                    if (!currentLoop) return "0/0";
-                    const counts = getLoopTaskCounts(currentLoop);
+                    if (!currentChapter) return "0/0";
+                    const counts = getChapterTaskCounts(currentChapter);
                     return `${counts.completed}/${counts.total}`;
                   })()}
                 </span>
@@ -265,9 +275,9 @@ export default function DashboardPage() {
             <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
               <Calendar className="h-3 w-3" />
               <span>
-                {currentLoop
-                  ? `${formatDate(currentLoop.startDate)} ~ ${formatDate(
-                      currentLoop.endDate
+                {currentChapter
+                  ? `${formatDate(currentChapter.startDate)} ~ ${formatDate(
+                      currentChapter.endDate
                     )}`
                   : "기간 없음"}
               </span>
@@ -275,7 +285,7 @@ export default function DashboardPage() {
 
             <div className="flex justify-end">
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/loop">
+                <Link href="/chapter">
                   자세히 보기
                   <ArrowUpRight className="ml-1 h-4 w-4" />
                 </Link>
@@ -285,9 +295,9 @@ export default function DashboardPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <StatsCard
-              title="누적 루프"
-              value={stats.totalLoops}
-              description="완료한 루프 수"
+              title="누적 챕터"
+              value={stats.totalChapters}
+              description="완료한 챕터 수"
               icon={<Target className="h-4 w-4 text-muted-foreground" />}
             />
             <StatsCard
@@ -299,21 +309,22 @@ export default function DashboardPage() {
           </div>
 
           <Card className="p-4">
-            <h3 className="mb-3 font-bold">다음 루프 준비</h3>
+            <h3 className="mb-3 font-bold">다음 챕터 준비</h3>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm">6월 루프 시작까지</p>
+                <p className="text-sm">6월 챕터 시작까지</p>
                 <p className="text-xs text-muted-foreground">
                   예정 프로젝트 2개
                 </p>
               </div>
               <div className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium">
                 D-
-                {currentLoop
+                {currentChapter
                   ? Math.max(
                       0,
                       Math.ceil(
-                        (currentLoop.endDate.getTime() - new Date().getTime()) /
+                        (currentChapter.endDate.getTime() -
+                          new Date().getTime()) /
                           (1000 * 60 * 60 * 24)
                       )
                     )
@@ -322,7 +333,7 @@ export default function DashboardPage() {
             </div>
             <div className="mt-3 flex justify-end">
               <Button variant="outline" size="sm" asChild>
-                <Link href="/loop/new">준비하기</Link>
+                <Link href="/chapter/new">준비하기</Link>
               </Button>
             </div>
           </Card>
@@ -362,9 +373,9 @@ export default function DashboardPage() {
           </Card>
 
           <Card className="p-4">
-            <h3 className="mb-4 font-bold">루프 비교</h3>
+            <h3 className="mb-4 font-bold">챕터 비교</h3>
             <div className="h-64">
-              <LoopComparisonChart data={loopComparisonData} />
+              <ChapterComparisonChart data={chapterComparisonData} />
             </div>
           </Card>
         </TabsContent>

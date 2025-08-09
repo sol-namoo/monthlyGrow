@@ -46,7 +46,7 @@ interface ProjectSelectionModalProps {
   areas?: any[]; // 외부에서 전달받은 영역 목록
   projectsLoading?: boolean;
   areasLoading?: boolean;
-  currentLoopId?: string; // 현재 루프 ID (수정 시에만 사용)
+  currentChapterId?: string; // 현재 챕터 ID (수정 시에만 사용)
 }
 
 export function ProjectSelectionModal({
@@ -61,7 +61,7 @@ export function ProjectSelectionModal({
   areas: externalAreas,
   projectsLoading: externalProjectsLoading,
   areasLoading: externalAreasLoading,
-  currentLoopId,
+  currentChapterId,
 }: ProjectSelectionModalProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -153,7 +153,7 @@ export function ProjectSelectionModal({
     }
 
     // 연결되지 않은 프로젝트만 필터
-    if (showOnlyUnconnected && project.loopId) {
+    if (showOnlyUnconnected && project.chapterId) {
       return false;
     }
 
@@ -221,7 +221,7 @@ export function ProjectSelectionModal({
         <DialogHeader>
           <DialogTitle>프로젝트 선택</DialogTitle>
           <DialogDescription>
-            이 루프에 연결할 프로젝트를 선택하세요.
+            이 챕터에 연결할 프로젝트를 선택하세요.
             {maxProjects && ` 최대 ${maxProjects}개까지 선택할 수 있습니다.`}
           </DialogDescription>
         </DialogHeader>
@@ -362,20 +362,20 @@ export function ProjectSelectionModal({
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1 ml-2">
-                          {currentLoopId &&
-                            project.loopId === currentLoopId && (
+                          {currentChapterId &&
+                            project.chapterId === currentChapterId && (
                               <Badge variant="secondary" className="text-xs">
-                                현재 루프에 연결됨
+                                현재 챕터에 연결됨
                               </Badge>
                             )}
-                          {currentLoopId &&
-                            project.loopId &&
-                            project.loopId !== currentLoopId && (
+                          {currentChapterId &&
+                            project.chapterId &&
+                            project.chapterId !== currentChapterId && (
                               <Badge
                                 variant="outline"
                                 className="text-xs text-muted-foreground"
                               >
-                                다른 루프에 연결됨
+                                다른 챕터에 연결됨
                               </Badge>
                             )}
                           {newlyCreatedProjectId === project.id && (
@@ -404,7 +404,7 @@ export function ProjectSelectionModal({
                   </p>
                   <Button asChild variant="outline">
                     <a
-                      href="/para/projects/new?returnUrl=/loop/new"
+                      href="/para/projects/new?returnUrl=/chapter/new"
                       target="_blank"
                     >
                       <Plus className="mr-2 h-4 w-4" />새 프로젝트 만들기

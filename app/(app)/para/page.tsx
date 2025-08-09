@@ -883,8 +883,8 @@ function ParaPageContent() {
                   )}
                   {filterType === "all"
                     ? translate("para.archives.filter.all")
-                    : filterType === "loop"
-                    ? translate("para.archives.filter.loop")
+                    : filterType === "chapter"
+                    ? translate("para.archives.filter.chapter")
                     : translate("para.archives.filter.project")}
                 </Button>
               </DropdownMenuTrigger>
@@ -892,8 +892,8 @@ function ParaPageContent() {
                 <DropdownMenuItem onClick={() => setFilterType("all")}>
                   {translate("para.archives.filter.all")}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilterType("loop")}>
-                  {translate("para.archives.filter.loop")}
+                <DropdownMenuItem onClick={() => setFilterType("chapter")}>
+                  {translate("para.archives.filter.chapter")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setFilterType("project")}>
                   {translate("para.archives.filter.project")}
@@ -944,7 +944,7 @@ function ParaPageContent() {
               {allArchives
                 .filter((archive) => {
                   if (filterType === "all") return true;
-                  if (filterType === "loop") return archive.loopId;
+                  if (filterType === "chapter") return archive.chapterId;
                   if (filterType === "project") return archive.projectId;
                   return true;
                 })
@@ -960,13 +960,13 @@ function ParaPageContent() {
                         </h3>
                         <Badge
                           className={`text-xs ${
-                            archive.loopId
+                            archive.chapterId
                               ? "bg-blue-100 text-blue-800"
                               : "bg-purple-100 text-purple-800"
                           }`}
                         >
-                          {archive.loopId
-                            ? translate("para.archives.loopRetrospective")
+                          {archive.chapterId
+                            ? translate("para.archives.chapterRetrospective")
                             : translate("para.archives.projectRetrospective")}
                         </Badge>
                       </div>

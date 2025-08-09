@@ -152,7 +152,7 @@ function NewAreaPageContent() {
         description: `${data.title} 영역이 생성되었습니다.`,
       });
 
-      // 루프 생성 페이지에서 왔다면 다시 루프 생성 페이지로 돌아가기
+      // 챕터 생성 페이지에서 왔다면 다시 챕터 생성 페이지로 돌아가기
       const returnUrl = searchParams.get("returnUrl");
       if (returnUrl) {
         router.replace(returnUrl);

@@ -179,7 +179,7 @@ export default function LoginPage() {
             <Target className="h-12 w-12 text-primary" />
           </div>
           <h1 className="text-3xl font-bold">MonthlyGrow</h1>
-          <p className="text-muted-foreground">월간 루프 기반 자기계발 앱</p>
+          <p className="text-muted-foreground">월간 챕터 기반 자기계발 앱</p>
         </div>
 
         <Card className="p-6">

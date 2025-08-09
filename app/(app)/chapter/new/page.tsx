@@ -39,9 +39,9 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { useQuery } from "@tanstack/react-query";
 import {
   auth,
-  findLoopByMonth,
-  deleteLoopById,
-  connectPendingProjectsToNewLoop,
+  findChapterByMonth,
+  deleteChapterById,
+  connectPendingProjectsToNewChapter,
   fetchAllProjectsByUserId,
   fetchAllAreasByUserId,
   fetchUnconnectedProjects,
@@ -73,11 +73,11 @@ import { formatDateForInput } from "@/lib/utils";
 import { useLanguage } from "@/hooks/useLanguage";
 
 // 기본 폼 스키마 정의
-const loopFormSchema = z
+const chapterFormSchema = z
   .object({
-    title: z.string().min(1, "루프 제목을 입력해주세요"),
+    title: z.string().min(1, "챕터 제목을 입력해주세요"),
     reward: z.string().min(1, "보상을 입력해주세요"),
-    selectedMonth: z.string().min(1, "루프 월을 선택해주세요"),
+    selectedMonth: z.string().min(1, "챕터 월을 선택해주세요"),
     startDate: z.string().min(1, "시작일을 입력해주세요"),
     endDate: z.string().min(1, "종료일을 입력해주세요"),
     selectedAreas: z.array(z.string()).min(1, "최소 1개의 영역을 선택해주세요"),
@@ -93,12 +93,12 @@ const loopFormSchema = z
       return selectedDate <= sixMonthsLater;
     },
     {
-      message: "루프는 최대 6개월 후까지만 생성할 수 있습니다",
+      message: "챕터는 최대 6개월 후까지만 생성할 수 있습니다",
       path: ["selectedMonth"],
     }
   );
 
-type LoopFormData = z.infer<typeof loopFormSchema>;
+type ChapterFormData = z.infer<typeof chapterFormSchema>;
 
 // 아이콘 컴포넌트 매핑 함수
 const getIconComponent = (iconName: string) => {
@@ -115,7 +115,7 @@ const getIconComponent = (iconName: string) => {
   return iconMap[iconName] || Compass;
 };
 
-function NewLoopPageContent() {
+function NewChapterPageContent() {
   const router = useRouter();
   const { toast } = useToast();
   const searchParams = useSearchParams();
@@ -126,15 +126,15 @@ function NewLoopPageContent() {
   useEffect(() => {
     if (!userLoading && !user) {
       toast({
-        title: translate("loopNew.loginRequired.title"),
-        description: translate("loopNew.loginRequired.description"),
+        title: translate("chapterNew.loginRequired.title"),
+        description: translate("chapterNew.loginRequired.description"),
         variant: "destructive",
       });
       router.push("/login");
     }
   }, [user, userLoading, toast, router]);
 
-  // URL 파라미터에서 loopId와 addedMidway 값을 가져옴
+  // URL 파라미터에서 chapterId와 addedMidway 값을 가져옴
 
   // 사용자의 연결되지 않은 프로젝트들만 가져오기
   const { data: unconnectedProjects = [], isLoading: projectsLoading } =
@@ -151,12 +151,12 @@ function NewLoopPageContent() {
     enabled: !!user?.uid,
   });
 
-  // 중복 루프 관련 상태
-  const [existingLoop, setExistingLoop] = useState<any>(null);
+  // 중복 챕터 관련 상태
+  const [existingChapter, setExistingChapter] = useState<any>(null);
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [showFinalConfirmDialog, setShowFinalConfirmDialog] = useState(false);
   const [blockedMonth, setBlockedMonth] = useState<string | null>(null);
-  const [loopToDelete, setLoopToDelete] = useState<any>(null); // 삭제할 루프 정보 임시 저장
+  const [chapterToDelete, setChapterToDelete] = useState<any>(null); // 삭제할 챕터 정보 임시 저장
 
   // 6개월 후까지의 월 옵션 생성
   const getAvailableMonths = () => {
@@ -185,8 +185,8 @@ function NewLoopPageContent() {
   };
 
   // react-hook-form 설정
-  const form = useForm<LoopFormData>({
-    resolver: zodResolver(loopFormSchema),
+  const form = useForm<ChapterFormData>({
+    resolver: zodResolver(chapterFormSchema),
     defaultValues: {
       title: "",
       reward: "",
@@ -206,7 +206,7 @@ function NewLoopPageContent() {
     string | undefined
   >();
   const [projectModalRefreshKey, setProjectModalRefreshKey] = useState(0);
-  const [currentUrl, setCurrentUrl] = useState("/loop/new");
+  const [currentUrl, setCurrentUrl] = useState("/chapter/new");
 
   // 월 선택 변경 핸들러
   const handleMonthChange = async (selectedMonth: string) => {
@@ -221,7 +221,7 @@ function NewLoopPageContent() {
       toast({
         title: "월 선택 제한",
         description:
-          "이 월은 기존 루프가 있어 선택할 수 없습니다. 다른 월을 선택해주세요.",
+          "이 월은 기존 챕터가 있어 선택할 수 없습니다. 다른 월을 선택해주세요.",
         variant: "destructive",
       });
       return;
@@ -229,16 +229,16 @@ function NewLoopPageContent() {
 
     const [year, month] = selectedMonth.split("-").map(Number);
 
-    // 중복 루프 확인
+    // 중복 챕터 확인
     try {
-      const existing = await findLoopByMonth(user.uid, year, month);
+      const existing = await findChapterByMonth(user.uid, year, month);
       if (existing) {
-        setExistingLoop(existing);
+        setExistingChapter(existing);
         setShowDuplicateDialog(true);
         return; // 중복 확인 대화상자가 나올 때까지 진행하지 않음
       }
     } catch (error) {
-      console.error("중복 루프 확인 중 오류:", error);
+      console.error("중복 챕터 확인 중 오류:", error);
     }
 
     // 중복이 없으면 계속 진행
@@ -265,19 +265,19 @@ function NewLoopPageContent() {
     form.setValue("startDate", startDateString);
     form.setValue("endDate", endDateString);
 
-    // 제목에 기본값 설정 ("n월 루프: ")
+    // 제목에 기본값 설정 ("n월 챕터: ")
     const monthName = startOfMonth.toLocaleDateString("ko-KR", {
       month: "long",
     });
 
     const currentTitle = form.getValues("title");
-    // 기존 제목이 없거나 이전 월 루프 패턴이면 새로 설정
-    if (!currentTitle || /^\d+월 루프:/.test(currentTitle)) {
-      form.setValue("title", `${monthName} 루프: `);
+    // 기존 제목이 없거나 이전 월 챕터 패턴이면 새로 설정
+    if (!currentTitle || /^\d+월 챕터:/.test(currentTitle)) {
+      form.setValue("title", `${monthName} 챕터: `);
     }
   };
 
-  // 중복 루프 대체 확인
+  // 중복 챕터 대체 확인
   const handleDuplicateConfirm = async (shouldReplace: boolean) => {
     if (!shouldReplace) {
       // 대체하지 않음 - 월 선택 초기화하고 해당 월 차단
@@ -285,18 +285,18 @@ function NewLoopPageContent() {
       setBlockedMonth(selectedMonth);
       form.setValue("selectedMonth", "");
       setShowDuplicateDialog(false);
-      setExistingLoop(null);
-      setLoopToDelete(null);
+      setExistingChapter(null);
+      setChapterToDelete(null);
       return;
     }
 
-    // 기존 루프 정보를 임시 저장하고 계속 진행
-    if (existingLoop) {
-      setLoopToDelete(existingLoop);
+    // 기존 챕터 정보를 임시 저장하고 계속 진행
+    if (existingChapter) {
+      setChapterToDelete(existingChapter);
       toast({
-        title: "기존 루프 대체 준비 완료",
+        title: "기존 챕터 대체 준비 완료",
         description:
-          "루프 생성하기 버튼을 누르면 기존 루프가 삭제되고 새 루프가 생성됩니다.",
+          "챕터 생성하기 버튼을 누르면 기존 챕터가 삭제되고 새 챕터가 생성됩니다.",
       });
 
       // 월 변경 사항 적용
@@ -306,7 +306,7 @@ function NewLoopPageContent() {
     }
 
     setShowDuplicateDialog(false);
-    setExistingLoop(null);
+    setExistingChapter(null);
   };
 
   // 실제 areas 데이터 사용 (allAreas)
@@ -317,17 +317,17 @@ function NewLoopPageContent() {
     const formData = form.watch();
     const url = new URL(window.location.href);
 
-    // 루프 기본 정보 저장
+    // 챕터 기본 정보 저장
     if (formData.title) {
-      url.searchParams.set("loopTitle", formData.title);
+      url.searchParams.set("chapterTitle", formData.title);
     } else {
-      url.searchParams.delete("loopTitle");
+      url.searchParams.delete("chapterTitle");
     }
 
     if (formData.reward) {
-      url.searchParams.set("loopReward", formData.reward);
+      url.searchParams.set("chapterReward", formData.reward);
     } else {
-      url.searchParams.delete("loopReward");
+      url.searchParams.delete("chapterReward");
     }
 
     if (formData.startDate) {
@@ -375,8 +375,8 @@ function NewLoopPageContent() {
 
   // URL 파라미터에서 상태 복원
   useEffect(() => {
-    const loopTitleParam = searchParams.get("loopTitle");
-    const loopRewardParam = searchParams.get("loopReward");
+    const chapterTitleParam = searchParams.get("chapterTitle");
+    const chapterRewardParam = searchParams.get("chapterReward");
     const startDateParam = searchParams.get("startDate");
     const endDateParam = searchParams.get("endDate");
     const selectedAreasParam = searchParams.get("selectedAreas");
@@ -385,12 +385,12 @@ function NewLoopPageContent() {
     );
     const newProjectId = searchParams.get("newProjectId");
 
-    // 루프 기본 정보 복원
-    if (loopTitleParam) {
-      form.setValue("title", loopTitleParam);
+    // 챕터 기본 정보 복원
+    if (chapterTitleParam) {
+      form.setValue("title", chapterTitleParam);
     }
-    if (loopRewardParam) {
-      form.setValue("reward", loopRewardParam);
+    if (chapterRewardParam) {
+      form.setValue("reward", chapterRewardParam);
     }
     if (startDateParam) {
       form.setValue("startDate", startDateParam);
@@ -473,18 +473,18 @@ function NewLoopPageContent() {
     }
   };
 
-  const onSubmit = async (data: LoopFormData) => {
+  const onSubmit = async (data: ChapterFormData) => {
     // 차단된 월인지 최종 확인
     if (blockedMonth === data.selectedMonth) {
       setShowFinalConfirmDialog(true);
       return;
     }
 
-    // 중복 루프 최종 확인
+    // 중복 챕터 최종 확인
     if (user?.uid && data.selectedMonth) {
       const [year, month] = data.selectedMonth.split("-").map(Number);
       try {
-        const existing = await findLoopByMonth(user.uid, year, month);
+        const existing = await findChapterByMonth(user.uid, year, month);
         if (existing) {
           setShowFinalConfirmDialog(true);
           return;
@@ -494,40 +494,43 @@ function NewLoopPageContent() {
       }
     }
 
-    // 실제 루프 생성
-    createLoop(data);
+    // 실제 챕터 생성
+    createChapter(data);
   };
 
-  const createLoop = async (data: LoopFormData) => {
+  const createChapter = async (data: ChapterFormData) => {
     if (!user?.uid) return;
 
     try {
-      // 기존 루프가 있다면 먼저 삭제
-      if (loopToDelete) {
-        await deleteLoopById(loopToDelete.id);
+      // 기존 챕터가 있다면 먼저 삭제
+      if (chapterToDelete) {
+        await deleteChapterById(chapterToDelete.id);
         toast({
-          title: "기존 루프 삭제 완료",
-          description: `${loopToDelete.title}가 삭제되었습니다.`,
+          title: "기존 챕터 삭제 완료",
+          description: `${chapterToDelete.title}가 삭제되었습니다.`,
         });
       }
 
-      // 루프 생성
-      const loopData = {
+      // 챕터 생성
+      const chapterData = {
         userId: user.uid,
         title: data.title,
         reward: data.reward,
         startDate: new Date(data.startDate),
         endDate: new Date(data.endDate),
-        // projectIds는 더 이상 사용하지 않음 (connectedLoops로 대체)
+        // projectIds는 더 이상 사용하지 않음 (connectedChapters로 대체)
         retrospective: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      // Firebase에 루프 추가
-      const newLoopId = await addDoc(collection(db, "loops"), loopData);
+      // Firebase에 챕터 추가
+      const newChapterId = await addDoc(
+        collection(db, "chapters"),
+        chapterData
+      );
 
-      // 선택된 기존 프로젝트들을 새 루프에 연결
+      // 선택된 기존 프로젝트들을 새 챕터에 연결
       if (data.selectedExistingProjects.length > 0) {
         const batch = writeBatch(db);
 
@@ -537,11 +540,11 @@ function NewLoopPageContent() {
 
           if (projectDoc.exists()) {
             const projectData = projectDoc.data();
-            const connectedLoops = projectData.connectedLoops || [];
+            const connectedChapters = projectData.connectedChapters || [];
 
-            if (!connectedLoops.includes(newLoopId.id)) {
+            if (!connectedChapters.includes(newChapterId.id)) {
               batch.update(projectRef, {
-                connectedLoops: [...connectedLoops, newLoopId.id],
+                connectedChapters: [...connectedChapters, newChapterId.id],
                 updatedAt: Timestamp.now(),
               });
             }
@@ -551,21 +554,21 @@ function NewLoopPageContent() {
         await batch.commit();
       }
 
-      // 대기 중인 프로젝트들을 새 루프에 자동 연결
-      await connectPendingProjectsToNewLoop(user.uid, newLoopId.id);
+      // 대기 중인 프로젝트들을 새 챕터에 자동 연결
+      await connectPendingProjectsToNewChapter(user.uid, newChapterId.id);
 
       toast({
-        title: "루프 생성 완료",
-        description: `${data.title} 루프가 생성되었습니다.`,
+        title: "챕터 생성 완료",
+        description: `${data.title} 챕터가 생성되었습니다.`,
       });
 
-      // 루프 상세 페이지로 이동 (replace로 히스토리 대체)
-      router.replace(`/loop/${newLoopId.id}`);
+      // 챕터 상세 페이지로 이동 (replace로 히스토리 대체)
+      router.replace(`/chapter/${newChapterId.id}`);
     } catch (error) {
-      console.error("루프 생성 중 오류:", error);
+      console.error("챕터 생성 중 오류:", error);
       toast({
-        title: "루프 생성 실패",
-        description: "루프 생성 중 오류가 발생했습니다.",
+        title: "챕터 생성 실패",
+        description: "챕터 생성 중 오류가 발생했습니다.",
         variant: "destructive",
       });
     }
@@ -598,12 +601,12 @@ function NewLoopPageContent() {
       <div className="container max-w-md px-4 py-6">
         <div className="mb-6 flex items-center">
           <Button variant="ghost" size="icon" asChild className="mr-2">
-            <Link href="/loop">
+            <Link href="/chapter">
               <ChevronLeft className="h-5 w-5" />
             </Link>
           </Button>
           <h1 className="text-2xl font-bold">
-            {monthName} {translate("loopNew.title")}
+            {monthName} {translate("chapterNew.title")}
           </h1>
         </div>
 
@@ -615,14 +618,14 @@ function NewLoopPageContent() {
           </div>
           <h2 className="text-xl font-bold mb-4">등록된 활동 영역이 없어요</h2>
           <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
-            루프를 만들기 위해서는 먼저 활동 영역(Area)을 등록해야 합니다. 건강,
+            챕터를 만들기 위해서는 먼저 활동 영역(Area)을 등록해야 합니다. 건강,
             커리어, 자기계발 등 관심 있는 영역을 만들어보세요.
           </p>
           <div className="space-y-4">
             <Button asChild className="w-full max-w-xs">
               <Link
                 href={`/para/areas/new?returnUrl=${encodeURIComponent(
-                  `/loop/new${
+                  `/chapter/new${
                     searchParams.get("startDate")
                       ? `?startDate=${searchParams.get("startDate")}`
                       : ""
@@ -651,24 +654,24 @@ function NewLoopPageContent() {
       {/* 헤더 */}
       <div className="mb-6 flex items-center">
         <Button variant="ghost" size="icon" asChild className="mr-2">
-          <Link href="/loop">
+          <Link href="/chapter">
             <ChevronLeft className="h-5 w-5" />
           </Link>
         </Button>
-        <h1 className="text-2xl font-bold">{translate("loopNew.title")}</h1>
+        <h1 className="text-2xl font-bold">{translate("chapterNew.title")}</h1>
       </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         {/* 기본 정보 */}
         <Card className="p-6">
           <h2 className="mb-4 text-lg font-semibold">
-            {translate("loopNew.basicInfo.title")}
+            {translate("chapterNew.basicInfo.title")}
           </h2>
           <div className="space-y-4">
             {/* 월 선택 */}
             <div>
               <Label htmlFor="selectedMonth">
-                {translate("loopNew.basicInfo.monthSelection")}
+                {translate("chapterNew.basicInfo.monthSelection")}
               </Label>
               <Select
                 value={form.watch("selectedMonth")}
@@ -683,7 +686,7 @@ function NewLoopPageContent() {
                 <SelectTrigger className="mt-1">
                   <SelectValue
                     placeholder={translate(
-                      "loopNew.basicInfo.monthPlaceholder"
+                      "chapterNew.basicInfo.monthPlaceholder"
                     )}
                   />
                 </SelectTrigger>
@@ -713,16 +716,16 @@ function NewLoopPageContent() {
                 </p>
               )}
               <p className="text-xs text-muted-foreground mt-1">
-                💡 루프는 최대 6개월 후까지 생성할 수 있습니다
+                💡 챕터는 최대 6개월 후까지 생성할 수 있습니다
               </p>
             </div>
 
             <div>
-              <Label htmlFor="title">루프 제목</Label>
+              <Label htmlFor="title">챕터 제목</Label>
               <Input
                 id="title"
                 {...form.register("title")}
-                placeholder="예: 1월 건강 루프"
+                placeholder="예: 1월 건강 챕터"
                 className="mt-1"
               />
               {form.formState.errors.title && (
@@ -742,7 +745,7 @@ function NewLoopPageContent() {
               />
               <p className="text-xs text-muted-foreground mt-1">
                 💡 기본 보상 설정이 비활성화되어 있습니다. 설정에서 활성화하면
-                새 루프 생성 시 자동으로 보상이 채워집니다.
+                새 챕터 생성 시 자동으로 보상이 채워집니다.
               </p>
               {form.formState.errors.reward && (
                 <p className="text-sm text-red-500 mt-1">
@@ -763,7 +766,7 @@ function NewLoopPageContent() {
                   disabled
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  루프는 월 단위로 설정됩니다
+                  챕터는 월 단위로 설정됩니다
                 </p>
               </div>
 
@@ -792,7 +795,7 @@ function NewLoopPageContent() {
           <div className="mb-4 space-y-2">
             <RecommendationBadge
               type="info"
-              message="권장: 2개 영역에 집중하면 루프의 효과를 높일 수 있어요"
+              message="권장: 2개 영역에 집중하면 챕터의 효과를 높일 수 있어요"
             />
             {form.watch("selectedAreas").length > 2 && (
               <RecommendationBadge
@@ -849,7 +852,7 @@ function NewLoopPageContent() {
                 등록된 활동 영역이 없습니다.
               </p>
               <Button asChild size="sm" variant="outline">
-                <Link href="/para/areas/new?returnUrl=/loop/new">
+                <Link href="/para/areas/new?returnUrl=/chapter/new">
                   Area 만들기
                 </Link>
               </Button>
@@ -862,7 +865,7 @@ function NewLoopPageContent() {
           <div className="mb-4">
             <h2 className="text-lg font-semibold mb-2">프로젝트 연결</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              이 루프와 연결할 프로젝트를 선택하거나 새 프로젝트를 만들어보세요.
+              이 챕터와 연결할 프로젝트를 선택하거나 새 프로젝트를 만들어보세요.
               프로젝트는 나중에 추가할 수도 있습니다.
             </p>
           </div>
@@ -953,7 +956,7 @@ function NewLoopPageContent() {
           <div className="mt-4 space-y-2">
             <RecommendationBadge
               type="info"
-              message="권장: 2~3개 프로젝트에 집중하면 루프의 효과를 높일 수 있어요"
+              message="권장: 2~3개 프로젝트에 집중하면 챕터의 효과를 높일 수 있어요"
             />
 
             {form.watch("selectedExistingProjects").length > 3 && (
@@ -988,7 +991,7 @@ function NewLoopPageContent() {
 
         {/* 제출 버튼 */}
         <Button type="submit" className="w-full" size="lg">
-          루프 생성하기
+          챕터 생성하기
         </Button>
       </form>
 
@@ -1001,7 +1004,7 @@ function NewLoopPageContent() {
           <DialogHeader>
             <DialogTitle>새 프로젝트 만들기</DialogTitle>
             <DialogDescription>
-              새 프로젝트를 만들어 루프에 연결하시겠습니까?
+              새 프로젝트를 만들어 챕터에 연결하시겠습니까?
             </DialogDescription>
           </DialogHeader>
 
@@ -1017,7 +1020,7 @@ function NewLoopPageContent() {
                   </h4>
                   <p className="text-xs text-blue-700 dark:text-blue-300">
                     프로젝트 생성 페이지로 이동하여 새 프로젝트를 만들고, 완료
-                    후 이 루프 페이지로 돌아와서 연결할 수 있습니다.
+                    후 이 챕터 페이지로 돌아와서 연결할 수 있습니다.
                   </p>
                 </div>
               </div>
@@ -1031,7 +1034,7 @@ function NewLoopPageContent() {
                     참고 사항
                   </h4>
                   <p className="text-xs text-amber-700 dark:text-amber-300">
-                    현재 작성 중인 루프 정보는 저장되므로 안심하고 이동하세요.
+                    현재 작성 중인 챕터 정보는 저장되므로 안심하고 이동하세요.
                   </p>
                 </div>
               </div>
@@ -1064,29 +1067,27 @@ function NewLoopPageContent() {
         </DialogContent>
       </Dialog>
 
-      {/* 중복 루프 대체 확인 대화상자 */}
+      {/* 중복 챕터 대체 확인 대화상자 */}
       <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>기존 루프가 있습니다</DialogTitle>
+            <DialogTitle>기존 챕터가 있습니다</DialogTitle>
             <DialogDescription>
-              선택한 월에 이미 루프가 존재합니다. 기존 루프를 대체하고 새로운
-              루프를 생성하시겠습니까?
+              선택한 월에 이미 챕터가 존재합니다. 기존 챕터를 대체하고 새로운
+              챕터를 생성하시겠습니까?
             </DialogDescription>
           </DialogHeader>
 
-          {existingLoop && (
+          {existingChapter && (
             <div className="my-4 p-4 bg-muted/50 rounded-lg">
-              <h4 className="font-medium mb-2">기존 루프 정보</h4>
+              <h4 className="font-medium mb-2">기존 챕터 정보</h4>
               <div className="text-sm text-muted-foreground space-y-1">
-                <div>제목: {existingLoop.title}</div>
+                <div>제목: {existingChapter.title}</div>
                 <div>
-                  기간: {formatDate(existingLoop.startDate)} ~{" "}
-                  {formatDate(existingLoop.endDate)}
+                  기간: {formatDate(existingChapter.startDate)} ~{" "}
+                  {formatDate(existingChapter.endDate)}
                 </div>
-                <div>
-                  연결된 프로젝트: {existingLoop.projectIds?.length || 0}개
-                </div>
+                <div>연결된 프로젝트: 0개</div>
               </div>
             </div>
           )}
@@ -1095,13 +1096,13 @@ function NewLoopPageContent() {
             <div className="flex items-center gap-2">
               <span className="text-primary">💡</span>
               <span>
-                연결된 프로젝트는 삭제되지 않고 루프 연결만 해제됩니다.
+                연결된 프로젝트는 삭제되지 않고 챕터 연결만 해제됩니다.
               </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-amber-500">⚠️</span>
               <span>
-                기존 루프는 "루프 생성하기" 버튼을 누를 때 삭제됩니다.
+                기존 챕터는 "챕터 생성하기" 버튼을 누를 때 삭제됩니다.
               </span>
             </div>
           </div>
@@ -1117,28 +1118,28 @@ function NewLoopPageContent() {
               variant="destructive"
               onClick={() => handleDuplicateConfirm(true)}
             >
-              기존 루프 대체하고 계속
+              기존 챕터 대체하고 계속
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* 최종 루프 생성 확인 대화상자 */}
+      {/* 최종 챕터 생성 확인 대화상자 */}
       <Dialog
         open={showFinalConfirmDialog}
         onOpenChange={setShowFinalConfirmDialog}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>루프 생성 확인</DialogTitle>
+            <DialogTitle>챕터 생성 확인</DialogTitle>
             <DialogDescription>
-              선택한 월에 기존 루프가 있거나 이전에 취소한 월입니다. 정말로
-              루프를 생성하시겠습니까?
+              선택한 월에 기존 챕터가 있거나 이전에 취소한 월입니다. 정말로
+              챕터를 생성하시겠습니까?
             </DialogDescription>
           </DialogHeader>
 
           <div className="text-sm text-muted-foreground">
-            <p>⚠️ 기존 루프가 있는 경우 삭제되고 새로운 루프가 생성됩니다.</p>
+            <p>⚠️ 기존 챕터가 있는 경우 삭제되고 새로운 챕터가 생성됩니다.</p>
           </div>
 
           <DialogFooter>
@@ -1153,10 +1154,10 @@ function NewLoopPageContent() {
               onClick={() => {
                 const formData = form.getValues();
                 setShowFinalConfirmDialog(false);
-                createLoop(formData);
+                createChapter(formData);
               }}
             >
-              확인, 루프 생성
+              확인, 챕터 생성
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1165,10 +1166,10 @@ function NewLoopPageContent() {
   );
 }
 
-export default function NewLoopPage() {
+export default function NewChapterPage() {
   return (
     <Suspense fallback={<Loading />}>
-      <NewLoopPageContent />
+      <NewChapterPageContent />
     </Suspense>
   );
 }

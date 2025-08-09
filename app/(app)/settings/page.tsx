@@ -75,8 +75,8 @@ export default function SettingsPage() {
     email: translate("settings.email"),
     noEmail: translate("settings.noEmail"),
 
-    // 루프 설정 섹션
-    loopSettings: translate("settings.loopSettings"),
+    // 챕터 설정 섹션
+    chapterSettings: translate("settings.chapterSettings"),
     defaultReward: translate("settings.defaultReward"),
     defaultRewardPlaceholder: translate("settings.defaultRewardPlaceholder"),
     defaultRewardEnabled: translate("settings.defaultRewardEnabled"),
@@ -484,7 +484,7 @@ export default function SettingsPage() {
         </section>
 
         <section>
-          <h2 className="mb-4 text-xl font-bold">{texts.loopSettings}</h2>
+          <h2 className="mb-4 text-xl font-bold">{texts.chapterSettings}</h2>
           <Card className="p-4">
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2">

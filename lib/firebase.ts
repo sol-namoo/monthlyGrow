@@ -38,7 +38,7 @@ import {
   Resource,
   Project,
   Task,
-  Loop,
+  Chapter,
   Retrospective,
   Note,
   User,
@@ -46,7 +46,7 @@ import {
   UserSettings,
   UserPreferences,
 } from "./types"; // lib/types.ts에서 타입 import
-import { getLoopStatus } from "./utils";
+import { getChapterStatus } from "./utils";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCKEG-VqAZRGyEpSsPIxeJV5ACZ8mfQvPY",
@@ -372,12 +372,12 @@ export const fetchProjectsByAreaId = async (
   });
 };
 
-export const fetchProjectsByLoopId = async (
-  loopId: string,
+export const fetchProjectsByChapterId = async (
+  chapterId: string,
   userId?: string
 ): Promise<Project[]> => {
-  // userId가 없으면 loopId에서 추출 시도
-  const targetUserId = userId || loopId.split("_")[0];
+  // userId가 없으면 chapterId에서 추출 시도
+  const targetUserId = userId || chapterId.split("_")[0];
 
   // 모든 프로젝트를 가져온 후 클라이언트 사이드에서 필터링
   const q = query(
@@ -398,21 +398,21 @@ export const fetchProjectsByLoopId = async (
     } as Project;
   });
 
-  // connectedLoops 배열에서 해당 loopId를 가진 프로젝트들만 필터링
+  // connectedChapters 배열에서 해당 chapterId를 가진 프로젝트들만 필터링
   return projects.filter((project) => {
-    const connectedLoops = (project as any).connectedLoops || [];
-    return connectedLoops.includes(loopId);
+    const connectedChapters = (project as any).connectedChapters || [];
+    return connectedChapters.includes(chapterId);
   });
 };
 
-// 현재 루프의 프로젝트만 효율적으로 가져오는 함수
-export const fetchCurrentLoopProjects = async (
+// 현재 챕터의 프로젝트만 효율적으로 가져오는 함수
+export const fetchCurrentChapterProjects = async (
   userId: string,
-  currentLoopId?: string
+  currentChapterId?: string
 ): Promise<Project[]> => {
-  if (!currentLoopId) return [];
+  if (!currentChapterId) return [];
 
-  // 현재 루프에 연결된 프로젝트들만 가져오기
+  // 현재 챕터에 연결된 프로젝트들만 가져오기
   const q = query(collection(db, "projects"), where("userId", "==", userId));
 
   const querySnapshot = await getDocs(q);
@@ -428,19 +428,20 @@ export const fetchCurrentLoopProjects = async (
     } as Project;
   });
 
-  // 현재 루프에 연결된 프로젝트들만 필터링
+  // 현재 챕터에 연결된 프로젝트들만 필터링
   return projects.filter((project) => {
-    const connectedLoops = (project as any).connectedLoops || [];
+    const connectedChapters = (project as any).connectedChapters || [];
     return (
-      connectedLoops.includes(currentLoopId) || project.loopId === currentLoopId
+      connectedChapters.includes(currentChapterId) ||
+      project.chapterId === currentChapterId
     );
   });
 };
 
-// 연결되지 않은 프로젝트들만 가져오는 함수 (루프 편집용)
+// 연결되지 않은 프로젝트들만 가져오는 함수 (챕터 편집용)
 export const fetchUnconnectedProjects = async (
   userId: string,
-  excludeLoopId?: string
+  excludeChapterId?: string
 ): Promise<Project[]> => {
   const q = query(collection(db, "projects"), where("userId", "==", userId));
 
@@ -459,15 +460,15 @@ export const fetchUnconnectedProjects = async (
 
   // 연결되지 않은 프로젝트들만 필터링
   return projects.filter((project) => {
-    const connectedLoops = (project as any).connectedLoops || [];
-    const isConnected = connectedLoops.length > 0 || project.loopId;
+    const connectedChapters = (project as any).connectedChapters || [];
+    const isConnected = connectedChapters.length > 0 || project.chapterId;
 
-    // excludeLoopId가 있으면 해당 루프는 제외
-    if (excludeLoopId) {
+    // excludeChapterId가 있으면 해당 챕터는 제외
+    if (excludeChapterId) {
       return (
         !isConnected ||
-        (!connectedLoops.includes(excludeLoopId) &&
-          project.loopId !== excludeLoopId)
+        (!connectedChapters.includes(excludeChapterId) &&
+          project.chapterId !== excludeChapterId)
       );
     }
 
@@ -475,17 +476,17 @@ export const fetchUnconnectedProjects = async (
   });
 };
 
-// 루프별 프로젝트 개수만 효율적으로 조회하는 함수
-export const fetchProjectCountsByLoopIds = async (
-  loopIds: string[],
+// 챕터별 프로젝트 개수만 효율적으로 조회하는 함수
+export const fetchProjectCountsByChapterIds = async (
+  chapterIds: string[],
   userId: string
-): Promise<{ [loopId: string]: number }> => {
-  if (loopIds.length === 0) return {};
+): Promise<{ [chapterId: string]: number }> => {
+  if (chapterIds.length === 0) return {};
 
-  const counts: { [loopId: string]: number } = {};
+  const counts: { [chapterId: string]: number } = {};
 
-  console.log("🔍 fetchProjectCountsByLoopIds 시작");
-  console.log("조회할 루프 IDs:", loopIds);
+  console.log("🔍 fetchProjectCountsByChapterIds 시작");
+  console.log("조회할 챕터 IDs:", chapterIds);
   console.log("사용자 ID:", userId);
 
   // 모든 프로젝트를 한 번에 가져오기
@@ -501,17 +502,17 @@ export const fetchProjectCountsByLoopIds = async (
 
   console.log(`총 ${allProjects.length}개 프로젝트 조회됨`);
 
-  // 각 루프별로 프로젝트 개수 계산
-  for (const loopId of loopIds) {
-    console.log(`\n📊 루프 ${loopId} 계산 중...`);
+  // 각 챕터별로 프로젝트 개수 계산
+  for (const chapterId of chapterIds) {
+    console.log(`\n📊 챕터 ${chapterId} 계산 중...`);
 
     const connectedProjects = allProjects.filter((project) => {
-      const connectedLoops = (project as any).connectedLoops || [];
-      return connectedLoops.includes(loopId);
+      const connectedChapters = (project as any).connectedChapters || [];
+      return connectedChapters.includes(chapterId);
     });
 
     console.log(
-      `루프 ${loopId} 결과:`,
+      `챕터 ${chapterId} 결과:`,
       connectedProjects.length,
       "개 프로젝트"
     );
@@ -521,15 +522,15 @@ export const fetchProjectCountsByLoopIds = async (
       console.log("연결된 프로젝트들:");
       connectedProjects.forEach((project) => {
         console.log(
-          `- ${project.title}: connectedLoops =`,
-          (project as any).connectedLoops
+          `- ${project.title}: connectedChapters =`,
+          (project as any).connectedChapters
         );
       });
     } else {
       console.log("연결된 프로젝트 없음");
     }
 
-    counts[loopId] = connectedProjects.length;
+    counts[chapterId] = connectedProjects.length;
   }
 
   console.log("최종 결과:", counts);
@@ -672,11 +673,11 @@ export const fetchTaskById = async (taskId: string): Promise<Task> => {
   }
 };
 
-// Loops
-export const fetchAllLoopsByUserId = async (
+// Chapters
+export const fetchAllChaptersByUserId = async (
   userId: string
-): Promise<Loop[]> => {
-  const q = query(collection(db, "loops"), where("userId", "==", userId));
+): Promise<Chapter[]> => {
+  const q = query(collection(db, "chapters"), where("userId", "==", userId));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => {
     const data = doc.data();
@@ -687,12 +688,12 @@ export const fetchAllLoopsByUserId = async (
       endDate: data.endDate.toDate(),
       createdAt: data.createdAt.toDate(),
       updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-    } as Loop;
+    } as Chapter;
   });
 };
 
-export const fetchLoopById = async (loopId: string): Promise<Loop> => {
-  const docRef = doc(db, "loops", loopId);
+export const fetchChapterById = async (chapterId: string): Promise<Chapter> => {
+  const docRef = doc(db, "chapters", chapterId);
   const docSnap = await getDoc(docRef);
 
   if (docSnap.exists()) {
@@ -705,29 +706,29 @@ export const fetchLoopById = async (loopId: string): Promise<Loop> => {
       // status 필드 제거 - 클라이언트에서 날짜 기반으로 계산
       createdAt: data.createdAt.toDate(),
       updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-    } as Loop;
+    } as Chapter;
   } else {
-    throw new Error("Loop not found");
+    throw new Error("Chapter not found");
   }
 };
 
-// 특정 월의 기존 루프 찾기
-export const findLoopByMonth = async (
+// 특정 월의 기존 챕터 찾기
+export const findChapterByMonth = async (
   userId: string,
   year: number,
   month: number
-): Promise<Loop | null> => {
-  const q = query(collection(db, "loops"), where("userId", "==", userId));
+): Promise<Chapter | null> => {
+  const q = query(collection(db, "chapters"), where("userId", "==", userId));
   const querySnapshot = await getDocs(q);
 
   for (const doc of querySnapshot.docs) {
     const data = doc.data();
-    const loopStartDate = data.startDate.toDate();
+    const chapterStartDate = data.startDate.toDate();
 
-    // 루프의 시작 월과 비교
+    // 챕터의 시작 월과 비교
     if (
-      loopStartDate.getFullYear() === year &&
-      loopStartDate.getMonth() === month - 1
+      chapterStartDate.getFullYear() === year &&
+      chapterStartDate.getMonth() === month - 1
     ) {
       return {
         id: doc.id,
@@ -736,26 +737,26 @@ export const findLoopByMonth = async (
         startDate: data.startDate.toDate(),
         endDate: data.endDate.toDate(),
         focusAreas: data.focusAreas,
-        // projectIds는 더 이상 사용하지 않음 (connectedLoops로 대체)
+        // projectIds는 더 이상 사용하지 않음 (connectedChapters로 대체)
         createdAt: data.createdAt.toDate(),
         updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
         doneCount: data.doneCount,
         targetCount: data.targetCount,
         reward: data.reward,
-      } as Loop;
+      } as Chapter;
     }
   }
 
   return null;
 };
 
-// 루프의 미완료 프로젝트 찾기
-export const findIncompleteProjectsInLoop = async (
-  loopId: string
+// 챕터의 미완료 프로젝트 찾기
+export const findIncompleteProjectsInChapter = async (
+  chapterId: string
 ): Promise<Project[]> => {
   const q = query(
     collection(db, "projects"),
-    where("connectedLoops", "array-contains", loopId)
+    where("connectedChapters", "array-contains", chapterId)
   );
   const querySnapshot = await getDocs(q);
 
@@ -791,13 +792,13 @@ export const findIncompleteProjectsInLoop = async (
         endDate: data.endDate?.toDate(),
         createdAt: data.createdAt.toDate(),
         updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-        loopId: data.loopId,
-        connectedLoops: data.connectedLoops || [],
+        chapterId: data.chapterId,
+        connectedChapters: data.connectedChapters || [],
         addedMidway: data.addedMidway,
         retrospective: data.retrospective,
         notes: data.notes || [], // notes 배열이 없으면 빈 배열
         isCarriedOver: data.isCarriedOver,
-        originalLoopId: data.originalLoopId,
+        originalChapterId: data.originalChapterId,
         carriedOverAt: data.carriedOverAt?.toDate(),
         migrationStatus: data.migrationStatus,
         status: data.status || "in_progress", // status가 없으면 기본값
@@ -808,11 +809,11 @@ export const findIncompleteProjectsInLoop = async (
   return incompleteProjects;
 };
 
-// 프로젝트를 다른 루프로 이동
-export const moveProjectToLoop = async (
+// 프로젝트를 다른 챕터로 이동
+export const moveProjectToChapter = async (
   projectId: string,
-  fromLoopId: string,
-  toLoopId: string
+  fromChapterId: string,
+  toChapterId: string
 ): Promise<void> => {
   const projectRef = doc(db, "projects", projectId);
   const projectSnap = await getDoc(projectRef);
@@ -822,18 +823,18 @@ export const moveProjectToLoop = async (
   }
 
   const projectData = projectSnap.data();
-  const connectedLoops = (projectData as any).connectedLoops || [];
+  const connectedChapters = (projectData as any).connectedChapters || [];
 
-  // 기존 루프에서 제거하고 새 루프에 추가
-  const updatedConnectedLoops = connectedLoops
-    .filter((loopId: string) => loopId !== fromLoopId)
-    .concat([toLoopId]);
+  // 기존 챕터에서 제거하고 새 챕터에 추가
+  const updatedConnectedChapters = connectedChapters
+    .filter((chapterId: string) => chapterId !== fromChapterId)
+    .concat([toChapterId]);
 
   // 프로젝트 업데이트
   await updateDoc(projectRef, {
-    connectedLoops: updatedConnectedLoops,
+    connectedChapters: updatedConnectedChapters,
     isCarriedOver: true,
-    originalLoopId: fromLoopId,
+    originalChapterId: fromChapterId,
     carriedOverAt: new Date(),
     migrationStatus: "migrated",
     updatedAt: new Date(),
@@ -878,12 +879,12 @@ export const fetchRetrospectiveById = async (
   }
 };
 
-export const fetchRetrospectivesByLoopId = async (
-  loopId: string
+export const fetchRetrospectivesByChapterId = async (
+  chapterId: string
 ): Promise<Retrospective[]> => {
   const q = query(
     collection(db, "retrospectives"),
-    where("loopId", "==", loopId)
+    where("chapterId", "==", chapterId)
   );
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => {
@@ -1122,13 +1123,13 @@ export const createProject = async (
     endDate: projectData.endDate,
     createdAt: new Date(),
     updatedAt: new Date(),
-    loopId: projectData.loopId,
+    chapterId: projectData.chapterId,
 
     addedMidway: projectData.addedMidway,
     retrospective: projectData.retrospective,
     notes: projectData.notes || [],
     isCarriedOver: projectData.isCarriedOver,
-    originalLoopId: projectData.originalLoopId,
+    originalChapterId: projectData.originalChapterId,
     carriedOverAt: projectData.carriedOverAt,
     migrationStatus: projectData.migrationStatus,
   } as Project;
@@ -1253,48 +1254,48 @@ export const deleteTaskFromProject = async (taskId: string): Promise<void> => {
   }
 };
 
-// Loops
-export const createLoop = async (
-  loopData: Omit<Loop, "id" | "createdAt" | "updatedAt">
-): Promise<Loop> => {
-  const baseData = createBaseData(loopData.userId);
+// Chapters
+export const createChapter = async (
+  chapterData: Omit<Chapter, "id" | "createdAt" | "updatedAt">
+): Promise<Chapter> => {
+  const baseData = createBaseData(chapterData.userId);
 
   // Date 객체를 Timestamp로 변환
-  const newLoop = {
-    ...loopData,
+  const newChapter = {
+    ...chapterData,
     ...baseData,
     startDate:
-      loopData.startDate instanceof Date
-        ? Timestamp.fromDate(loopData.startDate)
-        : loopData.startDate,
+      chapterData.startDate instanceof Date
+        ? Timestamp.fromDate(chapterData.startDate)
+        : chapterData.startDate,
     endDate:
-      loopData.endDate instanceof Date
-        ? Timestamp.fromDate(loopData.endDate)
-        : loopData.endDate,
+      chapterData.endDate instanceof Date
+        ? Timestamp.fromDate(chapterData.endDate)
+        : chapterData.endDate,
   };
 
-  const docRef = await addDoc(collection(db, "loops"), newLoop);
+  const docRef = await addDoc(collection(db, "chapters"), newChapter);
 
-  // Loop 타입에 맞는 객체로 변환하여 반환
+  // Chapter 타입에 맞는 객체로 변환하여 반환
   return {
     id: docRef.id,
-    userId: loopData.userId,
-    title: loopData.title,
-    startDate: loopData.startDate,
-    endDate: loopData.endDate,
-    status: loopData.status || "planned",
-    retrospective: loopData.retrospective,
-    focusAreas: loopData.focusAreas || [],
+    userId: chapterData.userId,
+    title: chapterData.title,
+    startDate: chapterData.startDate,
+    endDate: chapterData.endDate,
+    status: chapterData.status || "planned",
+    retrospective: chapterData.retrospective,
+    focusAreas: chapterData.focusAreas || [],
     createdAt: new Date(),
     updatedAt: new Date(),
-  } as Loop;
+  } as Chapter;
 };
 
-export const updateLoop = async (
-  loopId: string,
-  updateData: Partial<Omit<Loop, "id" | "userId" | "createdAt">>
+export const updateChapter = async (
+  chapterId: string,
+  updateData: Partial<Omit<Chapter, "id" | "userId" | "createdAt">>
 ): Promise<void> => {
-  const docRef = doc(db, "loops", loopId);
+  const docRef = doc(db, "chapters", chapterId);
   await updateDoc(docRef, {
     ...updateData,
     updatedAt: updateTimestamp(),
@@ -1322,7 +1323,7 @@ export const createRetrospective = async (
     userId: retrospectiveData.userId,
     title: retrospectiveData.title,
     projectId: retrospectiveData.projectId,
-    loopId: retrospectiveData.loopId,
+    chapterId: retrospectiveData.chapterId,
     content: retrospectiveData.content,
     bestMoment: retrospectiveData.bestMoment,
     routineAdherence: retrospectiveData.routineAdherence,
@@ -1695,20 +1696,20 @@ export const deleteProjectById = async (projectId: string): Promise<void> => {
   }
 };
 
-export const deleteLoopById = async (loopId: string): Promise<void> => {
+export const deleteChapterById = async (chapterId: string): Promise<void> => {
   try {
-    const docRef = doc(db, "loops", loopId);
+    const docRef = doc(db, "chapters", chapterId);
     await deleteDoc(docRef);
   } catch (error) {
-    console.error("Error deleting loop:", error);
-    throw new Error("루프 삭제에 실패했습니다.");
+    console.error("Error deleting chapter:", error);
+    throw new Error("챕터 삭제에 실패했습니다.");
   }
 };
 
-// 자동 이관을 위한 함수: 완료된 루프의 미완료 프로젝트를 다음 루프로 이관
+// 자동 이관을 위한 함수: 완료된 챕터의 미완료 프로젝트를 다음 챕터로 이관
 export const autoMigrateIncompleteProjects = async (
   userId: string,
-  completedLoopId: string
+  completedChapterId: string
 ): Promise<void> => {
   // 사용자 설정 확인
   const userData = await fetchUserById(userId);
@@ -1722,8 +1723,8 @@ export const autoMigrateIncompleteProjects = async (
   }
 
   // 1. 미완료 프로젝트 찾기
-  const incompleteProjects = await findIncompleteProjectsInLoop(
-    completedLoopId
+  const incompleteProjects = await findIncompleteProjectsInChapter(
+    completedChapterId
   );
 
   if (incompleteProjects.length === 0) {
@@ -1731,13 +1732,13 @@ export const autoMigrateIncompleteProjects = async (
     return;
   }
 
-  // 2. 다음 달 루프 찾기 (진행 중이거나 예정된 루프)
-  const allLoops = await fetchAllLoopsByUserId(userId);
-  const { getLoopStatus } = await import("./utils");
+  // 2. 다음 달 챕터 찾기 (진행 중이거나 예정된 챕터)
+  const allChapters = await fetchAllChaptersByUserId(userId);
+  const { getChapterStatus } = await import("./utils");
 
-  const sortedLoops = allLoops
-    .filter((loop) => {
-      const status = getLoopStatus(loop);
+  const sortedChapters = allChapters
+    .filter((chapter) => {
+      const status = getChapterStatus(chapter);
       return status === "in_progress" || status === "planned";
     })
     .sort(
@@ -1745,15 +1746,15 @@ export const autoMigrateIncompleteProjects = async (
         new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
     );
 
-  const targetLoop = sortedLoops[0]; // 가장 빠른 미래 루프
+  const targetChapter = sortedChapters[0]; // 가장 빠른 미래 챕터
 
-  if (!targetLoop) {
-    // 다음 달 루프가 없으면 프로젝트에 이관 대기 상태로 마킹
+  if (!targetChapter) {
+    // 다음 달 챕터가 없으면 프로젝트에 이관 대기 상태로 마킹
     for (const project of incompleteProjects) {
       const projectRef = doc(db, "projects", project.id);
       await updateDoc(projectRef, {
         migrationStatus: "pending",
-        originalLoopId: completedLoopId,
+        originalChapterId: completedChapterId,
         updatedAt: new Date(),
       });
     }
@@ -1763,12 +1764,16 @@ export const autoMigrateIncompleteProjects = async (
     return;
   }
 
-  // 3. 미완료 프로젝트들을 다음 루프로 이관
+  // 3. 미완료 프로젝트들을 다음 챕터로 이관
   for (const project of incompleteProjects) {
     try {
-      await moveProjectToLoop(project.id, completedLoopId, targetLoop.id);
+      await moveProjectToChapter(
+        project.id,
+        completedChapterId,
+        targetChapter.id
+      );
       console.log(
-        `Migrated project ${project.title} to loop ${targetLoop.title}`
+        `Migrated project ${project.title} to chapter ${targetChapter.title}`
       );
     } catch (error) {
       console.error(`Failed to migrate project ${project.id}:`, error);
@@ -1776,10 +1781,10 @@ export const autoMigrateIncompleteProjects = async (
   }
 };
 
-// 이관 대기 중인 프로젝트들을 새로 생성된 루프에 자동 연결
-export const connectPendingProjectsToNewLoop = async (
+// 이관 대기 중인 프로젝트들을 새로 생성된 챕터에 자동 연결
+export const connectPendingProjectsToNewChapter = async (
   userId: string,
-  newLoopId: string
+  newChapterId: string
 ): Promise<void> => {
   // 사용자 설정 확인
   const userData = await fetchUserById(userId);
@@ -1813,48 +1818,48 @@ export const connectPendingProjectsToNewLoop = async (
 
   for (const project of pendingProjects) {
     try {
-      // 기존 connectedLoops에 새 루프 추가
-      const connectedLoops = (project as any).connectedLoops || [];
-      const updatedLoops = [...connectedLoops, newLoopId];
+      // 기존 connectedChapters에 새 챕터 추가
+      const connectedChapters = (project as any).connectedChapters || [];
+      const updatedChapters = [...connectedChapters, newChapterId];
 
       const projectRef = doc(db, "projects", project.id);
       await updateDoc(projectRef, {
-        connectedLoops: updatedLoops,
+        connectedChapters: updatedChapters,
         migrationStatus: "migrated",
         carriedOverAt: new Date(),
         updatedAt: new Date(),
       });
 
-      // 새 루프 정보 가져오기
-      const loopRef = doc(db, "loops", newLoopId);
-      const loopSnap = await getDoc(loopRef);
-      if (loopSnap.exists()) {
-        const loopData = loopSnap.data();
-        const newLoopInfo = {
-          id: newLoopId,
-          title: loopData.title,
-          startDate: loopData.startDate.toDate(),
-          endDate: loopData.endDate.toDate(),
+      // 새 챕터 정보 가져오기
+      const chapterRef = doc(db, "chapters", newChapterId);
+      const chapterSnap = await getDoc(chapterRef);
+      if (chapterSnap.exists()) {
+        const chapterData = chapterSnap.data();
+        const newChapterInfo = {
+          id: newChapterId,
+          title: chapterData.title,
+          startDate: chapterData.startDate.toDate(),
+          endDate: chapterData.endDate.toDate(),
         };
 
-        // 새 루프가 이미 연결되어 있지 않으면 추가
-        const isAlreadyConnected = updatedLoops.some(
-          (loop: any) => loop.id === newLoopId
+        // 새 챕터가 이미 연결되어 있지 않으면 추가
+        const isAlreadyConnected = updatedChapters.some(
+          (chapter: any) => chapter.id === newChapterId
         );
 
-        const finalConnectedLoops = isAlreadyConnected
-          ? updatedLoops
-          : [...updatedLoops, newLoopInfo];
+        const finalConnectedChapters = isAlreadyConnected
+          ? updatedChapters
+          : [...updatedChapters, newChapterInfo];
 
         await updateDoc(projectRef, {
-          connectedLoops: finalConnectedLoops,
+          connectedChapters: finalConnectedChapters,
           migrationStatus: "migrated",
           carriedOverAt: new Date(),
           updatedAt: new Date(),
         });
       }
 
-      console.log(`Connected pending project ${project.title} to new loop`);
+      console.log(`Connected pending project ${project.title} to new chapter`);
     } catch (error) {
       console.error(`Failed to connect pending project ${project.id}:`, error);
     }
@@ -1983,16 +1988,16 @@ export const fetchYearlyActivityStats = async (
   year: number
 ): Promise<any> => {
   try {
-    // 1. 완료된 루프들 가져오기
-    const allLoops = await fetchAllLoopsByUserId(userId);
-    const completedLoops = allLoops.filter((loop) => {
-      const loopYear = new Date(loop.endDate).getFullYear();
-      return loopYear === year && getLoopStatus(loop) === "ended";
+    // 1. 완료된 챕터들 가져오기
+    const allChapters = await fetchAllChaptersByUserId(userId);
+    const completedChapters = allChapters.filter((chapter) => {
+      const chapterYear = new Date(chapter.endDate).getFullYear();
+      return chapterYear === year && getChapterStatus(chapter) === "ended";
     });
 
     // 2. 받은 보상 수 계산
-    const totalRewards = completedLoops.reduce(
-      (sum, loop) => sum + (loop.reward ? 1 : 0),
+    const totalRewards = completedChapters.reduce(
+      (sum, chapter) => sum + (chapter.reward ? 1 : 0),
       0
     );
 
@@ -2036,22 +2041,23 @@ export const fetchYearlyActivityStats = async (
     // 4. 월별 진행률 계산
     const monthlyProgress: any = {};
     for (let month = 1; month <= 12; month++) {
-      const monthLoops = completedLoops.filter((loop) => {
-        const loopMonth = new Date(loop.endDate).getMonth() + 1;
-        return loopMonth === month;
+      const monthChapters = completedChapters.filter((chapter) => {
+        const chapterMonth = new Date(chapter.endDate).getMonth() + 1;
+        return chapterMonth === month;
       });
 
-      const totalFocusTime = monthLoops.reduce(
-        (sum, loop) => sum + (loop.targetCount || 0),
+      const totalFocusTime = monthChapters.reduce(
+        (sum, chapter) => sum + (chapter.targetCount || 0),
         0
       );
 
       const completionRate =
-        monthLoops.length > 0
+        monthChapters.length > 0
           ? Math.round(
-              (monthLoops.filter((loop) => loop.doneCount >= loop.targetCount)
-                .length /
-                monthLoops.length) *
+              (monthChapters.filter(
+                (chapter) => chapter.doneCount >= chapter.targetCount
+              ).length /
+                monthChapters.length) *
                 100
             )
           : 0;
@@ -2059,32 +2065,32 @@ export const fetchYearlyActivityStats = async (
       monthlyProgress[month] = {
         completionRate,
         focusTime: totalFocusTime,
-        projectCount: monthLoops.length,
+        projectCount: monthChapters.length,
       };
     }
 
     // 5. 전체 통계 계산
-    const totalFocusTime = completedLoops.reduce(
-      (sum, loop) => sum + (loop.targetCount || 0),
+    const totalFocusTime = completedChapters.reduce(
+      (sum, chapter) => sum + (chapter.targetCount || 0),
       0
     );
 
     const averageCompletionRate =
-      completedLoops.length > 0
+      completedChapters.length > 0
         ? Math.round(
-            completedLoops.reduce(
-              (sum, loop) =>
+            completedChapters.reduce(
+              (sum, chapter) =>
                 sum +
-                (loop.targetCount > 0
-                  ? Math.round((loop.doneCount / loop.targetCount) * 100)
+                (chapter.targetCount > 0
+                  ? Math.round((chapter.doneCount / chapter.targetCount) * 100)
                   : 0),
               0
-            ) / completedLoops.length
+            ) / completedChapters.length
           )
         : 0;
 
     return {
-      completedLoops: completedLoops.length,
+      completedChapters: completedChapters.length,
       totalRewards,
       areaStats,
       monthlyProgress,
@@ -2094,7 +2100,7 @@ export const fetchYearlyActivityStats = async (
   } catch (error) {
     console.error("연간 활동 통계 조회 중 오류:", error);
     return {
-      completedLoops: 0,
+      completedChapters: 0,
       totalRewards: 0,
       areaStats: {},
       monthlyProgress: {},
@@ -2597,44 +2603,44 @@ export const fetchArchiveCountByUserId = async (
   }
 };
 
-// 루프와 프로젝트 개수를 한 번에 효율적으로 조회하는 함수
-export const fetchLoopsWithProjectCounts = async (
+// 챕터와 프로젝트 개수를 한 번에 효율적으로 조회하는 함수
+export const fetchChaptersWithProjectCounts = async (
   userId: string
-): Promise<(Loop & { projectCount: number })[]> => {
-  // 1. 모든 루프 조회
-  const loops = await fetchAllLoopsByUserId(userId);
+): Promise<(Chapter & { projectCount: number })[]> => {
+  // 1. 모든 챕터 조회
+  const chapters = await fetchAllChaptersByUserId(userId);
 
-  if (loops.length === 0) return [];
+  if (chapters.length === 0) return [];
 
-  // 2. 모든 프로젝트를 한 번에 조회하여 루프별 개수 계산
+  // 2. 모든 프로젝트를 한 번에 조회하여 챕터별 개수 계산
   const projectsQuery = query(
     collection(db, "projects"),
     where("userId", "==", userId)
   );
   const projectsSnapshot = await getDocs(projectsQuery);
 
-  // 3. 루프별 프로젝트 개수 계산
-  const projectCounts: { [loopId: string]: number } = {};
+  // 3. 챕터별 프로젝트 개수 계산
+  const projectCounts: { [chapterId: string]: number } = {};
 
   console.log("🔍 프로젝트 개수 계산 시작");
   console.log("총 프로젝트 수:", projectsSnapshot.size);
 
   projectsSnapshot.docs.forEach((doc) => {
     const projectData = doc.data();
-    const connectedLoops = projectData.connectedLoops || [];
+    const connectedChapters = projectData.connectedChapters || [];
 
     console.log(
-      `프로젝트 "${projectData.title}"의 connectedLoops:`,
-      connectedLoops
+      `프로젝트 "${projectData.title}"의 connectedChapters:`,
+      connectedChapters
     );
 
     // 이제 단순 ID 배열이므로 직접 사용
-    connectedLoops.forEach((loopId: string) => {
-      console.log("루프 ID:", loopId);
-      if (loopId) {
-        projectCounts[loopId] = (projectCounts[loopId] || 0) + 1;
+    connectedChapters.forEach((chapterId: string) => {
+      console.log("챕터 ID:", chapterId);
+      if (chapterId) {
+        projectCounts[chapterId] = (projectCounts[chapterId] || 0) + 1;
         console.log(
-          `루프 ${loopId}에 프로젝트 추가. 현재 개수: ${projectCounts[loopId]}`
+          `챕터 ${chapterId}에 프로젝트 추가. 현재 개수: ${projectCounts[chapterId]}`
         );
       }
     });
@@ -2642,49 +2648,53 @@ export const fetchLoopsWithProjectCounts = async (
 
   console.log("최종 프로젝트 개수:", projectCounts);
 
-  // 4. 루프에 프로젝트 개수 추가
-  return loops.map((loop) => ({
-    ...loop,
-    projectCount: projectCounts[loop.id] || 0,
+  // 4. 챕터에 프로젝트 개수 추가
+  return chapters.map((chapter) => ({
+    ...chapter,
+    projectCount: projectCounts[chapter.id] || 0,
   }));
 };
 
-// 루프 ID 배열로 루프 정보 가져오기
-export const fetchLoopsByIds = async (loopIds: string[]): Promise<Loop[]> => {
-  if (loopIds.length === 0) return [];
+// 챕터 ID 배열로 챕터 정보 가져오기
+export const fetchChaptersByIds = async (
+  chapterIds: string[]
+): Promise<Chapter[]> => {
+  if (chapterIds.length === 0) return [];
 
-  const connectedLoops: Loop[] = [];
+  const connectedChapters: Chapter[] = [];
 
-  // 배치로 루프 정보 가져오기 (Firestore는 'in' 쿼리에서 최대 10개만 지원)
+  // 배치로 챕터 정보 가져오기 (Firestore는 'in' 쿼리에서 최대 10개만 지원)
   const batchSize = 10;
-  for (let i = 0; i < loopIds.length; i += batchSize) {
-    const batch = loopIds.slice(i, i + batchSize);
+  for (let i = 0; i < chapterIds.length; i += batchSize) {
+    const batch = chapterIds.slice(i, i + batchSize);
 
-    const q = query(collection(db, "loops"), where("__name__", "in", batch));
+    const q = query(collection(db, "chapters"), where("__name__", "in", batch));
 
     const querySnapshot = await getDocs(q);
     querySnapshot.docs.forEach((doc) => {
-      const loopData = doc.data();
-      connectedLoops.push({
+      const chapterData = doc.data();
+      connectedChapters.push({
         id: doc.id,
-        userId: loopData.userId,
-        title: loopData.title,
-        startDate: loopData.startDate.toDate(),
-        endDate: loopData.endDate.toDate(),
-        focusAreas: loopData.focusAreas || [],
-        reward: loopData.reward,
-        createdAt: loopData.createdAt.toDate(),
-        updatedAt: loopData.updatedAt.toDate(),
-        doneCount: loopData.doneCount || 0,
-        targetCount: loopData.targetCount || 0,
-        retrospective: loopData.retrospective,
-        note: loopData.note,
+        userId: chapterData.userId,
+        title: chapterData.title,
+        startDate: chapterData.startDate.toDate(),
+        endDate: chapterData.endDate.toDate(),
+        focusAreas: chapterData.focusAreas || [],
+        reward: chapterData.reward,
+        createdAt: chapterData.createdAt.toDate(),
+        updatedAt: chapterData.updatedAt.toDate(),
+        doneCount: chapterData.doneCount || 0,
+        targetCount: chapterData.targetCount || 0,
+        retrospective: chapterData.retrospective,
+        note: chapterData.note,
       });
     });
   }
 
   // 날짜순으로 정렬
-  connectedLoops.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+  connectedChapters.sort(
+    (a, b) => a.startDate.getTime() - b.startDate.getTime()
+  );
 
-  return connectedLoops;
+  return connectedChapters;
 };

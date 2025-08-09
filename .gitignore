@@ -35,6 +35,7 @@ firebase-debug.log
 firebase-debug.*.log
 .firebase/
 serviceAccountKey.json
+firebase.rules
 # Firebase 환경별 설정 파일들 (선택사항)
 firebase-*.json
 .firebaserc.local

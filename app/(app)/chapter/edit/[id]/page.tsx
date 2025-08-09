@@ -29,16 +29,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatDate, getLoopStatus } from "@/lib/utils";
+import { formatDate, getChapterStatus } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
 import { useLanguage } from "@/hooks/useLanguage";
 import {
-  fetchLoopById,
+  fetchChapterById,
   fetchAllAreasByUserId,
-  updateLoop,
-  fetchProjectsByLoopId,
+  updateChapter,
+  fetchProjectsByChapterId,
   fetchAllProjectsByUserId,
   fetchUnconnectedProjects,
 } from "@/lib/firebase";
@@ -72,7 +72,7 @@ const getIconComponent = (iconName: string) => {
 };
 
 // 로딩 스켈레톤 컴포넌트
-function EditLoopSkeleton() {
+function EditChapterSkeleton() {
   return (
     <div className="container max-w-md px-4 py-6">
       <div className="mb-6 flex items-center">
@@ -90,13 +90,13 @@ function EditLoopSkeleton() {
   );
 }
 
-export default function EditLoopPage({
+export default function EditChapterPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const router = useRouter();
-  const { id: loopId } = use(params);
+  const { id: chapterId } = use(params);
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const [user] = useAuthState(auth);
@@ -108,40 +108,40 @@ export default function EditLoopPage({
 
   // 통합된 데이터 페칭 - 캐시 최적화
   const {
-    data: editLoopData,
+    data: editChapterData,
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["editLoopData", loopId, user?.uid],
+    queryKey: ["editChapterData", chapterId, user?.uid],
     queryFn: async () => {
-      if (!user?.uid || !loopId) return null;
+      if (!user?.uid || !chapterId) return null;
 
       // 병렬로 필요한 데이터만 가져오기
-      const [loop, areas, connectedProjects, unconnectedProjects] =
+      const [chapter, areas, connectedProjects, unconnectedProjects] =
         await Promise.all([
-          fetchLoopById(loopId),
+          fetchChapterById(chapterId),
           fetchAllAreasByUserId(user.uid),
-          fetchProjectsByLoopId(loopId, user.uid),
-          fetchUnconnectedProjects(user.uid, loopId),
+          fetchProjectsByChapterId(chapterId, user.uid),
+          fetchUnconnectedProjects(user.uid, chapterId),
         ]);
 
       return {
-        loop,
+        chapter,
         areas: areas || [],
         connectedProjects: connectedProjects || [],
         unconnectedProjects: unconnectedProjects || [],
       };
     },
-    enabled: !!user?.uid && !!loopId,
+    enabled: !!user?.uid && !!chapterId,
     staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
     gcTime: 10 * 60 * 1000, // 10분간 메모리에 유지
   });
 
   // 데이터 추출
-  const loop = editLoopData?.loop;
-  const areas = editLoopData?.areas || [];
-  const connectedProjects = editLoopData?.connectedProjects || [];
-  const unconnectedProjects = editLoopData?.unconnectedProjects || [];
+  const chapter = editChapterData?.chapter;
+  const areas = editChapterData?.areas || [];
+  const connectedProjects = editChapterData?.connectedProjects || [];
+  const unconnectedProjects = editChapterData?.unconnectedProjects || [];
   const projectsLoading = isLoading;
 
   // 수정 가능한 필드 상태
@@ -169,37 +169,37 @@ export default function EditLoopPage({
 
       toast({
         title: "프로젝트 연결됨",
-        description: "새로 생성된 프로젝트가 루프에 연결되었습니다.",
+        description: "새로 생성된 프로젝트가 챕터에 연결되었습니다.",
       });
     }
   }, [searchParams, selectedProjectIds, router, toast]);
 
-  // 루프 데이터와 연결된 프로젝트가 로드되면 폼 초기화
+  // 챕터 데이터와 연결된 프로젝트가 로드되면 폼 초기화
   useEffect(() => {
-    if (loop) {
-      setTitle(loop.title || "");
-      setReward(loop.reward || "");
+    if (chapter) {
+      setTitle(chapter.title || "");
+      setReward(chapter.reward || "");
 
       // 종료일이 월의 마지막 날이 아닌 경우 자동으로 수정
-      const endDate = new Date(loop.endDate);
+      const endDate = new Date(chapter.endDate);
       const year = endDate.getFullYear();
       const month = endDate.getMonth();
       const lastDayOfMonth = new Date(year, month + 1, 0);
 
       if (endDate.getDate() !== lastDayOfMonth.getDate()) {
-        // 올바른 종료일로 루프 업데이트
+        // 올바른 종료일로 챕터 업데이트
         const correctedEndDate = lastDayOfMonth;
-        updateLoop(loopId, { endDate: correctedEndDate }).then(() => {
+        updateChapter(chapterId, { endDate: correctedEndDate }).then(() => {
           // 통합된 쿼리 무효화
           queryClient.invalidateQueries({
-            queryKey: ["editLoopData", loopId, user?.uid],
+            queryKey: ["editChapterData", chapterId, user?.uid],
           });
         });
       }
 
       // 기존 focusAreas (이름 기반) 데이터를 ID로 변환
-      if (loop.focusAreas && loop.focusAreas.length > 0) {
-        const areaIds = loop.focusAreas
+      if (chapter.focusAreas && chapter.focusAreas.length > 0) {
+        const areaIds = chapter.focusAreas
           .map(
             (areaName: string) =>
               areas.find((area: any) => area.name === areaName)?.id
@@ -214,28 +214,28 @@ export default function EditLoopPage({
       const projectIds = connectedProjects.map((p: any) => p.id);
       setSelectedProjectIds(projectIds);
     }
-  }, [loop, areas, connectedProjects, loopId, queryClient]);
+  }, [chapter, areas, connectedProjects, chapterId, queryClient]);
 
-  // 루프 업데이트 mutation
-  const updateLoopMutation = useMutation({
-    mutationFn: (updatedData: any) => updateLoop(loopId, updatedData),
+  // 챕터 업데이트 mutation
+  const updateChapterMutation = useMutation({
+    mutationFn: (updatedData: any) => updateChapter(chapterId, updatedData),
     onSuccess: () => {
       // 통합된 쿼리 무효화
       queryClient.invalidateQueries({
-        queryKey: ["editLoopData", loopId, user?.uid],
+        queryKey: ["editChapterData", chapterId, user?.uid],
       });
-      queryClient.invalidateQueries({ queryKey: ["loops"] });
+      queryClient.invalidateQueries({ queryKey: ["chapters"] });
       toast({
-        title: "루프 수정 완료",
-        description: "루프가 성공적으로 수정되었습니다.",
+        title: "챕터 수정 완료",
+        description: "챕터가 성공적으로 수정되었습니다.",
       });
-      router.replace(`/loop/${loopId}`);
+      router.replace(`/chapter/${chapterId}`);
     },
     onError: (error: Error) => {
-      console.error("루프 수정 실패:", error);
+      console.error("챕터 수정 실패:", error);
       toast({
         title: "수정 실패",
-        description: "루프 수정에 실패했습니다.",
+        description: "챕터 수정에 실패했습니다.",
         variant: "destructive",
       });
     },
@@ -290,8 +290,8 @@ export default function EditLoopPage({
 
     if (!title.trim()) {
       toast({
-        title: translate("loopEdit.validation.title"),
-        description: translate("loopEdit.validation.titleRequired"),
+        title: translate("chapterEdit.validation.title"),
+        description: translate("chapterEdit.validation.titleRequired"),
         variant: "destructive",
       });
       return;
@@ -303,12 +303,12 @@ export default function EditLoopPage({
       focusAreas: selectedAreaIds,
     };
 
-    updateLoopMutation.mutate(updatedData);
+    updateChapterMutation.mutate(updatedData);
   };
 
   // 로딩 상태
   if (isLoading || projectsLoading) {
-    return <EditLoopSkeleton />;
+    return <EditChapterSkeleton />;
   }
 
   // 에러 상태
@@ -317,16 +317,18 @@ export default function EditLoopPage({
       <div className="container max-w-md px-4 py-6">
         <div className="mb-6 flex items-center">
           <Button variant="ghost" size="icon" asChild className="mr-2">
-            <Link href="/loop">
+            <Link href="/chapter">
               <ChevronLeft className="h-5 w-5" />
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold">{translate("loopEdit.title")}</h1>
+          <h1 className="text-2xl font-bold">
+            {translate("chapterEdit.title")}
+          </h1>
         </div>
 
         <Alert>
           <AlertDescription>
-            {translate("loopEdit.error.loading")}
+            {translate("chapterEdit.error.loading")}
           </AlertDescription>
         </Alert>
       </div>
@@ -334,43 +336,47 @@ export default function EditLoopPage({
   }
 
   // 데이터가 없는 경우
-  if (!loop) {
+  if (!chapter) {
     return (
       <div className="container max-w-md px-4 py-6 text-center">
         <div className="mb-6 flex items-center">
           <Button variant="ghost" size="icon" asChild className="mr-2">
-            <Link href="/loop">
+            <Link href="/chapter">
               <ChevronLeft className="h-5 w-5" />
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold">{translate("loopEdit.title")}</h1>
+          <h1 className="text-2xl font-bold">
+            {translate("chapterEdit.title")}
+          </h1>
         </div>
         <p className="text-muted-foreground">
-          {translate("loopEdit.error.notFound")}
+          {translate("chapterEdit.error.notFound")}
         </p>
       </div>
     );
   }
 
-  // 루프 상태 확인
-  const loopStatus = getLoopStatus(loop);
-  const isCompleted = loopStatus === "ended";
+  // 챕터 상태 확인
+  const chapterStatus = getChapterStatus(chapter);
+  const isCompleted = chapterStatus === "ended";
 
   if (isCompleted) {
     return (
       <div className="container max-w-md px-4 py-6">
         <div className="mb-6 flex items-center">
           <Button variant="ghost" size="icon" asChild className="mr-2">
-            <Link href="/loop">
+            <Link href="/chapter">
               <ChevronLeft className="h-5 w-5" />
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold">{translate("loopEdit.title")}</h1>
+          <h1 className="text-2xl font-bold">
+            {translate("chapterEdit.title")}
+          </h1>
         </div>
 
         <Alert>
           <AlertDescription>
-            {translate("loopEdit.error.completed")}
+            {translate("chapterEdit.error.completed")}
           </AlertDescription>
         </Alert>
       </div>
@@ -378,21 +384,23 @@ export default function EditLoopPage({
   }
 
   return (
-    <Suspense fallback={<EditLoopSkeleton />}>
+    <Suspense fallback={<EditChapterSkeleton />}>
       <div className="container max-w-md px-4 py-6">
         <div className="mb-6 flex items-center">
           <Button variant="ghost" size="icon" asChild className="mr-2">
-            <Link href="/loop">
+            <Link href="/chapter">
               <ChevronLeft className="h-5 w-5" />
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold">{translate("loopEdit.title")}</h1>
+          <h1 className="text-2xl font-bold">
+            {translate("chapterEdit.title")}
+          </h1>
         </div>
 
         <div className="mb-6 space-y-2">
           <RecommendationBadge
             type="info"
-            message={translate("loopEdit.basicInfo.recommendation")}
+            message={translate("chapterEdit.basicInfo.recommendation")}
           />
         </div>
 
@@ -400,19 +408,19 @@ export default function EditLoopPage({
           {/* 기본 정보 */}
           <Card className="p-6">
             <h2 className="mb-4 text-lg font-semibold">
-              {translate("loopEdit.basicInfo.title")}
+              {translate("chapterEdit.basicInfo.title")}
             </h2>
             <div className="space-y-4">
               <div>
                 <Label htmlFor="title">
-                  {translate("loopEdit.basicInfo.loopTitle")}
+                  {translate("chapterEdit.basicInfo.chapterTitle")}
                 </Label>
                 <Input
                   id="title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder={translate(
-                    "loopEdit.basicInfo.loopTitlePlaceholder"
+                    "chapterEdit.basicInfo.chapterTitlePlaceholder"
                   )}
                   className="mt-1"
                   required
@@ -421,43 +429,43 @@ export default function EditLoopPage({
 
               <div>
                 <Label htmlFor="reward">
-                  {translate("loopEdit.basicInfo.reward")}
+                  {translate("chapterEdit.basicInfo.reward")}
                 </Label>
                 <Input
                   id="reward"
                   value={reward}
                   onChange={(e) => setReward(e.target.value)}
                   placeholder={translate(
-                    "loopEdit.basicInfo.rewardPlaceholder"
+                    "chapterEdit.basicInfo.rewardPlaceholder"
                   )}
                   className="mt-1"
                   required
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  {translate("loopEdit.basicInfo.rewardHint")}
+                  {translate("chapterEdit.basicInfo.rewardHint")}
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>{translate("loopEdit.basicInfo.startDate")}</Label>
+                  <Label>{translate("chapterEdit.basicInfo.startDate")}</Label>
                   <div className="mt-1 flex items-center gap-2 rounded-md border bg-muted/30 p-3 text-sm">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span>{formatDate(loop.startDate)}</span>
+                    <span>{formatDate(chapter.startDate)}</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {translate("loopEdit.basicInfo.dateHint")}
+                    {translate("chapterEdit.basicInfo.dateHint")}
                   </p>
                 </div>
 
                 <div>
-                  <Label>{translate("loopEdit.basicInfo.endDate")}</Label>
+                  <Label>{translate("chapterEdit.basicInfo.endDate")}</Label>
                   <div className="mt-1 flex items-center gap-2 rounded-md border bg-muted/30 p-3 text-sm">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span>{formatDate(loop.endDate)}</span>
+                    <span>{formatDate(chapter.endDate)}</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {translate("loopEdit.basicInfo.endDateHint")}
+                    {translate("chapterEdit.basicInfo.endDateHint")}
                   </p>
                 </div>
               </div>
@@ -473,7 +481,7 @@ export default function EditLoopPage({
             <div className="mb-4 space-y-2">
               <RecommendationBadge
                 type="info"
-                message="권장: 2개 영역에 집중하면 루프의 효과를 높일 수 있어요"
+                message="권장: 2개 영역에 집중하면 챕터의 효과를 높일 수 있어요"
               />
               {selectedAreaIds.length > 2 && (
                 <RecommendationBadge
@@ -560,7 +568,7 @@ export default function EditLoopPage({
             <div className="mb-4">
               <h2 className="text-lg font-semibold mb-2">프로젝트 연결</h2>
               <p className="text-sm text-muted-foreground mb-4">
-                이 루프와 연결할 프로젝트를 선택하거나 새 프로젝트를
+                이 챕터와 연결할 프로젝트를 선택하거나 새 프로젝트를
                 만들어보세요. 프로젝트는 나중에 추가할 수도 있습니다.
               </p>
             </div>
@@ -697,7 +705,7 @@ export default function EditLoopPage({
             <div className="mt-4 space-y-2">
               <RecommendationBadge
                 type="info"
-                message="권장: 2~3개 프로젝트에 집중하면 루프의 효과를 높일 수 있어요"
+                message="권장: 2~3개 프로젝트에 집중하면 챕터의 효과를 높일 수 있어요"
               />
 
               {selectedProjectIds.length > 3 && (
@@ -714,9 +722,9 @@ export default function EditLoopPage({
             type="submit"
             className="w-full"
             size="lg"
-            disabled={updateLoopMutation.isPending}
+            disabled={updateChapterMutation.isPending}
           >
-            {updateLoopMutation.isPending ? "저장 중..." : "변경사항 저장"}
+            {updateChapterMutation.isPending ? "저장 중..." : "변경사항 저장"}
           </Button>
         </form>
 
@@ -729,7 +737,7 @@ export default function EditLoopPage({
             <DialogHeader>
               <DialogTitle>프로젝트 추가/제거</DialogTitle>
               <DialogDescription>
-                이 루프에 연결할 프로젝트를 선택하세요. 최대 5개까지 연결할 수
+                이 챕터에 연결할 프로젝트를 선택하세요. 최대 5개까지 연결할 수
                 있습니다.
               </DialogDescription>
             </DialogHeader>
@@ -866,10 +874,11 @@ export default function EditLoopPage({
               <Button
                 onClick={handleSaveProjectChanges}
                 disabled={
-                  selectedProjectIds.length > 5 || updateLoopMutation.isPending
+                  selectedProjectIds.length > 5 ||
+                  updateChapterMutation.isPending
                 }
               >
-                {updateLoopMutation.isPending ? "저장 중..." : "저장"}
+                {updateChapterMutation.isPending ? "저장 중..." : "저장"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -884,7 +893,7 @@ export default function EditLoopPage({
             <DialogHeader>
               <DialogTitle>새 프로젝트 만들기</DialogTitle>
               <DialogDescription>
-                새 프로젝트를 만들어 루프에 연결하시겠습니까?
+                새 프로젝트를 만들어 챕터에 연결하시겠습니까?
               </DialogDescription>
             </DialogHeader>
 
@@ -900,7 +909,7 @@ export default function EditLoopPage({
                     </h4>
                     <p className="text-xs text-blue-700 dark:text-blue-300">
                       프로젝트 생성 페이지로 이동하여 새 프로젝트를 만들고, 완료
-                      후 이 루프 수정 페이지로 돌아와서 연결할 수 있습니다.
+                      후 이 챕터 수정 페이지로 돌아와서 연결할 수 있습니다.
                     </p>
                   </div>
                 </div>
@@ -914,7 +923,7 @@ export default function EditLoopPage({
                       참고 사항
                     </h4>
                     <p className="text-xs text-amber-700 dark:text-amber-300">
-                      현재 수정 중인 루프 정보는 저장되므로 안심하고 이동하세요.
+                      현재 수정 중인 챕터 정보는 저장되므로 안심하고 이동하세요.
                     </p>
                   </div>
                 </div>

@@ -38,17 +38,17 @@ export interface Project {
   endDate: Date;
   createdAt: Date;
   updatedAt: Date;
-  loopId?: string; // 현재 연결된 루프 ID (legacy)
-  connectedLoops?: string[]; // 연결된 루프 ID 배열
+  chapterId?: string; // 현재 연결된 챕터 ID (legacy)
+  connectedChapters?: string[]; // 연결된 챕터 ID 배열
 
-  addedMidway?: boolean; // 루프 중간에 추가된 프로젝트 여부
+  addedMidway?: boolean; // 챕터 중간에 추가된 프로젝트 여부
   retrospective?: Retrospective;
   notes: Note[];
   // tasks는 서브컬렉션으로 관리: projects/{projectId}/tasks/{taskId}
 
   // 미완료 프로젝트 이관 관련 필드
-  isCarriedOver?: boolean; // 이전 루프에서 이관된 프로젝트 여부
-  originalLoopId?: string; // 원래 루프 ID (이관된 경우)
+  isCarriedOver?: boolean; // 이전 챕터에서 이관된 프로젝트 여부
+  originalChapterId?: string; // 원래 챕터 ID (이관된 경우)
   carriedOverAt?: Date; // 이관된 날짜
   migrationStatus?: "pending" | "migrated" | "ignored"; // 이관 상태
 
@@ -68,7 +68,7 @@ export interface Task {
   updatedAt: Date;
 }
 
-export interface Loop {
+export interface Chapter {
   id: string;
   userId: string;
   title: string;
@@ -80,8 +80,8 @@ export interface Loop {
   updatedAt: Date;
   doneCount: number;
   targetCount: number;
-  retrospective?: Retrospective; // 루프 회고
-  note?: Note; // 루프 노트 (선택)
+  retrospective?: Retrospective; // 챕터 회고
+  note?: Note; // 챕터 노트 (선택)
 
   // 로컬 계산 필드 (DB에 저장되지 않음)
   status?: "planned" | "in_progress" | "ended"; // startDate와 endDate를 기반으로 클라이언트에서 계산
@@ -89,7 +89,7 @@ export interface Loop {
 
 export interface Snapshot {
   id: string;
-  loopId: string;
+  chapterId: string;
   projectId: string;
   year: number;
   month: number;
@@ -102,17 +102,17 @@ export interface Snapshot {
 export interface Retrospective {
   id: string;
   userId: string;
-  loopId?: string; // 루프 회고인 경우
+  chapterId?: string; // 챕터 회고인 경우
   projectId?: string; // 프로젝트 회고인 경우
   createdAt: Date;
   updatedAt: Date;
   content?: string; // 자유 회고
 
-  // 루프용 필드
+  // 챕터용 필드
   bestMoment?: string;
   routineAdherence?: string;
   unexpectedObstacles?: string;
-  nextLoopApplication?: string;
+  nextChapterApplication?: string;
 
   // 프로젝트용 필드
   goalAchieved?: string;
@@ -181,5 +181,5 @@ export interface User {
   preferences: UserPreferences;
 }
 
-// Archive는 Loop나 Project의 완료된 상태를 나타내는 뷰
+// Archive는 Chapter나 Project의 완료된 상태를 나타내는 뷰
 // 별도 컬렉션이 아닌 기존 데이터의 필터링된 뷰

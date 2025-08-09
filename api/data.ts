@@ -1,26 +1,28 @@
 // src/api/data.ts
 
 import {
-  fetchLoopById,
-  fetchProjectsByLoopId,
+  fetchChapterById,
+  fetchProjectsByChapterId,
   fetchAllTasksByProjectId,
   fetchProjectById,
   fetchAllAreasByUserId,
   fetchAreaById,
   fetchResourceById,
   fetchAllProjectsByUserId,
-  fetchAllLoopsByUserId,
+  fetchAllChaptersByUserId,
   fetchArchivedItemsByUserId,
 } from "../lib/firebase"; // lib/firebase.ts에서 기본 함수들을 import
-import { Area, Loop, Project, Resource, Task } from "../lib/types";
+import { Area, Chapter, Project, Resource, Task } from "../lib/types";
 
-// Loops
-export const getLoop = async (loopId: string): Promise<Loop> => {
-  return fetchLoopById(loopId);
+// Chapters
+export const getChapter = async (chapterId: string): Promise<Chapter> => {
+  return fetchChapterById(chapterId);
 };
 
-export const getLoopsByUserId = async (userId: string): Promise<Loop[]> => {
-  return fetchAllLoopsByUserId(userId);
+export const getChaptersByUserId = async (
+  userId: string
+): Promise<Chapter[]> => {
+  return fetchAllChaptersByUserId(userId);
 };
 
 // Projects
@@ -28,10 +30,10 @@ export const getProject = async (projectId: string): Promise<Project> => {
   return fetchProjectById(projectId);
 };
 
-export const getProjectsByLoopId = async (
-  loopId: string
+export const getProjectsByChapterId = async (
+  chapterId: string
 ): Promise<Project[]> => {
-  return fetchProjectsByLoopId(loopId);
+  return fetchProjectsByChapterId(chapterId);
 };
 
 export const getProjectsByUserId = async (
@@ -40,23 +42,24 @@ export const getProjectsByUserId = async (
   return fetchAllProjectsByUserId(userId);
 };
 
-// 현재 루프의 프로젝트만 가져오는 함수
-export const getCurrentLoopProjects = async (
+// 현재 챕터의 프로젝트만 가져오는 함수
+export const getCurrentChapterProjects = async (
   userId: string,
-  currentLoopId: string
+  currentChapterId: string
 ): Promise<Project[]> => {
-  return fetchProjectsByLoopId(currentLoopId);
+  return fetchProjectsByChapterId(currentChapterId);
 };
 
 // 연결되지 않은 프로젝트들만 가져오는 함수
 export const getUnconnectedProjects = async (
   userId: string,
-  excludeLoopId?: string
+  excludeChapterId?: string
 ): Promise<Project[]> => {
   // TODO: 연결되지 않은 프로젝트 필터링 로직 구현
   const allProjects = await fetchAllProjectsByUserId(userId);
   return allProjects.filter(
-    (project) => !project.connectedLoops || project.connectedLoops.length === 0
+    (project) =>
+      !project.connectedChapters || project.connectedChapters.length === 0
   );
 };
 
@@ -68,9 +71,11 @@ export const getTasksByProjectId = async (
 };
 
 // Snapshots
-export const getSnapshotsByLoopId = async (loopId: string): Promise<any[]> => {
+export const getSnapshotsByChapterId = async (
+  chapterId: string
+): Promise<any[]> => {
   // TODO: Snapshot 타입으로 변경
-  // TODO: implement getSnapshotsByLoopId
+  // TODO: implement getSnapshotsByChapterId
   return [];
 };
 // Areas

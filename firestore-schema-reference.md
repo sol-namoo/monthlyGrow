@@ -122,15 +122,15 @@ interface Project {
   endDate: Date; // 마감일
   createdAt: Date; // 생성일시
   updatedAt: Date; // 수정일시
-  loopId?: string; // 현재 연결된 루프 ID (legacy)
-  connectedLoops?: string[]; // 연결된 루프 ID 배열
-  addedMidway?: boolean; // 루프 중간 추가 여부
+  chapterId?: string; // 현재 연결된 챕터 ID (legacy)
+  connectedChapters?: string[]; // 연결된 챕터 ID 배열
+  addedMidway?: boolean; // 챕터 중간 추가 여부
   retrospective?: Retrospective; // 프로젝트 회고
   notes: Note[]; // 프로젝트 노트들
 
   // 미완료 프로젝트 이관 관련 필드
-  isCarriedOver?: boolean; // 이전 루프에서 이관된 프로젝트 여부
-  originalLoopId?: string; // 원래 루프 ID (이관된 경우)
+  isCarriedOver?: boolean; // 이전 챕터에서 이관된 프로젝트 여부
+  originalChapterId?: string; // 원래 챕터 ID (이관된 경우)
   carriedOverAt?: Date; // 이관된 날짜
   migrationStatus?: "pending" | "migrated" | "ignored"; // 이관 상태
 
@@ -159,15 +159,15 @@ interface Project {
 
 ---
 
-### 🔹 Loops 컬렉션
+### 🔹 Chapters 컬렉션
 
-각 루프는 사용자가 한 달 동안 집중할 프로젝트들과 목표를 묶은 단위입니다.
+각 챕터는 사용자가 한 달 동안 집중할 프로젝트들과 목표를 묶은 단위입니다.
 
 ```typescript
-interface Loop {
+interface Chapter {
   id: string;
   userId: string;
-  title: string; // 루프 제목 (예: "7월 루프: 자기계발")
+  title: string; // 챕터 제목 (예: "7월 챕터: 자기계발")
   startDate: Date; // 시작일 (보통 월초)
   endDate: Date; // 종료일 (보통 월말)
   focusAreas: string[]; // 중점 영역 ID 배열
@@ -177,8 +177,8 @@ interface Loop {
   targetCount: number; // 목표 횟수
   createdAt: Date;
   updatedAt: Date;
-  retrospective?: Retrospective; // 루프 회고 (완료 후)
-  note?: Note; // 루프 노트 (선택)
+  retrospective?: Retrospective; // 챕터 회고 (완료 후)
+  note?: Note; // 챕터 노트 (선택)
 
   // 로컬 계산 필드 (DB에 저장되지 않음)
   status?: "planned" | "in_progress" | "ended"; // startDate와 endDate를 기반으로 클라이언트에서 계산
@@ -221,7 +221,7 @@ interface Task {
 
 ### 🔹 Retrospectives 컬렉션
 
-루프와 프로젝트의 회고를 저장합니다.
+챕터와 프로젝트의 회고를 저장합니다.
 
 ```typescript
 interface Retrospective {
@@ -231,11 +231,11 @@ interface Retrospective {
   updatedAt: Date; // 수정일시
   content?: string; // 자유 회고 내용
 
-  // 루프용 필드
+  // 챕터용 필드
   bestMoment?: string; // 가장 좋았던 순간
   routineAdherence?: string; // 루틴 준수도
   unexpectedObstacles?: string; // 예상치 못한 장애물
-  nextLoopApplication?: string; // 다음 루프 적용사항
+  nextChapterApplication?: string; // 다음 챕터 적용사항
 
   // 프로젝트용 필드
   goalAchieved?: string; // 목표 달성도
@@ -289,7 +289,7 @@ interface Note {
 ```typescript
 interface Snapshot {
   id: string; // 문서 ID (자동 생성)
-  loopId: string; // 루프 ID
+  chapterId: string; // 챕터 ID
   projectId: string; // 프로젝트 ID
   year: number; // 년도
   month: number; // 월
@@ -302,7 +302,7 @@ interface Snapshot {
 
 **인덱스:**
 
-- `loopId` (단일)
+- `chapterId` (단일)
 - `projectId` (단일)
 - `year` + `month` (복합)
 
@@ -331,16 +331,16 @@ interface Snapshot {
 - 서브컬렉션으로 관리: `projects/{projectId}/tasks/{taskId}`
 - `projectId`로 연결
 
-### 5. Loop → Projects (1:N)
+### 5. Chapter → Projects (1:N)
 
-- 루프 하나가 여러 프로젝트를 가질 수 있음
-- Loop의 `projectIds[]`로 연결
-- Project에서 Loop 정보가 필요한 경우 쿼리 시 조인
+- 챕터 하나가 여러 프로젝트를 가질 수 있음
+- Chapter의 `projectIds[]`로 연결
+- Project에서 Chapter 정보가 필요한 경우 쿼리 시 조인
 
-### 6. Loop → Retrospective (1:1)
+### 6. Chapter → Retrospective (1:1)
 
-- 루프 하나당 회고 하나
-- Loop 문서 내에 `retrospective` 필드로 저장
+- 챕터 하나당 회고 하나
+- Chapter 문서 내에 `retrospective` 필드로 저장
 
 ### 7. Project → Retrospective (1:1)
 
@@ -370,13 +370,13 @@ interface Snapshot {
 
 - `areaId`: Areas 컬렉션에 존재하는 ID만 허용
 - `projectId`: Projects 컬렉션에 존재하는 ID만 허용
-- `loopId`: Loops 컬렉션에 존재하는 ID만 허용
+- `chapterId`: Chapters 컬렉션에 존재하는 ID만 허용
 
 ### 4. 배열 제약
 
 - `focusAreas`: 최대 4개 (권장 2개)
 - `projectIds`: 최대 5개 (권장 2-3개)
-- `connectedLoops`: 제한 없음
+- `connectedChapters`: 제한 없음
 
 ---
 
@@ -407,8 +407,8 @@ match /projects/{projectId} {
     request.auth.uid == resource.data.userId;
 }
 
-// Loops 컬렉션
-match /loops/{loopId} {
+// Chapters 컬렉션
+match /chapters/{chapterId} {
   allow read, write: if request.auth != null &&
     request.auth.uid == resource.data.userId;
 }
@@ -421,7 +421,7 @@ match /loops/{loopId} {
 ### 1. Denormalization 전략
 
 - **Area 정보**: Project, Resource에 `area`, `areaColor` 저장
-- **Loop 정보**: Project에 `connectedLoops[]` 배열로 저장
+- **Chapter 정보**: Project에 `connectedChapters[]` 배열로 저장
 - **이유**: 조인 없이 UI 렌더링 가능
 
 ### 2. 인덱싱 전략

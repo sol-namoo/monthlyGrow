@@ -10,7 +10,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 
 const navItems = [
   { href: "/home", labelKey: "bottomNav.home", icon: Home },
-  { href: "/loop", labelKey: "bottomNav.loop", icon: Target },
+  { href: "/chapter", labelKey: "bottomNav.chapter", icon: Target },
   { href: "/para", labelKey: "bottomNav.para", icon: Layers },
   { href: "/settings", labelKey: "bottomNav.settings", icon: Settings },
 ];

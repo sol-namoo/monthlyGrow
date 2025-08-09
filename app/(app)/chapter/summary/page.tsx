@@ -13,16 +13,16 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
 
-export default function LoopSummaryPage() {
+export default function ChapterSummaryPage() {
   const [user, loading] = useAuthState(auth);
   const [reflection, setReflection] = useState("");
   const [rewardClaimed, setRewardClaimed] = useState(false);
-  const [selectedLoopId, setSelectedLoopId] = useState<string | undefined>(
-    undefined
-  );
+  const [selectedChapterId, setSelectedChapterId] = useState<
+    string | undefined
+  >(undefined);
   const { translate } = useLanguage();
 
-  const { loops, isLoading: isLoadingLoops } = usePageData("home", {
+  const { chapters, isLoading: isLoadingChapters } = usePageData("home", {
     userId: user?.uid,
   });
   const router = useRouter();
@@ -40,17 +40,17 @@ export default function LoopSummaryPage() {
     }
   }, [user, loading, toast, router]);
 
-  // 최근 루프 id 선택
+  // 최근 챕터 id 선택
   useEffect(() => {
-    if (loops && loops.length > 0) {
-      setSelectedLoopId(loops[0].id);
+    if (chapters && chapters.length > 0) {
+      setSelectedChapterId(chapters[0].id);
     }
-  }, [loops]);
-  const { loop, projects, isLoading, error } = usePageData("loopDetail", {
-    loopId: selectedLoopId,
+  }, [chapters]);
+  const { chapter, projects, isLoading, error } = usePageData("chapterDetail", {
+    chapterId: selectedChapterId,
   });
 
-  if (loading || isLoadingLoops || isLoading)
+  if (loading || isLoadingChapters || isLoading)
     return <div>{translate("settings.loading.loading")}</div>;
 
   if (!user) {
@@ -58,19 +58,19 @@ export default function LoopSummaryPage() {
   }
 
   if (error) return <div>에러 발생: {error.message}</div>;
-  if (!loop) return <div>루프 데이터가 없습니다.</div>;
+  if (!chapter) return <div>챕터 데이터가 없습니다.</div>;
 
   const progress =
-    loop.targetCount > 0
-      ? Math.round((loop.doneCount / loop.targetCount) * 100)
+    chapter.targetCount > 0
+      ? Math.round((chapter.doneCount / chapter.targetCount) * 100)
       : 0;
-  const total = loop.targetCount;
+  const total = chapter.targetCount;
 
   return (
     <div className="container max-w-md px-4 py-6">
       <div className="mb-6 flex items-center">
         <Button variant="ghost" size="icon" asChild className="mr-2">
-          <Link href="/loop">
+          <Link href="/chapter">
             <ChevronLeft className="h-5 w-5" />
           </Link>
         </Button>
@@ -78,16 +78,16 @@ export default function LoopSummaryPage() {
       </div>
 
       <Card className="mb-6 p-4">
-        <h2 className="mb-4 text-xl font-bold">{loop.title}</h2>
+        <h2 className="mb-4 text-xl font-bold">{chapter.title}</h2>
         <div className="mb-4 flex items-center gap-2 text-sm">
           <Star className="h-4 w-4 text-yellow-500" />
-          <span>보상: {loop.reward}</span>
+          <span>보상: {chapter.reward}</span>
         </div>
         <div className="mb-4">
           <div className="mb-1 flex justify-between text-sm">
             <span>달성률: {progress}%</span>
             <span>
-              {loop.doneCount}/{total}
+              {chapter.doneCount}/{total}
             </span>
           </div>
           <div className="progress-bar">
@@ -136,9 +136,9 @@ export default function LoopSummaryPage() {
         <h2 className="mb-4 text-xl font-bold">회고</h2>
         <Card className="p-4">
           <Textarea
-            placeholder="이번 루프에서 배운 점, 어려웠던 점, 다음 루프에 적용할 점 등을 자유롭게 작성해보세요."
+            placeholder="이번 챕터에서 배운 점, 어려웠던 점, 다음 챕터에 적용할 점 등을 자유롭게 작성해보세요."
             className="min-h-32"
-            value={reflection || loop.retrospective?.content || ""}
+            value={reflection || chapter.retrospective?.content || ""}
             onChange={(e) => setReflection(e.target.value)}
           />
         </Card>
@@ -149,7 +149,7 @@ export default function LoopSummaryPage() {
         <Card className="p-4">
           <div className="flex items-center gap-4">
             <div className="flex-1">
-              <h3 className="font-medium">{loop.reward}</h3>
+              <h3 className="font-medium">{chapter.reward}</h3>
               <p className="text-sm text-muted-foreground">
                 달성률 {progress}%로 보상을 받을 수 있습니다.
               </p>
@@ -166,7 +166,7 @@ export default function LoopSummaryPage() {
 
       <div className="flex justify-end">
         <Button asChild>
-          <Link href="/loop/new">새 루프 시작하기</Link>
+          <Link href="/chapter/new">새 챕터 시작하기</Link>
         </Button>
       </div>
     </div>

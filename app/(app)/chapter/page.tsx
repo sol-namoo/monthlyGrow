@@ -33,19 +33,19 @@ import Loading from "@/components/feedback/Loading";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
-import { Loop, Retrospective } from "@/lib/types";
+import { Chapter, Retrospective } from "@/lib/types";
 import {
-  fetchAllLoopsByUserId,
-  fetchProjectsByLoopId,
+  fetchAllChaptersByUserId,
+  fetchProjectsByChapterId,
   getTaskCountsForMultipleProjects,
-  fetchProjectCountsByLoopIds,
-  fetchLoopsWithProjectCounts,
+  fetchProjectCountsByChapterIds,
+  fetchChaptersWithProjectCounts,
 } from "@/lib/firebase";
-import { formatDate, getLoopStatus } from "@/lib/utils";
+import { formatDate, getChapterStatus } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/hooks/useLanguage";
 
-function LoopPageContent() {
+function ChapterPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, userLoading] = useAuthState(auth);
@@ -65,51 +65,56 @@ function LoopPageContent() {
   }, [searchParams]);
 
   // Firestore에서 데이터 가져오기 - 임시로 이전 방식 사용
-  const { data: loops = [], isLoading: loopsLoading } = useQuery({
-    queryKey: ["loops", user?.uid],
-    queryFn: () => fetchAllLoopsByUserId(user?.uid || ""),
+  const { data: chapters = [], isLoading: chaptersLoading } = useQuery({
+    queryKey: ["chapters", user?.uid],
+    queryFn: () => fetchAllChaptersByUserId(user?.uid || ""),
     enabled: !!user?.uid,
   });
 
-  // 각 루프의 프로젝트 개수만 효율적으로 가져오기
-  const { data: loopProjectCounts = {}, isLoading: projectCountsLoading } =
+  // 각 챕터의 프로젝트 개수만 효율적으로 가져오기
+  const { data: chapterProjectCounts = {}, isLoading: projectCountsLoading } =
     useQuery({
-      queryKey: ["loopProjectCounts", user?.uid],
+      queryKey: ["chapterProjectCounts", user?.uid],
       queryFn: async () => {
-        if (!user?.uid || loops.length === 0) return {};
-        const loopIds = loops.map((loop) => loop.id);
-        console.log("🔍 프로젝트 개수 조회 - 루프 IDs:", loopIds);
-        const counts = await fetchProjectCountsByLoopIds(loopIds, user.uid);
+        if (!user?.uid || chapters.length === 0) return {};
+        const chapterIds = chapters.map((chapter) => chapter.id);
+        console.log("🔍 프로젝트 개수 조회 - 챕터 IDs:", chapterIds);
+        const counts = await fetchProjectCountsByChapterIds(
+          chapterIds,
+          user.uid
+        );
         console.log("📊 프로젝트 개수 결과:", counts);
         return counts;
       },
-      enabled: !!user?.uid && loops.length > 0,
+      enabled: !!user?.uid && chapters.length > 0,
     });
 
-  // 디버깅: 각 루프의 프로젝트 상태 출력
+  // 디버깅: 각 챕터의 프로젝트 상태 출력
   useEffect(() => {
-    if (loops.length > 0) {
-      console.log("🔍 루프별 프로젝트 상태:");
-      loops.forEach((loop) => {
-        const projectCount = loopProjectCounts[loop.id] || 0;
-        const status = getLoopStatus(loop);
-        console.log(`- ${loop.title} (${status}): ${projectCount}개 프로젝트`);
+    if (chapters.length > 0) {
+      console.log("🔍 챕터별 프로젝트 상태:");
+      chapters.forEach((chapter) => {
+        const projectCount = chapterProjectCounts[chapter.id] || 0;
+        const status = getChapterStatus(chapter);
+        console.log(
+          `- ${chapter.title} (${status}): ${projectCount}개 프로젝트`
+        );
       });
     }
-  }, [loops, loopProjectCounts]);
+  }, [chapters, chapterProjectCounts]);
 
-  // 디버깅: 실제 루프별 프로젝트 쿼리 결과 확인
+  // 디버깅: 실제 챕터별 프로젝트 쿼리 결과 확인
   useEffect(() => {
-    if (user?.uid && loops.length > 0) {
-      console.log("🔍 루프별 프로젝트 쿼리 디버깅 시작");
-      console.log("총 루프 수:", loops.length);
+    if (user?.uid && chapters.length > 0) {
+      console.log("🔍 챕터별 프로젝트 쿼리 디버깅 시작");
+      console.log("총 챕터 수:", chapters.length);
 
-      loops.forEach(async (loop) => {
-        console.log(`\n📊 루프 "${loop.title}" (${loop.id}) 조회 중...`);
+      chapters.forEach(async (chapter) => {
+        console.log(`\n📊 챕터 "${chapter.title}" (${chapter.id}) 조회 중...`);
 
         try {
           // 실제 쿼리 실행
-          const projects = await fetchProjectsByLoopId(loop.id, user.uid);
+          const projects = await fetchProjectsByChapterId(chapter.id, user.uid);
           console.log(`- 연결된 프로젝트 수: ${projects.length}개`);
 
           if (projects.length > 0) {
@@ -118,82 +123,90 @@ function LoopPageContent() {
               console.log(
                 `  ${index + 1}. ${project.title} (ID: ${project.id})`
               );
-              console.log(`     connectedLoops:`, project.connectedLoops);
+              console.log(`     connectedChapters:`, project.connectedChapters);
             });
           } else {
             console.log("- 연결된 프로젝트 없음");
           }
         } catch (error) {
-          console.error(`❌ 루프 "${loop.title}" 조회 실패:`, error);
+          console.error(`❌ 챕터 "${chapter.title}" 조회 실패:`, error);
         }
       });
     }
-  }, [user?.uid, loops]);
+  }, [user?.uid, chapters]);
 
-  // 각 루프의 태스크 개수 데이터 가져오기 (현재 탭의 루프만)
-  const { data: loopTaskCounts = {}, isLoading: taskCountsLoading } = useQuery({
-    queryKey: [
-      "loopTaskCounts",
-      user?.uid,
-      currentTab,
-      loops.length,
-      Object.keys(loopProjectCounts).join(","),
-    ],
-    queryFn: async () => {
-      const taskCountsMap: {
-        [loopId: string]: { totalTasks: number; completedTasks: number };
-      } = {};
+  // 각 챕터의 태스크 개수 데이터 가져오기 (현재 탭의 챕터만)
+  const { data: chapterTaskCounts = {}, isLoading: taskCountsLoading } =
+    useQuery({
+      queryKey: [
+        "chapterTaskCounts",
+        user?.uid,
+        currentTab,
+        chapters.length,
+        Object.keys(chapterProjectCounts).join(","),
+      ],
+      queryFn: async () => {
+        const taskCountsMap: {
+          [chapterId: string]: { totalTasks: number; completedTasks: number };
+        } = {};
 
-      // 현재 탭에 해당하는 루프만 처리
-      let targetLoops: Loop[] = [];
+        // 현재 탭에 해당하는 챕터만 처리
+        let targetChapters: Chapter[] = [];
 
-      if (currentTab === "active") {
-        const currentLoop = loops.find(
-          (loop) => getLoopStatus(loop) === "in_progress"
-        );
-        if (currentLoop) targetLoops = [currentLoop];
-      } else if (currentTab === "future") {
-        targetLoops = loops.filter((loop) => getLoopStatus(loop) === "planned");
-      } else if (currentTab === "past") {
-        targetLoops = loops.filter((loop) => getLoopStatus(loop) === "ended");
-      }
-
-      for (const loop of targetLoops) {
-        const projectCount = loopProjectCounts[loop.id] || 0;
-
-        if (projectCount > 0) {
-          // 프로젝트가 있을 때만 상세 조회
-          const projects = await fetchProjectsByLoopId(loop.id, user?.uid);
-          if (projects.length > 0) {
-            const projectIds = projects.map((p) => p.id);
-            const taskCounts = await getTaskCountsForMultipleProjects(
-              projectIds
-            );
-            const totalTasks = Object.values(taskCounts).reduce(
-              (sum, counts) => sum + counts.totalTasks,
-              0
-            );
-            const completedTasks = Object.values(taskCounts).reduce(
-              (sum, counts) => sum + counts.completedTasks,
-              0
-            );
-            taskCountsMap[loop.id] = { totalTasks, completedTasks };
-          } else {
-            taskCountsMap[loop.id] = { totalTasks: 0, completedTasks: 0 };
-          }
-        } else {
-          taskCountsMap[loop.id] = { totalTasks: 0, completedTasks: 0 };
+        if (currentTab === "active") {
+          const currentChapter = chapters.find(
+            (chapter) => getChapterStatus(chapter) === "in_progress"
+          );
+          if (currentChapter) targetChapters = [currentChapter];
+        } else if (currentTab === "future") {
+          targetChapters = chapters.filter(
+            (chapter) => getChapterStatus(chapter) === "planned"
+          );
+        } else if (currentTab === "past") {
+          targetChapters = chapters.filter(
+            (chapter) => getChapterStatus(chapter) === "ended"
+          );
         }
-      }
-      return taskCountsMap;
-    },
-    enabled: !!user?.uid && loops.length > 0 && !projectCountsLoading,
-    staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
-    refetchOnWindowFocus: true, // 윈도우 포커스 시 재페칭
-  });
 
-  // 초기 로딩 상태 (사용자 인증, 루프 목록 로딩)
-  if (userLoading || loopsLoading) {
+        for (const chapter of targetChapters) {
+          const projectCount = chapterProjectCounts[chapter.id] || 0;
+
+          if (projectCount > 0) {
+            // 프로젝트가 있을 때만 상세 조회
+            const projects = await fetchProjectsByChapterId(
+              chapter.id,
+              user?.uid
+            );
+            if (projects.length > 0) {
+              const projectIds = projects.map((p) => p.id);
+              const taskCounts = await getTaskCountsForMultipleProjects(
+                projectIds
+              );
+              const totalTasks = Object.values(taskCounts).reduce(
+                (sum, counts) => sum + counts.totalTasks,
+                0
+              );
+              const completedTasks = Object.values(taskCounts).reduce(
+                (sum, counts) => sum + counts.completedTasks,
+                0
+              );
+              taskCountsMap[chapter.id] = { totalTasks, completedTasks };
+            } else {
+              taskCountsMap[chapter.id] = { totalTasks: 0, completedTasks: 0 };
+            }
+          } else {
+            taskCountsMap[chapter.id] = { totalTasks: 0, completedTasks: 0 };
+          }
+        }
+        return taskCountsMap;
+      },
+      enabled: !!user?.uid && chapters.length > 0 && !projectCountsLoading,
+      staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
+      refetchOnWindowFocus: true, // 윈도우 포커스 시 재페칭
+    });
+
+  // 초기 로딩 상태 (사용자 인증, 챕터 목록 로딩)
+  if (userLoading || chaptersLoading) {
     return (
       <div className="container max-w-md px-4 py-6 pb-20">
         <div className="mb-6">
@@ -210,23 +223,28 @@ function LoopPageContent() {
     );
   }
 
-  // 루프 상태별 분류
-  const currentLoop =
-    loops.find((loop) => getLoopStatus(loop) === "in_progress") || null;
-  const futureLoops = loops.filter((loop) => getLoopStatus(loop) === "planned");
-  const pastLoops = loops.filter((loop) => getLoopStatus(loop) === "ended");
+  // 챕터 상태별 분류
+  const currentChapter =
+    chapters.find((chapter) => getChapterStatus(chapter) === "in_progress") ||
+    null;
+  const futureChapters = chapters.filter(
+    (chapter) => getChapterStatus(chapter) === "planned"
+  );
+  const pastChapters = chapters.filter(
+    (chapter) => getChapterStatus(chapter) === "ended"
+  );
 
-  // 정렬: 미래 루프는 시작일 순, 과거 루프는 최신순
-  futureLoops.sort(
+  // 정렬: 미래 챕터는 시작일 순, 과거 챕터는 최신순
+  futureChapters.sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
-  pastLoops.sort(
+  pastChapters.sort(
     (a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
   );
 
   // 계산된 값들을 위한 헬퍼 함수들
-  const getCompletionRate = (loop: Loop) => {
-    const taskCounts = loopTaskCounts[loop.id];
+  const getCompletionRate = (chapter: Chapter) => {
+    const taskCounts = chapterTaskCounts[chapter.id];
     if (taskCounts && taskCounts.totalTasks > 0) {
       return Math.round(
         (taskCounts.completedTasks / taskCounts.totalTasks) * 100
@@ -235,27 +253,27 @@ function LoopPageContent() {
     return 0;
   };
 
-  const getTaskCounts = (loop: Loop) => {
-    const taskCounts = loopTaskCounts[loop.id];
+  const getTaskCounts = (chapter: Chapter) => {
+    const taskCounts = chapterTaskCounts[chapter.id];
     return {
       completed: taskCounts?.completedTasks || 0,
       total: taskCounts?.totalTasks || 0,
     };
   };
 
-  const getProjectCount = (loop: Loop) => {
-    return loopProjectCounts[loop.id] || 0;
+  const getProjectCount = (chapter: Chapter) => {
+    return chapterProjectCounts[chapter.id] || 0;
   };
 
   const handleTabChange = (value: string) => {
-    router.push(`/loop?tab=${value}`, { scroll: false });
+    router.push(`/chapter?tab=${value}`, { scroll: false });
   };
 
-  const handleCreateLoop = (monthOffset: number) => {
-    // monthOffset에 따라 루프 생성 페이지로 이동
+  const handleCreateChapter = (monthOffset: number) => {
+    // monthOffset에 따라 챕터 생성 페이지로 이동
     const searchParams = new URLSearchParams();
     searchParams.set("monthOffset", monthOffset.toString());
-    router.push(`/loop/new?${searchParams.toString()}`);
+    router.push(`/chapter/new?${searchParams.toString()}`);
   };
 
   const renderStars = (rating: number | undefined) => {
@@ -277,54 +295,56 @@ function LoopPageContent() {
   return (
     <div className="container max-w-md px-4 py-6 pb-20">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{translate("loop.title")}</h1>
+        <h1 className="text-2xl font-bold">{translate("chapter.title")}</h1>
       </div>
 
       <Tabs value={currentTab} onValueChange={handleTabChange} className="mb-6">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="active">
-            {translate("loop.tabs.active")}
+            {translate("chapter.tabs.active")}
           </TabsTrigger>
           <TabsTrigger value="future" className="relative">
-            {translate("loop.tabs.future")}
-            {futureLoops.length > 0 && (
+            {translate("chapter.tabs.future")}
+            {futureChapters.length > 0 && (
               <Badge variant="secondary" className="ml-1 h-4 w-4 p-0 text-xs">
-                {futureLoops.length}
+                {futureChapters.length}
               </Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="past" className="relative">
-            {translate("loop.tabs.past")}
-            {pastLoops.length > 0 && (
+            {translate("chapter.tabs.past")}
+            {pastChapters.length > 0 && (
               <Badge variant="secondary" className="ml-1 h-4 w-4 p-0 text-xs">
-                {pastLoops.length}
+                {pastChapters.length}
               </Badge>
             )}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="active" className="mt-6 space-y-8">
-          {/* 현재 루프 섹션 */}
+          {/* 현재 챕터 섹션 */}
           <section>
             <div className="mb-4 flex items-center justify-between">
-              {currentLoop && (
+              {currentChapter && (
                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
                   <Clock className="h-4 w-4" />
                   <span>
-                    {getLoopStatus(currentLoop) === "ended"
-                      ? translate("loop.currentLoop.status.completed")
-                      : translate("loop.currentLoop.status.inProgress")}
+                    {getChapterStatus(currentChapter) === "ended"
+                      ? translate("chapter.currentChapter.status.completed")
+                      : translate("chapter.currentChapter.status.inProgress")}
                   </span>
                 </div>
               )}
             </div>
-            {currentLoop ? (
-              <Link href={`/loop/${currentLoop.id}`}>
+            {currentChapter ? (
+              <Link href={`/chapter/${currentChapter.id}`}>
                 <Card className="border-2 border-primary/20 p-4 mb-6 cursor-pointer hover:shadow-md transition-shadow">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-lg font-bold">{currentLoop.title}</h3>
+                    <h3 className="text-lg font-bold">
+                      {currentChapter.title}
+                    </h3>
                     <div className="flex items-center gap-2">
-                      {getLoopStatus(currentLoop) === "ended" ? (
+                      {getChapterStatus(currentChapter) === "ended" ? (
                         <Badge variant="default">완료</Badge>
                       ) : (
                         <Badge variant="secondary">
@@ -332,7 +352,7 @@ function LoopPageContent() {
                           {Math.max(
                             0,
                             Math.ceil(
-                              (currentLoop.endDate.getTime() -
+                              (currentChapter.endDate.getTime() -
                                 new Date().getTime()) /
                                 (1000 * 60 * 60 * 24)
                             )
@@ -346,23 +366,23 @@ function LoopPageContent() {
                   <div className="mb-4 flex items-center gap-2 text-sm">
                     <Gift className="h-4 w-4 text-purple-500" />
                     <span>
-                      {translate("loop.currentLoop.reward")}:{" "}
-                      {currentLoop.reward}
+                      {translate("chapter.currentChapter.reward")}:{" "}
+                      {currentChapter.reward}
                     </span>
                   </div>
 
                   <div className="mb-4">
                     <div className="mb-1 flex justify-between text-sm">
                       <span>
-                        {translate("loop.currentLoop.completionRate")}:{" "}
-                        {getCompletionRate(currentLoop)}%
+                        {translate("chapter.currentChapter.completionRate")}:{" "}
+                        {getCompletionRate(currentChapter)}%
                       </span>
                       <span>
                         {taskCountsLoading ? (
                           <Skeleton className="h-4 w-12" />
                         ) : (
                           (() => {
-                            const counts = getTaskCounts(currentLoop);
+                            const counts = getTaskCounts(currentChapter);
                             return `${counts.completed}/${counts.total}`;
                           })()
                         )}
@@ -371,7 +391,9 @@ function LoopPageContent() {
                     <div className="progress-bar">
                       <div
                         className="progress-value"
-                        style={{ width: `${getCompletionRate(currentLoop)}%` }}
+                        style={{
+                          width: `${getCompletionRate(currentChapter)}%`,
+                        }}
                       ></div>
                     </div>
                   </div>
@@ -379,17 +401,17 @@ function LoopPageContent() {
                   <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="h-4 w-4" />
                     <span>
-                      {formatDate(currentLoop.startDate, currentLanguage)} ~{" "}
-                      {formatDate(currentLoop.endDate, currentLanguage)}
+                      {formatDate(currentChapter.startDate, currentLanguage)} ~{" "}
+                      {formatDate(currentChapter.endDate, currentLanguage)}
                     </span>
                   </div>
 
                   <div className="mb-4">
                     <h4 className="mb-2 font-medium">
-                      {translate("loop.currentLoop.focusAreas")}
+                      {translate("chapter.currentChapter.focusAreas")}
                     </h4>
                     <div className="flex flex-wrap gap-2">
-                      {currentLoop.focusAreas?.map((areaId) => (
+                      {currentChapter.focusAreas?.map((areaId) => (
                         <span
                           key={areaId}
                           className="rounded-full bg-primary/10 px-3 py-1 text-xs"
@@ -402,23 +424,23 @@ function LoopPageContent() {
 
                   <div>
                     <h4 className="mb-2 font-medium">
-                      {translate("loop.currentLoop.projects")} (
-                      {getProjectCount(currentLoop)}개)
+                      {translate("chapter.currentChapter.projects")} (
+                      {getProjectCount(currentChapter)}개)
                     </h4>
                     {projectCountsLoading ? (
                       <Skeleton className="h-4 w-32" />
-                    ) : getProjectCount(currentLoop) > 0 ? (
+                    ) : getProjectCount(currentChapter) > 0 ? (
                       <p className="text-xs text-muted-foreground">
                         {translate(
-                          "loop.currentLoop.projectsConnected"
+                          "chapter.currentChapter.projectsConnected"
                         ).replace(
                           "{count}",
-                          getProjectCount(currentLoop).toString()
+                          getProjectCount(currentChapter).toString()
                         )}
                       </p>
                     ) : (
                       <p className="text-xs text-muted-foreground">
-                        {translate("loop.currentLoop.noProjects")}
+                        {translate("chapter.currentChapter.noProjects")}
                       </p>
                     )}
                   </div>
@@ -432,14 +454,14 @@ function LoopPageContent() {
                   </div>
                 </div>
                 <h3 className="mb-2 text-lg font-bold">
-                  {translate("loop.currentLoop.noLoop.title")}
+                  {translate("chapter.currentChapter.noChapter.title")}
                 </h3>
                 <p className="mb-6 text-xs text-muted-foreground max-w-sm mx-auto">
-                  {translate("loop.currentLoop.noLoop.description")}
+                  {translate("chapter.currentChapter.noChapter.description")}
                 </p>
-                <Button onClick={() => handleCreateLoop(0)}>
+                <Button onClick={() => handleCreateChapter(0)}>
                   <Plus className="mr-2 h-4 w-4" />
-                  {translate("loop.currentLoop.noLoop.button")}
+                  {translate("chapter.currentChapter.noChapter.button")}
                 </Button>
               </Card>
             )}
@@ -447,35 +469,35 @@ function LoopPageContent() {
         </TabsContent>
 
         <TabsContent value="future" className="mt-6 space-y-8">
-          {/* 미래 루프 헤더 */}
+          {/* 미래 챕터 헤더 */}
           <div className="flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
-              {translate("loop.futureLoops.totalCount").replace(
+              {translate("chapter.futureChapters.totalCount").replace(
                 "{count}",
-                futureLoops.length.toString()
+                futureChapters.length.toString()
               )}
             </div>
-            <Button onClick={() => handleCreateLoop(1)}>
+            <Button onClick={() => handleCreateChapter(1)}>
               <Plus className="mr-2 h-4 w-4" />
-              {translate("loop.futureLoops.button")}
+              {translate("chapter.futureChapters.button")}
             </Button>
           </div>
 
-          {/* 미래 루프 리스트 */}
-          {futureLoops.length > 0 ? (
+          {/* 미래 챕터 리스트 */}
+          {futureChapters.length > 0 ? (
             <div className="space-y-4">
-              {futureLoops.map((loop, index) => (
-                <div key={loop.id} className={index > 0 ? "mt-4" : ""}>
-                  <Link href={`/loop/${loop.id}`}>
+              {futureChapters.map((chapter, index) => (
+                <div key={chapter.id} className={index > 0 ? "mt-4" : ""}>
+                  <Link href={`/chapter/${chapter.id}`}>
                     <Card className="border-2 border-purple-200 dark:border-purple-700 bg-purple-50/50 dark:bg-purple-950/30 p-4 cursor-pointer hover:shadow-md transition-shadow">
                       <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-lg font-bold">{loop.title}</h3>
+                        <h3 className="text-lg font-bold">{chapter.title}</h3>
                         <div className="flex items-center gap-2">
                           <Badge
                             variant="outline"
                             className="bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700"
                           >
-                            {new Date(loop.startDate).toLocaleDateString(
+                            {new Date(chapter.startDate).toLocaleDateString(
                               currentLanguage === "ko" ? "ko-KR" : "en-UK",
                               {
                                 month: "long",
@@ -489,27 +511,30 @@ function LoopPageContent() {
                       <div className="mb-4 flex items-center gap-2 text-sm">
                         <Gift className="h-4 w-4 text-purple-500 dark:text-purple-400" />
                         <span>
-                          {translate("loop.futureLoops.reward")}: {loop.reward}
+                          {translate("chapter.futureChapters.reward")}:{" "}
+                          {chapter.reward}
                         </span>
                       </div>
 
                       <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
                         <Clock className="h-4 w-4" />
                         <span>
-                          {formatDate(loop.startDate, currentLanguage)} ~{" "}
-                          {formatDate(loop.endDate, currentLanguage)}
+                          {formatDate(chapter.startDate, currentLanguage)} ~{" "}
+                          {formatDate(chapter.endDate, currentLanguage)}
                         </span>
                       </div>
 
                       <div className="mb-4">
                         <h4 className="mb-2 font-medium">
-                          {translate("loop.futureLoops.target")}
+                          {translate("chapter.futureChapters.target")}
                         </h4>
                         <div className="mb-1 flex justify-between text-sm">
                           <span>
-                            {translate("loop.futureLoops.targetCount").replace(
+                            {translate(
+                              "chapter.futureChapters.targetCount"
+                            ).replace(
                               "{count}",
-                              loop.targetCount.toString()
+                              chapter.targetCount.toString()
                             )}
                           </span>
                           <span>
@@ -517,19 +542,19 @@ function LoopPageContent() {
                               <Skeleton className="h-4 w-8" />
                             ) : (
                               translate(
-                                "loop.futureLoops.connectedProjects"
+                                "chapter.futureChapters.connectedProjects"
                               ).replace(
                                 "{count}",
-                                getProjectCount(loop).toString()
+                                getProjectCount(chapter).toString()
                               )
                             )}
                           </span>
                         </div>
                         {projectCountsLoading ? (
                           <Skeleton className="h-4 w-48" />
-                        ) : getProjectCount(loop) === 0 ? (
+                        ) : getProjectCount(chapter) === 0 ? (
                           <p className="text-xs text-muted-foreground mt-1">
-                            {translate("loop.futureLoops.noProjects")}
+                            {translate("chapter.futureChapters.noProjects")}
                           </p>
                         ) : null}
                       </div>
@@ -546,44 +571,46 @@ function LoopPageContent() {
                 </div>
               </div>
               <h3 className="mb-2 text-lg font-bold">
-                {translate("loop.futureLoops.noLoops.title")}
+                {translate("chapter.futureChapters.noChapters.title")}
               </h3>
               <p className="mb-6 text-sm text-muted-foreground max-w-sm mx-auto">
-                {translate("loop.futureLoops.noLoops.description")}
+                {translate("chapter.futureChapters.noChapters.description")}
               </p>
-              <Button onClick={() => handleCreateLoop(1)}>
+              <Button onClick={() => handleCreateChapter(1)}>
                 <Plus className="mr-2 h-4 w-4" />
-                {translate("loop.futureLoops.noLoops.button")}
+                {translate("chapter.futureChapters.noChapters.button")}
               </Button>
             </Card>
           )}
         </TabsContent>
 
         <TabsContent value="past" className="mt-6 space-y-8">
-          {/* 지난 루프 헤더 */}
+          {/* 지난 챕터 헤더 */}
           <div className="flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
-              {translate("loop.pastLoops.totalCount").replace(
+              {translate("chapter.pastChapters.totalCount").replace(
                 "{count}",
-                pastLoops.length.toString()
+                pastChapters.length.toString()
               )}
             </div>
           </div>
 
-          {/* 지난 루프 리스트 */}
-          {pastLoops.length > 0 ? (
+          {/* 지난 챕터 리스트 */}
+          {pastChapters.length > 0 ? (
             <div className="space-y-4">
-              {pastLoops.map((loop, index) => (
-                <div key={loop.id} className={index > 0 ? "mt-4" : ""}>
-                  <Link href={`/loop/${loop.id}`}>
+              {pastChapters.map((chapter, index) => (
+                <div key={chapter.id} className={index > 0 ? "mt-4" : ""}>
+                  <Link href={`/chapter/${chapter.id}`}>
                     <Card className="p-4 cursor-pointer hover:shadow-md transition-shadow">
                       <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-lg font-bold">{loop.title}</h3>
+                        <h3 className="text-lg font-bold">{chapter.title}</h3>
                         <div className="flex items-center gap-2">
                           <Badge variant="secondary">
-                            {translate("loop.pastLoops.achievement").replace(
+                            {translate(
+                              "chapter.pastChapters.achievement"
+                            ).replace(
                               "{rate}",
-                              getCompletionRate(loop).toString()
+                              getCompletionRate(chapter).toString()
                             )}
                           </Badge>
                           <ChevronRight className="h-5 w-5 text-muted-foreground" />
@@ -593,23 +620,23 @@ function LoopPageContent() {
                       <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
                         <Clock className="h-4 w-4" />
                         <span>
-                          {formatDate(loop.startDate, currentLanguage)} ~{" "}
-                          {formatDate(loop.endDate, currentLanguage)}
+                          {formatDate(chapter.startDate, currentLanguage)} ~{" "}
+                          {formatDate(chapter.endDate, currentLanguage)}
                         </span>
                       </div>
 
                       <div className="mb-4">
                         <div className="mb-1 flex justify-between text-sm">
                           <span>
-                            {translate("loop.pastLoops.completionRate")}:{" "}
-                            {getCompletionRate(loop)}%
+                            {translate("chapter.pastChapters.completionRate")}:{" "}
+                            {getCompletionRate(chapter)}%
                           </span>
                           <span>
                             {taskCountsLoading ? (
                               <Skeleton className="h-4 w-12" />
                             ) : (
                               (() => {
-                                const counts = getTaskCounts(loop);
+                                const counts = getTaskCounts(chapter);
                                 return `${counts.completed}/${counts.total}`;
                               })()
                             )}
@@ -618,7 +645,7 @@ function LoopPageContent() {
                         <div className="progress-bar">
                           <div
                             className="progress-value"
-                            style={{ width: `${getCompletionRate(loop)}%` }}
+                            style={{ width: `${getCompletionRate(chapter)}%` }}
                           ></div>
                         </div>
                       </div>
@@ -629,14 +656,14 @@ function LoopPageContent() {
                             <Skeleton className="h-4 w-8" />
                           ) : (
                             translate(
-                              "loop.pastLoops.connectedProjects"
+                              "chapter.pastChapters.connectedProjects"
                             ).replace(
                               "{count}",
-                              getProjectCount(loop).toString()
+                              getProjectCount(chapter).toString()
                             )
                           )}
                         </span>
-                        {renderStars(loop.retrospective?.userRating)}
+                        {renderStars(chapter.retrospective?.userRating)}
                       </div>
                     </Card>
                   </Link>
@@ -651,10 +678,10 @@ function LoopPageContent() {
                 </div>
               </div>
               <h3 className="mb-2 text-lg font-bold">
-                {translate("loop.pastLoops.noLoops.title")}
+                {translate("chapter.pastChapters.noChapters.title")}
               </h3>
               <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                {translate("loop.pastLoops.noLoops.description")}
+                {translate("chapter.pastChapters.noChapters.description")}
               </p>
             </Card>
           )}
@@ -664,10 +691,10 @@ function LoopPageContent() {
   );
 }
 
-export default function LoopPage() {
+export default function ChapterPage() {
   return (
     <Suspense fallback={<Loading />}>
-      <LoopPageContent />
+      <ChapterPageContent />
     </Suspense>
   );
 }

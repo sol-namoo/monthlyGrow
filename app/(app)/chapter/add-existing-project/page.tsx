@@ -21,45 +21,45 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
 import {
-  fetchLoopById,
+  fetchChapterById,
   fetchUnconnectedProjects,
   updateProject,
 } from "@/lib/firebase";
 import { getProjectStatus } from "@/lib/utils";
-import type { Loop, Project } from "@/lib/types";
+import type { Chapter, Project } from "@/lib/types";
 
 function AddExistingProjectPageContent() {
   const router = useRouter();
   const { toast } = useToast();
   const searchParams = useSearchParams();
-  const loopId = searchParams.get("loopId");
+  const chapterId = searchParams.get("chapterId");
   const [user, userLoading] = useAuthState(auth);
   const queryClient = useQueryClient();
 
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [showOnlyUnconnected, setShowOnlyUnconnected] = useState(true);
 
-  // 현재 루프 정보 가져오기
-  const { data: currentLoop, isLoading: loopLoading } = useQuery({
-    queryKey: ["loop", loopId],
-    queryFn: () => fetchLoopById(loopId!),
-    enabled: !!loopId,
+  // 현재 챕터 정보 가져오기
+  const { data: currentChapter, isLoading: chapterLoading } = useQuery({
+    queryKey: ["chapter", chapterId],
+    queryFn: () => fetchChapterById(chapterId!),
+    enabled: !!chapterId,
   });
 
   // 연결되지 않은 프로젝트들 가져오기
   const { data: unconnectedProjects = [], isLoading: projectsLoading } =
     useQuery({
-      queryKey: ["unconnectedProjects", user?.uid, loopId],
-      queryFn: () => fetchUnconnectedProjects(user?.uid || "", loopId!),
-      enabled: !!user?.uid && !!loopId,
+      queryKey: ["unconnectedProjects", user?.uid, chapterId],
+      queryFn: () => fetchUnconnectedProjects(user?.uid || "", chapterId!),
+      enabled: !!user?.uid && !!chapterId,
     });
 
-  // 프로젝트를 루프에 연결하는 mutation
+  // 프로젝트를 챕터에 연결하는 mutation
   const connectProjectsMutation = useMutation({
     mutationFn: async (projectIds: string[]) => {
       const promises = projectIds.map((projectId) =>
         updateProject(projectId, {
-          connectedLoops: [loopId!],
+          connectedChapters: [chapterId!],
         })
       );
       await Promise.all(promises);
@@ -67,13 +67,13 @@ function AddExistingProjectPageContent() {
     onSuccess: () => {
       toast({
         title: "프로젝트 연결 완료",
-        description: "선택한 프로젝트가 루프에 연결되었습니다.",
+        description: "선택한 프로젝트가 챕터에 연결되었습니다.",
       });
-      queryClient.invalidateQueries({ queryKey: ["loop", loopId] });
+      queryClient.invalidateQueries({ queryKey: ["chapter", chapterId] });
       queryClient.invalidateQueries({
-        queryKey: ["unconnectedProjects", user?.uid, loopId],
+        queryKey: ["unconnectedProjects", user?.uid, chapterId],
       });
-      router.push(`/loop/${loopId}`);
+      router.push(`/chapter/${chapterId}`);
     },
     onError: (error) => {
       toast({
@@ -85,7 +85,7 @@ function AddExistingProjectPageContent() {
   });
 
   // 로딩 중이거나 데이터가 없으면 처리
-  if (loopLoading || !currentLoop) {
+  if (chapterLoading || !currentChapter) {
     return <Loading />;
   }
 
@@ -99,8 +99,8 @@ function AddExistingProjectPageContent() {
     if (selectedProjects.includes(projectId)) {
       setSelectedProjects(selectedProjects.filter((id) => id !== projectId));
     } else {
-      // 프로젝트 개수 제한 확인 (현재 루프 프로젝트 + 선택된 프로젝트 <= 5)
-      const currentProjectCount = currentLoop.connectedLoops?.length || 0;
+      // 프로젝트 개수 제한 확인 (현재 챕터 프로젝트 + 선택된 프로젝트 <= 5)
+      const currentProjectCount = currentChapter.connectedChapters?.length || 0;
       if (currentProjectCount + selectedProjects.length < 5) {
         setSelectedProjects([...selectedProjects, projectId]);
       }
@@ -108,7 +108,7 @@ function AddExistingProjectPageContent() {
   };
 
   // 프로젝트 추가 가능 여부 확인
-  const currentProjectCount = currentLoop.connectedLoops?.length || 0;
+  const currentProjectCount = currentChapter.connectedChapters?.length || 0;
   const canAddMoreProjects = currentProjectCount + selectedProjects.length < 5;
 
   // 프로젝트 추가 처리 함수
@@ -122,7 +122,7 @@ function AddExistingProjectPageContent() {
     <div className="container max-w-md px-4 py-6">
       <div className="mb-6 flex items-center">
         <Button variant="ghost" size="icon" asChild className="mr-2">
-          <Link href={`/loop/${loopId}`}>
+          <Link href={`/chapter/${chapterId}`}>
             <ChevronLeft className="h-5 w-5" />
           </Link>
         </Button>
@@ -130,9 +130,9 @@ function AddExistingProjectPageContent() {
       </div>
 
       <Card className="mb-6 p-4">
-        <h2 className="mb-2 text-lg font-bold">{currentLoop.title}</h2>
+        <h2 className="mb-2 text-lg font-bold">{currentChapter.title}</h2>
         <p className="text-sm text-muted-foreground">
-          현재 루프에 연결된 프로젝트: {currentProjectCount}/5
+          현재 챕터에 연결된 프로젝트: {currentProjectCount}/5
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
           추가 가능한 프로젝트: {Math.max(0, 5 - currentProjectCount)}개
@@ -144,8 +144,8 @@ function AddExistingProjectPageContent() {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>주의사항</AlertTitle>
           <AlertDescription>
-            기존 프로젝트를 루프에 연결하면 해당 프로젝트의 기존 데이터가
-            유지됩니다. 프로젝트의 시작일과 목표 완료일이 루프 기간과 맞지 않을
+            기존 프로젝트를 챕터에 연결하면 해당 프로젝트의 기존 데이터가
+            유지됩니다. 프로젝트의 시작일과 목표 완료일이 챕터 기간과 맞지 않을
             수 있습니다.
           </AlertDescription>
         </CustomAlert>
@@ -158,7 +158,7 @@ function AddExistingProjectPageContent() {
           size="sm"
           onClick={() => setShowOnlyUnconnected(!showOnlyUnconnected)}
         >
-          {showOnlyUnconnected ? "모든 프로젝트 보기" : "루프 미연결만 보기"}
+          {showOnlyUnconnected ? "모든 프로젝트 보기" : "챕터 미연결만 보기"}
         </Button>
       </div>
 
@@ -232,20 +232,21 @@ function AddExistingProjectPageContent() {
                 </div>
               </div>
 
-              {project.connectedLoops && project.connectedLoops.length > 0 && (
-                <div className="mt-2">
-                  <Badge variant="secondary" className="text-xs">
-                    {project.connectedLoops.length}개 루프에 연결됨
-                  </Badge>
-                </div>
-              )}
+              {project.connectedChapters &&
+                project.connectedChapters.length > 0 && (
+                  <div className="mt-2">
+                    <Badge variant="secondary" className="text-xs">
+                      {project.connectedChapters.length}개 챕터에 연결됨
+                    </Badge>
+                  </div>
+                )}
             </div>
           ))
         ) : (
           <div className="rounded-lg border border-dashed p-6 text-center">
             <p className="text-muted-foreground">
               {showOnlyUnconnected
-                ? "루프에 연결되지 않은 프로젝트가 없습니다"
+                ? "챕터에 연결되지 않은 프로젝트가 없습니다"
                 : "추가할 수 있는 프로젝트가 없습니다"}
             </p>
           </div>
@@ -265,7 +266,7 @@ function AddExistingProjectPageContent() {
             : `${selectedProjects.length}개 프로젝트 추가`}
         </Button>
         <Button variant="outline" asChild className="flex-1">
-          <Link href={`/loop/${loopId}`}>취소</Link>
+          <Link href={`/chapter/${chapterId}`}>취소</Link>
         </Button>
       </div>
     </div>

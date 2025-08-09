@@ -53,14 +53,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
 import {
   auth,
-  fetchAllLoopsByUserId,
+  fetchAllChaptersByUserId,
   fetchAllAreasByUserId,
-  fetchLoopById,
+  fetchChapterById,
   createProject,
   addTaskToProject,
 } from "@/lib/firebase";
 
-import { getLoopStatus, formatDate, formatDateForInput } from "@/lib/utils";
+import { getChapterStatus, formatDate, formatDateForInput } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -80,7 +80,7 @@ const projectFormSchema = z
       required_error: "프로젝트 유형을 선택해주세요",
     }),
     area: z.string().min(1, "영역을 선택해주세요"),
-    loop: z.string().optional(),
+    chapter: z.string().optional(),
     startDate: z.string().min(1, "시작일을 입력해주세요"),
     dueDate: z.string().min(1, "목표 완료일을 입력해주세요"),
     targetCount: z.string().refine((val) => {
@@ -152,13 +152,13 @@ function NewProjectPageContent() {
   const [selectedCategory, setSelectedCategory] = useState<
     "repetitive" | "task_based"
   >("repetitive");
-  const [selectedLoopIds, setSelectedLoopIds] = useState<string[]>([]);
+  const [selectedChapterIds, setSelectedChapterIds] = useState<string[]>([]);
 
   // 선택된 태스크들을 관리하는 상태
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
 
-  // 루프 연결 관리 상태
-  const [showLoopConnectionDialog, setShowLoopConnectionDialog] =
+  // 챕터 연결 관리 상태
+  const [showChapterConnectionDialog, setShowChapterConnectionDialog] =
     useState(false);
 
   // 프로젝트 유형 변경 다이얼로그 상태
@@ -186,26 +186,26 @@ function NewProjectPageContent() {
     }
   }, [user, userLoading, toast, router]);
 
-  // URL 파라미터에서 loopId와 addedMidway 값을 가져옴
-  const loopId = searchParams.get("loopId");
+  // URL 파라미터에서 chapterId와 addedMidway 값을 가져옴
+  const chapterId = searchParams.get("chapterId");
   const addedMidway = searchParams.get("addedMidway") === "true";
   const returnUrl = searchParams.get("returnUrl");
 
-  // returnUrl에서 루프 ID 추출 (루프 수정 페이지에서 온 경우)
-  const extractLoopIdFromReturnUrl = () => {
+  // returnUrl에서 챕터 ID 추출 (챕터 수정 페이지에서 온 경우)
+  const extractChapterIdFromReturnUrl = () => {
     if (returnUrl) {
-      const match = returnUrl.match(/\/loop\/edit\/([^/?]+)/);
+      const match = returnUrl.match(/\/chapter\/edit\/([^/?]+)/);
       return match ? match[1] : null;
     }
     return null;
   };
 
-  const returnUrlLoopId = extractLoopIdFromReturnUrl();
+  const returnUrlChapterId = extractChapterIdFromReturnUrl();
 
-  // 사용자의 모든 루프 가져오기
-  const { data: allLoops = [], isLoading: loopsLoading } = useQuery({
-    queryKey: ["loops", user?.uid],
-    queryFn: () => fetchAllLoopsByUserId(user?.uid || ""),
+  // 사용자의 모든 챕터 가져오기
+  const { data: allChapters = [], isLoading: chaptersLoading } = useQuery({
+    queryKey: ["chapters", user?.uid],
+    queryFn: () => fetchAllChaptersByUserId(user?.uid || ""),
     enabled: !!user?.uid,
   });
 
@@ -242,7 +242,7 @@ function NewProjectPageContent() {
       description: "",
       category: "repetitive",
       area: "", // 초기값은 빈 문자열로 설정
-      loop: "",
+      chapter: "",
       startDate: getDefaultDates().startDate,
       dueDate: getDefaultDates().endDate,
       targetCount: "",
@@ -255,48 +255,48 @@ function NewProjectPageContent() {
     name: "tasks",
   });
 
-  // 프로젝트 기간과 겹치는 루프만 필터링 (현재 달로부터 6개월 이후까지의 기간과 겹치는 것만)
-  const getOverlappingLoops = () => {
+  // 프로젝트 기간과 겹치는 챕터만 필터링 (현재 달로부터 6개월 이후까지의 기간과 겹치는 것만)
+  const getOverlappingChapters = () => {
     const startDate = form.watch("startDate");
     const dueDate = form.watch("dueDate");
 
     if (!startDate || !dueDate) {
-      // 날짜가 없으면 현재 달로부터 6개월 이후까지의 기간과 겹치는 루프만 반환
+      // 날짜가 없으면 현재 달로부터 6개월 이후까지의 기간과 겹치는 챕터만 반환
       const currentDate = new Date();
       const currentYear = currentDate.getFullYear();
       const currentMonth = currentDate.getMonth();
       const sixMonthsLater = new Date(currentYear, currentMonth + 6, 0);
 
-      return allLoops.filter((loop) => {
-        const loopStart = new Date(loop.startDate);
-        const loopEnd = new Date(loop.endDate);
+      return allChapters.filter((chapter) => {
+        const chapterStart = new Date(chapter.startDate);
+        const chapterEnd = new Date(chapter.endDate);
 
-        // 루프가 6개월 이후 범위와 겹치는지 확인
-        return loopStart <= sixMonthsLater && loopEnd >= currentDate;
+        // 챕터가 6개월 이후 범위와 겹치는지 확인
+        return chapterStart <= sixMonthsLater && chapterEnd >= currentDate;
       });
     }
 
     const projectStart = new Date(startDate);
     const projectEnd = new Date(dueDate);
 
-    return allLoops.filter((loop) => {
-      const loopStart = new Date(loop.startDate);
-      const loopEnd = new Date(loop.endDate);
+    return allChapters.filter((chapter) => {
+      const chapterStart = new Date(chapter.startDate);
+      const chapterEnd = new Date(chapter.endDate);
 
-      // 프로젝트 기간과 루프 기간이 겹치는지 확인
+      // 프로젝트 기간과 챕터 기간이 겹치는지 확인
       return (
-        (projectStart <= loopEnd && projectEnd >= loopStart) ||
-        // returnUrl에서 추출한 루프는 항상 포함 (자동 선택용)
-        loop.id === returnUrlLoopId
+        (projectStart <= chapterEnd && projectEnd >= chapterStart) ||
+        // returnUrl에서 추출한 챕터는 항상 포함 (자동 선택용)
+        chapter.id === returnUrlChapterId
       );
     });
   };
 
-  const overlappingLoops = getOverlappingLoops();
+  const overlappingChapters = getOverlappingChapters();
 
-  // 선택된 루프들 계산
-  const selectedLoops = overlappingLoops.filter((loop) =>
-    selectedLoopIds.includes(loop.id)
+  // 선택된 챕터들 계산
+  const selectedChapters = overlappingChapters.filter((chapter) =>
+    selectedChapterIds.includes(chapter.id)
   );
 
   // 영역이 로드되면 첫 번째 영역(미분류)을 기본값으로 설정
@@ -306,17 +306,17 @@ function NewProjectPageContent() {
     }
   }, [areas, form]);
 
-  // returnUrl에서 추출한 루프 ID가 있으면 자동으로 선택
+  // returnUrl에서 추출한 챕터 ID가 있으면 자동으로 선택
   useEffect(() => {
-    if (returnUrlLoopId && overlappingLoops.length > 0) {
-      const targetLoop = overlappingLoops.find(
-        (loop) => loop.id === returnUrlLoopId
+    if (returnUrlChapterId && overlappingChapters.length > 0) {
+      const targetChapter = overlappingChapters.find(
+        (chapter) => chapter.id === returnUrlChapterId
       );
-      if (targetLoop && !selectedLoopIds.includes(returnUrlLoopId)) {
-        setSelectedLoopIds((prev) => [...prev, returnUrlLoopId]);
+      if (targetChapter && !selectedChapterIds.includes(returnUrlChapterId)) {
+        setSelectedChapterIds((prev) => [...prev, returnUrlChapterId]);
       }
     }
-  }, [returnUrlLoopId, overlappingLoops, selectedLoopIds]);
+  }, [returnUrlChapterId, overlappingChapters, selectedChapterIds]);
 
   // 반복형 프로젝트에서 카테고리나 날짜 변경 시 태스크 목록 자동 업데이트
   useEffect(() => {
@@ -352,17 +352,19 @@ function NewProjectPageContent() {
     replace,
   ]);
 
-  // 프로젝트 기간과 겹치는 루프만 필터링 (연결용)
-  const availableLoopsForConnection = overlappingLoops.filter((loop) => {
-    const status = getLoopStatus(loop);
-    // 과거 루프 제외 + 활성 루프만
-    return status === "in_progress" || status === "planned";
-  });
+  // 프로젝트 기간과 겹치는 챕터만 필터링 (연결용)
+  const availableChaptersForConnection = overlappingChapters.filter(
+    (chapter) => {
+      const status = getChapterStatus(chapter);
+      // 과거 챕터 제외 + 활성 챕터만
+      return status === "in_progress" || status === "planned";
+    }
+  );
 
-  // 루프에 연결된 프로젝트 개수 계산 (현재 선택된 루프들 기준)
-  const getConnectedProjectCount = (loopId: string) => {
-    // 현재 선택된 루프들 중에서 해당 루프가 포함되어 있는지 확인
-    return selectedLoopIds.includes(loopId) ? 1 : 0;
+  // 챕터에 연결된 프로젝트 개수 계산 (현재 선택된 챕터들 기준)
+  const getConnectedProjectCount = (chapterId: string) => {
+    // 현재 선택된 챕터들 중에서 해당 챕터가 포함되어 있는지 확인
+    return selectedChapterIds.includes(chapterId) ? 1 : 0;
   };
 
   // 프로젝트 유형별 헬퍼 함수
@@ -382,11 +384,11 @@ function NewProjectPageContent() {
       : "완료해야 할 총 작업의 개수를 설정하세요";
   };
 
-  // 현재 루프 정보 가져오기 (loopId가 있는 경우)
-  const { data: currentLoop } = useQuery({
-    queryKey: ["loop", loopId],
-    queryFn: () => fetchLoopById(loopId!),
-    enabled: !!loopId,
+  // 현재 챕터 정보 가져오기 (chapterId가 있는 경우)
+  const { data: currentChapter } = useQuery({
+    queryKey: ["chapter", chapterId],
+    queryFn: () => fetchChapterById(chapterId!),
+    enabled: !!chapterId,
   });
 
   // 프로젝트 유형 변경 핸들러
@@ -452,12 +454,12 @@ function NewProjectPageContent() {
     setPendingCategoryChange(null);
   };
 
-  // 루프 선택/해제 핸들러
-  const toggleLoopSelection = (loopId: string) => {
-    setSelectedLoopIds((prev) =>
-      prev.includes(loopId)
-        ? prev.filter((id) => id !== loopId)
-        : [...prev, loopId]
+  // 챕터 선택/해제 핸들러
+  const toggleChapterSelection = (chapterId: string) => {
+    setSelectedChapterIds((prev) =>
+      prev.includes(chapterId)
+        ? prev.filter((id) => id !== chapterId)
+        : [...prev, chapterId]
     );
   };
 
@@ -652,8 +654,8 @@ function NewProjectPageContent() {
         });
       }
 
-      // 선택된 루프들을 ConnectedLoop 형식으로 변환
-      const connectedLoops = selectedLoops.map((loop) => loop.id);
+      // 선택된 챕터들을 ConnectedChapter 형식으로 변환
+      const connectedChapters = selectedChapters.map((chapter) => chapter.id);
 
       const projectData = {
         title: data.title,
@@ -664,7 +666,7 @@ function NewProjectPageContent() {
         endDate: createValidDate(data.dueDate),
         target: parseInt(data.targetCount),
         completedTasks: 0,
-        connectedLoops, // 선택된 루프 ID 배열
+        connectedChapters, // 선택된 챕터 ID 배열
         notes: [], // 초기에는 빈 배열
         tasks,
         userId: user!.uid,
@@ -704,13 +706,13 @@ function NewProjectPageContent() {
       toast({
         title: "프로젝트 생성 완료",
         description: `${data.title} 프로젝트가 생성되었습니다.${
-          selectedLoops.length > 0
-            ? ` (${selectedLoops.length}개 루프에 연결됨)`
+          selectedChapters.length > 0
+            ? ` (${selectedChapters.length}개 챕터에 연결됨)`
             : ""
         }`,
       });
 
-      // 루프 생성 페이지에서 왔다면 새 프로젝트 ID와 함께 돌아가기
+      // 챕터 생성 페이지에서 왔다면 새 프로젝트 ID와 함께 돌아가기
       if (returnUrl) {
         const separator = returnUrl.includes("?") ? "&" : "?";
         const urlWithProjectId = `${returnUrl}${separator}newProjectId=${newProject.id}`;
@@ -730,9 +732,9 @@ function NewProjectPageContent() {
     }
   };
 
-  // 루프 연결 대화상자 열기
-  const openLoopConnectionDialog = () => {
-    setShowLoopConnectionDialog(true);
+  // 챕터 연결 대화상자 열기
+  const openChapterConnectionDialog = () => {
+    setShowChapterConnectionDialog(true);
   };
 
   const calculateDuration = (startDate: string, dueDate: string) => {
@@ -763,7 +765,7 @@ function NewProjectPageContent() {
   const weeklyAverage = calculateWeeklyAverage(form.watch("targetCount"));
 
   // 로딩 상태 확인
-  if (userLoading || loopsLoading || areasLoading) {
+  if (userLoading || chaptersLoading || areasLoading) {
     return <Loading />;
   }
 
@@ -807,21 +809,21 @@ function NewProjectPageContent() {
         {returnUrl && (
           <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
             <p className="text-xs text-blue-700 dark:text-blue-300">
-              프로젝트 생성 완료 후 루프 생성 페이지로 돌아갑니다.
+              프로젝트 생성 완료 후 챕터 생성 페이지로 돌아갑니다.
             </p>
           </div>
         )}
       </div>
 
-      {currentLoop && (
+      {currentChapter && (
         <Card className="mb-6 p-4">
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-blue-500" />
-            <span className="font-medium">{currentLoop.title}</span>
+            <span className="font-medium">{currentChapter.title}</span>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            현재 루프에 연결된 프로젝트:{" "}
-            {currentLoop.connectedLoops?.length || 0}개
+            현재 챕터에 연결된 프로젝트:{" "}
+            {currentChapter.connectedChapters?.length || 0}개
           </p>
         </Card>
       )}
@@ -993,7 +995,7 @@ function NewProjectPageContent() {
                   })}
                   min={form.watch("startDate") || undefined}
                   max={(() => {
-                    // 이번달 이후 6개월까지만 가능 (루프 생성 가능 월과 동일)
+                    // 이번달 이후 6개월까지만 가능 (챕터 생성 가능 월과 동일)
                     const currentDate = new Date();
                     const currentYear = currentDate.getFullYear();
                     const currentMonth = currentDate.getMonth();
@@ -1036,7 +1038,7 @@ function NewProjectPageContent() {
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>장기 프로젝트 안내</AlertTitle>
                 <AlertDescription>
-                  8주 이상의 장기 프로젝트입니다. 루프 단위로 나누어 진행하는
+                  8주 이상의 장기 프로젝트입니다. 챕터 단위로 나누어 진행하는
                   것을 권장합니다.
                 </AlertDescription>
               </CustomAlert>
@@ -1151,7 +1153,7 @@ function NewProjectPageContent() {
                     {form.watch("category") === "repetitive" && (
                       <RecommendationBadge
                         type="info"
-                        message="목표 설정: 일주일에 2회 이상이면 루프 집중에 도움이 돼요"
+                        message="목표 설정: 일주일에 2회 이상이면 챕터 집중에 도움이 돼요"
                       />
                     )}
                   </div>
@@ -1416,31 +1418,33 @@ function NewProjectPageContent() {
           )}
         </Card>
 
-        {/* 루프 연결 섹션 */}
+        {/* 챕터 연결 섹션 */}
         <Card className="p-6">
-          <h2 className="mb-4 text-lg font-semibold">루프 연결</h2>
+          <h2 className="mb-4 text-lg font-semibold">챕터 연결</h2>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              이 프로젝트를 특정 루프에 연결하여 월별 목표로 관리할 수 있습니다.
+              이 프로젝트를 특정 챕터에 연결하여 월별 목표로 관리할 수 있습니다.
             </p>
 
-            {/* 현재 연결된 루프들 표시 */}
-            {selectedLoopIds.length > 0 && allLoops.length > 0 && (
+            {/* 현재 연결된 챕터들 표시 */}
+            {selectedChapterIds.length > 0 && allChapters.length > 0 && (
               <div>
-                <Label>현재 연결된 루프</Label>
+                <Label>현재 연결된 챕터</Label>
                 <div className="mt-2 space-y-2">
-                  {allLoops
-                    .filter((loop) => selectedLoopIds.includes(loop.id))
-                    .map((loop) => (
+                  {allChapters
+                    .filter((chapter) =>
+                      selectedChapterIds.includes(chapter.id)
+                    )
+                    .map((chapter) => (
                       <div
-                        key={loop.id}
+                        key={chapter.id}
                         className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
                       >
                         <div>
-                          <span className="font-medium">{loop.title}</span>
+                          <span className="font-medium">{chapter.title}</span>
                           <p className="text-xs text-muted-foreground">
-                            {formatDate(loop.startDate)} ~{" "}
-                            {formatDate(loop.endDate)}
+                            {formatDate(chapter.startDate)} ~{" "}
+                            {formatDate(chapter.endDate)}
                           </p>
                         </div>
                         <Button
@@ -1448,9 +1452,9 @@ function NewProjectPageContent() {
                           variant="ghost"
                           size="sm"
                           onClick={() => {
-                            // 루프 연결 해제
-                            setSelectedLoopIds((prev) =>
-                              prev.filter((id) => id !== loop.id)
+                            // 챕터 연결 해제
+                            setSelectedChapterIds((prev) =>
+                              prev.filter((id) => id !== chapter.id)
                             );
                           }}
                         >
@@ -1464,17 +1468,17 @@ function NewProjectPageContent() {
 
             <div className="text-center p-4 border-2 border-dashed rounded-lg">
               <p className="text-sm text-muted-foreground mb-2">
-                새로운 루프에 연결하거나 기존 연결을 관리하세요
+                새로운 챕터에 연결하거나 기존 연결을 관리하세요
               </p>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  openLoopConnectionDialog();
+                  openChapterConnectionDialog();
                 }}
               >
                 <Plus className="h-4 w-4 mr-2" />
-                루프 연결 관리
+                챕터 연결 관리
               </Button>
             </div>
           </div>
@@ -1541,53 +1545,53 @@ function NewProjectPageContent() {
         </DialogContent>
       </Dialog>
 
-      {/* 루프 연결 대화상자 */}
+      {/* 챕터 연결 대화상자 */}
       <Dialog
-        open={showLoopConnectionDialog}
-        onOpenChange={setShowLoopConnectionDialog}
+        open={showChapterConnectionDialog}
+        onOpenChange={setShowChapterConnectionDialog}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>루프에 연결</DialogTitle>
+            <DialogTitle>챕터에 연결</DialogTitle>
             <DialogDescription>
-              이 프로젝트를 연결할 루프를 선택하세요. 연결된 루프에서 프로젝트를
+              이 프로젝트를 연결할 챕터를 선택하세요. 연결된 챕터에서 프로젝트를
               함께 관리할 수 있습니다.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            {availableLoopsForConnection.length === 0 ? (
+            {availableChaptersForConnection.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-muted-foreground">
-                  연결할 수 있는 루프가 없습니다.
+                  연결할 수 있는 챕터가 없습니다.
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  6개월 이내의 루프만 연결할 수 있습니다.
+                  6개월 이내의 챕터만 연결할 수 있습니다.
                 </p>
                 <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
                   <p className="text-xs text-blue-700 dark:text-blue-300">
                     💡 <strong>팁:</strong> AI 플래닝 기능(준비중)을 사용하면
-                    장기 목표에 맞는 여러 루프를 자동으로 생성할 수 있습니다.
+                    장기 목표에 맞는 여러 챕터를 자동으로 생성할 수 있습니다.
                   </p>
                 </div>
               </div>
             ) : (
               <>
                 <div className="space-y-2">
-                  {availableLoopsForConnection.map((loop) => (
+                  {availableChaptersForConnection.map((chapter) => (
                     <div
-                      key={loop.id}
+                      key={chapter.id}
                       className={`p-3 border rounded-lg cursor-pointer ${
-                        selectedLoopIds.includes(loop.id)
+                        selectedChapterIds.includes(chapter.id)
                           ? "border-primary bg-primary/5"
                           : "border-border"
                       }`}
-                      onClick={() => toggleLoopSelection(loop.id)}
+                      onClick={() => toggleChapterSelection(chapter.id)}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <h4 className="font-medium">{loop.title}</h4>
-                          {selectedLoopIds.includes(loop.id) && (
+                          <h4 className="font-medium">{chapter.title}</h4>
+                          {selectedChapterIds.includes(chapter.id) && (
                             <Badge variant="outline" className="text-xs">
                               선택됨
                             </Badge>
@@ -1595,22 +1599,23 @@ function NewProjectPageContent() {
                         </div>
                         <span
                           className={`text-xs px-2 py-1 rounded-full ${
-                            getLoopStatus(loop) === "in_progress"
+                            getChapterStatus(chapter) === "in_progress"
                               ? "bg-green-100 text-green-700"
                               : "bg-blue-100 text-blue-700"
                           }`}
                         >
-                          {getLoopStatus(loop) === "in_progress"
+                          {getChapterStatus(chapter) === "in_progress"
                             ? "진행 중"
                             : "예정"}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {formatDate(loop.startDate)} -{" "}
-                        {formatDate(loop.endDate)}
+                        {formatDate(chapter.startDate)} -{" "}
+                        {formatDate(chapter.endDate)}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        연결된 프로젝트: {getConnectedProjectCount(loop.id)}개
+                        연결된 프로젝트: {getConnectedProjectCount(chapter.id)}
+                        개
                       </p>
                     </div>
                   ))}
@@ -1619,25 +1624,25 @@ function NewProjectPageContent() {
                 <div className="flex gap-2">
                   <Button
                     onClick={() => {
-                      setShowLoopConnectionDialog(false);
-                      if (selectedLoopIds.length > 0) {
+                      setShowChapterConnectionDialog(false);
+                      if (selectedChapterIds.length > 0) {
                         toast({
-                          title: "루프 연결 완료",
-                          description: `${selectedLoopIds.length}개 루프에 연결되었습니다.`,
+                          title: "챕터 연결 완료",
+                          description: `${selectedChapterIds.length}개 챕터에 연결되었습니다.`,
                         });
                       }
                     }}
                     className="flex-1"
                   >
-                    {selectedLoopIds.length > 0
-                      ? `연결하기 (${selectedLoopIds.length}개)`
+                    {selectedChapterIds.length > 0
+                      ? `연결하기 (${selectedChapterIds.length}개)`
                       : "연결 없이 진행"}
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => {
-                      setSelectedLoopIds([]);
-                      setShowLoopConnectionDialog(false);
+                      setSelectedChapterIds([]);
+                      setShowChapterConnectionDialog(false);
                     }}
                     className="flex-1"
                   >

@@ -294,15 +294,15 @@ export function isProjectActive(project: {
   return status === "in_progress" || status === "overdue";
 }
 
-// === 루프 상태 관련 함수들 (새로 추가) ===
+// === 챕터 상태 관련 함수들 (새로 추가) ===
 
-export function getLoopStatus(loop: {
+export function getChapterStatus(chapter: {
   startDate: Date;
   endDate: Date;
 }): "planned" | "in_progress" | "ended" {
   const now = new Date();
-  const startDate = new Date(loop.startDate);
-  const endDate = new Date(loop.endDate);
+  const startDate = new Date(chapter.startDate);
+  const endDate = new Date(chapter.endDate);
 
   if (now < startDate) {
     return "planned";
@@ -313,20 +313,23 @@ export function getLoopStatus(loop: {
   }
 }
 
-export function isLoopInProgress(loop: {
+export function isChapterInProgress(chapter: {
   startDate: Date;
   endDate: Date;
 }): boolean {
-  return getLoopStatus(loop) === "in_progress";
+  return getChapterStatus(chapter) === "in_progress";
 }
 
-export function isLoopEnded(loop: { startDate: Date; endDate: Date }): boolean {
-  return getLoopStatus(loop) === "ended";
-}
-
-export function isLoopPlanned(loop: {
+export function isChapterEnded(chapter: {
   startDate: Date;
   endDate: Date;
 }): boolean {
-  return getLoopStatus(loop) === "planned";
+  return getChapterStatus(chapter) === "ended";
+}
+
+export function isChapterPlanned(chapter: {
+  startDate: Date;
+  endDate: Date;
+}): boolean {
+  return getChapterStatus(chapter) === "planned";
 }

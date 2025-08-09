@@ -1,2 +1,2 @@
 // Firebase Functions 진입점
-export { checkCompletedLoops, testProjectMigration } from "./cronJobs"; 
+export { checkCompletedChapters, testProjectMigration } from "./cronJobs"; 

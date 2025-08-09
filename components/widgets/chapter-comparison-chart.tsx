@@ -12,7 +12,7 @@ import {
 } from "recharts";
 import { useLanguage } from "@/hooks/useLanguage";
 
-interface LoopComparisonChartProps {
+interface ChapterComparisonChartProps {
   data: {
     name: string;
     completion: number;
@@ -20,7 +20,7 @@ interface LoopComparisonChartProps {
   }[];
 }
 
-export function LoopComparisonChart({ data }: LoopComparisonChartProps) {
+export function ChapterComparisonChart({ data }: ChapterComparisonChartProps) {
   const { translate } = useLanguage();
 
   return (

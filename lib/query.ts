@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchAllLoopsByUserId } from "./firebase";
+import { fetchAllChaptersByUserId } from "./firebase";
 import { getAuth } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { Loop } from "./types";
+import { Chapter } from "./types";
 import { useEffect } from "react";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { db } from "@/lib/firebase";
@@ -14,11 +14,11 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
-import { Project, ConnectedLoop, Loop } from "@/lib/types";
+import { Project, ConnectedChapter, Chapter } from "@/lib/types";
 
 const auth = getAuth();
 
-const useLoops = () => {
+const useChapters = () => {
   const [user, loading] = useAuthState(auth);
   const router = useRouter();
 
@@ -29,59 +29,62 @@ const useLoops = () => {
   }, [user, loading, router]);
 
   const queryResult = useQuery({
-    queryKey: ["loops", user?.uid],
+    queryKey: ["chapters", user?.uid],
     queryFn: async () => {
       if (!user) {
         return [];
       }
-      return await fetchAllLoopsByUserId(user.uid);
+      return await fetchAllChaptersByUserId(user.uid);
     },
     enabled: !!user,
   });
   return queryResult;
 };
 
-// 프로젝트 조회 시 연결된 루프 정보를 함께 가져오는 함수
-export const getProjectWithConnectedLoops = async (
+// 프로젝트 조회 시 연결된 챕터 정보를 함께 가져오는 함수
+export const getProjectWithConnectedChapters = async (
   projectId: string
 ): Promise<Project> => {
   // 1. 프로젝트 기본 정보 조회
   const projectDoc = await getDoc(doc(db, "projects", projectId));
   const projectData = projectDoc.data() as Project;
 
-  // 2. 연결된 루프 ID들로 루프 정보 조회
-  if (projectData.connectedLoops && projectData.connectedLoops.length > 0) {
-    const loopIds = projectData.connectedLoops as string[];
-    const loopsQuery = query(
-      collection(db, "loops"),
-      where("__name__", "in", loopIds)
+  // 2. 연결된 챕터 ID들로 챕터 정보 조회
+  if (
+    projectData.connectedChapters &&
+    projectData.connectedChapters.length > 0
+  ) {
+    const chapterIds = projectData.connectedChapters as string[];
+    const chaptersQuery = query(
+      collection(db, "chapters"),
+      where("__name__", "in", chapterIds)
     );
 
-    const loopsSnapshot = await getDocs(loopsQuery);
-    const connectedLoops: ConnectedLoop[] = [];
+    const chaptersSnapshot = await getDocs(chaptersQuery);
+    const connectedChapters: ConnectedChapter[] = [];
 
-    loopsSnapshot.forEach((doc) => {
-      const loopData = doc.data() as Loop;
-      connectedLoops.push({
+    chaptersSnapshot.forEach((doc) => {
+      const chapterData = doc.data() as Chapter;
+      connectedChapters.push({
         id: doc.id,
-        title: loopData.title,
-        startDate: loopData.startDate,
-        endDate: loopData.endDate,
+        title: chapterData.title,
+        startDate: chapterData.startDate,
+        endDate: chapterData.endDate,
       });
     });
 
     // 날짜순으로 정렬
-    connectedLoops.sort(
+    connectedChapters.sort(
       (a, b) => a.startDate.getTime() - b.startDate.getTime()
     );
 
     return {
       ...projectData,
-      connectedLoops,
+      connectedChapters,
     };
   }
 
   return projectData;
 };
 
-export default useLoops;
+export default useChapters;

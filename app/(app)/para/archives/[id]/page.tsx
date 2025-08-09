@@ -10,7 +10,7 @@ import type { Retrospective } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
-import { fetchRetrospectiveById, fetchLoopById } from "@/lib/firebase";
+import { fetchRetrospectiveById, fetchChapterById } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatDate } from "@/lib/utils";
@@ -63,15 +63,15 @@ export default function ArchiveDetailPage({
     enabled: !!id,
   });
 
-  // 노트 탭이 활성화되었을 때만 루프 정보를 가져오기
+  // 노트 탭이 활성화되었을 때만 챕터 정보를 가져오기
   const {
-    data: loop,
-    isLoading: loopLoading,
-    error: loopError,
+    data: chapter,
+    isLoading: chapterLoading,
+    error: chapterError,
   } = useQuery({
-    queryKey: ["loop", retrospective?.loopId],
-    queryFn: () => fetchLoopById(retrospective!.loopId!),
-    enabled: !!retrospective?.loopId && activeTab === "freeform",
+    queryKey: ["chapter", retrospective?.chapterId],
+    queryFn: () => fetchChapterById(retrospective!.chapterId!),
+    enabled: !!retrospective?.chapterId && activeTab === "freeform",
   });
 
   // 에러 상태
@@ -182,19 +182,21 @@ export default function ArchiveDetailPage({
           </div>
         </div>
 
-        {/* 연관된 루프/프로젝트 링크 */}
+        {/* 연관된 챕터/프로젝트 링크 */}
         <div className="mb-6">
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-medium mb-1">
-                  {retrospective.loopId
-                    ? translate("paraArchiveDetail.relatedItem.loop")
+                  {retrospective.chapterId
+                    ? translate("paraArchiveDetail.relatedItem.chapter")
                     : translate("paraArchiveDetail.relatedItem.project")}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {retrospective.loopId
-                    ? translate("paraArchiveDetail.relatedItem.loopDescription")
+                  {retrospective.chapterId
+                    ? translate(
+                        "paraArchiveDetail.relatedItem.chapterDescription"
+                      )
                     : translate(
                         "paraArchiveDetail.relatedItem.projectDescription"
                       )}
@@ -203,13 +205,13 @@ export default function ArchiveDetailPage({
               <Button variant="outline" size="sm" asChild>
                 <Link
                   href={
-                    retrospective.loopId
-                      ? `/loop/${retrospective.loopId}`
+                    retrospective.chapterId
+                      ? `/chapter/${retrospective.chapterId}`
                       : `/para/projects/${retrospective.projectId}`
                   }
                 >
-                  {retrospective.loopId
-                    ? translate("paraArchiveDetail.relatedItem.viewLoop")
+                  {retrospective.chapterId
+                    ? translate("paraArchiveDetail.relatedItem.viewChapter")
                     : translate("paraArchiveDetail.relatedItem.viewProject")}
                 </Link>
               </Button>
@@ -229,7 +231,7 @@ export default function ArchiveDetailPage({
           </TabsList>
 
           <TabsContent value="official" className="space-y-4">
-            {/* 루프용 필드들 */}
+            {/* 챕터용 필드들 */}
             {retrospective.bestMoment && (
               <Card>
                 <div className="p-4">
@@ -269,12 +271,12 @@ export default function ArchiveDetailPage({
               </Card>
             )}
 
-            {retrospective.nextLoopApplication && (
+            {retrospective.nextChapterApplication && (
               <Card>
                 <div className="p-4">
-                  <h3 className="font-medium mb-2">다음 루프 적용 방안</h3>
+                  <h3 className="font-medium mb-2">다음 챕터 적용 방안</h3>
                   <p className="text-sm text-muted-foreground">
-                    {retrospective.nextLoopApplication}
+                    {retrospective.nextChapterApplication}
                   </p>
                 </div>
               </Card>
@@ -338,28 +340,28 @@ export default function ArchiveDetailPage({
           </TabsContent>
 
           <TabsContent value="freeform">
-            {loopLoading ? (
+            {chapterLoading ? (
               <div className="text-center py-8">
                 <Skeleton className="h-4 w-32 mx-auto mb-2" />
                 <Skeleton className="h-4 w-48 mx-auto" />
               </div>
-            ) : loopError ? (
+            ) : chapterError ? (
               <div className="text-center py-8">
                 <p className="text-sm text-muted-foreground">
                   노트를 불러오는 중 오류가 발생했습니다.
                 </p>
               </div>
-            ) : loop?.note ? (
+            ) : chapter?.note ? (
               <Card>
                 <div className="p-4">
                   <h3 className="font-medium mb-2">
                     {translate("paraArchiveDetail.retrospective.note")}
                   </h3>
                   <div className="whitespace-pre-wrap text-sm text-muted-foreground">
-                    {loop.note.content}
+                    {chapter.note.content}
                   </div>
                   <p className="text-xs text-muted-foreground mt-3">
-                    {formatDate(loop.note.createdAt)}
+                    {formatDate(chapter.note.createdAt)}
                   </p>
                 </div>
               </Card>

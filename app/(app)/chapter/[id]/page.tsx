@@ -40,24 +40,24 @@ import {
 } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  fetchLoopById,
+  fetchChapterById,
   fetchAllTasksByProjectId,
-  deleteLoopById,
-  findIncompleteProjectsInLoop,
-  moveProjectToLoop,
-  fetchAllLoopsByUserId,
+  deleteChapterById,
+  findIncompleteProjectsInChapter,
+  moveProjectToChapter,
+  fetchAllChaptersByUserId,
   fetchAllAreasByUserId,
-  fetchProjectsByLoopId,
+  fetchProjectsByChapterId,
   getTaskCountsForMultipleProjects,
   createRetrospective,
   updateRetrospective,
   createNote,
   updateNote,
-  updateLoop,
+  updateChapter,
 } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
-import { formatDate, getLoopStatus } from "@/lib/utils";
+import { formatDate, getChapterStatus } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -67,7 +67,7 @@ import { useRouter } from "next/navigation";
 import { useLanguage } from "@/hooks/useLanguage";
 
 // 로딩 스켈레톤 컴포넌트
-function LoopDetailSkeleton() {
+function ChapterDetailSkeleton() {
   return (
     <div className="container max-w-md px-4 py-6">
       <div className="flex items-center justify-between mb-6">
@@ -90,7 +90,7 @@ function LoopDetailSkeleton() {
   );
 }
 
-export function LoopDetailPage({
+export function ChapterDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -107,36 +107,37 @@ export function LoopDetailPage({
   const [showProjectMigrationDialog, setShowProjectMigrationDialog] =
     useState(false);
   const [incompleteProjects, setIncompleteProjects] = useState<any[]>([]);
-  const [selectedTargetLoop, setSelectedTargetLoop] = useState<string>("");
+  const [selectedTargetChapter, setSelectedTargetChapter] =
+    useState<string>("");
   const [noteContent, setNoteContent] = useState("");
   const [bestMoment, setBestMoment] = useState("");
   const [routineAdherence, setRoutineAdherence] = useState("");
   const [unexpectedObstacles, setUnexpectedObstacles] = useState("");
-  const [nextLoopApplication, setNextLoopApplication] = useState("");
+  const [nextChapterApplication, setNextChapterApplication] = useState("");
   const [userRating, setUserRating] = useState<number | undefined>(undefined);
   const [bookmarked, setBookmarked] = useState(false);
   const [hoverRating, setHoverRating] = useState<number | undefined>(undefined);
 
   const queryClient = useQueryClient();
 
-  // 미완료 프로젝트 확인 (직전 달 루프에서만)
+  // 미완료 프로젝트 확인 (직전 달 챕터에서만)
   const checkIncompleteProjects = async () => {
-    if (!loop) return;
+    if (!chapter) return;
 
     // 현재 달과 직전 달만 체크 (2달 전부터는 제외)
     const now = new Date();
     const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
-    const loopStartDate = new Date(loop.startDate);
+    const chapterStartDate = new Date(chapter.startDate);
 
-    // 루프가 현재 달이나 직전 달이 아니면 모달을 열지 않음
-    if (loopStartDate < lastMonth) {
+    // 챕터가 현재 달이나 직전 달이 아니면 모달을 열지 않음
+    if (chapterStartDate < lastMonth) {
       return;
     }
 
     try {
-      const incomplete = await findIncompleteProjectsInLoop(loop.id);
+      const incomplete = await findIncompleteProjectsInChapter(chapter.id);
       if (incomplete.length > 0) {
         setIncompleteProjects(incomplete);
         setShowProjectMigrationDialog(true);
@@ -148,55 +149,61 @@ export function LoopDetailPage({
 
   // 프로젝트 이동 처리
   const handleProjectMigration = async () => {
-    if (!selectedTargetLoop || incompleteProjects.length === 0) return;
+    if (!selectedTargetChapter || incompleteProjects.length === 0) return;
 
     try {
-      // 모든 미완료 프로젝트를 선택된 루프로 이동
+      // 모든 미완료 프로젝트를 선택된 챕터로 이동
       for (const project of incompleteProjects) {
-        await moveProjectToLoop(project.id, loop?.id || "", selectedTargetLoop);
+        await moveProjectToChapter(
+          project.id,
+          chapter?.id || "",
+          selectedTargetChapter
+        );
       }
 
       toast({
-        title: translate("loopDetail.projectMigration.success.title"),
+        title: translate("chapterDetail.projectMigration.success.title"),
         description: translate(
-          "loopDetail.projectMigration.success.description"
+          "chapterDetail.projectMigration.success.description"
         ).replace("{count}", incompleteProjects.length.toString()),
       });
 
       // 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: ["loops"] });
+      queryClient.invalidateQueries({ queryKey: ["chapters"] });
       queryClient.invalidateQueries({ queryKey: ["projects"] });
 
       setShowProjectMigrationDialog(false);
       setIncompleteProjects([]);
-      setSelectedTargetLoop("");
+      setSelectedTargetChapter("");
     } catch (error) {
       console.error("프로젝트 이동 중 오류:", error);
       toast({
-        title: translate("loopDetail.projectMigration.error.title"),
-        description: translate("loopDetail.projectMigration.error.description"),
+        title: translate("chapterDetail.projectMigration.error.title"),
+        description: translate(
+          "chapterDetail.projectMigration.error.description"
+        ),
         variant: "destructive",
       });
     }
   };
 
-  // 루프 삭제 mutation
-  const deleteLoopMutation = useMutation({
-    mutationFn: () => deleteLoopById(id),
+  // 챕터 삭제 mutation
+  const deleteChapterMutation = useMutation({
+    mutationFn: () => deleteChapterById(id),
     onSuccess: () => {
       // 성공 시 캐시 무효화 및 목록 페이지로 이동
-      queryClient.invalidateQueries({ queryKey: ["loops"] });
+      queryClient.invalidateQueries({ queryKey: ["chapters"] });
       toast({
-        title: translate("loopDetail.delete.success.title"),
-        description: translate("loopDetail.delete.success.description"),
+        title: translate("chapterDetail.delete.success.title"),
+        description: translate("chapterDetail.delete.success.description"),
       });
-      router.push("/loop");
+      router.push("/chapter");
     },
     onError: (error: Error) => {
-      console.error("루프 삭제 실패:", error);
+      console.error("챕터 삭제 실패:", error);
       toast({
-        title: translate("loopDetail.delete.error.title"),
-        description: translate("loopDetail.delete.error.description"),
+        title: translate("chapterDetail.delete.error.title"),
+        description: translate("chapterDetail.delete.error.description"),
         variant: "destructive",
       });
     },
@@ -221,7 +228,7 @@ export function LoopDetailPage({
         bestMoment: retrospectiveData.bestMoment,
         routineAdherence: retrospectiveData.routineAdherence,
         unexpectedObstacles: retrospectiveData.unexpectedObstacles,
-        nextLoopApplication: retrospectiveData.nextLoopApplication,
+        nextChapterApplication: retrospectiveData.nextChapterApplication,
         userRating: retrospectiveData.userRating,
         bookmarked: retrospectiveData.bookmarked,
         title: retrospectiveData.title,
@@ -229,24 +236,24 @@ export function LoopDetailPage({
         content: retrospectiveData.content,
       });
 
-      if (loop?.retrospective?.id) {
+      if (chapter?.retrospective?.id) {
         // 기존 회고가 있으면 업데이트
-        await updateRetrospective(loop.retrospective.id, filteredData);
+        await updateRetrospective(chapter.retrospective.id, filteredData);
       } else {
-        // 새 회고 생성 (루프 회고용 필드만 포함)
+        // 새 회고 생성 (챕터 회고용 필드만 포함)
         const newRetrospective = await createRetrospective({
           userId: user?.uid || "",
-          loopId: loop?.id || "",
+          chapterId: chapter?.id || "",
           ...filteredData,
-          // projectId는 루프 회고에서는 사용하지 않으므로 제외
+          // projectId는 챕터 회고에서는 사용하지 않으므로 제외
         });
 
-        // 루프에 회고 연결 (필요한 필드만 포함)
-        await updateLoop(loop?.id || "", {
+        // 챕터에 회고 연결 (필요한 필드만 포함)
+        await updateChapter(chapter?.id || "", {
           retrospective: {
             id: newRetrospective.id,
             userId: newRetrospective.userId,
-            loopId: newRetrospective.loopId,
+            chapterId: newRetrospective.chapterId,
             createdAt: newRetrospective.createdAt,
             updatedAt: newRetrospective.updatedAt,
             ...filteredData,
@@ -256,8 +263,8 @@ export function LoopDetailPage({
     },
     onSuccess: () => {
       // 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: ["loop", id] });
-      queryClient.invalidateQueries({ queryKey: ["loops"] });
+      queryClient.invalidateQueries({ queryKey: ["chapter", id] });
+      queryClient.invalidateQueries({ queryKey: ["chapters"] });
       toast({
         title: "회고 저장 완료",
         description: "회고가 성공적으로 저장되었습니다.",
@@ -277,9 +284,9 @@ export function LoopDetailPage({
   // 노트 저장 mutation
   const saveNoteMutation = useMutation({
     mutationFn: async (noteContent: string) => {
-      if (loop?.note?.id) {
+      if (chapter?.note?.id) {
         // 기존 노트가 있으면 업데이트
-        await updateNote(loop.note.id, {
+        await updateNote(chapter.note.id, {
           content: noteContent,
         });
       } else {
@@ -289,16 +296,16 @@ export function LoopDetailPage({
           content: noteContent,
         });
 
-        // 루프에 노트 연결
-        await updateLoop(loop?.id || "", {
+        // 챕터에 노트 연결
+        await updateChapter(chapter?.id || "", {
           note: newNote,
         });
       }
     },
     onSuccess: () => {
       // 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: ["loop", id] });
-      queryClient.invalidateQueries({ queryKey: ["loops"] });
+      queryClient.invalidateQueries({ queryKey: ["chapter", id] });
+      queryClient.invalidateQueries({ queryKey: ["chapters"] });
       toast({
         title: "노트 저장 완료",
         description: "노트가 성공적으로 저장되었습니다.",
@@ -315,21 +322,21 @@ export function LoopDetailPage({
     },
   });
 
-  // Firestore에서 실제 루프 데이터 가져오기
+  // Firestore에서 실제 챕터 데이터 가져오기
   const {
-    data: loop,
+    data: chapter,
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["loop", id],
-    queryFn: () => fetchLoopById(id),
+    queryKey: ["chapter", id],
+    queryFn: () => fetchChapterById(id),
     enabled: !!id,
   });
 
-  // 사용자의 모든 루프 가져오기 (프로젝트 이동용)
-  const { data: allLoops = [] } = useQuery({
-    queryKey: ["loops", user?.uid],
-    queryFn: () => fetchAllLoopsByUserId(user?.uid || ""),
+  // 사용자의 모든 챕터 가져오기 (프로젝트 이동용)
+  const { data: allChapters = [] } = useQuery({
+    queryKey: ["chapters", user?.uid],
+    queryFn: () => fetchAllChaptersByUserId(user?.uid || ""),
     enabled: !!user?.uid,
   });
 
@@ -340,51 +347,53 @@ export function LoopDetailPage({
     enabled: !!user?.uid,
   });
 
-  // 루프가 완료되었을 때 미완료 프로젝트 확인
+  // 챕터가 완료되었을 때 미완료 프로젝트 확인
   useEffect(() => {
-    if (loop && getLoopStatus(loop) === "ended") {
+    if (chapter && getChapterStatus(chapter) === "ended") {
       checkIncompleteProjects();
     }
-  }, [loop]);
+  }, [chapter]);
 
   // 실제 프로젝트 데이터 가져오기
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
-    queryKey: ["projects", "loop", id],
-    queryFn: () => fetchProjectsByLoopId(id, user?.uid),
+    queryKey: ["projects", "chapter", id],
+    queryFn: () => fetchProjectsByChapterId(id, user?.uid),
     enabled: !!id && !!user?.uid,
   });
 
   // 프로젝트별 태스크 개수 가져오기
   const { data: projectTaskCounts = {} } = useQuery({
-    queryKey: ["projectTaskCounts", "loop", id],
+    queryKey: ["projectTaskCounts", "chapter", id],
     queryFn: () => getTaskCountsForMultipleProjects(projects.map((p) => p.id)),
     enabled: !!projects && projects.length > 0,
   });
 
   // 노트 데이터
-  const note = loop?.note;
+  const note = chapter?.note;
 
   // useEffect는 모든 조건부 return 이전에 위치해야 함
   useEffect(() => {
     // 회고 모달이 열릴 때만 기존 회고 데이터 로드
-    if (showRetrospectiveDialog && loop?.retrospective) {
-      setBestMoment(loop.retrospective.bestMoment || "");
-      setRoutineAdherence(loop.retrospective.routineAdherence || "");
-      setUnexpectedObstacles(loop.retrospective.unexpectedObstacles || "");
-      setNextLoopApplication(loop.retrospective.nextLoopApplication || "");
-      setUserRating(loop.retrospective.userRating);
-      setBookmarked(loop.retrospective.bookmarked || false);
+    if (showRetrospectiveDialog && chapter?.retrospective) {
+      setBestMoment(chapter.retrospective.bestMoment || "");
+      setRoutineAdherence(chapter.retrospective.routineAdherence || "");
+      setUnexpectedObstacles(chapter.retrospective.unexpectedObstacles || "");
+      setNextChapterApplication(
+        chapter.retrospective.nextChapterApplication || ""
+      );
+      setUserRating(chapter.retrospective.userRating);
+      setBookmarked(chapter.retrospective.bookmarked || false);
     } else if (!showRetrospectiveDialog) {
       // 회고 모달이 닫힐 때 폼 초기화
       setBestMoment("");
       setRoutineAdherence("");
       setUnexpectedObstacles("");
-      setNextLoopApplication("");
+      setNextChapterApplication("");
       setUserRating(undefined);
       setBookmarked(false);
       setHoverRating(undefined);
     }
-  }, [showRetrospectiveDialog, loop?.retrospective]);
+  }, [showRetrospectiveDialog, chapter?.retrospective]);
 
   // 노트 모달 상태 변경 시 데이터 로드/초기화
   useEffect(() => {
@@ -397,7 +406,7 @@ export function LoopDetailPage({
 
   // 로딩 상태
   if (isLoading) {
-    return <LoopDetailSkeleton />;
+    return <ChapterDetailSkeleton />;
   }
 
   // 에러 상태
@@ -416,7 +425,7 @@ export function LoopDetailPage({
 
         <Alert>
           <AlertDescription>
-            루프를 불러오는 중 오류가 발생했습니다. 다시 시도해주세요.
+            챕터를 불러오는 중 오류가 발생했습니다. 다시 시도해주세요.
           </AlertDescription>
         </Alert>
       </div>
@@ -424,7 +433,7 @@ export function LoopDetailPage({
   }
 
   // 데이터가 없는 경우
-  if (!loop) {
+  if (!chapter) {
     return (
       <div className="container max-w-md px-4 py-6 pb-20 text-center">
         <div className="flex items-center justify-between mb-6">
@@ -436,14 +445,14 @@ export function LoopDetailPage({
             <ChevronLeft className="h-4 w-4" />
           </Button>
         </div>
-        <p className="text-muted-foreground">루프를 찾을 수 없습니다.</p>
+        <p className="text-muted-foreground">챕터를 찾을 수 없습니다.</p>
       </div>
     );
   }
 
-  // 루프 상태 계산
-  const loopStatus = getLoopStatus(loop);
-  const isCompleted = loopStatus === "ended";
+  // 챕터 상태 계산
+  const chapterStatus = getChapterStatus(chapter);
+  const isCompleted = chapterStatus === "ended";
 
   // 진행률 계산 (실제 프로젝트 데이터 기반)
   const completionRate = (() => {
@@ -469,7 +478,7 @@ export function LoopDetailPage({
     if (!canAddProject) {
       toast({
         title: "프로젝트 추가 실패",
-        description: "한 루프에는 최대 5개의 프로젝트만 등록할 수 있습니다.",
+        description: "한 챕터에는 최대 5개의 프로젝트만 등록할 수 있습니다.",
         variant: "destructive",
       });
       return;
@@ -508,22 +517,22 @@ export function LoopDetailPage({
     }
 
     const newRetrospective: Retrospective = {
-      id: loop?.retrospective?.id || `new-retro-${Date.now()}`,
-      loopId: loop?.id || "",
+      id: chapter?.retrospective?.id || `new-retro-${Date.now()}`,
+      chapterId: chapter?.id || "",
       userId: user?.uid || "",
-      createdAt: loop?.retrospective?.createdAt || new Date(),
+      createdAt: chapter?.retrospective?.createdAt || new Date(),
       updatedAt: new Date(),
-      title: loop?.title || "",
+      title: chapter?.title || "",
       summary:
         bestMoment.substring(0, 100) + (bestMoment.length > 100 ? "..." : ""),
       bestMoment,
       routineAdherence,
       unexpectedObstacles,
-      nextLoopApplication,
+      nextChapterApplication,
       // content 필드는 노트에서만 사용하므로 회고에서는 제외
       userRating,
       bookmarked,
-      // projectId는 루프 회고에서는 사용하지 않으므로 제외
+      // projectId는 챕터 회고에서는 사용하지 않으므로 제외
     };
 
     saveRetrospectiveMutation.mutate(newRetrospective);
@@ -537,7 +546,7 @@ export function LoopDetailPage({
 
     if (!startDate || !endDate)
       return {
-        status: translate("loopDetail.project.status.undefined"),
+        status: translate("chapterDetail.project.status.undefined"),
         color: "text-gray-500",
       };
 
@@ -550,7 +559,7 @@ export function LoopDetailPage({
     // 완료된 경우 (완료율이 100% 이상)
     if (completionRate >= 100) {
       return {
-        status: translate("loopDetail.project.status.completed"),
+        status: translate("chapterDetail.project.status.completed"),
         color: "text-purple-500",
       };
     }
@@ -558,7 +567,7 @@ export function LoopDetailPage({
     // 시작일이 미래인 경우
     if (startDate && now < startDate) {
       return {
-        status: translate("loopDetail.project.status.planned"),
+        status: translate("chapterDetail.project.status.planned"),
         color: "text-blue-500",
       };
     }
@@ -566,14 +575,14 @@ export function LoopDetailPage({
     // 종료일이 지났지만 완료되지 않은 경우
     if (endDate && now > endDate && completionRate < 100) {
       return {
-        status: translate("loopDetail.project.status.overdue"),
+        status: translate("chapterDetail.project.status.overdue"),
         color: "text-red-500",
       };
     }
 
     // 진행 중인 경우
     return {
-      status: translate("loopDetail.project.status.inProgress"),
+      status: translate("chapterDetail.project.status.inProgress"),
       color: "text-green-500",
     };
   };
@@ -584,7 +593,7 @@ export function LoopDetailPage({
     const endDate = project.endDate ? new Date(project.endDate) : null;
 
     if (!startDate || !endDate)
-      return translate("loopDetail.project.duration.undefined");
+      return translate("chapterDetail.project.duration.undefined");
 
     const start = formatDate(startDate, currentLanguage);
     const end = formatDate(endDate, currentLanguage);
@@ -612,7 +621,7 @@ export function LoopDetailPage({
             } ${setRating ? "cursor-pointer hover:scale-110" : ""}`}
             onClick={() => {
               if (setRating) {
-                console.log(`루프 별점 클릭: ${star}점`);
+                console.log(`챕터 별점 클릭: ${star}점`);
                 setRating(star);
               }
             }}
@@ -633,20 +642,20 @@ export function LoopDetailPage({
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center">
           <Button variant="ghost" size="icon" asChild className="mr-2">
-            <Link href="/loop">
+            <Link href="/chapter">
               <ChevronLeft className="h-5 w-5" />
             </Link>
           </Button>
           <h1 className="text-2xl font-bold">
-            {translate("loopDetail.title")}
+            {translate("chapterDetail.title")}
           </h1>
         </div>
         <div className="flex gap-2">
           {!isCompleted && (
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/loop/edit/${loop.id}`}>
+              <Link href={`/chapter/edit/${chapter.id}`}>
                 <Edit className="mr-2 h-4 w-4" />
-                {translate("loopEdit.title")}
+                {translate("chapterEdit.title")}
               </Link>
             </Button>
           )}
@@ -660,21 +669,21 @@ export function LoopDetailPage({
         </div>
       </div>
 
-      {/* 1. 📘 루프 개요 */}
+      {/* 1. 📘 챕터 개요 */}
       <Card className="mb-6 p-4">
-        <h2 className="mb-2 text-xl font-bold">{loop.title}</h2>
+        <h2 className="mb-2 text-xl font-bold">{chapter.title}</h2>
         <div className="mb-4 flex items-center gap-2 text-sm">
           <Gift className="h-4 w-4 text-purple-500" />
           <span>
-            {translate("loopDetail.reward")}:{" "}
-            {loop.reward || translate("loopDetail.noReward")}
+            {translate("chapterDetail.reward")}:{" "}
+            {chapter.reward || translate("chapterDetail.noReward")}
           </span>
         </div>
 
         <div className="mb-4">
           <div className="mb-1 flex justify-between text-sm">
             <span>
-              {translate("loopDetail.completionRate")}: {completionRate}%
+              {translate("chapterDetail.completionRate")}: {completionRate}%
             </span>
             <span>
               {projectsLoading ? (
@@ -702,7 +711,9 @@ export function LoopDetailPage({
           {projects.length === 0 && (
             <div className="mt-2 flex items-center gap-2 text-xs text-amber-600">
               <AlertCircle className="h-3 w-3" />
-              <span>{translate("loopDetail.noProjectsForCompletionRate")}</span>
+              <span>
+                {translate("chapterDetail.noProjectsForCompletionRate")}
+              </span>
             </div>
           )}
         </div>
@@ -710,29 +721,29 @@ export function LoopDetailPage({
         <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
           <Clock className="h-4 w-4" />
           <span>
-            {formatDate(loop.startDate)} ~ {formatDate(loop.endDate)}
+            {formatDate(chapter.startDate)} ~ {formatDate(chapter.endDate)}
           </span>
         </div>
 
         <div className="mb-4">
           <h3 className="mb-2 font-medium">
-            {translate("loopDetail.focusAreas")}
+            {translate("chapterDetail.focusAreas")}
           </h3>
           <div className="flex flex-wrap gap-2">
             {(() => {
-              // 디버깅: 현재 루프 데이터 구조 확인
-              console.log("루프 데이터:", {
-                focusAreas: loop?.focusAreas,
+              // 디버깅: 현재 챕터 데이터 구조 확인
+              console.log("챕터 데이터:", {
+                focusAreas: chapter?.focusAreas,
                 areasCount: areas.length,
               });
 
               // focusAreas (ID 기반) 사용
               let focusAreas: any[] = [];
 
-              if (loop?.focusAreas && loop.focusAreas.length > 0) {
+              if (chapter?.focusAreas && chapter.focusAreas.length > 0) {
                 // ID 기반 필터링
                 focusAreas = areas.filter((area) =>
-                  loop.focusAreas.includes(area.id)
+                  chapter.focusAreas.includes(area.id)
                 );
               }
 
@@ -746,9 +757,9 @@ export function LoopDetailPage({
                     {area.name}
                   </Link>
                 ));
-              } else if (loop?.focusAreas && loop.focusAreas.length > 0) {
+              } else if (chapter?.focusAreas && chapter.focusAreas.length > 0) {
                 // Area ID는 있지만 해당 Area를 찾을 수 없는 경우
-                const missingItems = loop.focusAreas || [];
+                const missingItems = chapter.focusAreas || [];
                 return missingItems.map((item: any, index: number) => (
                   <span
                     key={index}
@@ -788,13 +799,13 @@ export function LoopDetailPage({
         ) : projects.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center">
             <p className="text-muted-foreground mb-2">
-              이 루프에 연결된 프로젝트가 없어요
+              이 챕터에 연결된 프로젝트가 없어요
             </p>
             <p className="text-xs text-muted-foreground">
               연결된 프로젝트가 없으면 달성률을 측정할 수 없어요
             </p>
             <p className="text-xs text-muted-foreground mt-2">
-              프로젝트를 연결하려면 상단의 "루프 수정" 버튼을 사용하세요
+              프로젝트를 연결하려면 상단의 "챕터 수정" 버튼을 사용하세요
             </p>
           </div>
         ) : (
@@ -873,14 +884,14 @@ export function LoopDetailPage({
                         </span>
                       </div>
 
-                      {/* 루프 도중 추가 표시 */}
+                      {/* 챕터 도중 추가 표시 */}
                       {project.addedMidway && (
                         <div className="flex justify-end">
                           <Badge
                             variant="outline"
                             className="bg-amber-100 text-amber-800 text-xs"
                           >
-                            💡 루프 도중 추가됨
+                            💡 챕터 도중 추가됨
                           </Badge>
                         </div>
                       )}
@@ -902,38 +913,38 @@ export function LoopDetailPage({
               className="flex items-center gap-2"
             >
               <FileText className="h-4 w-4" />
-              {translate("loopDetail.tabs.retrospective")}
+              {translate("chapterDetail.tabs.retrospective")}
             </TabsTrigger>
             <TabsTrigger value="note" className="flex items-center gap-2">
               <PenTool className="h-4 w-4" />
-              {translate("loopDetail.tabs.note")}
+              {translate("chapterDetail.tabs.note")}
             </TabsTrigger>
           </TabsList>
 
           {/* 회고 탭 */}
           <TabsContent value="retrospective" className="mt-4">
-            {loop.retrospective ? (
+            {chapter.retrospective ? (
               <Card className="p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-medium">
-                    {loop.retrospective.title || "회고 작성 완료"}
+                    {chapter.retrospective.title || "회고 작성 완료"}
                   </h4>
                   <div className="flex items-center gap-2">
-                    {loop.retrospective.bookmarked && (
+                    {chapter.retrospective.bookmarked && (
                       <Bookmark className="h-4 w-4 text-yellow-500 fill-yellow-500" />
                     )}
-                    {renderStarRating(loop.retrospective.userRating)}
+                    {renderStarRating(chapter.retrospective.userRating)}
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
-                  {loop.retrospective.summary ||
-                    loop.retrospective.content ||
-                    loop.retrospective.bestMoment ||
+                  {chapter.retrospective.summary ||
+                    chapter.retrospective.content ||
+                    chapter.retrospective.bestMoment ||
                     "작성된 회고 요약이 없습니다."}
                 </p>
                 <div className="flex justify-end">
                   <Button variant="outline" size="sm" asChild>
-                    <Link href={`/para/archives/${loop.retrospective.id}`}>
+                    <Link href={`/para/archives/${chapter.retrospective.id}`}>
                       회고 상세 보기
                     </Link>
                   </Button>
@@ -942,19 +953,19 @@ export function LoopDetailPage({
             ) : (
               <div className="rounded-lg border border-dashed p-8 text-center">
                 <p className="text-muted-foreground mb-2">
-                  {translate("loopDetail.retrospective.noContent")}
+                  {translate("chapterDetail.retrospective.noContent")}
                 </p>
                 <p className="text-sm text-muted-foreground mb-4">
                   {isCompleted
-                    ? translate("loopDetail.retrospective.description")
+                    ? translate("chapterDetail.retrospective.description")
                     : translate(
-                        "loopDetail.retrospective.inProgressDescription"
+                        "chapterDetail.retrospective.inProgressDescription"
                       )}
                 </p>
                 {isCompleted && (
                   <Button onClick={() => setShowRetrospectiveDialog(true)}>
                     <Plus className="mr-2 h-4 w-4" />
-                    {translate("loopDetail.retrospective.writeTitle")}
+                    {translate("chapterDetail.retrospective.writeTitle")}
                   </Button>
                 )}
               </div>
@@ -967,7 +978,7 @@ export function LoopDetailPage({
               <Card className="p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-medium">
-                    {translate("loopDetail.note.title")}
+                    {translate("chapterDetail.note.title")}
                   </h4>
                   <Button
                     variant="outline"
@@ -975,7 +986,7 @@ export function LoopDetailPage({
                     onClick={() => setShowAddNoteDialog(true)}
                   >
                     <Edit className="mr-1 h-4 w-4" />
-                    {translate("loopDetail.note.edit")}
+                    {translate("chapterDetail.note.edit")}
                   </Button>
                 </div>
                 <p className="text-sm mb-3">{note.content}</p>
@@ -986,14 +997,14 @@ export function LoopDetailPage({
             ) : (
               <div className="rounded-lg border border-dashed p-8 text-center">
                 <p className="text-muted-foreground mb-2">
-                  {translate("loopDetail.note.noNote")}
+                  {translate("chapterDetail.note.noNote")}
                 </p>
                 <p className="text-sm text-muted-foreground mb-4">
-                  {translate("loopDetail.note.description")}
+                  {translate("chapterDetail.note.description")}
                 </p>
                 <Button onClick={() => setShowAddNoteDialog(true)}>
                   <Plus className="mr-2 h-4 w-4" />
-                  {translate("loopDetail.note.addButton")}
+                  {translate("chapterDetail.note.addButton")}
                 </Button>
               </div>
             )}
@@ -1008,9 +1019,9 @@ export function LoopDetailPage({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>루프에 프로젝트 추가</DialogTitle>
+            <DialogTitle>챕터에 프로젝트 추가</DialogTitle>
             <DialogDescription>
-              루프 중간에 추가된 프로젝트는 별도로 표시되며, 월말 리포트에서
+              챕터 중간에 추가된 프로젝트는 별도로 표시되며, 월말 리포트에서
               '후속 투입 항목'으로 집계됩니다.
             </DialogDescription>
           </DialogHeader>
@@ -1018,13 +1029,15 @@ export function LoopDetailPage({
           <div className="flex flex-col gap-4 py-4">
             <Button asChild>
               <Link
-                href={`/para/projects/new?loopId=${loop.id}&addedMidway=true`}
+                href={`/para/projects/new?chapterId=${chapter.id}&addedMidway=true`}
               >
                 새 프로젝트 생성
               </Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link href={`/loop/add-existing-project?loopId=${loop.id}`}>
+              <Link
+                href={`/chapter/add-existing-project?chapterId=${chapter.id}`}
+              >
                 기존 프로젝트 연결
               </Link>
             </Button>
@@ -1045,9 +1058,9 @@ export function LoopDetailPage({
       <Dialog open={showAddNoteDialog} onOpenChange={setShowAddNoteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>루프 노트 {note ? "수정" : "작성"}</DialogTitle>
+            <DialogTitle>챕터 노트 {note ? "수정" : "작성"}</DialogTitle>
             <DialogDescription>
-              루프 진행 중 느낀 점이나 배운 점을 자유롭게 기록하세요.
+              챕터 진행 중 느낀 점이나 배운 점을 자유롭게 기록하세요.
             </DialogDescription>
           </DialogHeader>
 
@@ -1086,10 +1099,10 @@ export function LoopDetailPage({
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>
-              {translate("loopDetail.retrospective.title")}
+              {translate("chapterDetail.retrospective.title")}
             </DialogTitle>
             <DialogDescription>
-              {translate("loopDetail.retrospective.description")}
+              {translate("chapterDetail.retrospective.description")}
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh] pr-4">
@@ -1099,7 +1112,7 @@ export function LoopDetailPage({
                   htmlFor="bestMoment"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  {translate("loopDetail.retrospective.bestMoment.label")}
+                  {translate("chapterDetail.retrospective.bestMoment.label")}
                 </label>
                 <Textarea
                   id="bestMoment"
@@ -1108,7 +1121,7 @@ export function LoopDetailPage({
                   value={bestMoment}
                   onChange={(e) => setBestMoment(e.target.value)}
                   placeholder={translate(
-                    "loopDetail.retrospective.bestMoment.placeholder"
+                    "chapterDetail.retrospective.bestMoment.placeholder"
                   )}
                 />
               </div>
@@ -1117,7 +1130,9 @@ export function LoopDetailPage({
                   htmlFor="routineAdherence"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  {translate("loopDetail.retrospective.routineAdherence.label")}
+                  {translate(
+                    "chapterDetail.retrospective.routineAdherence.label"
+                  )}
                 </label>
                 <Textarea
                   id="routineAdherence"
@@ -1126,7 +1141,7 @@ export function LoopDetailPage({
                   value={routineAdherence}
                   onChange={(e) => setRoutineAdherence(e.target.value)}
                   placeholder={translate(
-                    "loopDetail.retrospective.routineAdherence.placeholder"
+                    "chapterDetail.retrospective.routineAdherence.placeholder"
                   )}
                 />
               </div>
@@ -1136,7 +1151,7 @@ export function LoopDetailPage({
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
                   {translate(
-                    "loopDetail.retrospective.unexpectedObstacles.label"
+                    "chapterDetail.retrospective.unexpectedObstacles.label"
                   )}
                 </label>
                 <Textarea
@@ -1146,33 +1161,33 @@ export function LoopDetailPage({
                   value={unexpectedObstacles}
                   onChange={(e) => setUnexpectedObstacles(e.target.value)}
                   placeholder={translate(
-                    "loopDetail.retrospective.unexpectedObstacles.placeholder"
+                    "chapterDetail.retrospective.unexpectedObstacles.placeholder"
                   )}
                 />
               </div>
               <div>
                 <label
-                  htmlFor="nextLoopApplication"
+                  htmlFor="nextChapterApplication"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
                   {translate(
-                    "loopDetail.retrospective.nextLoopApplication.label"
+                    "chapterDetail.retrospective.nextChapterApplication.label"
                   )}
                 </label>
                 <Textarea
-                  id="nextLoopApplication"
+                  id="nextChapterApplication"
                   className="mt-1"
                   rows={2}
-                  value={nextLoopApplication}
-                  onChange={(e) => setNextLoopApplication(e.target.value)}
+                  value={nextChapterApplication}
+                  onChange={(e) => setNextChapterApplication(e.target.value)}
                   placeholder={translate(
-                    "loopDetail.retrospective.nextLoopApplication.placeholder"
+                    "chapterDetail.retrospective.nextChapterApplication.placeholder"
                   )}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  {translate("loopDetail.retrospective.helpful.label")}
+                  {translate("chapterDetail.retrospective.helpful.label")}
                 </label>
                 {renderStarRating(userRating, setUserRating)}
               </div>
@@ -1181,7 +1196,7 @@ export function LoopDetailPage({
                   id="bookmarked"
                   checked={bookmarked}
                   onCheckedChange={(checked) => {
-                    console.log(`루프 북마크 상태 변경: ${checked}`);
+                    console.log(`챕터 북마크 상태 변경: ${checked}`);
                     setBookmarked(checked as boolean);
                   }}
                 />
@@ -1190,10 +1205,12 @@ export function LoopDetailPage({
                     htmlFor="bookmarked"
                     className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer"
                   >
-                    {translate("loopDetail.retrospective.bookmark.label")}
+                    {translate("chapterDetail.retrospective.bookmark.label")}
                   </label>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {translate("loopDetail.retrospective.bookmark.description")}
+                    {translate(
+                      "chapterDetail.retrospective.bookmark.description"
+                    )}
                   </p>
                 </div>
                 {bookmarked && (
@@ -1218,7 +1235,7 @@ export function LoopDetailPage({
             >
               {saveRetrospectiveMutation.isPending
                 ? "저장 중..."
-                : translate("loopDetail.retrospective.save")}
+                : translate("chapterDetail.retrospective.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1228,10 +1245,10 @@ export function LoopDetailPage({
       <ConfirmDialog
         open={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
-        title="루프 삭제"
-        description="이 루프를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+        title="챕터 삭제"
+        description="이 챕터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
         onConfirm={() => {
-          deleteLoopMutation.mutate();
+          deleteChapterMutation.mutate();
           setShowDeleteDialog(false);
         }}
       />
@@ -1245,7 +1262,7 @@ export function LoopDetailPage({
           <DialogHeader>
             <DialogTitle>미완료 프로젝트 발견</DialogTitle>
             <DialogDescription>
-              이 루프에 완료되지 않은 프로젝트가 있습니다. 다른 루프에
+              이 챕터에 완료되지 않은 프로젝트가 있습니다. 다른 챕터에
               추가하시겠습니까?
             </DialogDescription>
           </DialogHeader>
@@ -1272,36 +1289,39 @@ export function LoopDetailPage({
               </div>
             </div>
 
-            {/* 대상 루프 선택 */}
+            {/* 대상 챕터 선택 */}
             <div>
-              <h4 className="font-medium mb-2">이동할 루프 선택</h4>
+              <h4 className="font-medium mb-2">이동할 챕터 선택</h4>
               <Select
-                value={selectedTargetLoop}
-                onValueChange={setSelectedTargetLoop}
+                value={selectedTargetChapter}
+                onValueChange={setSelectedTargetChapter}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="루프를 선택하세요" />
+                  <SelectValue placeholder="챕터를 선택하세요" />
                 </SelectTrigger>
                 <SelectContent>
-                  {allLoops
+                  {allChapters
                     .filter(
-                      (targetLoop) =>
-                        targetLoop.id !== loop?.id &&
-                        (getLoopStatus(targetLoop) === "in_progress" ||
-                          getLoopStatus(targetLoop) === "planned")
+                      (targetChapter) =>
+                        targetChapter.id !== chapter?.id &&
+                        (getChapterStatus(targetChapter) === "in_progress" ||
+                          getChapterStatus(targetChapter) === "planned")
                     )
-                    .map((targetLoop) => (
-                      <SelectItem key={targetLoop.id} value={targetLoop.id}>
+                    .map((targetChapter) => (
+                      <SelectItem
+                        key={targetChapter.id}
+                        value={targetChapter.id}
+                      >
                         <div className="flex items-center gap-2">
-                          <span>{targetLoop.title}</span>
+                          <span>{targetChapter.title}</span>
                           <Badge
                             variant={
-                              getLoopStatus(targetLoop) === "in_progress"
+                              getChapterStatus(targetChapter) === "in_progress"
                                 ? "default"
                                 : "secondary"
                             }
                           >
-                            {getLoopStatus(targetLoop) === "in_progress"
+                            {getChapterStatus(targetChapter) === "in_progress"
                               ? "진행 중"
                               : "예정"}
                           </Badge>
@@ -1310,14 +1330,14 @@ export function LoopDetailPage({
                     ))}
                 </SelectContent>
               </Select>
-              {allLoops.filter(
-                (targetLoop) =>
-                  targetLoop.id !== loop?.id &&
-                  (getLoopStatus(targetLoop) === "in_progress" ||
-                    getLoopStatus(targetLoop) === "planned")
+              {allChapters.filter(
+                (targetChapter) =>
+                  targetChapter.id !== chapter?.id &&
+                  (getChapterStatus(targetChapter) === "in_progress" ||
+                    getChapterStatus(targetChapter) === "planned")
               ).length === 0 && (
                 <p className="text-sm text-muted-foreground mt-2">
-                  💡 현재 이동 가능한 루프가 없습니다. 새로운 루프를 먼저
+                  💡 현재 이동 가능한 챕터가 없습니다. 새로운 챕터를 먼저
                   생성해주세요.
                 </p>
               )}
@@ -1330,14 +1350,16 @@ export function LoopDetailPage({
               onClick={() => {
                 setShowProjectMigrationDialog(false);
                 setIncompleteProjects([]);
-                setSelectedTargetLoop("");
+                setSelectedTargetChapter("");
               }}
             >
               나중에 처리
             </Button>
             <Button
               onClick={handleProjectMigration}
-              disabled={!selectedTargetLoop || incompleteProjects.length === 0}
+              disabled={
+                !selectedTargetChapter || incompleteProjects.length === 0
+              }
             >
               프로젝트 추가
             </Button>
@@ -1345,18 +1367,18 @@ export function LoopDetailPage({
         </DialogContent>
       </Dialog>
 
-      {/* 루프 삭제 확인 다이얼로그 */}
+      {/* 챕터 삭제 확인 다이얼로그 */}
       <ConfirmDialog
         open={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
-        title="루프 삭제"
+        title="챕터 삭제"
         description={
-          getLoopStatus(loop) === "ended"
-            ? "이 루프를 삭제하시겠습니까? 삭제해도 해당 월의 정보는 연간 통계에 여전히 반영됩니다."
-            : "이 루프를 삭제하시겠습니까? 연결된 프로젝트와 태스크도 함께 삭제됩니다."
+          getChapterStatus(chapter) === "ended"
+            ? "이 챕터를 삭제하시겠습니까? 삭제해도 해당 월의 정보는 연간 통계에 여전히 반영됩니다."
+            : "이 챕터를 삭제하시겠습니까? 연결된 프로젝트와 태스크도 함께 삭제됩니다."
         }
         onConfirm={() => {
-          deleteLoopMutation.mutate();
+          deleteChapterMutation.mutate();
           setShowDeleteDialog(false);
         }}
         confirmText="삭제"
@@ -1369,8 +1391,8 @@ export function LoopDetailPage({
 
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <Suspense fallback={<LoopDetailSkeleton />}>
-      <LoopDetailPage params={params} />
+    <Suspense fallback={<ChapterDetailSkeleton />}>
+      <ChapterDetailPage params={params} />
     </Suspense>
   );
 }

@@ -13,7 +13,9 @@ const retrospectiveFormSchema = z.object({
   bestMoment: z.string().min(1, "가장 좋았던 순간을 입력해주세요"),
   routineAdherence: z.string().min(1, "루틴 준수율을 입력해주세요"),
   unexpectedObstacles: z.string().min(1, "예상치 못한 장애물을 입력해주세요"),
-  nextLoopApplication: z.string().min(1, "다음 루프 적용 방안을 입력해주세요"),
+  nextChapterApplication: z
+    .string()
+    .min(1, "다음 챕터 적용 방안을 입력해주세요"),
   freeformContent: z.string().optional(),
   userRating: z.number().min(1).max(5),
   bookmarked: z.boolean(),
@@ -22,13 +24,13 @@ const retrospectiveFormSchema = z.object({
 type RetrospectiveFormData = z.infer<typeof retrospectiveFormSchema>;
 
 interface RetrospectiveFormProps {
-  loopTitle: string;
+  chapterTitle: string;
   onClose: () => void;
   onSave: (data: RetrospectiveFormData) => void;
 }
 
 export function RetrospectiveForm({
-  loopTitle,
+  chapterTitle,
   onClose,
   onSave,
 }: RetrospectiveFormProps) {
@@ -40,7 +42,7 @@ export function RetrospectiveForm({
       bestMoment: "",
       routineAdherence: "",
       unexpectedObstacles: "",
-      nextLoopApplication: "",
+      nextChapterApplication: "",
       freeformContent: "",
       userRating: 0,
       bookmarked: false,
@@ -85,7 +87,7 @@ export function RetrospectiveForm({
             <label className="text-sm font-medium">가장 좋았던 순간</label>
             <Textarea
               {...form.register("bestMoment")}
-              placeholder="이번 루프에서 가장 좋았던 순간을 기록해주세요"
+              placeholder="이번 챕터에서 가장 좋았던 순간을 기록해주세요"
               rows={3}
             />
             {form.formState.errors.bestMoment && (
@@ -124,15 +126,15 @@ export function RetrospectiveForm({
           </div>
 
           <div>
-            <label className="text-sm font-medium">다음 루프 적용 방안</label>
+            <label className="text-sm font-medium">다음 챕터 적용 방안</label>
             <Textarea
-              {...form.register("nextLoopApplication")}
-              placeholder="이번 경험을 다음 루프에 어떻게 적용할지 기록해주세요"
+              {...form.register("nextChapterApplication")}
+              placeholder="이번 경험을 다음 챕터에 어떻게 적용할지 기록해주세요"
               rows={3}
             />
-            {form.formState.errors.nextLoopApplication && (
+            {form.formState.errors.nextChapterApplication && (
               <p className="text-sm text-red-500 mt-1">
-                {form.formState.errors.nextLoopApplication.message}
+                {form.formState.errors.nextChapterApplication.message}
               </p>
             )}
           </div>

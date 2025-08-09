@@ -12,7 +12,7 @@ export const translations = {
     },
     bottomNav: {
       home: "홈",
-      loop: "루프",
+      chapter: "챕터",
       para: "PARA",
       settings: "설정",
     },
@@ -36,14 +36,14 @@ export const translations = {
       noName: "이름 없음",
       email: "이메일",
       noEmail: "이메일 없음",
-      loopSettings: "루프 설정",
+      chapterSettings: "챕터 설정",
       defaultReward: "기본 보상 설정",
-      defaultRewardPlaceholder: "루프 완료 시 기본 보상을 입력하세요",
-      defaultRewardEnabled: "새 루프 생성 시 기본으로 설정될 보상입니다.",
+      defaultRewardPlaceholder: "챕터 완료 시 기본 보상을 입력하세요",
+      defaultRewardEnabled: "새 챕터 생성 시 기본으로 설정될 보상입니다.",
       defaultRewardDisabled:
-        "기본 보상 설정이 비활성화되어 있습니다. 활성화하면 새 루프 생성 시 자동으로 보상이 채워집니다.",
+        "기본 보상 설정이 비활성화되어 있습니다. 활성화하면 새 챕터 생성 시 자동으로 보상이 채워집니다.",
       carryOver: "미완료 항목 이월",
-      carryOverDescription: "완료하지 못한 항목을 다음 루프로 이월합니다.",
+      carryOverDescription: "완료하지 못한 항목을 다음 챕터로 이월합니다.",
       themeSettings: "테마 설정",
       theme: "테마",
       language: "언어",
@@ -91,7 +91,7 @@ export const translations = {
     home: {
       greeting: "안녕하세요",
       greetingSuffix: "님!",
-      noName: "루퍼",
+      noName: "챕터러",
       encouragement: "오늘도 성장하는 하루 되세요.",
       improvement: "전월 대비",
       improvementSuffix: "% 향상",
@@ -99,8 +99,8 @@ export const translations = {
         summary: "요약 보기",
         dashboard: "활동 대시보드",
       },
-      currentLoop: "현재 루프",
-      noLoop: "루프 없음",
+      currentChapter: "현재 챕터",
+      noChapter: "챕터 없음",
       reward: "🎁 보상",
       noReward: "없음",
       progress: "진행률",
@@ -110,12 +110,12 @@ export const translations = {
       todayDeadlineDescription: "개 프로젝트가 오늘 마감입니다.",
       completed: "완료",
       inProgress: "진행 중",
-      currentLoopProjects: "현재 루프 프로젝트",
+      currentChapterProjects: "현재 챕터 프로젝트",
       noProjects: "프로젝트가 없습니다",
-      noProjectsDescription: "현재 루프에 연결된 프로젝트가 없습니다.",
+      noProjectsDescription: "현재 챕터에 연결된 프로젝트가 없습니다.",
       addProject: "프로젝트 추가",
       area: "Area",
-      addedMidway: "🔥 루프 중 추가됨",
+      addedMidway: "🔥 챕터 중 추가됨",
       showMore: "더보기",
       showMoreSuffix: "개",
       yearlyStats: "📊 연간 활동 통계",
@@ -123,12 +123,12 @@ export const translations = {
       focusTime: "집중 시간",
       hours: "시간",
       completionRate: "완료율",
-      completedLoops: "누적 루프",
-      completedLoopsDescription: "완료한 루프 수",
+      completedChapters: "누적 챕터",
+      completedChaptersDescription: "완료한 챕터 수",
       totalRewards: "받은 보상",
       totalRewardsDescription: "달성한 보상 수",
       areaActivity: "Area 활동 비중",
-      loopComparison: "루프 비교",
+      chapterComparison: "챕터 비교",
       dashboardUpdate:
         "📊 활동 대시보드는 매월 1일 오전 4시에 자동으로 업데이트됩니다.",
       loginRequired: "로그인이 필요합니다",
@@ -144,14 +144,14 @@ export const translations = {
           "미분류 항목이 {count}개 있습니다. 영역별로 분류하여 더 나은 정리를 해보세요!",
       },
     },
-    loop: {
-      title: "루프",
+    chapter: {
+      title: "챕터",
       tabs: {
         active: "진행 중",
         future: "예정",
         past: "완료",
       },
-      currentLoop: {
+      currentChapter: {
         status: {
           inProgress: "진행 중",
           completed: "완료됨",
@@ -162,37 +162,37 @@ export const translations = {
         projects: "프로젝트",
         projectsConnected: "{count}개 프로젝트가 연결되어 있습니다",
         noProjects: "연결된 프로젝트가 없습니다",
-        noLoop: {
-          title: "현재 루프가 없습니다",
-          description: "새로운 루프를 생성하여 목표를 설정하고 달성해보세요",
-          button: "루프 생성하기",
+        noChapter: {
+          title: "현재 챕터가 없습니다",
+          description: "새로운 챕터를 생성하여 목표를 설정하고 달성해보세요",
+          button: "챕터 생성하기",
         },
       },
-      futureLoops: {
+      futureChapters: {
         reward: "보상",
         target: "목표",
         targetCount: "목표: {count}개",
         connectedProjects: "{count}개 연결됨",
         noProjects: "연결된 프로젝트가 없습니다",
-        totalCount: "총 {count}개의 예정된 루프",
-        button: "루프 생성하기",
-        noLoops: {
-          title: "예정된 루프가 없습니다",
-          description: "미래의 목표를 위해 새로운 루프를 계획해보세요",
-          button: "루프 생성하기",
+        totalCount: "총 {count}개의 예정된 챕터",
+        button: "챕터 생성하기",
+        noChapters: {
+          title: "예정된 챕터가 없습니다",
+          description: "미래의 목표를 위해 새로운 챕터를 계획해보세요",
+          button: "챕터 생성하기",
         },
       },
-      pastLoops: {
+      pastChapters: {
         achievement: "달성률: {rate}%",
-        totalCount: "총 {count}개의 완료된 루프",
-        noLoops: {
-          title: "완료된 루프가 없습니다",
-          description: "완료된 루프가 여기에 표시됩니다",
+        totalCount: "총 {count}개의 완료된 챕터",
+        noChapters: {
+          title: "완료된 챕터가 없습니다",
+          description: "완료된 챕터가 여기에 표시됩니다",
         },
       },
     },
-    loopDetail: {
-      title: "루프 상세",
+    chapterDetail: {
+      title: "챕터 상세",
       reward: "보상",
       noReward: "보상 없음",
       completionRate: "달성률",
@@ -217,32 +217,32 @@ export const translations = {
         },
       },
       error: {
-        loading: "루프를 불러오는 중 오류가 발생했습니다. 다시 시도해주세요.",
-        notFound: "루프를 찾을 수 없습니다.",
+        loading: "챕터를 불러오는 중 오류가 발생했습니다. 다시 시도해주세요.",
+        notFound: "챕터를 찾을 수 없습니다.",
       },
-      noConnectedProjects: "루프에 연결된 프로젝트가 없어요",
+      noConnectedProjects: "챕터에 연결된 프로젝트가 없어요",
       noProjectsForCompletionRateDescription:
         "연결된 프로젝트가 없으면 달성률을 측정할 수 없어요",
       connectProjectsHint:
-        '프로젝트를 연결하려면 상단의 "루프 수정" 버튼을 사용하세요',
+        '프로젝트를 연결하려면 상단의 "챕터 수정" 버튼을 사용하세요',
       noFocusAreas: "중점 영역이 설정되지 않았습니다.",
       tabs: {
         retrospective: "회고",
         note: "노트",
       },
       note: {
-        title: "루프 노트",
+        title: "챕터 노트",
         edit: "노트 수정",
         add: "노트 작성",
         noNote: "작성된 노트가 없어요",
-        description: "이번 루프에서 느낀 점을 기록해 보세요",
+        description: "이번 챕터에서 느낀 점을 기록해 보세요",
         addButton: "노트 작성하기",
         placeholder: "오늘의 노트를 작성해보세요...",
         save: "저장하기",
-        editTitle: "루프 노트 수정",
-        addTitle: "루프 노트 작성",
+        editTitle: "챕터 노트 수정",
+        addTitle: "챕터 노트 작성",
         descriptionText:
-          "루프 진행 중 느낀 점이나 배운 점을 자유롭게 기록하세요.",
+          "챕터 진행 중 느낀 점이나 배운 점을 자유롭게 기록하세요.",
         saveSuccess: "노트 저장 완료",
         saveSuccessDescription: "노트가 성공적으로 저장되었습니다.",
         saveError: "노트 저장 실패",
@@ -251,21 +251,21 @@ export const translations = {
         contentRequiredDescription: "노트 내용을 입력해주세요.",
       },
       addProject: {
-        title: "루프에 프로젝트 추가",
+        title: "챕터에 프로젝트 추가",
         description:
-          "루프 중간에 추가된 프로젝트는 별도로 표시되며, 월말 리포트에서 '후속 투입 항목'으로 집계됩니다.",
+          "챕터 중간에 추가된 프로젝트는 별도로 표시되며, 월말 리포트에서 '후속 투입 항목'으로 집계됩니다.",
         newProject: "새 프로젝트 생성",
         existingProject: "기존 프로젝트 연결",
         cancel: "취소",
       },
       retrospective: {
         title: "월간 회고 작성",
-        description: "이번 루프를 돌아보고 다음 루프를 계획하세요.",
+        description: "이번 챕터를 돌아보고 다음 챕터를 계획하세요.",
         noContent: "작성된 회고가 없어요",
-        inProgressDescription: "루프가 진행 중일 때는 회고를 작성할 수 없어요",
+        inProgressDescription: "챕터가 진행 중일 때는 회고를 작성할 수 없어요",
         writeTitle: "회고 작성하기",
         bestMoment: {
-          label: "이번 루프에서 가장 좋았던 순간은?",
+          label: "이번 챕터에서 가장 좋았던 순간은?",
           placeholder: "예: 운동 후 기분이 좋아지는 것을 느낀 순간",
         },
         routineAdherence: {
@@ -276,9 +276,9 @@ export const translations = {
           label: "예기치 못한 방해 요소는 있었나요?",
           placeholder: "예: 주말에 늦잠을 자는 습관",
         },
-        nextLoopApplication: {
-          label: "다음 루프에 적용할 점은?",
-          placeholder: "예: 다음 루프에서는 주말 루틴도 포함해서 계획",
+        nextChapterApplication: {
+          label: "다음 챕터에 적용할 점은?",
+          placeholder: "예: 다음 챕터에서는 주말 루틴도 포함해서 계획",
         },
         helpful: {
           label: "이 회고는 스스로에게 도움이 되었나요?",
@@ -290,33 +290,33 @@ export const translations = {
         save: "회고 저장",
       },
       delete: {
-        title: "루프 삭제",
+        title: "챕터 삭제",
         description:
-          "이 루프를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+          "이 챕터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
         completedDescription:
-          "이 루프를 삭제하시겠습니까? 삭제해도 해당 월의 정보는 연간 통계에 여전히 반영됩니다.",
+          "이 챕터를 삭제하시겠습니까? 삭제해도 해당 월의 정보는 연간 통계에 여전히 반영됩니다.",
         activeDescription:
-          "이 루프를 삭제하시겠습니까? 연결된 프로젝트와 태스크도 함께 삭제됩니다.",
+          "이 챕터를 삭제하시겠습니까? 연결된 프로젝트와 태스크도 함께 삭제됩니다.",
         success: {
-          title: "루프 삭제 완료",
-          description: "루프가 성공적으로 삭제되었습니다.",
+          title: "챕터 삭제 완료",
+          description: "챕터가 성공적으로 삭제되었습니다.",
         },
         error: {
-          title: "루프 삭제 실패",
-          description: "루프 삭제 중 오류가 발생했습니다.",
+          title: "챕터 삭제 실패",
+          description: "챕터 삭제 중 오류가 발생했습니다.",
         },
       },
       projectMigration: {
         title: "미완료 프로젝트 발견",
         description:
-          "이 루프에 완료되지 않은 프로젝트가 있습니다. 다른 루프로 이동하시겠습니까?",
+          "이 챕터에 완료되지 않은 프로젝트가 있습니다. 다른 챕터로 이동하시겠습니까?",
         incompleteProjects: "미완료 프로젝트 ({count}개)",
-        selectTarget: "이동할 루프 선택",
-        selectPlaceholder: "루프를 선택하세요",
+        selectTarget: "이동할 챕터 선택",
+        selectPlaceholder: "챕터를 선택하세요",
         inProgress: "진행 중",
         planned: "예정",
-        noAvailableLoops:
-          "💡 현재 이동 가능한 루프가 없습니다. 새로운 루프를 먼저 생성해주세요.",
+        noAvailableChapters:
+          "💡 현재 이동 가능한 챕터가 없습니다. 새로운 챕터를 먼저 생성해주세요.",
         later: "나중에 처리",
         migrate: "프로젝트 이동",
         success: {
@@ -329,38 +329,38 @@ export const translations = {
         },
       },
     },
-    loopEdit: {
-      title: "루프 수정",
+    chapterEdit: {
+      title: "챕터 수정",
       validation: {
         title: "입력 오류",
-        titleRequired: "루프 제목을 입력해주세요",
+        titleRequired: "챕터 제목을 입력해주세요",
       },
       error: {
-        loading: "루프 정보를 불러오는 중 오류가 발생했습니다",
-        notFound: "루프를 찾을 수 없습니다",
-        completed: "완료된 루프는 수정할 수 없습니다",
+        loading: "챕터 정보를 불러오는 중 오류가 발생했습니다",
+        notFound: "챕터를 찾을 수 없습니다",
+        completed: "완료된 챕터는 수정할 수 없습니다",
       },
       success: {
-        title: "루프 수정 완료",
-        description: "루프가 성공적으로 수정되었습니다",
+        title: "챕터 수정 완료",
+        description: "챕터가 성공적으로 수정되었습니다",
       },
       basicInfo: {
         title: "기본 정보",
-        loopTitle: "루프 제목",
-        loopTitlePlaceholder: "예: 1월 건강 루프",
+        chapterTitle: "챕터 제목",
+        chapterTitlePlaceholder: "예: 1월 건강 챕터",
         reward: "달성 보상",
         rewardPlaceholder: "예: 새로운 운동화 구매",
-        rewardHint: "💡 루프를 완료했을 때 자신에게 줄 보상을 설정하세요",
+        rewardHint: "💡 챕터를 완료했을 때 자신에게 줄 보상을 설정하세요",
         startDate: "시작일",
         endDate: "종료일",
-        dateHint: "루프 기간은 수정할 수 없습니다",
+        dateHint: "챕터 기간은 수정할 수 없습니다",
         endDateHint: "해당 월의 마지막 날까지",
         recommendation:
-          "루프 제목, 보상, 중점 영역은 언제든지 수정할 수 있습니다",
+          "챕터 제목, 보상, 중점 영역은 언제든지 수정할 수 있습니다",
       },
       focusAreas: {
         title: "중점 Areas",
-        description: "이번 루프에서 집중할 영역을 선택하세요",
+        description: "이번 챕터에서 집중할 영역을 선택하세요",
         noAreas: "생성된 영역이 없습니다",
         createArea: "영역 생성하기",
         areaHint: "영역을 생성하면 더 체계적으로 관리할 수 있어요",
@@ -368,18 +368,18 @@ export const translations = {
       projects: {
         title: "프로젝트 연결",
         description:
-          "이 루프와 연결할 프로젝트를 선택하거나 새 프로젝트를 만들어보세요. 프로젝트는 나중에 추가할 수도 있습니다",
+          "이 챕터와 연결할 프로젝트를 선택하거나 새 프로젝트를 만들어보세요. 프로젝트는 나중에 추가할 수도 있습니다",
         selectExisting: "기존 프로젝트 선택",
         createNew: "새 프로젝트 만들기",
         connectedProjects: "연결된 프로젝트",
         noConnectedProjects: "아직 연결된 프로젝트가 없습니다",
         recommendation:
-          "권장: 2~3개 프로젝트에 집중하면 루프의 효과를 높일 수 있어요",
+          "권장: 2~3개 프로젝트에 집중하면 챕터의 효과를 높일 수 있어요",
         warning: "많은 프로젝트를 선택하면 집중도가 떨어질 수 있습니다",
         modal: {
           title: "프로젝트 추가/제거",
           description:
-            "이 루프에 연결할 프로젝트를 선택하세요. 최대 5개까지 연결할 수 있습니다",
+            "이 챕터에 연결할 프로젝트를 선택하세요. 최대 5개까지 연결할 수 있습니다",
           search: "프로젝트 검색",
           searchPlaceholder: "프로젝트 제목으로 검색...",
           connected: "연결됨",
@@ -388,38 +388,38 @@ export const translations = {
         newProject: {
           title: "새 프로젝트 생성",
           description:
-            "프로젝트 생성 페이지로 이동하여 새 프로젝트를 만들고, 완료 후 이 루프 수정 페이지로 돌아와서 연결할 수 있습니다",
+            "프로젝트 생성 페이지로 이동하여 새 프로젝트를 만들고, 완료 후 이 챕터 수정 페이지로 돌아와서 연결할 수 있습니다",
           note: "참고 사항",
           noteDescription:
-            "현재 수정 중인 루프 정보는 저장되므로 안심하고 이동하세요",
+            "현재 수정 중인 챕터 정보는 저장되므로 안심하고 이동하세요",
         },
       },
       save: "변경사항 저장",
       saving: "저장 중...",
     },
-    loopNew: {
-      title: "루프 생성",
+    chapterNew: {
+      title: "챕터 생성",
       loginRequired: {
         title: "로그인이 필요합니다",
-        description: "루프를 생성하려면 로그인이 필요합니다",
+        description: "챕터를 생성하려면 로그인이 필요합니다",
       },
       basicInfo: {
         title: "기본 정보",
-        monthSelection: "루프 월 선택",
-        monthPlaceholder: "루프를 진행할 월을 선택하세요",
-        loopTitle: "루프 제목",
-        loopTitlePlaceholder: "예: 1월 건강 루프",
+        monthSelection: "챕터 월 선택",
+        monthPlaceholder: "챕터를 진행할 월을 선택하세요",
+        chapterTitle: "챕터 제목",
+        chapterTitlePlaceholder: "예: 1월 건강 챕터",
         reward: "달성 보상",
         rewardPlaceholder: "예: 새로운 운동화 구매",
-        rewardHint: "💡 루프를 완료했을 때 자신에게 줄 보상을 설정하세요",
+        rewardHint: "💡 챕터를 완료했을 때 자신에게 줄 보상을 설정하세요",
         startDate: "시작일",
         endDate: "종료일",
-        dateHint: "루프 기간은 수정할 수 없습니다",
+        dateHint: "챕터 기간은 수정할 수 없습니다",
         endDateHint: "해당 월의 마지막 날까지",
       },
       focusAreas: {
         title: "중점 Areas",
-        description: "이번 루프에서 집중할 영역을 선택하세요",
+        description: "이번 챕터에서 집중할 영역을 선택하세요",
         noAreas: "생성된 영역이 없습니다",
         createArea: "Area 만들기",
         areaHint: "영역을 생성하면 더 체계적으로 관리할 수 있어요",
@@ -428,70 +428,70 @@ export const translations = {
       projects: {
         title: "프로젝트 연결",
         description:
-          "이 루프와 연결할 프로젝트를 선택하거나 새 프로젝트를 만들어보세요. 프로젝트는 나중에 추가할 수도 있습니다",
+          "이 챕터와 연결할 프로젝트를 선택하거나 새 프로젝트를 만들어보세요. 프로젝트는 나중에 추가할 수도 있습니다",
         selectExisting: "기존 프로젝트 선택",
         createNew: "새 프로젝트 만들기",
         connectedProjects: "연결된 프로젝트",
         noConnectedProjects: "아직 연결된 프로젝트가 없습니다",
         recommendation:
-          "권장: 2~3개 프로젝트에 집중하면 루프의 효과를 높일 수 있어요",
+          "권장: 2~3개 프로젝트에 집중하면 챕터의 효과를 높일 수 있어요",
         warning: "많은 프로젝트를 선택하면 집중도가 떨어질 수 있습니다",
         modal: {
           title: "새 프로젝트 만들기",
-          description: "새 프로젝트를 만들어 루프에 연결하시겠습니까?",
+          description: "새 프로젝트를 만들어 챕터에 연결하시겠습니까?",
           createNew: "새 프로젝트 생성",
           createDescription:
-            "프로젝트 생성 페이지로 이동하여 새 프로젝트를 만들고, 완료 후 이 루프 페이지로 돌아와서 연결할 수 있습니다",
+            "프로젝트 생성 페이지로 이동하여 새 프로젝트를 만들고, 완료 후 이 챕터 페이지로 돌아와서 연결할 수 있습니다",
           note: "참고 사항",
           noteDescription:
-            "현재 작성 중인 루프 정보는 저장되므로 안심하고 이동하세요",
+            "현재 작성 중인 챕터 정보는 저장되므로 안심하고 이동하세요",
           cancel: "취소",
           viewProjects: "기존 프로젝트 목록 보기",
         },
       },
-      duplicateLoop: {
-        title: "기존 루프가 있습니다",
+      duplicateChapter: {
+        title: "기존 챕터가 있습니다",
         description:
-          "선택한 월에 이미 루프가 존재합니다. 기존 루프를 대체하고 새로운 루프를 생성하시겠습니까?",
-        existingLoopInfo: "기존 루프 정보",
+          "선택한 월에 이미 챕터가 존재합니다. 기존 챕터를 대체하고 새로운 챕터를 생성하시겠습니까?",
+        existingChapterInfo: "기존 챕터 정보",
         titleLabel: "제목",
         periodLabel: "기간",
         connectedProjectsLabel: "연결된 프로젝트",
         projectsCount: "{count}개",
-        tip: "연결된 프로젝트는 삭제되지 않고 루프 연결만 해제됩니다",
-        warning: "기존 루프는 '루프 생성하기' 버튼을 누를 때 삭제됩니다",
+        tip: "연결된 프로젝트는 삭제되지 않고 챕터 연결만 해제됩니다",
+        warning: "기존 챕터는 '챕터 생성하기' 버튼을 누를 때 삭제됩니다",
         cancel: "취소",
-        replace: "기존 루프 대체하고 계속",
+        replace: "기존 챕터 대체하고 계속",
       },
       finalConfirm: {
-        title: "루프 생성 확인",
+        title: "챕터 생성 확인",
         description:
-          "선택한 월에 기존 루프가 있거나 이전에 취소한 월입니다. 정말로 루프를 생성하시겠습니까?",
-        warning: "⚠️ 기존 루프가 있는 경우 삭제되고 새로운 루프가 생성됩니다",
+          "선택한 월에 기존 챕터가 있거나 이전에 취소한 월입니다. 정말로 챕터를 생성하시겠습니까?",
+        warning: "⚠️ 기존 챕터가 있는 경우 삭제되고 새로운 챕터가 생성됩니다",
         cancel: "취소",
-        confirm: "확인, 루프 생성",
+        confirm: "확인, 챕터 생성",
       },
       noAreas: {
         title: "등록된 활동 영역이 없어요",
         description:
-          "루프를 만들기 위해서는 먼저 활동 영역(Area)을 등록해야 합니다. 건강, 커리어, 자기계발 등 관심 있는 영역을 만들어보세요",
+          "챕터를 만들기 위해서는 먼저 활동 영역(Area)을 등록해야 합니다. 건강, 커리어, 자기계발 등 관심 있는 영역을 만들어보세요",
         createArea: "Area 만들기",
         viewPara: "PARA 시스템 보기",
       },
       success: {
-        title: "루프 생성 완료",
-        description: "{title} 루프가 생성되었습니다",
+        title: "챕터 생성 완료",
+        description: "{title} 챕터가 생성되었습니다",
         projectCreated: "프로젝트 생성 완료",
         projectCreatedDescription:
           "새로 생성된 프로젝트가 목록에 추가되었습니다. 프로젝트 선택에서 확인하세요",
-        existingLoopDeleted: "기존 루프 삭제 완료",
-        existingLoopDeletedDescription: "{title}가 삭제되었습니다",
+        existingChapterDeleted: "기존 챕터 삭제 완료",
+        existingChapterDeletedDescription: "{title}가 삭제되었습니다",
       },
       error: {
-        title: "루프 생성 실패",
-        description: "루프 생성 중 오류가 발생했습니다",
+        title: "챕터 생성 실패",
+        description: "챕터 생성 중 오류가 발생했습니다",
       },
-      createLoop: "루프 생성하기",
+      createChapter: "챕터 생성하기",
     },
     para: {
       title: "PARA",
@@ -582,7 +582,7 @@ export const translations = {
         count: "총 {count}개",
         filter: {
           all: "전체",
-          loop: "루프",
+          chapter: "챕터",
           project: "프로젝트",
         },
         sort: {
@@ -595,7 +595,7 @@ export const translations = {
           description: "완료된 프로젝트와 자료가 여기에 보관됩니다",
         },
         noTitle: "제목 없음",
-        loopRetrospective: "루프 회고",
+        chapterRetrospective: "챕터 회고",
         projectRetrospective: "프로젝트 회고",
         noSummary: "요약 없음",
         loading: "로딩 중...",
@@ -645,8 +645,8 @@ export const translations = {
       noArea: "Area 없음",
       createdAt: "생성일",
       updatedAt: "수정일",
-      connectedLoops: "연결된 루프",
-      noConnectedLoops: "연결된 루프 없음",
+      connectedChapters: "연결된 챕터",
+      noConnectedChapters: "연결된 챕터 없음",
       taskList: "태스크 목록",
       add: "추가",
       taskForm: {
@@ -700,7 +700,7 @@ export const translations = {
       longTermProject: {
         title: "장기 프로젝트",
         description:
-          "이 프로젝트는 {count}개 루프에 걸쳐 진행되고 있습니다. 장기 프로젝트는 더 체계적인 관리가 필요할 수 있습니다",
+          "이 프로젝트는 {count}개 챕터에 걸쳐 진행되고 있습니다. 장기 프로젝트는 더 체계적인 관리가 필요할 수 있습니다",
       },
       note: {
         title: "프로젝트 노트",
@@ -752,10 +752,10 @@ export const translations = {
           label: "예상치 못한 장애물은 무엇이었나요?",
           placeholder: "예: 예상치 못한 업무가 생겨서 계획을 변경해야 했습니다",
         },
-        nextLoopApplication: {
-          label: "다음 루프에 적용할 점은?",
+        nextChapterApplication: {
+          label: "다음 챕터에 적용할 점은?",
           placeholder:
-            "예: 다음 루프에서는 더 현실적인 목표를 설정해야겠습니다",
+            "예: 다음 챕터에서는 더 현실적인 목표를 설정해야겠습니다",
         },
         goalAchievement: {
           label: "목표를 얼마나 달성했나요?",
@@ -896,7 +896,7 @@ export const translations = {
         bestMoment: "가장 좋았던 순간",
         routineAdherenceRate: "루틴 준수율",
         unexpectedObstacles: "예상치 못한 장애물",
-        nextLoopApplication: "다음 루프 적용 방안",
+        nextChapterApplication: "다음 챕터 적용 방안",
         goalAchieved: "목표 달성 여부",
         memorableTask: "가장 기억에 남는 작업",
         stuckPoints: "막힌 지점",
@@ -905,11 +905,11 @@ export const translations = {
         noContent: "작성된 회고가 없습니다",
       },
       relatedItem: {
-        loop: "연관된 루프",
+        chapter: "연관된 챕터",
         project: "연관된 프로젝트",
-        loopDescription: "이 회고가 작성된 루프로 이동",
+        chapterDescription: "이 회고가 작성된 챕터로 이동",
         projectDescription: "이 회고가 작성된 프로젝트로 이동",
-        viewLoop: "루프 보기",
+        viewChapter: "챕터 보기",
         viewProject: "프로젝트 보기",
       },
       notes: {
@@ -931,7 +931,7 @@ export const translations = {
       areaActivity: "영역별 활동",
       completionRate: "완료율",
       focusTime: "집중 시간",
-      loopComparison: "루프 비교",
+      chapterComparison: "챕터 비교",
       monthlyProgress: "월간 진행률",
       yearlyStats: "연간 통계",
       projectStatus: "프로젝트 상태",
@@ -949,7 +949,7 @@ export const translations = {
     },
     bottomNav: {
       home: "Home",
-      loop: "Loop",
+      chapter: "Chapter",
       para: "PARA",
       settings: "Settings",
     },
@@ -972,15 +972,15 @@ export const translations = {
       noName: "No name",
       email: "Email",
       noEmail: "No email",
-      loopSettings: "Loop Settings",
+      chapterSettings: "Chapter Settings",
       defaultReward: "Default Reward Setting",
-      defaultRewardPlaceholder: "Enter default reward for loop completion",
+      defaultRewardPlaceholder: "Enter default reward for chapter completion",
       defaultRewardEnabled:
-        "This will be the default reward set when creating new loops.",
+        "This will be the default reward set when creating new chapters.",
       defaultRewardDisabled:
-        "Default reward setting is disabled. Enable to automatically fill rewards when creating new loops.",
+        "Default reward setting is disabled. Enable to automatically fill rewards when creating new chapters.",
       carryOver: "Carry Over Incomplete Items",
-      carryOverDescription: "Carry over incomplete items to the next loop.",
+      carryOverDescription: "Carry over incomplete items to the next chapter.",
       themeSettings: "Theme Settings",
       theme: "Theme",
       language: "Language",
@@ -1028,7 +1028,7 @@ export const translations = {
     home: {
       greeting: "Hello",
       greetingSuffix: "!",
-      noName: "Looper",
+      noName: "Chapterer",
       encouragement: "Have a great day of growth today.",
       improvement: "vs last month",
       improvementSuffix: "% improvement",
@@ -1036,8 +1036,8 @@ export const translations = {
         summary: "Summary",
         dashboard: "Activity Dashboard",
       },
-      currentLoop: "Current Loop",
-      noLoop: "No Loop",
+      currentChapter: "Current Chapter",
+      noChapter: "No Chapter",
       reward: "🎁 Reward",
       noReward: "None",
       progress: "Progress",
@@ -1047,9 +1047,10 @@ export const translations = {
       todayDeadlineDescription: "projects are due today.",
       completed: "completed",
       inProgress: "in progress",
-      currentLoopProjects: "Current Loop Projects",
+      currentChapterProjects: "Current Chapter Projects",
       noProjects: "No Projects",
-      noProjectsDescription: "No projects are connected to the current loop.",
+      noProjectsDescription:
+        "No projects are connected to the current chapter.",
       addProject: "Add Project",
       area: "Area",
       addedMidway: "🔥 Added Midway",
@@ -1061,12 +1062,12 @@ export const translations = {
       focusTime: "Focus Time",
       hours: "hours",
       completionRate: "Completion Rate",
-      completedLoops: "Completed Loops",
-      completedLoopsDescription: "Number of completed loops",
+      completedChapters: "Completed Chapters",
+      completedChaptersDescription: "Number of completed chapters",
       totalRewards: "Total Rewards",
       totalRewardsDescription: "Number of rewards earned",
       areaActivity: "Area Activity Share",
-      loopComparison: "Loop Comparison",
+      chapterComparison: "Chapter Comparison",
       dashboardUpdate:
         "📊 Activity dashboard is automatically updated at 4 AM on the 1st of each month.",
       loginRequired: "Login required",
@@ -1082,14 +1083,14 @@ export const translations = {
           "There are {count} uncategorized items. Classify them by area for better organization!",
       },
     },
-    loop: {
-      title: "Loops",
+    chapter: {
+      title: "Chapters",
       tabs: {
         active: "Active",
         future: "Future",
         past: "Completed",
       },
-      currentLoop: {
+      currentChapter: {
         status: {
           inProgress: "In Progress",
           completed: "Completed",
@@ -1100,37 +1101,37 @@ export const translations = {
         projects: "Projects",
         projectsConnected: "{count} projects connected",
         noProjects: "No projects connected",
-        noLoop: {
-          title: "No Current Loop",
-          description: "Create a new loop to set and achieve your goals",
-          button: "Create Loop",
+        noChapter: {
+          title: "No Current Chapter",
+          description: "Create a new chapter to set and achieve your goals",
+          button: "Create Chapter",
         },
       },
-      futureLoops: {
+      futureChapters: {
         reward: "Reward",
         target: "Target",
         targetCount: "Target: {count}",
         connectedProjects: "{count} connected",
         noProjects: "No projects connected",
-        totalCount: "Total {count} future loops",
-        button: "Create Loop",
-        noLoops: {
-          title: "No Future Loops",
-          description: "Plan new loops for your future goals",
-          button: "Create Loop",
+        totalCount: "Total {count} future chapters",
+        button: "Create Chapter",
+        noChapters: {
+          title: "No Future Chapters",
+          description: "Plan new chapters for your future goals",
+          button: "Create Chapter",
         },
       },
-      pastLoops: {
+      pastChapters: {
         achievement: "Achievement: {rate}%",
-        totalCount: "Total {count} completed loops",
-        noLoops: {
-          title: "No Completed Loops",
-          description: "Completed loops will appear here",
+        totalCount: "Total {count} completed chapters",
+        noChapters: {
+          title: "No Completed Chapters",
+          description: "Completed chapters will appear here",
         },
       },
     },
-    loopDetail: {
-      title: "Loop Detail",
+    chapterDetail: {
+      title: "Chapter Detail",
       reward: "Reward",
       noReward: "No Reward",
       completionRate: "Completion Rate",
@@ -1155,32 +1156,33 @@ export const translations = {
         },
       },
       error: {
-        loading: "An error occurred while loading the loop. Please try again.",
-        notFound: "Loop not found.",
+        loading:
+          "An error occurred while loading the chapter. Please try again.",
+        notFound: "Chapter not found.",
       },
-      noConnectedProjects: "No projects connected to this loop",
+      noConnectedProjects: "No projects connected to this chapter",
       noProjectsForCompletionRateDescription:
         "Cannot measure completion rate without connected projects",
       connectProjectsHint:
-        'Use the "Edit Loop" button at the top to connect projects',
+        'Use the "Edit Chapter" button at the top to connect projects',
       noFocusAreas: "No focus areas have been set.",
       tabs: {
         retrospective: "Retrospective",
         note: "Notes",
       },
       note: {
-        title: "Loop Notes",
+        title: "Chapter Notes",
         edit: "Edit Note",
         add: "Add Note",
         noNote: "No notes written yet",
-        description: "Record your thoughts and learnings from this loop",
+        description: "Record your thoughts and learnings from this chapter",
         addButton: "Write Note",
         placeholder: "Write today's note...",
         save: "Save",
-        editTitle: "Edit Loop Note",
-        addTitle: "Write Loop Note",
+        editTitle: "Edit Chapter Note",
+        addTitle: "Write Chapter Note",
         descriptionText:
-          "Freely record your thoughts and learnings during the loop.",
+          "Freely record your thoughts and learnings during the chapter.",
         saveSuccess: "Note saved successfully",
         saveSuccessDescription: "Note has been saved successfully.",
         saveError: "Failed to save note",
@@ -1189,22 +1191,22 @@ export const translations = {
         contentRequiredDescription: "Please enter note content.",
       },
       addProject: {
-        title: "Add Project to Loop",
+        title: "Add Project to Chapter",
         description:
-          "Projects added mid-loop are marked separately and aggregated as 'follow-up items' in monthly reports.",
+          "Projects added mid-chapter are marked separately and aggregated as 'follow-up items' in monthly reports.",
         newProject: "Create New Project",
         existingProject: "Connect Existing Project",
         cancel: "Cancel",
       },
       retrospective: {
         title: "Write Monthly Retrospective",
-        description: "Reflect on this loop and plan for the next one.",
+        description: "Reflect on this chapter and plan for the next one.",
         noContent: "No retrospective written yet",
         inProgressDescription:
-          "Cannot write retrospective while loop is in progress",
+          "Cannot write retrospective while chapter is in progress",
         writeTitle: "Write Retrospective",
         bestMoment: {
-          label: "What was the best moment of this loop?",
+          label: "What was the best moment of this chapter?",
           placeholder: "e.g., The moment I felt good after exercising",
         },
         routineAdherence: {
@@ -1215,9 +1217,10 @@ export const translations = {
           label: "Were there any unexpected obstacles?",
           placeholder: "e.g., Sleeping in on weekends",
         },
-        nextLoopApplication: {
-          label: "What will you apply to the next loop?",
-          placeholder: "e.g., Include weekend routines in the next loop plan",
+        nextChapterApplication: {
+          label: "What will you apply to the next chapter?",
+          placeholder:
+            "e.g., Include weekend routines in the next chapter plan",
         },
         helpful: {
           label: "Was this retrospective helpful to you?",
@@ -1232,14 +1235,14 @@ export const translations = {
       projectMigration: {
         title: "Incomplete Projects Found",
         description:
-          "There are incomplete projects in this loop. Would you like to move them to another loop?",
+          "There are incomplete projects in this chapter. Would you like to move them to another chapter?",
         incompleteProjects: "Incomplete Projects ({count})",
-        selectTarget: "Select Target Loop",
-        selectPlaceholder: "Select a loop",
+        selectTarget: "Select Target Chapter",
+        selectPlaceholder: "Select a chapter",
         inProgress: "In Progress",
         planned: "Planned",
-        noAvailableLoops:
-          "💡 No available loops to move to. Please create a new loop first.",
+        noAvailableChapters:
+          "💡 No available chapters to move to. Please create a new chapter first.",
         later: "Handle Later",
         migrate: "Move Projects",
         success: {
@@ -1252,55 +1255,56 @@ export const translations = {
         },
       },
       delete: {
-        title: "Loop Deletion",
+        title: "Chapter Deletion",
         description:
-          "Are you sure you want to delete this loop? This action cannot be undone.",
+          "Are you sure you want to delete this chapter? This action cannot be undone.",
         completedDescription:
-          "Are you sure you want to delete this loop? Deleted data will still be reflected in annual statistics.",
+          "Are you sure you want to delete this chapter? Deleted data will still be reflected in annual statistics.",
         activeDescription:
-          "Are you sure you want to delete this loop? Connected projects and tasks will also be deleted.",
+          "Are you sure you want to delete this chapter? Connected projects and tasks will also be deleted.",
         success: {
-          title: "Loop Deletion Complete",
-          description: "Loop has been successfully deleted.",
+          title: "Chapter Deletion Complete",
+          description: "Chapter has been successfully deleted.",
         },
         error: {
-          title: "Loop Deletion Failed",
-          description: "An error occurred while deleting the loop.",
+          title: "Chapter Deletion Failed",
+          description: "An error occurred while deleting the chapter.",
         },
       },
     },
-    loopEdit: {
-      title: "Edit Loop",
+    chapterEdit: {
+      title: "Edit Chapter",
       validation: {
         title: "Validation Error",
-        titleRequired: "Please enter a loop title",
+        titleRequired: "Please enter a chapter title",
       },
       error: {
-        loading: "An error occurred while loading loop information",
-        notFound: "Loop not found",
-        completed: "Completed loops cannot be edited",
+        loading: "An error occurred while loading chapter information",
+        notFound: "Chapter not found",
+        completed: "Completed chapters cannot be edited",
       },
       success: {
-        title: "Loop Edit Complete",
-        description: "Loop has been successfully updated",
+        title: "Chapter Edit Complete",
+        description: "Chapter has been successfully updated",
       },
       basicInfo: {
         title: "Basic Information",
-        loopTitle: "Loop Title",
-        loopTitlePlaceholder: "e.g., January Health Loop",
+        chapterTitle: "Chapter Title",
+        chapterTitlePlaceholder: "e.g., January Health Chapter",
         reward: "Achievement Reward",
         rewardPlaceholder: "e.g., Buy new sneakers",
-        rewardHint: "💡 Set a reward for yourself when you complete the loop",
+        rewardHint:
+          "💡 Set a reward for yourself when you complete the chapter",
         startDate: "Start Date",
         endDate: "End Date",
-        dateHint: "Loop period cannot be modified",
+        dateHint: "Chapter period cannot be modified",
         endDateHint: "Until the last day of the month",
         recommendation:
-          "Loop title, reward, and focus areas can be modified at any time",
+          "Chapter title, reward, and focus areas can be modified at any time",
       },
       focusAreas: {
         title: "Focus Areas",
-        description: "Select areas to focus on in this loop",
+        description: "Select areas to focus on in this chapter",
         noAreas: "No areas created yet",
         createArea: "Create Area",
         areaHint: "Creating areas helps you manage more systematically",
@@ -1308,18 +1312,18 @@ export const translations = {
       projects: {
         title: "Connect Projects",
         description:
-          "Select projects to connect to this loop or create new projects. Projects can be added later",
+          "Select projects to connect to this chapter or create new projects. Projects can be added later",
         selectExisting: "Select Existing Project",
         createNew: "Create New Project",
         connectedProjects: "Connected Projects",
         noConnectedProjects: "No projects connected yet",
         recommendation:
-          "Recommendation: Focusing on 2-3 projects can increase loop effectiveness",
+          "Recommendation: Focusing on 2-3 projects can increase chapter effectiveness",
         warning: "Selecting too many projects can reduce focus",
         modal: {
           title: "Add/Remove Projects",
           description:
-            "Select projects to connect to this loop. You can connect up to 5 projects",
+            "Select projects to connect to this chapter. You can connect up to 5 projects",
           search: "Search Projects",
           searchPlaceholder: "Search by project title...",
           connected: "Connected",
@@ -1328,38 +1332,39 @@ export const translations = {
         newProject: {
           title: "Create New Project",
           description:
-            "Go to the project creation page to create a new project, then return to this loop edit page to connect it",
+            "Go to the project creation page to create a new project, then return to this chapter edit page to connect it",
           note: "Note",
           noteDescription:
-            "Current loop information is saved, so you can safely navigate away",
+            "Current chapter information is saved, so you can safely navigate away",
         },
       },
       save: "Save Changes",
       saving: "Saving...",
     },
-    loopNew: {
-      title: "Create Loop",
+    chapterNew: {
+      title: "Create Chapter",
       loginRequired: {
         title: "Login Required",
-        description: "You need to log in to create a loop",
+        description: "You need to log in to create a chapter",
       },
       basicInfo: {
         title: "Basic Information",
-        monthSelection: "Select Loop Month",
-        monthPlaceholder: "Select the month for your loop",
-        loopTitle: "Loop Title",
-        loopTitlePlaceholder: "e.g., January Health Loop",
+        monthSelection: "Select Chapter Month",
+        monthPlaceholder: "Select the month for your chapter",
+        chapterTitle: "Chapter Title",
+        chapterTitlePlaceholder: "e.g., January Health Chapter",
         reward: "Achievement Reward",
         rewardPlaceholder: "e.g., Buy new sneakers",
-        rewardHint: "💡 Set a reward for yourself when you complete the loop",
+        rewardHint:
+          "💡 Set a reward for yourself when you complete the chapter",
         startDate: "Start Date",
         endDate: "End Date",
-        dateHint: "Loop period cannot be modified",
+        dateHint: "Chapter period cannot be modified",
         endDateHint: "Until the last day of the month",
       },
       focusAreas: {
         title: "Focus Areas",
-        description: "Select areas to focus on in this loop",
+        description: "Select areas to focus on in this chapter",
         noAreas: "No areas created yet",
         createArea: "Create Area",
         areaHint: "Creating areas helps you manage more systematically",
@@ -1368,73 +1373,73 @@ export const translations = {
       projects: {
         title: "Connect Projects",
         description:
-          "Select projects to connect to this loop or create new projects. Projects can be added later",
+          "Select projects to connect to this chapter or create new projects. Projects can be added later",
         selectExisting: "Select Existing Project",
         createNew: "Create New Project",
         connectedProjects: "Connected Projects",
         noConnectedProjects: "No projects connected yet",
         recommendation:
-          "Recommendation: Focusing on 2-3 projects can increase loop effectiveness",
+          "Recommendation: Focusing on 2-3 projects can increase chapter effectiveness",
         warning: "Selecting too many projects can reduce focus",
         modal: {
           title: "Create New Project",
           description:
-            "Would you like to create a new project and connect it to the loop?",
+            "Would you like to create a new project and connect it to the chapter?",
           createNew: "Create New Project",
           createDescription:
-            "Go to the project creation page to create a new project, then return to this loop page to connect it",
+            "Go to the project creation page to create a new project, then return to this chapter page to connect it",
           note: "Note",
           noteDescription:
-            "Current loop information is saved, so you can safely navigate away",
+            "Current chapter information is saved, so you can safely navigate away",
           cancel: "Cancel",
           viewProjects: "View Existing Projects",
         },
       },
-      duplicateLoop: {
-        title: "Existing Loop Found",
+      duplicateChapter: {
+        title: "Existing Chapter Found",
         description:
-          "A loop already exists for the selected month. Would you like to replace the existing loop with a new one?",
-        existingLoopInfo: "Existing Loop Information",
+          "A chapter already exists for the selected month. Would you like to replace the existing chapter with a new one?",
+        existingChapterInfo: "Existing Chapter Information",
         titleLabel: "Title",
         periodLabel: "Period",
         connectedProjectsLabel: "Connected Projects",
         projectsCount: "{count} projects",
-        tip: "Connected projects will not be deleted, only the loop connection will be removed",
+        tip: "Connected projects will not be deleted, only the chapter connection will be removed",
         warning:
-          "The existing loop will be deleted when you click 'Create Loop'",
+          "The existing chapter will be deleted when you click 'Create Chapter'",
         cancel: "Cancel",
-        replace: "Replace Existing Loop and Continue",
+        replace: "Replace Existing Chapter and Continue",
       },
       finalConfirm: {
-        title: "Loop Creation Confirmation",
+        title: "Chapter Creation Confirmation",
         description:
-          "There is an existing loop for the selected month or you previously cancelled this month. Are you sure you want to create the loop?",
+          "There is an existing chapter for the selected month or you previously cancelled this month. Are you sure you want to create the chapter?",
         warning:
-          "⚠️ If there is an existing loop, it will be deleted and a new loop will be created",
+          "⚠️ If there is an existing chapter, it will be deleted and a new chapter will be created",
         cancel: "Cancel",
-        confirm: "Confirm, Create Loop",
+        confirm: "Confirm, Create Chapter",
       },
       noAreas: {
         title: "No Activity Areas Registered",
         description:
-          "To create a loop, you need to register activity areas (Areas) first. Create areas for health, career, self-development, or other areas of interest",
+          "To create a chapter, you need to register activity areas (Areas) first. Create areas for health, career, self-development, or other areas of interest",
         createArea: "Create Area",
         viewPara: "View PARA System",
       },
       success: {
-        title: "Loop Creation Complete",
-        description: "Loop '{title}' has been created",
+        title: "Chapter Creation Complete",
+        description: "Chapter '{title}' has been created",
         projectCreated: "Project Creation Complete",
         projectCreatedDescription:
           "The newly created project has been added to the list. Check it in the project selection",
-        existingLoopDeleted: "Existing Loop Deletion Complete",
-        existingLoopDeletedDescription: "{title} has been deleted",
+        existingChapterDeleted: "Existing Chapter Deletion Complete",
+        existingChapterDeletedDescription: "{title} has been deleted",
       },
       error: {
-        title: "Loop Creation Failed",
-        description: "An error occurred while creating the loop",
+        title: "Chapter Creation Failed",
+        description: "An error occurred while creating the chapter",
       },
-      createLoop: "Create Loop",
+      createChapter: "Create Chapter",
     },
     para: {
       title: "PARA",
@@ -1526,7 +1531,7 @@ export const translations = {
         count: "Total {count}",
         filter: {
           all: "All",
-          loop: "Loop",
+          chapter: "Chapter",
           project: "Project",
         },
         sort: {
@@ -1539,7 +1544,7 @@ export const translations = {
           description: "Completed projects and resources will be archived here",
         },
         noTitle: "No Title",
-        loopRetrospective: "Loop Retrospective",
+        chapterRetrospective: "Chapter Retrospective",
         projectRetrospective: "Project Retrospective",
         noSummary: "No Summary",
         loading: "Loading...",
@@ -1589,8 +1594,8 @@ export const translations = {
       noArea: "No Area",
       createdAt: "Created At",
       updatedAt: "Updated At",
-      connectedLoops: "Connected Loops",
-      noConnectedLoops: "No Connected Loops",
+      connectedChapters: "Connected Chapters",
+      noConnectedChapters: "No Connected Chapters",
       taskList: "Task List",
       add: "Add",
       taskForm: {
@@ -1644,7 +1649,7 @@ export const translations = {
       longTermProject: {
         title: "Long-term Project",
         description:
-          "This project spans {count} loops. Long-term projects may require more systematic management",
+          "This project spans {count} chapters. Long-term projects may require more systematic management",
       },
       note: {
         title: "Project Notes",
@@ -1698,10 +1703,10 @@ export const translations = {
           placeholder:
             "e.g., Unexpected work came up and I had to change plans",
         },
-        nextLoopApplication: {
-          label: "What will you apply to the next loop?",
+        nextChapterApplication: {
+          label: "What will you apply to the next chapter?",
           placeholder:
-            "e.g., I should set more realistic goals in the next loop",
+            "e.g., I should set more realistic goals in the next chapter",
         },
         goalAchievement: {
           label: "How much did you achieve your goals?",
@@ -1845,7 +1850,7 @@ export const translations = {
         bestMoment: "Best Moment",
         routineAdherenceRate: "Routine Adherence",
         unexpectedObstacles: "Unexpected Obstacles",
-        nextLoopApplication: "Next Loop Application",
+        nextChapterApplication: "Next Chapter Application",
         goalAchieved: "Goal Achievement",
         memorableTask: "Most Memorable Task",
         stuckPoints: "Stuck Points",
@@ -1854,12 +1859,13 @@ export const translations = {
         noContent: "No retrospective content available",
       },
       relatedItem: {
-        loop: "Related Loop",
+        chapter: "Related Chapter",
         project: "Related Project",
-        loopDescription: "Go to the loop where this retrospective was written",
+        chapterDescription:
+          "Go to the chapter where this retrospective was written",
         projectDescription:
           "Go to the project where this retrospective was written",
-        viewLoop: "View Loop",
+        viewChapter: "View Chapter",
         viewProject: "View Project",
       },
       notes: {
@@ -1881,7 +1887,7 @@ export const translations = {
       areaActivity: "Area Activity",
       completionRate: "Completion Rate",
       focusTime: "Focus Time",
-      loopComparison: "Loop Comparison",
+      chapterComparison: "Chapter Comparison",
       monthlyProgress: "Monthly Progress",
       yearlyStats: "Yearly Statistics",
       projectStatus: "Project Status",
