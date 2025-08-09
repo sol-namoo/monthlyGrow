@@ -63,6 +63,7 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/custom-alert";
+import { Alert } from "@/components/ui/alert";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 // 프로젝트 편집 폼 스키마 정의
@@ -340,7 +341,7 @@ export default function EditProjectPage({
 
       // 현재 연결된 루프들을 selectedLoopIds에 설정
       if (project.connectedLoops) {
-        setSelectedLoopIds(project.connectedLoops.map((loop) => loop.id));
+        setSelectedLoopIds(project.connectedLoops);
       }
     }
   }, [project, form, areas]);
@@ -483,12 +484,7 @@ export default function EditProjectPage({
       // 1. 프로젝트 정보 업데이트
       const connectedLoops = allLoops
         .filter((loop) => selectedLoopIds.includes(loop.id))
-        .map((loop) => ({
-          id: loop.id,
-          title: loop.title,
-          startDate: loop.startDate,
-          endDate: loop.endDate,
-        }));
+        .map((loop) => loop.id);
 
       const updateData: Partial<Omit<Project, "id" | "userId" | "createdAt">> =
         {

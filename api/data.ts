@@ -45,7 +45,7 @@ export const getCurrentLoopProjects = async (
   userId: string,
   currentLoopId: string
 ): Promise<Project[]> => {
-  return fetchCurrentLoopProjects(userId, currentLoopId);
+  return fetchProjectsByLoopId(currentLoopId);
 };
 
 // 연결되지 않은 프로젝트들만 가져오는 함수
@@ -53,7 +53,11 @@ export const getUnconnectedProjects = async (
   userId: string,
   excludeLoopId?: string
 ): Promise<Project[]> => {
-  return fetchUnconnectedProjects(userId, excludeLoopId);
+  // TODO: 연결되지 않은 프로젝트 필터링 로직 구현
+  const allProjects = await fetchAllProjectsByUserId(userId);
+  return allProjects.filter(
+    (project) => !project.connectedLoops || project.connectedLoops.length === 0
+  );
 };
 
 // Tasks

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { CharacterAvatar } from "@/components/character-avatar";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/hooks/useSettings";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -24,6 +24,7 @@ import {
 } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { Edit2, Check, X, Save, Loader2 } from "lucide-react";
+import Image from "next/image";
 
 // 설정 폼 스키마 정의 (Firebase Auth 정보 제외)
 const settingsFormSchema = z.object({
@@ -59,80 +60,77 @@ export default function SettingsPage() {
   // 프로필 사진 업로드 상태
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
-  // 번역 텍스트 메모이제이션
-  const texts = useMemo(
-    () => ({
-      // 페이지 제목
-      title: translate("settings.title"),
-      loading: translate("settings.loading"),
+  // 번역 텍스트 (메모이제이션 제거)
+  const texts = {
+    // 페이지 제목
+    title: translate("settings.title"),
+    loading: translate("settings.loading"),
 
-      // 프로필 섹션
-      profile: translate("settings.profile"),
-      avatarChange: translate("settings.avatarChange"),
-      username: translate("settings.username"),
-      usernamePlaceholder: translate("settings.usernamePlaceholder"),
-      noName: translate("settings.noName"),
-      email: translate("settings.email"),
-      noEmail: translate("settings.noEmail"),
+    // 프로필 섹션
+    profile: translate("settings.profile"),
+    avatarChange: translate("settings.avatarChange"),
+    username: translate("settings.username"),
+    usernamePlaceholder: translate("settings.usernamePlaceholder"),
+    noName: translate("settings.noName"),
+    email: translate("settings.email"),
+    noEmail: translate("settings.noEmail"),
 
-      // 루프 설정 섹션
-      loopSettings: translate("settings.loopSettings"),
-      defaultReward: translate("settings.defaultReward"),
-      defaultRewardPlaceholder: translate("settings.defaultRewardPlaceholder"),
-      defaultRewardEnabled: translate("settings.defaultRewardEnabled"),
-      defaultRewardDisabled: translate("settings.defaultRewardDisabled"),
-      carryOver: translate("settings.carryOver"),
-      carryOverDescription: translate("settings.carryOverDescription"),
+    // 루프 설정 섹션
+    loopSettings: translate("settings.loopSettings"),
+    defaultReward: translate("settings.defaultReward"),
+    defaultRewardPlaceholder: translate("settings.defaultRewardPlaceholder"),
+    defaultRewardEnabled: translate("settings.defaultRewardEnabled"),
+    defaultRewardDisabled: translate("settings.defaultRewardDisabled"),
+    carryOver: translate("settings.carryOver"),
+    carryOverDescription: translate("settings.carryOverDescription"),
 
-      // 테마 설정 섹션
-      themeSettings: translate("settings.themeSettings"),
-      theme: translate("settings.theme"),
-      language: translate("settings.language"),
+    // 테마 설정 섹션
+    themeSettings: translate("settings.themeSettings"),
+    theme: translate("settings.theme"),
+    language: translate("settings.language"),
 
-      // 계정 섹션
-      account: translate("settings.account"),
-      logout: translate("settings.logout"),
-      logoutDescription: translate("settings.logoutDescription"),
+    // 계정 섹션
+    account: translate("settings.account"),
+    logout: translate("settings.logout"),
+    logoutDescription: translate("settings.logoutDescription"),
 
-      // 테마 옵션
-      themeLight: translate("theme.light"),
-      themeDark: translate("theme.dark"),
-      themeSystem: translate("theme.system"),
+    // 테마 옵션
+    themeLight: translate("theme.light"),
+    themeDark: translate("theme.dark"),
+    themeSystem: translate("theme.system"),
 
-      // 언어 옵션
-      languageKorean: translate("language.korean"),
-      languageEnglish: translate("language.english"),
+    // 언어 옵션
+    languageKorean: translate("language.korean"),
+    languageEnglish: translate("language.english"),
 
-      // 토스트 메시지
-      save: translate("settings.save"),
-      saveSuccess: translate("settings.saveSuccess"),
-      saveSuccessDescription: translate("settings.saveSuccessDescription"),
-      saveError: translate("settings.saveError"),
-      saveErrorDescription: translate("settings.saveErrorDescription"),
-      nameRequired: translate("settings.nameRequired"),
-      nameRequiredDescription: translate("settings.nameRequiredDescription"),
-      nameChangeSuccess: translate("settings.nameChangeSuccess"),
-      nameChangeSuccessDescription: translate(
-        "settings.nameChangeSuccessDescription"
-      ),
-      nameChangeError: translate("settings.nameChangeError"),
-      nameChangeErrorDescription: translate(
-        "settings.nameChangeErrorDescription"
-      ),
-      logoutSuccess: translate("settings.logoutSuccess"),
-      logoutSuccessDescription: translate("settings.logoutSuccessDescription"),
-      logoutError: translate("settings.logoutError"),
-      logoutErrorDescription: translate("settings.logoutErrorDescription"),
-      // 에러 메시지
-      errorSettingsSave: translate("settings.errorMessage.settingsSave"),
-      errorNameChange: translate("settings.errorMessage.nameChange"),
-      errorDefaultRewardSave: translate(
-        "settings.errorMessage.defaultRewardSave"
-      ),
-      errorLogout: translate("settings.errorMessage.logout"),
-    }),
-    [translate]
-  );
+    // 토스트 메시지
+    save: translate("settings.save"),
+    saveSuccess: translate("settings.saveSuccess"),
+    saveSuccessDescription: translate("settings.saveSuccessDescription"),
+    saveError: translate("settings.saveError"),
+    saveErrorDescription: translate("settings.saveErrorDescription"),
+    nameRequired: translate("settings.nameRequired"),
+    nameRequiredDescription: translate("settings.nameRequiredDescription"),
+    nameChangeSuccess: translate("settings.nameChangeSuccess"),
+    nameChangeSuccessDescription: translate(
+      "settings.nameChangeSuccessDescription"
+    ),
+    nameChangeError: translate("settings.nameChangeError"),
+    nameChangeErrorDescription: translate(
+      "settings.nameChangeErrorDescription"
+    ),
+    logoutSuccess: translate("settings.logoutSuccess"),
+    logoutSuccessDescription: translate("settings.logoutSuccessDescription"),
+    logoutError: translate("settings.logoutError"),
+    logoutErrorDescription: translate("settings.logoutErrorDescription"),
+    // 에러 메시지
+    errorSettingsSave: translate("settings.errorMessage.settingsSave"),
+    errorNameChange: translate("settings.errorMessage.nameChange"),
+    errorDefaultRewardSave: translate(
+      "settings.errorMessage.defaultRewardSave"
+    ),
+    errorLogout: translate("settings.errorMessage.logout"),
+  };
 
   const form = useForm<SettingsFormData>({
     resolver: zodResolver(settingsFormSchema),
@@ -147,38 +145,68 @@ export default function SettingsPage() {
   }, [settings, isLoading, form]);
 
   // 실시간 설정 저장
-  const saveSetting = useCallback(
-    async (key: string, value: any, successMessage?: string) => {
-      setSavingStates((prev) => ({ ...prev, [key]: true }));
+  const saveSetting = async (
+    key: string,
+    value: any,
+    successMessage?: string
+  ) => {
+    setSavingStates((prev) => ({ ...prev, [key]: true }));
 
-      try {
-        console.log(`Saving setting: ${key} = ${value}`);
-        await updateSettings({ [key]: value });
-        console.log(`Setting saved successfully: ${key} = ${value}`);
+    try {
+      console.log(`Saving setting: ${key} = ${value}`);
+      await updateSettings({ [key]: value });
+      console.log(`Setting saved successfully: ${key} = ${value}`);
 
-        toast({
-          title: successMessage || texts.saveSuccess,
-          description: texts.saveSuccessDescription,
-        });
-      } catch (error: any) {
-        console.error(texts.errorSettingsSave + ":", error);
-        console.error("Error details:", {
-          key,
-          value,
-          error: error?.message || "Unknown error",
-          stack: error?.stack,
-        });
-        toast({
-          title: texts.saveError,
-          description: texts.saveErrorDescription,
-          variant: "destructive",
-        });
-      } finally {
-        setSavingStates((prev) => ({ ...prev, [key]: false }));
-      }
-    },
-    [updateSettings, toast, texts]
-  );
+      toast({
+        title: successMessage || texts.saveSuccess,
+        description: texts.saveSuccessDescription,
+      });
+    } catch (error: any) {
+      console.error(texts.errorSettingsSave + ":", error);
+      console.error("Error details:", {
+        key,
+        value,
+        error: error?.message || "Unknown error",
+        stack: error?.stack,
+      });
+      toast({
+        title: texts.saveError,
+        description: texts.saveErrorDescription,
+        variant: "destructive",
+      });
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  // 언어 변경 핸들러
+  const handleLanguageChange = async (value: "ko" | "en") => {
+    const currentValue = form.getValues("language");
+
+    // 값이 실제로 변경되었을 때만 저장
+    if (value !== currentValue) {
+      form.setValue("language", value);
+      await saveSetting(
+        "language",
+        value,
+        texts.language + " " + texts.saveSuccess
+      );
+
+      // 언어 변경 후 페이지 새로고침
+      window.location.reload();
+    }
+  };
+
+  // 테마 변경 핸들러
+  const handleThemeChange = async (value: "light" | "dark" | "system") => {
+    const currentValue = form.getValues("theme");
+
+    // 값이 실제로 변경되었을 때만 저장
+    if (value !== currentValue) {
+      form.setValue("theme", value);
+      await saveSetting("theme", value, texts.theme + " " + texts.saveSuccess);
+    }
+  };
 
   // 사용자 이름 편집 시작
   const startEditingName = () => {
@@ -282,12 +310,16 @@ export default function SettingsPage() {
       // 사용자 프로필 업데이트
       await updateUserProfilePicture(downloadURL);
 
+      // 성공 메시지 표시
       toast({
         title: translate("settings.profilePictureUpload.success"),
         description: translate(
           "settings.profilePictureUpload.successDescription"
         ),
       });
+
+      // 파일 input 초기화 (같은 파일을 다시 선택할 수 있도록)
+      event.target.value = "";
     } catch (error) {
       console.error("프로필 사진 업로드 실패:", error);
       toast({
@@ -320,7 +352,21 @@ export default function SettingsPage() {
           <h2 className="mb-4 text-xl font-bold">{texts.profile}</h2>
           <Card className="p-4">
             <div className="mb-6 flex flex-col items-center">
-              <CharacterAvatar size="lg" level={5} className="mb-4" />
+              <div className="relative mb-4">
+                <div className="w-32 h-32 relative overflow-hidden rounded-full border-4 border-primary/20 bg-secondary">
+                  {user?.photoURL ? (
+                    <Image
+                      src={user.photoURL}
+                      alt="Profile Picture"
+                      width={128}
+                      height={128}
+                      className="object-cover w-full h-full"
+                    />
+                  ) : (
+                    <CharacterAvatar size="lg" level={5} />
+                  )}
+                </div>
+              </div>
               <div className="flex flex-col items-center gap-2">
                 <input
                   type="file"
@@ -329,27 +375,46 @@ export default function SettingsPage() {
                   onChange={handleProfilePictureUpload}
                   className="hidden"
                   disabled={isUploadingPhoto}
+                  // 파일 크기 제한을 브라우저에서도 미리 체크
+                  onInput={(e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0];
+                    if (file && file.size > 2 * 1024 * 1024) {
+                      // 2MB
+                      toast({
+                        title: "파일 크기 제한",
+                        description:
+                          "프로필 이미지는 2MB 이하의 파일만 업로드 가능합니다.",
+                        variant: "destructive",
+                      });
+                      (e.target as HTMLInputElement).value = "";
+                    }
+                  }}
                 />
-                <label
-                  htmlFor="profile-picture-upload"
-                  className="cursor-pointer"
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isUploadingPhoto}
+                  className="flex items-center gap-2"
+                  onClick={() => {
+                    if (!isUploadingPhoto) {
+                      document
+                        .getElementById("profile-picture-upload")
+                        ?.click();
+                    }
+                  }}
                 >
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={isUploadingPhoto}
-                    className="flex items-center gap-2"
-                  >
-                    {isUploadingPhoto ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        {translate("settings.profilePictureUpload.uploading")}
-                      </>
-                    ) : (
-                      texts.avatarChange
-                    )}
-                  </Button>
-                </label>
+                  {isUploadingPhoto ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {translate("settings.profilePictureUpload.uploading")}
+                    </>
+                  ) : (
+                    texts.avatarChange
+                  )}
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  {translate("settings.profilePictureUpload.fileFormatInfo")}
+                </p>
               </div>
             </div>
 
@@ -538,20 +603,11 @@ export default function SettingsPage() {
                 <select
                   id="theme"
                   value={form.watch("theme")}
-                  onChange={async (e) => {
-                    const value = e.target.value as "light" | "dark" | "system";
-                    const currentValue = form.getValues("theme");
-
-                    // 값이 실제로 변경되었을 때만 저장
-                    if (value !== currentValue) {
-                      form.setValue("theme", value);
-                      await saveSetting(
-                        "theme",
-                        value,
-                        texts.theme + " " + texts.saveSuccess
-                      );
-                    }
-                  }}
+                  onChange={(e) =>
+                    handleThemeChange(
+                      e.target.value as "light" | "dark" | "system"
+                    )
+                  }
                   disabled={savingStates["theme"]}
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >
@@ -569,20 +625,9 @@ export default function SettingsPage() {
                 <select
                   id="language"
                   value={form.watch("language")}
-                  onChange={async (e) => {
-                    const value = e.target.value as "ko" | "en";
-                    const currentValue = form.getValues("language");
-
-                    // 값이 실제로 변경되었을 때만 저장
-                    if (value !== currentValue) {
-                      form.setValue("language", value);
-                      await saveSetting(
-                        "language",
-                        value,
-                        texts.language + " " + texts.saveSuccess
-                      );
-                    }
-                  }}
+                  onChange={(e) =>
+                    handleLanguageChange(e.target.value as "ko" | "en")
+                  }
                   disabled={savingStates["language"]}
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >

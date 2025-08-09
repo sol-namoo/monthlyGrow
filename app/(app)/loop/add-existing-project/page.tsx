@@ -17,80 +17,105 @@ import {
   AlertTitle,
 } from "@/components/ui/custom-alert";
 import { AlertCircle } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "@/lib/firebase";
+import {
+  fetchLoopById,
+  fetchUnconnectedProjects,
+  updateProject,
+} from "@/lib/firebase";
+import { getProjectStatus } from "@/lib/utils";
+import type { Loop, Project } from "@/lib/types";
 
 function AddExistingProjectPageContent() {
   const router = useRouter();
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const loopId = searchParams.get("loopId");
+  const [user, userLoading] = useAuthState(auth);
+  const queryClient = useQueryClient();
 
-  const [selectedProjects, setSelectedProjects] = useState<number[]>([]);
+  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [showOnlyUnconnected, setShowOnlyUnconnected] = useState(true);
 
-  // 샘플 데이터 - 현재 루프 정보
-  const currentLoop = {
-    id: loopId || "1",
-    title: "5월 루프: 건강 관리",
-    projectCount: 4, // 현재 루프에 연결된 프로젝트 수
-  };
+  // 현재 루프 정보 가져오기
+  const { data: currentLoop, isLoading: loopLoading } = useQuery({
+    queryKey: ["loop", loopId],
+    queryFn: () => fetchLoopById(loopId!),
+    enabled: !!loopId,
+  });
 
-  // 샘플 데이터 - 기존 프로젝트
-  const existingProjects = [
-    {
-      id: 5,
-      title: "블로그 글 작성",
-      description: "개인 블로그에 주 1회 글 작성",
-      area: "커리어",
-      progress: 30,
-      total: 100,
-      connectedLoop: null,
+  // 연결되지 않은 프로젝트들 가져오기
+  const { data: unconnectedProjects = [], isLoading: projectsLoading } =
+    useQuery({
+      queryKey: ["unconnectedProjects", user?.uid, loopId],
+      queryFn: () => fetchUnconnectedProjects(user?.uid || "", loopId!),
+      enabled: !!user?.uid && !!loopId,
+    });
+
+  // 프로젝트를 루프에 연결하는 mutation
+  const connectProjectsMutation = useMutation({
+    mutationFn: async (projectIds: string[]) => {
+      const promises = projectIds.map((projectId) =>
+        updateProject(projectId, {
+          connectedLoops: [loopId!],
+        })
+      );
+      await Promise.all(promises);
     },
-    {
-      id: 6,
-      title: "재테크 공부",
-      description: "투자 관련 지식 습득",
-      area: "재정",
-      progress: 10,
-      total: 100,
-      connectedLoop: null,
+    onSuccess: () => {
+      toast({
+        title: "프로젝트 연결 완료",
+        description: "선택한 프로젝트가 루프에 연결되었습니다.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["loop", loopId] });
+      queryClient.invalidateQueries({
+        queryKey: ["unconnectedProjects", user?.uid, loopId],
+      });
+      router.push(`/loop/${loopId}`);
     },
-    {
-      id: 7,
-      title: "외국어 학습",
-      description: "매일 30분 영어 공부",
-      area: "자기계발",
-      progress: 20,
-      total: 100,
-      connectedLoop: "4월 루프: 생활 습관 개선",
+    onError: (error) => {
+      toast({
+        title: "프로젝트 연결 실패",
+        description: "프로젝트 연결 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
     },
-  ];
+  });
+
+  // 로딩 중이거나 데이터가 없으면 처리
+  if (loopLoading || !currentLoop) {
+    return <Loading />;
+  }
 
   // 필터링된 프로젝트 계산 로직
   const filteredProjects = showOnlyUnconnected
-    ? existingProjects.filter((project) => !project.connectedLoop)
-    : existingProjects;
+    ? unconnectedProjects
+    : unconnectedProjects;
 
   // 프로젝트 선택 토글 함수
-  const toggleProject = (projectId: number) => {
+  const toggleProject = (projectId: string) => {
     if (selectedProjects.includes(projectId)) {
       setSelectedProjects(selectedProjects.filter((id) => id !== projectId));
     } else {
       // 프로젝트 개수 제한 확인 (현재 루프 프로젝트 + 선택된 프로젝트 <= 5)
-      if (currentLoop.projectCount + selectedProjects.length < 5) {
+      const currentProjectCount = currentLoop.connectedLoops?.length || 0;
+      if (currentProjectCount + selectedProjects.length < 5) {
         setSelectedProjects([...selectedProjects, projectId]);
       }
     }
   };
 
   // 프로젝트 추가 가능 여부 확인
-  const canAddMoreProjects =
-    currentLoop.projectCount + selectedProjects.length < 5;
+  const currentProjectCount = currentLoop.connectedLoops?.length || 0;
+  const canAddMoreProjects = currentProjectCount + selectedProjects.length < 5;
 
   // 프로젝트 추가 처리 함수
   const handleAddProjects = () => {
-    // 여기서 선택된 프로젝트를 루프에 추가하는 로직 구현
-    // 추가 후 루프 상세 페이지로 이동
-    router.push(`/loop/${loopId}`);
+    if (selectedProjects.length > 0) {
+      connectProjectsMutation.mutate(selectedProjects);
+    }
   };
 
   return (
@@ -107,10 +132,10 @@ function AddExistingProjectPageContent() {
       <Card className="mb-6 p-4">
         <h2 className="mb-2 text-lg font-bold">{currentLoop.title}</h2>
         <p className="text-sm text-muted-foreground">
-          현재 루프에 연결된 프로젝트: {currentLoop.projectCount}/5
+          현재 루프에 연결된 프로젝트: {currentProjectCount}/5
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          추가 가능한 프로젝트: {Math.max(0, 5 - currentLoop.projectCount)}개
+          추가 가능한 프로젝트: {Math.max(0, 5 - currentProjectCount)}개
         </p>
       </Card>
 
@@ -175,26 +200,42 @@ function AddExistingProjectPageContent() {
                     project.area === "미분류" ? "destructive" : "outline"
                   }
                 >
-                  {project.area}
+                  {project.area || "미분류"}
                 </Badge>
               </div>
 
               <div className="mt-2">
                 <div className="mb-1 flex justify-between text-xs">
-                  <span>진행률: {project.progress}%</span>
+                  <span>
+                    진행률:{" "}
+                    {project.target > 0
+                      ? Math.round(
+                          (project.completedTasks / project.target) * 100
+                        )
+                      : 0}
+                    %
+                  </span>
                 </div>
                 <div className="progress-bar">
                   <div
                     className="progress-value"
-                    style={{ width: `${project.progress}%` }}
+                    style={{
+                      width: `${
+                        project.target > 0
+                          ? Math.round(
+                              (project.completedTasks / project.target) * 100
+                            )
+                          : 0
+                      }%`,
+                    }}
                   ></div>
                 </div>
               </div>
 
-              {project.connectedLoop && (
+              {project.connectedLoops && project.connectedLoops.length > 0 && (
                 <div className="mt-2">
                   <Badge variant="secondary" className="text-xs">
-                    {project.connectedLoop}에 연결됨
+                    {project.connectedLoops.length}개 루프에 연결됨
                   </Badge>
                 </div>
               )}
@@ -215,9 +256,13 @@ function AddExistingProjectPageContent() {
         <Button
           className="flex-1"
           onClick={handleAddProjects}
-          disabled={selectedProjects.length === 0}
+          disabled={
+            selectedProjects.length === 0 || connectProjectsMutation.isPending
+          }
         >
-          {selectedProjects.length}개 프로젝트 추가
+          {connectProjectsMutation.isPending
+            ? "연결 중..."
+            : `${selectedProjects.length}개 프로젝트 추가`}
         </Button>
         <Button variant="outline" asChild className="flex-1">
           <Link href={`/loop/${loopId}`}>취소</Link>

@@ -55,6 +55,7 @@ import {
   auth,
   fetchAllLoopsByUserId,
   fetchAllAreasByUserId,
+  fetchLoopById,
   createProject,
   addTaskToProject,
 } from "@/lib/firebase";
@@ -381,14 +382,12 @@ function NewProjectPageContent() {
       : "완료해야 할 총 작업의 개수를 설정하세요";
   };
 
-  // 샘플 데이터 - 현재 루프 정보 (loopId가 있는 경우)
-  const currentLoop = loopId
-    ? {
-        id: loopId,
-        title: "5월 루프: 건강 관리",
-        projectCount: 4, // 현재 루프에 연결된 프로젝트 수
-      }
-    : null;
+  // 현재 루프 정보 가져오기 (loopId가 있는 경우)
+  const { data: currentLoop } = useQuery({
+    queryKey: ["loop", loopId],
+    queryFn: () => fetchLoopById(loopId!),
+    enabled: !!loopId,
+  });
 
   // 프로젝트 유형 변경 핸들러
   const handleCategoryChange = (newCategory: "repetitive" | "task_based") => {
@@ -821,7 +820,8 @@ function NewProjectPageContent() {
             <span className="font-medium">{currentLoop.title}</span>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            현재 루프에 연결된 프로젝트: {currentLoop.projectCount}개
+            현재 루프에 연결된 프로젝트:{" "}
+            {currentLoop.connectedLoops?.length || 0}개
           </p>
         </Card>
       )}

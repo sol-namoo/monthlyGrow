@@ -72,6 +72,7 @@ export const translations = {
         successDescription: "프로필 사진이 성공적으로 업로드되었습니다.",
         error: "프로필 사진 업로드 실패",
         uploading: "업로드 중...",
+        fileFormatInfo: "지원 형식: JPEG, PNG, GIF • 최대 2MB",
       },
       // 에러 메시지
       errorMessage: {
@@ -1008,6 +1009,7 @@ export const translations = {
         successDescription: "Profile picture has been uploaded successfully.",
         error: "Profile Picture Upload Failed",
         uploading: "Uploading...",
+        fileFormatInfo: "Supported formats: JPEG, PNG, GIF • Max 2MB",
       },
       // Error messages
       errorMessage: {

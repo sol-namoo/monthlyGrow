@@ -1540,11 +1540,11 @@ export const uploadProfilePicture = async (
       );
     }
 
-    // 파일 크기 확인 (5MB 제한)
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    // 파일 크기 확인 (2MB 제한)
+    const maxSize = 2 * 1024 * 1024; // 2MB
     if (file.size > maxSize) {
       throw new Error(
-        "파일 크기가 너무 큽니다. 5MB 이하의 파일만 업로드 가능합니다."
+        "파일 크기가 너무 큽니다. 2MB 이하의 파일만 업로드 가능합니다."
       );
     }
 

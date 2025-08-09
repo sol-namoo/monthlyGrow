@@ -367,7 +367,7 @@ function ParaPageContent() {
                       ).replace(
                         "{count}",
                         projectsWithStatus
-                          .filter((p) => p.status === "planned")
+                          .filter((p) => getProjectStatus(p) === "scheduled")
                           .length.toString()
                       )
                     : projectFilter === "in_progress"
@@ -393,7 +393,7 @@ function ParaPageContent() {
                 <DropdownMenuItem onClick={() => setProjectFilter("all")}>
                   {translate("para.projects.filter.all")}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setProjectFilter("planned")}>
+                <DropdownMenuItem onClick={() => setProjectFilter("scheduled")}>
                   {translate("para.projects.filter.planned")}
                 </DropdownMenuItem>
                 <DropdownMenuItem

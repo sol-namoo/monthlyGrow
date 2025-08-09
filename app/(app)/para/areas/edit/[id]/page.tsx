@@ -39,18 +39,17 @@ import { Badge } from "@/components/ui/badge";
 import Loading from "@/components/feedback/Loading";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
-
-interface Project {
-  id: string;
-  name: string;
-  status: string;
-}
-
-interface Resource {
-  id: string;
-  name: string;
-  type: string;
-}
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "@/lib/firebase";
+import {
+  fetchAreaById,
+  fetchAllProjectsByUserId,
+  fetchAllResourcesByUserId,
+  updateArea,
+} from "@/lib/firebase";
+import { getProjectStatus } from "@/lib/utils";
+import type { Area, Project, Resource } from "@/lib/types";
 
 // 로딩 스켈레톤 컴포넌트
 function EditAreaSkeleton() {
@@ -76,10 +75,76 @@ function EditAreaPageContent({ params }: { params: Promise<{ id: string }> }) {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const { id } = use(params);
-  const [isSubmitting, setIsSubmitting] = useState(false); // Area 수정 중 로딩 상태
+  const areaId = id!;
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [user, userLoading] = useAuthState(auth);
+  const queryClient = useQueryClient();
+
+  // Area 데이터 가져오기
+  const { data: area, isLoading: areaLoading } = useQuery({
+    queryKey: ["area", areaId],
+    queryFn: () => fetchAreaById(areaId),
+    enabled: !!areaId,
+  });
+
+  // 모든 프로젝트 가져오기
+  const { data: allProjects = [], isLoading: projectsLoading } = useQuery({
+    queryKey: ["projects", user?.uid],
+    queryFn: () => fetchAllProjectsByUserId(user?.uid || ""),
+    enabled: !!user?.uid,
+  });
+
+  // 모든 리소스 가져오기
+  const { data: allResources = [], isLoading: resourcesLoading } = useQuery({
+    queryKey: ["resources", user?.uid],
+    queryFn: () => fetchAllResourcesByUserId(user?.uid || ""),
+    enabled: !!user?.uid,
+  });
+
+  // Area 업데이트 mutation
+  const updateAreaMutation = useMutation({
+    mutationFn: (updateData: Partial<Area>) => updateArea(id, updateData),
+    onSuccess: () => {
+      toast({
+        title: "영역 수정 완료",
+        description: "영역 정보가 성공적으로 수정되었습니다.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["area", id] });
+      queryClient.invalidateQueries({ queryKey: ["areas", user?.uid] });
+      router.push("/para");
+    },
+    onError: (error) => {
+      toast({
+        title: "영역 수정 실패",
+        description: "영역 수정 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const [formData, setFormData] = useState<Partial<Area>>({});
+  const [isProjectSelectOpen, setIsProjectSelectOpen] = useState(false);
+  const [isResourceSelectOpen, setIsResourceSelectOpen] = useState(false);
+
+  // Area 데이터가 로드되면 formData 설정
+  useEffect(() => {
+    if (area) {
+      setFormData({
+        name: area.name,
+        description: area.description,
+        icon: area.icon,
+        color: area.color,
+      });
+    }
+  }, [area]);
+
+  // 로딩 중이거나 데이터가 없으면 스켈레톤 표시
+  if (areaLoading || !area) {
+    return <EditAreaSkeleton />;
+  }
 
   // "미분류" 영역은 수정 불가
-  if (initialAreaData.name === "미분류") {
+  if (area.name === "미분류") {
     return (
       <div className="container max-w-md px-4 py-6">
         <div className="mb-6 flex items-center">
@@ -100,41 +165,6 @@ function EditAreaPageContent({ params }: { params: Promise<{ id: string }> }) {
       </div>
     );
   }
-
-  // 샘플 데이터 로드 (실제 앱에서는 id를 사용하여 데이터베이스에서 가져옴)
-  const initialAreaData = {
-    name: "개인 성장",
-    description: "자기 계발 및 학습 관련 활동을 관리하는 영역입니다.",
-    color: "#8b5cf6",
-    icon: "brain",
-    associatedProjects: [
-      { id: "p1", name: "Next.js 학습 프로젝트", status: "진행 중" },
-      { id: "p2", name: "TypeScript 마스터하기", status: "완료" },
-    ],
-    associatedResources: [
-      { id: "r1", name: "클린 코드", type: "책" },
-      { id: "r2", name: "React 공식 문서", type: "웹사이트" },
-    ],
-  };
-
-  // 모든 프로젝트 및 자료 샘플 데이터 (실제 앱에서는 데이터베이스에서 가져옴)
-  const allAvailableProjects: Project[] = [
-    { id: "p1", name: "Next.js 학습 프로젝트", status: "진행 중" },
-    { id: "p2", name: "TypeScript 마스터하기", status: "완료" },
-    { id: "p3", name: "포트폴리오 웹사이트 구축", status: "계획 중" },
-    { id: "p4", name: "알고리즘 문제 풀이", status: "진행 중" },
-  ];
-
-  const allAvailableResources: Resource[] = [
-    { id: "r1", name: "클린 코드", type: "책" },
-    { id: "r2", name: "React 공식 문서", type: "웹사이트" },
-    { id: "r3", name: "실용주의 프로그래머", type: "책" },
-    { id: "r4", name: "MDN Web Docs", type: "웹사이트" },
-  ];
-
-  const [formData, setFormData] = useState(initialAreaData);
-  const [isProjectSelectOpen, setIsProjectSelectOpen] = useState(false);
-  const [isResourceSelectOpen, setIsResourceSelectOpen] = useState(false);
 
   // 아이콘 선택 옵션
   const iconOptions = [
@@ -161,7 +191,7 @@ function EditAreaPageContent({ params }: { params: Promise<{ id: string }> }) {
     return iconOption ? iconOption.icon : Compass;
   };
 
-  const SelectedIcon = getIconComponent(formData.icon);
+  const SelectedIcon = getIconComponent(formData.icon || "compass");
 
   // 디자인 톤에 맞는 색상 팔레트
   const colorPalette = [
@@ -192,41 +222,21 @@ function EditAreaPageContent({ params }: { params: Promise<{ id: string }> }) {
   };
 
   const handleSaveProjects = (selectedIds: string[]) => {
-    const newAssociatedProjects = allAvailableProjects.filter((p) =>
-      selectedIds.includes(p.id)
-    );
-    setFormData((prev) => ({
-      ...prev,
-      associatedProjects: newAssociatedProjects,
-    }));
+    // 프로젝트 연결 기능은 별도 페이지에서 처리
+    setIsProjectSelectOpen(false);
   };
 
   const handleSaveResources = (selectedIds: string[]) => {
-    const newAssociatedResources = allAvailableResources.filter((r) =>
-      selectedIds.includes(r.id)
-    );
-    setFormData((prev) => ({
-      ...prev,
-      associatedResources: newAssociatedResources,
-    }));
+    // 리소스 연결 기능은 별도 페이지에서 처리
+    setIsResourceSelectOpen(false);
   };
 
   const handleRemoveProject = (projectId: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      associatedProjects: prev.associatedProjects.filter(
-        (p) => p.id !== projectId
-      ),
-    }));
+    // 프로젝트 연결 해제 기능은 별도 페이지에서 처리
   };
 
   const handleRemoveResource = (resourceId: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      associatedResources: prev.associatedResources.filter(
-        (r) => r.id !== resourceId
-      ),
-    }));
+    // 리소스 연결 해제 기능은 별도 페이지에서 처리
   };
 
   const handleCloseModal = () => {
@@ -242,21 +252,19 @@ function EditAreaPageContent({ params }: { params: Promise<{ id: string }> }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true); // 로딩 상태 시작
+    if (!id) return;
+
+    setIsSubmitting(true);
 
     try {
-      // 여기서 Area 업데이트 로직 구현
-      // formData.name, formData.description, formData.tags,
-      // formData.associatedProjects, formData.associatedResources를 서버로 전송
-      console.log("Updated Area Data:", formData);
+      await updateAreaMutation.mutateAsync(formData);
 
       toast({
         title: "영역 수정 완료",
         description: `${formData.name} 영역이 업데이트되었습니다.`,
       });
 
-      // 영역 상세 페이지로 이동 (replace로 히스토리 대체)
-      router.replace(`/para/areas/${id}`);
+      router.replace(`/para/areas/${id || ""}`);
     } catch (error) {
       console.error("Area 수정 실패:", error);
       toast({
@@ -265,7 +273,7 @@ function EditAreaPageContent({ params }: { params: Promise<{ id: string }> }) {
         variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false); // 로딩 상태 해제
+      setIsSubmitting(false);
     }
   };
 
@@ -379,146 +387,10 @@ function EditAreaPageContent({ params }: { params: Promise<{ id: string }> }) {
           </div>
         </Card>
 
-        {/* 연결된 프로젝트 섹션 */}
-        <Card className="mb-6 p-4">
-          <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
-            <Folder className="h-5 w-5 text-muted-foreground" />
-            연결된 프로젝트
-          </h2>
-          {formData.associatedProjects.length > 0 ? (
-            <div className="space-y-2">
-              {formData.associatedProjects.map((project) => (
-                <div
-                  key={project.id}
-                  className="flex items-center justify-between rounded-md border p-3"
-                >
-                  <div className="flex flex-col">
-                    <span className="font-medium">{project.name}</span>
-                    <Badge variant="outline" className="mt-1 w-fit">
-                      {(() => {
-                        const status = getProjectStatus(project);
-                        switch (status) {
-                          case "scheduled":
-                            return "예정";
-                          case "in_progress":
-                            return "진행 중";
-                          case "completed":
-                            return "완료됨";
-                          case "overdue":
-                            return "기한 지남";
-                          default:
-                            return "진행 중";
-                        }
-                      })()}
-                    </Badge>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleRemoveProject(project.id)}
-                    aria-label={`Remove ${project.name}`}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground mb-3">
-              아직 연결된 프로젝트가 없습니다.
-            </p>
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            className="mt-4 w-full bg-transparent"
-            onClick={() => setIsProjectSelectOpen(true)}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            기존 프로젝트 추가
-          </Button>
-        </Card>
-
-        {/* 연결된 자료 섹션 */}
-        <Card className="mb-6 p-4">
-          <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-muted-foreground" />
-            연결된 자료
-          </h2>
-          {formData.associatedResources.length > 0 ? (
-            <div className="space-y-2">
-              {formData.associatedResources.map((resource) => (
-                <div
-                  key={resource.id}
-                  className="flex items-center justify-between rounded-md border p-3"
-                >
-                  <div className="flex flex-col">
-                    <span className="font-medium">{resource.name}</span>
-                    <Badge variant="outline" className="mt-1 w-fit">
-                      {resource.type}
-                    </Badge>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleRemoveResource(resource.id)}
-                    aria-label={`Remove ${resource.name}`}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground mb-3">
-              아직 연결된 자료가 없습니다.
-            </p>
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            className="mt-4 w-full bg-transparent"
-            onClick={() => setIsResourceSelectOpen(true)}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            기존 자료 추가
-          </Button>
-        </Card>
-
         <Button type="submit" className="w-full" disabled={isSubmitting}>
           {isSubmitting ? "저장 중..." : "변경 사항 저장"}
         </Button>
       </form>
-
-      {/* 프로젝트 선택 모달 */}
-      <SelectItemsDialog
-        isOpen={isProjectSelectOpen}
-        onClose={() => {
-          setIsProjectSelectOpen(false);
-          handleCloseModal();
-        }}
-        items={allAvailableProjects}
-        selectedItemIds={formData.associatedProjects.map((p) => p.id)}
-        onSave={handleSaveProjects}
-        title="프로젝트 선택"
-        description="이 영역에 연결할 프로젝트를 선택하세요."
-        searchPlaceholder="프로젝트 검색..."
-      />
-
-      {/* 자료 선택 모달 */}
-      <SelectItemsDialog
-        isOpen={isResourceSelectOpen}
-        onClose={() => {
-          setIsResourceSelectOpen(false);
-          handleCloseModal();
-        }}
-        items={allAvailableResources}
-        selectedItemIds={formData.associatedResources.map((r) => r.id)}
-        onSave={handleSaveResources}
-        title="자료 선택"
-        description="이 영역에 연결할 자료를 선택하세요."
-        searchPlaceholder="자료 검색..."
-      />
     </div>
   );
 }
