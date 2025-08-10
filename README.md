@@ -1,6 +1,6 @@
 # 🌙 월간 챕터 기반 자기계발 앱 – MonthlyGrow
 
-> 육성 게임에서 차용한 챕터형 구조로, ‘나’를 키우듯 목표를 실행하는 자기계발 게임 앱
+> 육성 게임에서 차용한 챕터형 구조로, '나'를 키우듯 목표를 실행하는 자기계발 게임 앱
 
 ---
 
@@ -22,6 +22,10 @@ PARA 시스템을 활용해 목표를 실행하며 성장해 나가는 **게임�
   - Projects / Areas / Resources / Archives
 - **챕터 내 Task 실행 관리**
   - 실행 시간 기록, 진행률 시각화
+- **프로젝트-챕터 목표치 분리 시스템** 🆕
+  - 프로젝트 전체 목표와 챕터별 개별 목표 분리
+  - 3개월 프로젝트도 이번 달에는 8개만 완료하면 달성으로 인정
+  - 챕터별 진행률과 프로젝트 전체 진행률 동시 관리
 - **보상 시스템**
   - 챕터 성공 시 사용자 정의 보상 제공
 - **다국어 지원**
@@ -76,6 +80,51 @@ http://localhost:3000
   /settings      # 언어 전환, 보상 설정
   /login         # 로그인 화면 (구글 OAuth 전용)
 ```
+
+---
+
+## 🔄 데이터 구조 (v2.0)
+
+### 프로젝트-챕터 목표치 분리 시스템
+
+**기존 구조**: 프로젝트 전체 목표치만 관리
+
+```
+Project: target: 40, completedTasks: 15
+Chapter: doneCount: 15, targetCount: 40
+```
+
+**새로운 구조**: 프로젝트 전체 + 챕터별 개별 목표치 관리
+
+```
+Project: target: 40, completedTasks: 15 (전체)
+Chapter:
+  connectedProjects: [
+    { projectId: "proj1", chapterTargetCount: 8, chapterDoneCount: 6 },
+    { projectId: "proj2", chapterTargetCount: 5, chapterDoneCount: 3 }
+  ]
+```
+
+### 주요 변경사항
+
+1. **Chapter 구조 개선**
+
+   - `projectIds[]` → `connectedProjects[]` (목표치 포함)
+   - 각 프로젝트마다 챕터별 목표치와 진행률 관리
+
+2. **진행률 계산 방식**
+
+   - 챕터 달성률 = Σ(chapterDoneCount) / Σ(chapterTargetCount)
+   - 프로젝트별 챕터 진행률 = chapterDoneCount / chapterTargetCount
+
+3. **태스크 완료 이벤트**
+
+   - 프로젝트 전체 진행률 업데이트
+   - 활성 챕터의 해당 프로젝트 chapterDoneCount 업데이트
+
+4. **마이그레이션 지원**
+   - 기존 데이터를 새로운 구조로 자동 변환
+   - 하위 호환성 유지
 
 ---
 

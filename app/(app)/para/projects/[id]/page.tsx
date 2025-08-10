@@ -7,23 +7,27 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ChevronLeft,
-  Calendar,
-  CheckCircle2,
-  Circle,
-  Edit,
-  Plus,
-  Target,
-  Clock,
-  RotateCcw,
   Star,
   Bookmark,
-  Trash2,
+  Clock,
+  CalendarDays,
+  Target,
   AlertCircle,
+  Calendar,
+  Zap,
+  Gift,
+  Edit,
+  Sparkles,
+  Plus,
+  Archive,
+  BookOpen,
   ExternalLink,
-  Edit2,
-  Info,
+  CheckCircle2,
+  Circle,
+  Trash2,
   FileText,
   PenTool,
+  Info,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -731,10 +735,10 @@ export default function ProjectDetailPage({
     0;
   const totalTasks = taskCounts?.totalTasks ?? tasks?.length ?? 0;
 
-  // 반복형 프로젝트의 경우 목표 횟수가 없으면 완료된 태스크 수를 목표로 설정
+  // 반복형 프로젝트의 경우 targetCount 사용, 작업형의 경우 tasks 개수 사용
   const targetCount =
-    project?.target ||
-    (project?.category === "repetitive" ? completedTasks : 0);
+    project?.targetCount ||
+    (project?.category === "repetitive" ? completedTasks : totalTasks);
 
   const progressPercentage =
     totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
@@ -1075,10 +1079,11 @@ export default function ProjectDetailPage({
                 : translate("paraProjectDetail.targetLabels.tasks")}
             </span>
             <span className="text-sm text-muted-foreground">
-              {project.target || 0}
-              {project.category === "repetitive"
-                ? translate("paraProjectDetail.targetLabels.times")
-                : translate("paraProjectDetail.targetLabels.items")}
+              {project.category === "repetitive" && project.targetCount
+                ? `${project.target} ${project.targetCount}${translate(
+                    "paraProjectDetail.targetLabels.times"
+                  )}`
+                : project.target}
             </span>
           </div>
 
@@ -1112,7 +1117,7 @@ export default function ProjectDetailPage({
                     key={chapter.id}
                     className="flex items-center gap-3 p-2 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors"
                   >
-                    <RotateCcw className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                    <BookOpen className="h-4 w-4 text-blue-600 flex-shrink-0" />
                     <div className="flex flex-col flex-1 min-w-0">
                       <Link
                         href={`/chapter/${chapter.id}`}
@@ -1218,9 +1223,7 @@ export default function ProjectDetailPage({
                       : translate("paraProjectDetail.targetLabels.tasks")}
                   </span>
                   <span className="font-medium">
-                    {project.category === "repetitive"
-                      ? completedTasks || 0
-                      : completedTasks || 0}
+                    {completedTasks || 0}
                     {project.category === "repetitive"
                       ? translate("paraProjectDetail.targetLabels.times")
                       : translate("paraProjectDetail.targetLabels.items")}
@@ -1337,10 +1340,11 @@ export default function ProjectDetailPage({
                       : translate("paraProjectDetail.targetLabels.tasks")}
                   </span>
                   <span>
-                    {project.target || 0}
-                    {project.category === "repetitive"
-                      ? translate("paraProjectDetail.targetLabels.times")
-                      : translate("paraProjectDetail.targetLabels.items")}
+                    {project.category === "repetitive" && project.targetCount
+                      ? `${project.target} ${project.targetCount}${translate(
+                          "paraProjectDetail.targetLabels.times"
+                        )}`
+                      : project.target}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -1485,7 +1489,7 @@ export default function ProjectDetailPage({
                             onClick={() => openEditTaskDialog(task)}
                             className="flex-shrink-0 h-8 w-8 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
                           >
-                            <Edit2 className="h-4 w-4" />
+                            <Edit className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"

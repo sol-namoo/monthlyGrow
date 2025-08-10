@@ -1,5 +1,5 @@
-import { ko } from "./translations/ko";
-import { en } from "./translations/en";
+import { ko } from "./ko";
+import { en } from "./en";
 
 export type Language = "ko" | "en";
 

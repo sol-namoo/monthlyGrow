@@ -559,7 +559,9 @@ function ParaPageContent() {
                           {(() => {
                             const taskCount = projectTaskCounts[project.id];
                             if (taskCount) {
-                              return `${taskCount.completedTasks}/${taskCount.totalTasks}`;
+                              const targetCount =
+                                project.targetCount || taskCount.totalTasks;
+                              return `${taskCount.completedTasks}/${targetCount}`;
                             }
                             // 태스크 개수가 로딩 중일 때는 스켈레톤 표시
                             if (taskCountsLoading) {
@@ -605,12 +607,6 @@ function ParaPageContent() {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Compass className="h-4 w-4" />
               <span>{translate("para.areas.description")}</span>
-              <span className="text-xs text-muted-foreground">
-                {translate("para.areas.count").replace(
-                  "{count}",
-                  areas.length.toString()
-                )}
-              </span>
             </div>
             <Button size="sm" asChild>
               <Link href="/para/areas/new">
@@ -721,12 +717,6 @@ function ParaPageContent() {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Folder className="h-4 w-4" />
               <span>{translate("para.resources.description")}</span>
-              <span className="text-xs text-muted-foreground">
-                {translate("para.resources.count").replace(
-                  "{count}",
-                  allResources.length.toString()
-                )}
-              </span>
             </div>
             <Button asChild size="sm">
               <Link href="/para/resources/new">
@@ -863,12 +853,6 @@ function ParaPageContent() {
             <div className="flex items-center gap-2 text-sm text-muted-foreground h-9">
               <Archive className="h-4 w-4" />
               <span>{translate("para.archives.description")}</span>
-              <span className="text-xs text-muted-foreground">
-                {translate("para.archives.count").replace(
-                  "{count}",
-                  allArchives.length.toString()
-                )}
-              </span>
             </div>
           </div>
           {/* 아카이브 필터링 및 정렬 */}

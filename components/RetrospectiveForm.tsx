@@ -7,26 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import type { Retrospective } from "@/lib/types";
-
-// 회고 폼 스키마 정의
-const retrospectiveFormSchema = z.object({
-  bestMoment: z.string().min(1, "가장 좋았던 순간을 입력해주세요"),
-  routineAdherence: z.string().min(1, "루틴 준수율을 입력해주세요"),
-  unexpectedObstacles: z.string().min(1, "예상치 못한 장애물을 입력해주세요"),
-  nextChapterApplication: z
-    .string()
-    .min(1, "다음 챕터 적용 방안을 입력해주세요"),
-  freeformContent: z.string().optional(),
-  userRating: z.number().min(1).max(5),
-  bookmarked: z.boolean(),
-});
-
-type RetrospectiveFormData = z.infer<typeof retrospectiveFormSchema>;
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface RetrospectiveFormProps {
   chapterTitle: string;
   onClose: () => void;
-  onSave: (data: RetrospectiveFormData) => void;
+  onSave: (data: any) => void;
 }
 
 export function RetrospectiveForm({
@@ -35,6 +21,39 @@ export function RetrospectiveForm({
   onSave,
 }: RetrospectiveFormProps) {
   const { toast } = useToast();
+  const { translate } = useLanguage();
+
+  // 회고 폼 스키마 정의
+  const retrospectiveFormSchema = z.object({
+    bestMoment: z
+      .string()
+      .min(1, translate("retrospective.form.validation.bestMomentRequired")),
+    routineAdherence: z
+      .string()
+      .min(
+        1,
+        translate("retrospective.form.validation.routineAdherenceRequired")
+      ),
+    unexpectedObstacles: z
+      .string()
+      .min(
+        1,
+        translate("retrospective.form.validation.unexpectedObstaclesRequired")
+      ),
+    nextChapterApplication: z
+      .string()
+      .min(
+        1,
+        translate(
+          "retrospective.form.validation.nextChapterApplicationRequired"
+        )
+      ),
+    freeformContent: z.string().optional(),
+    userRating: z.number().min(1).max(5),
+    bookmarked: z.boolean(),
+  });
+
+  type RetrospectiveFormData = z.infer<typeof retrospectiveFormSchema>;
 
   const form = useForm<RetrospectiveFormData>({
     resolver: zodResolver(retrospectiveFormSchema),
@@ -80,14 +99,20 @@ export function RetrospectiveForm({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <h3 className="text-lg font-semibold mb-4">회고 작성</h3>
+        <h3 className="text-lg font-semibold mb-4">
+          {translate("retrospective.form.title")}
+        </h3>
 
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
           <div>
-            <label className="text-sm font-medium">가장 좋았던 순간</label>
+            <label className="text-sm font-medium">
+              {translate("retrospective.form.bestMoment")}
+            </label>
             <Textarea
               {...form.register("bestMoment")}
-              placeholder="이번 챕터에서 가장 좋았던 순간을 기록해주세요"
+              placeholder={translate(
+                "retrospective.form.bestMomentPlaceholder"
+              )}
               rows={3}
             />
             {form.formState.errors.bestMoment && (
@@ -98,10 +123,14 @@ export function RetrospectiveForm({
           </div>
 
           <div>
-            <label className="text-sm font-medium">루틴 준수율</label>
+            <label className="text-sm font-medium">
+              {translate("retrospective.form.routineAdherence")}
+            </label>
             <Textarea
               {...form.register("routineAdherence")}
-              placeholder="계획한 루틴을 얼마나 잘 지켰는지 기록해주세요"
+              placeholder={translate(
+                "retrospective.form.routineAdherencePlaceholder"
+              )}
               rows={3}
             />
             {form.formState.errors.routineAdherence && (
@@ -112,10 +141,14 @@ export function RetrospectiveForm({
           </div>
 
           <div>
-            <label className="text-sm font-medium">예상치 못한 장애물</label>
+            <label className="text-sm font-medium">
+              {translate("retrospective.form.unexpectedObstacles")}
+            </label>
             <Textarea
               {...form.register("unexpectedObstacles")}
-              placeholder="예상하지 못했던 어려움을 기록해주세요"
+              placeholder={translate(
+                "retrospective.form.unexpectedObstaclesPlaceholder"
+              )}
               rows={3}
             />
             {form.formState.errors.unexpectedObstacles && (
@@ -126,10 +159,14 @@ export function RetrospectiveForm({
           </div>
 
           <div>
-            <label className="text-sm font-medium">다음 챕터 적용 방안</label>
+            <label className="text-sm font-medium">
+              {translate("retrospective.form.nextChapterApplication")}
+            </label>
             <Textarea
               {...form.register("nextChapterApplication")}
-              placeholder="이번 경험을 다음 챕터에 어떻게 적용할지 기록해주세요"
+              placeholder={translate(
+                "retrospective.form.nextChapterApplicationPlaceholder"
+              )}
               rows={3}
             />
             {form.formState.errors.nextChapterApplication && (
@@ -140,16 +177,22 @@ export function RetrospectiveForm({
           </div>
 
           <div>
-            <label className="text-sm font-medium">자유 회고 (선택사항)</label>
+            <label className="text-sm font-medium">
+              {translate("retrospective.form.freeformContent")}
+            </label>
             <Textarea
               {...form.register("freeformContent")}
-              placeholder="추가로 기록하고 싶은 내용이 있다면 자유롭게 작성해주세요"
+              placeholder={translate(
+                "retrospective.form.freeformContentPlaceholder"
+              )}
               rows={3}
             />
           </div>
 
           <div>
-            <label className="text-sm font-medium">평점</label>
+            <label className="text-sm font-medium">
+              {translate("retrospective.form.rating")}
+            </label>
             <div className="mt-2">
               {renderStarRating(form.watch("userRating"), (rating) =>
                 form.setValue("userRating", rating)
@@ -169,16 +212,16 @@ export function RetrospectiveForm({
               {...form.register("bookmarked")}
             />
             <label htmlFor="bookmarked" className="text-sm">
-              북마크에 추가
+              {translate("retrospective.form.bookmarked")}
             </label>
           </div>
 
           <div className="flex gap-2">
             <Button type="submit" className="flex-1">
-              저장
+              {translate("retrospective.form.save")}
             </Button>
             <Button type="button" variant="outline" onClick={onClose}>
-              취소
+              {translate("retrospective.form.cancel")}
             </Button>
           </div>
         </form>

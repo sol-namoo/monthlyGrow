@@ -12,7 +12,9 @@
     "clear-test-data": "tsx scripts/clear-test-data.ts",
     "create-user-data": "tsx scripts/create-user-data.ts",
     "update-task-dates": "tsx scripts/update-task-dates.ts",
-    "fix-resource-areas": "tsx scripts/fix-resource-areas-script.ts"
+    "fix-resource-areas": "tsx scripts/fix-resource-areas-script.ts",
+    "check-loop-migration": "node scripts/check-loop-migration.js",
+    "migrate-loop-to-chapter": "node scripts/check-loop-migration.js migrate"
   },
   "dependencies": {
     "@capacitor/cli": "^7.2.0",

@@ -208,9 +208,11 @@ function AddExistingProjectPageContent() {
                 <div className="mb-1 flex justify-between text-xs">
                   <span>
                     진행률:{" "}
-                    {project.target > 0
+                    {(project.targetCount || project.completedTasks) > 0
                       ? Math.round(
-                          (project.completedTasks / project.target) * 100
+                          (project.completedTasks /
+                            (project.targetCount || project.completedTasks)) *
+                            100
                         )
                       : 0}
                     %
@@ -221,9 +223,12 @@ function AddExistingProjectPageContent() {
                     className="progress-value"
                     style={{
                       width: `${
-                        project.target > 0
+                        (project.targetCount || project.completedTasks) > 0
                           ? Math.round(
-                              (project.completedTasks / project.target) * 100
+                              (project.completedTasks /
+                                (project.targetCount ||
+                                  project.completedTasks)) *
+                                100
                             )
                           : 0
                       }%`,

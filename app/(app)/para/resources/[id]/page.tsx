@@ -13,6 +13,7 @@ import { fetchResourceWithAreaById, deleteResourceById } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // 로딩 스켈레톤 컴포넌트
 function ResourceDetailSkeleton() {
@@ -45,6 +46,7 @@ export default function ResourceDetailPage({
   const router = useRouter();
   const { id } = use(params);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const { translate } = useLanguage();
 
   const queryClient = useQueryClient();
 
@@ -58,7 +60,7 @@ export default function ResourceDetailPage({
     },
     onError: (error: Error) => {
       console.error("자료 삭제 실패:", error);
-      alert("자료 삭제에 실패했습니다.");
+      alert(translate("para.resources.detail.error.deleteError"));
     },
   });
 
@@ -116,7 +118,7 @@ export default function ResourceDetailPage({
 
         <Alert>
           <AlertDescription>
-            자료를 불러오는 중 오류가 발생했습니다. 다시 시도해주세요.
+            {translate("para.resources.detail.error.loadError")}
           </AlertDescription>
         </Alert>
       </div>
@@ -138,7 +140,9 @@ export default function ResourceDetailPage({
         </div>
 
         <Alert>
-          <AlertDescription>해당 자료를 찾을 수 없습니다.</AlertDescription>
+          <AlertDescription>
+            {translate("para.resources.detail.error.notFound")}
+          </AlertDescription>
         </Alert>
       </div>
     );
@@ -203,7 +207,7 @@ export default function ResourceDetailPage({
               {resource.link && (
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-2">
-                    링크
+                    {translate("para.resources.detail.link")}
                   </p>
                   <a
                     href={resource.link}
@@ -219,7 +223,7 @@ export default function ResourceDetailPage({
               {resource.text && (
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-2">
-                    내용
+                    {translate("para.resources.detail.content")}
                   </p>
                   <div className="whitespace-pre-wrap text-sm">
                     {resource.text}
@@ -234,8 +238,8 @@ export default function ResourceDetailPage({
         <ConfirmDialog
           open={showDeleteDialog}
           onOpenChange={setShowDeleteDialog}
-          title="자료 삭제"
-          description="이 자료를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+          title={translate("para.resources.detail.delete.title")}
+          description={translate("para.resources.detail.delete.description")}
           onConfirm={() => {
             deleteResourceMutation.mutate();
             setShowDeleteDialog(false);

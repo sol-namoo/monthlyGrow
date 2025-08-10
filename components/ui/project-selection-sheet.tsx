@@ -8,13 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RecommendationBadge } from "@/components/ui/recommendation-badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet";
 import {
   Select,
   SelectContent,
@@ -34,7 +34,7 @@ import { Project, Area } from "@/lib/types";
 import { getProjectStatus, formatDate } from "@/lib/utils";
 import { useLanguage } from "@/hooks/useLanguage";
 
-interface ProjectSelectionModalProps {
+interface ProjectSelectionSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedProjects: string[];
@@ -49,7 +49,7 @@ interface ProjectSelectionModalProps {
   currentChapterId?: string; // 현재 챕터 ID (수정 시에만 사용)
 }
 
-export function ProjectSelectionModal({
+export function ProjectSelectionSheet({
   open,
   onOpenChange,
   selectedProjects,
@@ -62,10 +62,11 @@ export function ProjectSelectionModal({
   projectsLoading: externalProjectsLoading,
   areasLoading: externalAreasLoading,
   currentChapterId,
-}: ProjectSelectionModalProps) {
+}: ProjectSelectionSheetProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [areaFilter, setAreaFilter] = useState<string>("all");
+  // 챕터 수정 시에는 모든 프로젝트를 보여주기 위해 기본값을 false로 설정
   const [showOnlyUnconnected, setShowOnlyUnconnected] = useState(false);
   const [itemsPerPage] = useState(10);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -87,23 +88,62 @@ export function ProjectSelectionModal({
     queryFn: async () => {
       if (externalProjects) return null;
 
+      // 디버깅: 모든 프로젝트 개수 확인
+      console.log("🔍 전체 프로젝트 개수 확인 중...");
+      console.log("🔍 현재 사용자 ID:", user?.uid);
+      const allProjects = await fetchAllProjectsByUserId(user?.uid || "");
+      console.log(
+        "🔍 fetchAllProjectsByUserId 결과:",
+        allProjects.length,
+        "개"
+      );
+
+      // 모든 경우에 10개씩 페이지네이션 사용
+      console.log(
+        "🔍 페칭 시작 - userId:",
+        user?.uid,
+        "pageLimit:",
+        itemsPerPage
+      );
       const result = await fetchProjectsByUserIdWithPaging(
         user?.uid || "",
         itemsPerPage,
         lastDoc,
         "latest"
       );
+      console.log("🔍 페칭 완료 - 결과:", {
+        projectsCount: result.projects.length,
+        hasMore: result.hasMore,
+        lastDoc: result.lastDoc ? "있음" : "없음",
+      });
 
       if (lastDoc === null) {
         // 첫 페이지 로드
         setAllProjects(result.projects);
+        console.log(
+          "🔍 첫 페이지 로드:",
+          result.projects.length,
+          "개 프로젝트"
+        );
+        console.log(
+          "프로젝트들:",
+          result.projects.map((p) => ({ id: p.id, title: p.title }))
+        );
+        console.log("🔍 요청한 페이지 크기:", itemsPerPage);
+        console.log("🔍 실제 반환된 크기:", result.projects.length);
       } else {
         // 추가 페이지 로드
         setAllProjects((prev) => [...prev, ...result.projects]);
+        console.log(
+          "🔍 추가 페이지 로드:",
+          result.projects.length,
+          "개 프로젝트"
+        );
       }
 
       setLastDoc(result.lastDoc);
       setHasMore(result.hasMore);
+      console.log("🔍 hasMore:", result.hasMore, "lastDoc:", result.lastDoc);
 
       return result.projects;
     },
@@ -153,7 +193,8 @@ export function ProjectSelectionModal({
     }
 
     // 연결되지 않은 프로젝트만 필터 (체크박스가 체크되어 있을 때만)
-    if (showOnlyUnconnected) {
+    // 챕터 수정 시에는 모든 프로젝트를 보여줌
+    if (showOnlyUnconnected && !currentChapterId) {
       const connectedChapters = (project as any).connectedChapters || [];
       const isConnected = connectedChapters.length > 0 || project.chapterId;
       if (isConnected) {
@@ -163,6 +204,20 @@ export function ProjectSelectionModal({
 
     return true;
   });
+
+  // 디버깅용 로그
+  console.log("🔍 전체 프로젝트:", projects.length, "개");
+  console.log("🔍 필터링된 프로젝트:", filteredProjects.length, "개");
+  console.log(
+    "🔍 검색어:",
+    searchTerm,
+    "상태필터:",
+    statusFilter,
+    "영역필터:",
+    areaFilter,
+    "연결필터:",
+    showOnlyUnconnected
+  );
 
   // 필터 변경 시 프로젝트 목록 초기화
   useEffect(() => {
@@ -208,27 +263,27 @@ export function ProjectSelectionModal({
 
   if (projectsLoading || areasLoading) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>프로젝트 선택</DialogTitle>
-            <DialogDescription>프로젝트를 불러오는 중...</DialogDescription>
-          </DialogHeader>
-        </DialogContent>
-      </Dialog>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" className="h-[90vh]">
+          <SheetHeader>
+            <SheetTitle>프로젝트 선택</SheetTitle>
+            <SheetDescription>프로젝트를 불러오는 중...</SheetDescription>
+          </SheetHeader>
+        </SheetContent>
+      </Sheet>
     );
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[95vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>프로젝트 선택</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="h-[90vh] flex flex-col">
+        <SheetHeader>
+          <SheetTitle>프로젝트 선택</SheetTitle>
+          <SheetDescription>
             이 챕터에 연결할 프로젝트를 선택하세요.
             {maxProjects && ` 최대 ${maxProjects}개까지 선택할 수 있습니다.`}
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col min-h-0">
           {/* 필터 및 검색 */}
@@ -280,7 +335,9 @@ export function ProjectSelectionModal({
                 }
               />
               <Label htmlFor="showOnlyUnconnected" className="text-sm">
-                연결되지 않은 프로젝트만 보기 (체크 해제 시 모든 프로젝트 표시)
+                {currentChapterId
+                  ? "연결되지 않은 프로젝트만 보기 (체크 해제 시 모든 프로젝트 표시)"
+                  : "연결되지 않은 프로젝트만 보기"}
               </Label>
             </div>
 
@@ -302,7 +359,7 @@ export function ProjectSelectionModal({
           </div>
 
           {/* 프로젝트 목록 - ScrollArea로 감싸서 스크롤 영역 확대 */}
-          <ScrollArea className="h-[60vh] w-full border rounded-lg bg-background">
+          <ScrollArea className="flex-1 w-full border rounded-lg bg-background">
             <div className="p-4 space-y-3">
               <div className="text-xs text-muted-foreground mb-3 flex justify-between items-center">
                 <span>총 {filteredProjects.length}개 프로젝트</span>
@@ -365,31 +422,41 @@ export function ProjectSelectionModal({
                             </div>
                           </div>
                         </div>
-                        <div className="flex flex-col items-end gap-1 ml-2">
-                          {currentChapterId &&
-                            project.chapterId === currentChapterId && (
-                              <Badge variant="secondary" className="text-xs">
-                                현재 챕터에 연결됨
+                        <div className="flex flex-col items-end gap-1">
+                          <Badge
+                            variant={
+                              project.status === "completed"
+                                ? "default"
+                                : project.status === "in_progress"
+                                ? "secondary"
+                                : project.status === "overdue"
+                                ? "destructive"
+                                : "outline"
+                            }
+                            className="text-xs"
+                          >
+                            {project.status === "completed"
+                              ? "완료됨"
+                              : project.status === "in_progress"
+                              ? "진행 중"
+                              : project.status === "overdue"
+                              ? "지연됨"
+                              : "계획됨"}
+                          </Badge>
+                          {(() => {
+                            const connectedChapters =
+                              (project as any).connectedChapters || [];
+                            const isConnectedToCurrentChapter =
+                              currentChapterId &&
+                              (connectedChapters.includes(currentChapterId) ||
+                                project.chapterId === currentChapterId);
+
+                            return isConnectedToCurrentChapter ? (
+                              <Badge variant="outline" className="text-xs">
+                                연결됨
                               </Badge>
-                            )}
-                          {currentChapterId &&
-                            project.chapterId &&
-                            project.chapterId !== currentChapterId && (
-                              <Badge
-                                variant="outline"
-                                className="text-xs text-muted-foreground"
-                              >
-                                다른 챕터에 연결됨
-                              </Badge>
-                            )}
-                          {newlyCreatedProjectId === project.id && (
-                            <Badge
-                              variant="default"
-                              className="text-xs bg-green-500"
-                            >
-                              새로 생성됨
-                            </Badge>
-                          )}
+                            ) : null;
+                          })()}
                         </div>
                       </div>
                     </Card>
@@ -420,7 +487,7 @@ export function ProjectSelectionModal({
           </ScrollArea>
         </div>
 
-        <DialogFooter className="mt-4">
+        <SheetFooter className="mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             취소
           </Button>
@@ -428,8 +495,8 @@ export function ProjectSelectionModal({
             선택 완료 ({selectedProjects.length}
             {maxProjects ? `/${maxProjects}` : ""}개)
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }

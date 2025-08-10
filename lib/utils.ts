@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { Chapter, ConnectedProjectGoal, Project } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -212,11 +213,6 @@ export function getProjectStatus(project: {
   const startDate = new Date(project.startDate);
   const endDate = new Date(project.endDate);
 
-  // 시작일이 미래인 경우
-  if (startDate > now) {
-    return "scheduled";
-  }
-
   // 완료율 계산
   const completionRate =
     project.target && project.completedTasks
@@ -231,6 +227,11 @@ export function getProjectStatus(project: {
   // 종료일이 지났지만 완료되지 않은 경우
   if (endDate < now && completionRate < 100) {
     return "overdue";
+  }
+
+  // 시작일이 미래인 경우
+  if (startDate > now) {
+    return "scheduled";
   }
 
   // 진행 중인 경우
@@ -283,6 +284,18 @@ export function getProjectCompletionRate(project: {
   return Math.round((project.completedTasks / project.target) * 100);
 }
 
+/**
+ * 프로젝트의 전체 진행률을 계산합니다.
+ * @param project 프로젝트 객체
+ * @returns 진행률 (0-1 사이의 값)
+ */
+export function calculateProjectProgress(project: Project): number {
+  if (project.target === 0) {
+    return 0;
+  }
+  return project.completedTasks / project.target;
+}
+
 // 프로젝트가 활성 상태인지 확인하는 함수
 export function isProjectActive(project: {
   startDate: Date;
@@ -332,4 +345,218 @@ export function isChapterPlanned(chapter: {
   endDate: Date;
 }): boolean {
   return getChapterStatus(chapter) === "planned";
+}
+
+/**
+ * 챕터별 프로젝트 목표치 관련 유틸리티 함수들
+ */
+
+/**
+ * 챕터의 전체 달성률을 계산합니다.
+ * @param chapter 챕터 객체
+ * @returns 달성률 (0-1 사이의 값)
+ */
+export function calculateChapterProgress(chapter: Chapter): number {
+  if (!chapter.connectedProjects || chapter.connectedProjects.length === 0) {
+    return 0;
+  }
+
+  const totalTarget = chapter.connectedProjects.reduce(
+    (sum, project) => sum + project.chapterTargetCount,
+    0
+  );
+  const totalDone = chapter.connectedProjects.reduce(
+    (sum, project) => sum + project.chapterDoneCount,
+    0
+  );
+
+  return totalTarget > 0 ? totalDone / totalTarget : 0;
+}
+
+/**
+ * 특정 프로젝트의 챕터별 진행률을 계산합니다.
+ * @param chapter 챕터 객체
+ * @param projectId 프로젝트 ID
+ * @returns 진행률 (0-1 사이의 값), 프로젝트가 연결되지 않은 경우 0
+ */
+export function calculateProjectChapterProgress(
+  chapter: Chapter,
+  projectId: string
+): number {
+  if (!chapter.connectedProjects) {
+    return 0;
+  }
+
+  const projectGoal = chapter.connectedProjects.find(
+    (goal) => goal.projectId === projectId
+  );
+
+  if (!projectGoal || projectGoal.chapterTargetCount === 0) {
+    return 0;
+  }
+
+  return projectGoal.chapterDoneCount / projectGoal.chapterTargetCount;
+}
+
+/**
+ * 프로젝트가 챕터에 연결되어 있는지 확인합니다.
+ * @param chapter 챕터 객체
+ * @param projectId 프로젝트 ID
+ * @returns 연결 여부
+ */
+export function isProjectConnectedToChapter(
+  chapter: Chapter,
+  projectId: string
+): boolean {
+  return (
+    chapter.connectedProjects?.some((goal) => goal.projectId === projectId) ??
+    false
+  );
+}
+
+/**
+ * 챕터에서 프로젝트 목표치를 가져옵니다.
+ * @param chapter 챕터 객체
+ * @param projectId 프로젝트 ID
+ * @returns 프로젝트 목표치 객체, 연결되지 않은 경우 null
+ */
+export function getProjectGoalFromChapter(
+  chapter: Chapter,
+  projectId: string
+): ConnectedProjectGoal | null {
+  return (
+    chapter.connectedProjects?.find((goal) => goal.projectId === projectId) ??
+    null
+  );
+}
+
+/**
+ * 챕터에 프로젝트를 연결하고 목표치를 설정합니다.
+ * @param chapter 챕터 객체
+ * @param projectId 프로젝트 ID
+ * @param targetCount 챕터별 목표치
+ * @returns 업데이트된 챕터 객체
+ */
+export function connectProjectToChapter(
+  chapter: Chapter,
+  projectId: string,
+  targetCount: number
+): Chapter {
+  const existingGoal = chapter.connectedProjects?.find(
+    (goal) => goal.projectId === projectId
+  );
+
+  if (existingGoal) {
+    // 기존 목표치 업데이트
+    existingGoal.chapterTargetCount = targetCount;
+    return chapter;
+  }
+
+  // 새로운 프로젝트 연결
+  const newGoal: ConnectedProjectGoal = {
+    projectId,
+    chapterTargetCount: targetCount,
+    chapterDoneCount: 0,
+  };
+
+  return {
+    ...chapter,
+    connectedProjects: [...(chapter.connectedProjects || []), newGoal],
+  };
+}
+
+/**
+ * 챕터에서 프로젝트 연결을 해제합니다.
+ * @param chapter 챕터 객체
+ * @param projectId 프로젝트 ID
+ * @returns 업데이트된 챕터 객체
+ */
+export function disconnectProjectFromChapter(
+  chapter: Chapter,
+  projectId: string
+): Chapter {
+  return {
+    ...chapter,
+    connectedProjects:
+      chapter.connectedProjects?.filter(
+        (goal) => goal.projectId !== projectId
+      ) || [],
+  };
+}
+
+/**
+ * 태스크 완료 시 챕터별 진행률을 업데이트합니다.
+ * @param chapter 챕터 객체
+ * @param projectId 프로젝트 ID
+ * @param increment 증가할 완료 수 (기본값: 1)
+ * @returns 업데이트된 챕터 객체
+ */
+export function updateChapterProgress(
+  chapter: Chapter,
+  projectId: string,
+  increment: number = 1
+): Chapter {
+  if (!chapter.connectedProjects) {
+    return chapter;
+  }
+
+  const updatedProjects = chapter.connectedProjects.map((goal) => {
+    if (goal.projectId === projectId) {
+      return {
+        ...goal,
+        chapterDoneCount: Math.min(
+          goal.chapterDoneCount + increment,
+          goal.chapterTargetCount
+        ),
+      };
+    }
+    return goal;
+  });
+
+  return {
+    ...chapter,
+    connectedProjects: updatedProjects,
+  };
+}
+
+/**
+ * 챕터별 목표치의 기본값을 계산합니다.
+ * 프로젝트의 전체 목표치를 챕터 기간에 비례하여 분배합니다.
+ * @param project 프로젝트 객체
+ * @param chapterStartDate 챕터 시작일
+ * @param chapterEndDate 챕터 종료일
+ * @returns 챕터별 목표치
+ */
+export function calculateDefaultChapterTarget(
+  project: Project,
+  chapterStartDate: Date,
+  chapterEndDate: Date
+): number {
+  const projectStart = new Date(project.startDate);
+  const projectEnd = new Date(project.endDate);
+  const chapterStart = new Date(chapterStartDate);
+  const chapterEnd = new Date(chapterEndDate);
+
+  // 프로젝트와 챕터의 겹치는 기간 계산
+  const overlapStart = new Date(
+    Math.max(projectStart.getTime(), chapterStart.getTime())
+  );
+  const overlapEnd = new Date(
+    Math.min(projectEnd.getTime(), chapterEnd.getTime())
+  );
+
+  if (overlapEnd <= overlapStart) {
+    return 0; // 겹치는 기간이 없음
+  }
+
+  // 전체 프로젝트 기간
+  const totalProjectDays =
+    (projectEnd.getTime() - projectStart.getTime()) / (1000 * 60 * 60 * 24);
+  // 겹치는 기간
+  const overlapDays =
+    (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24);
+
+  // 비례하여 목표치 계산
+  const ratio = overlapDays / totalProjectDays;
+  return Math.round(project.target * ratio);
 }

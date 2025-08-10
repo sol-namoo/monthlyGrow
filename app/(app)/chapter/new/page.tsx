@@ -56,7 +56,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { RecommendationBadge } from "@/components/ui/recommendation-badge";
-import { ProjectSelectionModal } from "@/components/ui/project-selection-modal";
+import { ProjectSelectionSheet } from "@/components/ui/project-selection-sheet";
 import {
   Dialog,
   DialogContent,
@@ -71,34 +71,6 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { formatDateForInput } from "@/lib/utils";
 import { useLanguage } from "@/hooks/useLanguage";
-
-// 기본 폼 스키마 정의
-const chapterFormSchema = z
-  .object({
-    title: z.string().min(1, "챕터 제목을 입력해주세요"),
-    reward: z.string().min(1, "보상을 입력해주세요"),
-    selectedMonth: z.string().min(1, "챕터 월을 선택해주세요"),
-    startDate: z.string().min(1, "시작일을 입력해주세요"),
-    endDate: z.string().min(1, "종료일을 입력해주세요"),
-    selectedAreas: z.array(z.string()).min(1, "최소 1개의 영역을 선택해주세요"),
-    selectedExistingProjects: z.array(z.string()),
-  })
-  .refine(
-    (data) => {
-      // 6개월 제한 체크
-      const selectedDate = new Date(data.selectedMonth + "-01");
-      const sixMonthsLater = new Date();
-      sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
-
-      return selectedDate <= sixMonthsLater;
-    },
-    {
-      message: "챕터는 최대 6개월 후까지만 생성할 수 있습니다",
-      path: ["selectedMonth"],
-    }
-  );
-
-type ChapterFormData = z.infer<typeof chapterFormSchema>;
 
 // 아이콘 컴포넌트 매핑 함수
 const getIconComponent = (iconName: string) => {
@@ -121,6 +93,46 @@ function NewChapterPageContent() {
   const searchParams = useSearchParams();
   const [user, userLoading] = useAuthState(auth);
   const { translate, currentLanguage } = useLanguage();
+
+  // 기본 폼 스키마 정의
+  const chapterFormSchema = z
+    .object({
+      title: z
+        .string()
+        .min(1, translate("chapterNew.validation.titleRequired")),
+      reward: z
+        .string()
+        .min(1, translate("chapterNew.validation.rewardRequired")),
+      selectedMonth: z
+        .string()
+        .min(1, translate("chapterNew.validation.monthRequired")),
+      startDate: z
+        .string()
+        .min(1, translate("chapterNew.validation.startDateRequired")),
+      endDate: z
+        .string()
+        .min(1, translate("chapterNew.validation.endDateRequired")),
+      selectedAreas: z
+        .array(z.string())
+        .min(1, translate("chapterNew.validation.areasRequired")),
+      selectedExistingProjects: z.array(z.string()),
+    })
+    .refine(
+      (data) => {
+        // 6개월 제한 체크
+        const selectedDate = new Date(data.selectedMonth + "-01");
+        const sixMonthsLater = new Date();
+        sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
+
+        return selectedDate <= sixMonthsLater;
+      },
+      {
+        message: translate("chapterNew.monthLimit"),
+        path: ["selectedMonth"],
+      }
+    );
+
+  type ChapterFormData = z.infer<typeof chapterFormSchema>;
 
   // 로그인 상태 확인 및 리다이렉션
   useEffect(() => {
@@ -219,9 +231,8 @@ function NewChapterPageContent() {
     if (blockedMonth === selectedMonth) {
       form.setValue("selectedMonth", "");
       toast({
-        title: "월 선택 제한",
-        description:
-          "이 월은 기존 챕터가 있어 선택할 수 없습니다. 다른 월을 선택해주세요.",
+        title: translate("chapterNew.monthSelection.limitTitle"),
+        description: translate("chapterNew.monthSelection.limitDescription"),
         variant: "destructive",
       });
       return;
@@ -294,9 +305,10 @@ function NewChapterPageContent() {
     if (existingChapter) {
       setChapterToDelete(existingChapter);
       toast({
-        title: "기존 챕터 대체 준비 완료",
-        description:
-          "챕터 생성하기 버튼을 누르면 기존 챕터가 삭제되고 새 챕터가 생성됩니다.",
+        title: translate("chapterNew.success.existingChapterDeleted.title"),
+        description: translate(
+          "chapterNew.success.existingChapterDeleted.description"
+        ),
       });
 
       // 월 변경 사항 적용
@@ -426,9 +438,8 @@ function NewChapterPageContent() {
       window.history.replaceState({}, "", url.toString());
 
       toast({
-        title: "프로젝트 생성 완료",
-        description:
-          "새로 생성된 프로젝트가 목록에 추가되었습니다. 프로젝트 선택에서 확인하세요.",
+        title: translate("chapterNew.success.projectCreated"),
+        description: translate("chapterNew.success.projectCreatedDescription"),
       });
     }
   }, [searchParams, form, toast]);
@@ -506,7 +517,9 @@ function NewChapterPageContent() {
       if (chapterToDelete) {
         await deleteChapterById(chapterToDelete.id);
         toast({
-          title: "기존 챕터 삭제 완료",
+          title: translate(
+            "chapterNew.success.existingChapterDeletedDescription"
+          ),
           description: `${chapterToDelete.title}가 삭제되었습니다.`,
         });
       }
@@ -558,8 +571,10 @@ function NewChapterPageContent() {
       await connectPendingProjectsToNewChapter(user.uid, newChapterId.id);
 
       toast({
-        title: "챕터 생성 완료",
-        description: `${data.title} 챕터가 생성되었습니다.`,
+        title: translate("chapterNew.success.title"),
+        description: `${data.title} ${translate(
+          "chapterNew.success.description"
+        )}`,
       });
 
       // 챕터 상세 페이지로 이동 (replace로 히스토리 대체)
@@ -567,8 +582,8 @@ function NewChapterPageContent() {
     } catch (error) {
       console.error("챕터 생성 중 오류:", error);
       toast({
-        title: "챕터 생성 실패",
-        description: "챕터 생성 중 오류가 발생했습니다.",
+        title: translate("chapterNew.error.title"),
+        description: translate("chapterNew.error.description"),
         variant: "destructive",
       });
     }
@@ -616,10 +631,11 @@ function NewChapterPageContent() {
               <Compass className="h-16 w-16 text-muted-foreground/50" />
             </div>
           </div>
-          <h2 className="text-xl font-bold mb-4">등록된 활동 영역이 없어요</h2>
+          <h2 className="text-xl font-bold mb-4">
+            {translate("chapterNew.noAreas.title")}
+          </h2>
           <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
-            챕터를 만들기 위해서는 먼저 활동 영역(Area)을 등록해야 합니다. 건강,
-            커리어, 자기계발 등 관심 있는 영역을 만들어보세요.
+            {translate("chapterNew.noAreas.description")}
           </p>
           <div className="space-y-4">
             <Button asChild className="w-full max-w-xs">
@@ -633,7 +649,7 @@ function NewChapterPageContent() {
                 )}`}
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Area 만들기
+                {translate("chapterNew.noAreas.createArea")}
               </Link>
             </Button>
             <Button
@@ -641,7 +657,9 @@ function NewChapterPageContent() {
               asChild
               className="w-full max-w-xs bg-transparent"
             >
-              <Link href="/para">PARA 시스템 보기</Link>
+              <Link href="/para">
+                {translate("chapterNew.noAreas.viewPara")}
+              </Link>
             </Button>
           </div>
         </div>
@@ -697,12 +715,12 @@ function NewChapterPageContent() {
                         <span>{month.label}</span>
                         {month.isThisMonth && (
                           <Badge variant="secondary" className="text-xs">
-                            현재
+                            {translate("chapterNew.monthSelection.current")}
                           </Badge>
                         )}
                         {month.isNextMonth && (
                           <Badge variant="outline" className="text-xs">
-                            다음
+                            {translate("chapterNew.monthSelection.next")}
                           </Badge>
                         )}
                       </div>
@@ -716,16 +734,20 @@ function NewChapterPageContent() {
                 </p>
               )}
               <p className="text-xs text-muted-foreground mt-1">
-                💡 챕터는 최대 6개월 후까지 생성할 수 있습니다
+                {translate("chapterNew.monthSelection.hint")}
               </p>
             </div>
 
             <div>
-              <Label htmlFor="title">챕터 제목</Label>
+              <Label htmlFor="title">
+                {translate("chapterNew.basicInfo.chapterTitle")}
+              </Label>
               <Input
                 id="title"
                 {...form.register("title")}
-                placeholder="예: 1월 건강 챕터"
+                placeholder={translate(
+                  "chapterNew.basicInfo.chapterTitlePlaceholder"
+                )}
                 className="mt-1"
               />
               {form.formState.errors.title && (
@@ -736,16 +758,19 @@ function NewChapterPageContent() {
             </div>
 
             <div>
-              <Label htmlFor="reward">보상</Label>
+              <Label htmlFor="reward">
+                {translate("chapterNew.basicInfo.reward")}
+              </Label>
               <Input
                 id="reward"
                 {...form.register("reward")}
-                placeholder="예: 새로운 운동화 구매"
+                placeholder={translate(
+                  "chapterNew.basicInfo.rewardPlaceholder"
+                )}
                 className="mt-1"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                💡 기본 보상 설정이 비활성화되어 있습니다. 설정에서 활성화하면
-                새 챕터 생성 시 자동으로 보상이 채워집니다.
+                {translate("chapterNew.basicInfo.rewardHint")}
               </p>
               {form.formState.errors.reward && (
                 <p className="text-sm text-red-500 mt-1">
@@ -756,7 +781,9 @@ function NewChapterPageContent() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="startDate">시작일</Label>
+                <Label htmlFor="startDate">
+                  {translate("chapterNew.basicInfo.startDate")}
+                </Label>
                 <Input
                   id="startDate"
                   type="date"
@@ -766,12 +793,14 @@ function NewChapterPageContent() {
                   disabled
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  챕터는 월 단위로 설정됩니다
+                  {translate("chapterNew.basicInfo.dateHint")}
                 </p>
               </div>
 
               <div>
-                <Label htmlFor="endDate">종료일</Label>
+                <Label htmlFor="endDate">
+                  {translate("chapterNew.basicInfo.endDate")}
+                </Label>
                 <Input
                   id="endDate"
                   type="date"
@@ -781,26 +810,28 @@ function NewChapterPageContent() {
                   disabled
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  해당 월의 마지막 날까지
+                  {translate("chapterNew.basicInfo.endDateHint")}
                 </p>
               </div>
             </div>
           </div>
         </Card>
 
-        {/* 중점 Areas */}
+        {/* Focus Areas */}
         <Card className="mb-6 p-4">
-          <h2 className="mb-4 text-lg font-semibold">중점 Areas (최대 4개)</h2>
+          <h2 className="mb-4 text-lg font-semibold">
+            {translate("chapterNew.focusAreas.title")}
+          </h2>
 
           <div className="mb-4 space-y-2">
             <RecommendationBadge
               type="info"
-              message="권장: 2개 영역에 집중하면 챕터의 효과를 높일 수 있어요"
+              message={translate("chapterNew.focusAreas.recommendation")}
             />
             {form.watch("selectedAreas").length > 2 && (
               <RecommendationBadge
                 type="warning"
-                message="많은 영역을 선택하면 집중도가 떨어질 수 있습니다"
+                message={translate("chapterNew.focusAreas.warning")}
               />
             )}
           </div>
@@ -849,24 +880,25 @@ function NewChapterPageContent() {
                 </div>
               </div>
               <p className="text-sm text-muted-foreground mb-3">
-                등록된 활동 영역이 없습니다.
+                {translate("chapterNew.focusAreas.noAreas")}
               </p>
               <Button asChild size="sm" variant="outline">
                 <Link href="/para/areas/new?returnUrl=/chapter/new">
-                  Area 만들기
+                  {translate("chapterNew.focusAreas.createArea")}
                 </Link>
               </Button>
             </div>
           )}
         </Card>
 
-        {/* 프로젝트 연결 */}
+        {/* Project Connection */}
         <Card className="mb-6 p-4">
           <div className="mb-4">
-            <h2 className="text-lg font-semibold mb-2">프로젝트 연결</h2>
+            <h2 className="text-lg font-semibold mb-2">
+              {translate("chapterNew.projects.title")}
+            </h2>
             <p className="text-sm text-muted-foreground mb-4">
-              이 챕터와 연결할 프로젝트를 선택하거나 새 프로젝트를 만들어보세요.
-              프로젝트는 나중에 추가할 수도 있습니다.
+              {translate("chapterNew.projects.description")}
             </p>
           </div>
 
@@ -877,14 +909,15 @@ function NewChapterPageContent() {
                 onClick={() => setShowProjectModal(true)}
                 className="flex-1"
               >
-                기존 프로젝트 선택
+                {translate("chapterNew.projects.selectExisting")}
               </Button>
               <Button
                 variant="outline"
                 onClick={() => setShowNewProjectDialog(true)}
                 className="flex-1"
               >
-                <Plus className="mr-2 h-4 w-4" />새 프로젝트 만들기
+                <Plus className="mr-2 h-4 w-4" />
+                {translate("chapterNew.projects.createNew")}
               </Button>
             </div>
           </div>
@@ -893,7 +926,9 @@ function NewChapterPageContent() {
           {form.watch("selectedExistingProjects").length > 0 && (
             <div className="space-y-3 mb-4 p-3 bg-muted/30 rounded-lg">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium">선택된 프로젝트</h3>
+                <h3 className="text-sm font-medium">
+                  {translate("chapterNew.projects.connectedProjects")}
+                </h3>
                 <Badge variant="secondary" className="text-xs">
                   {form.watch("selectedExistingProjects").length}개
                 </Badge>
@@ -948,7 +983,7 @@ function NewChapterPageContent() {
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">
-                아직 선택된 프로젝트가 없습니다
+                {translate("chapterNew.projects.noConnectedProjects")}
               </p>
             </div>
           )}
@@ -956,25 +991,25 @@ function NewChapterPageContent() {
           <div className="mt-4 space-y-2">
             <RecommendationBadge
               type="info"
-              message="권장: 2~3개 프로젝트에 집중하면 챕터의 효과를 높일 수 있어요"
+              message={translate("chapterNew.projects.recommendation")}
             />
 
             {form.watch("selectedExistingProjects").length > 3 && (
               <RecommendationBadge
                 type="warning"
-                message="많은 프로젝트를 선택하면 집중도가 떨어질 수 있습니다"
+                message={translate("chapterNew.projects.warning")}
               />
             )}
           </div>
         </Card>
 
-        {/* 프로젝트 선택 모달 */}
-        <ProjectSelectionModal
+        {/* 프로젝트 선택 바텀시트 */}
+        <ProjectSelectionSheet
           open={showProjectModal}
           onOpenChange={(open) => {
             setShowProjectModal(open);
             if (!open) {
-              // 모달이 닫힐 때 새로 생성된 프로젝트 ID 초기화
+              // 바텀시트가 닫힐 때 새로 생성된 프로젝트 ID 초기화
               setNewlyCreatedProjectId(undefined);
             }
           }}
@@ -991,7 +1026,7 @@ function NewChapterPageContent() {
 
         {/* 제출 버튼 */}
         <Button type="submit" className="w-full" size="lg">
-          챕터 생성하기
+          {translate("chapterNew.createChapter")}
         </Button>
       </form>
 
@@ -1002,9 +1037,11 @@ function NewChapterPageContent() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>새 프로젝트 만들기</DialogTitle>
+            <DialogTitle>
+              {translate("chapterNew.projects.newProjectDialog.title")}
+            </DialogTitle>
             <DialogDescription>
-              새 프로젝트를 만들어 챕터에 연결하시겠습니까?
+              {translate("chapterNew.projects.newProjectDialog.description")}
             </DialogDescription>
           </DialogHeader>
 
@@ -1016,11 +1053,14 @@ function NewChapterPageContent() {
                 </div>
                 <div className="flex-1">
                   <h4 className="text-sm font-medium text-blue-900 dark:text-blue-200 mb-1">
-                    새 프로젝트 생성
+                    {translate(
+                      "chapterNew.projects.newProjectDialog.createNew"
+                    )}
                   </h4>
                   <p className="text-xs text-blue-700 dark:text-blue-300">
-                    프로젝트 생성 페이지로 이동하여 새 프로젝트를 만들고, 완료
-                    후 이 챕터 페이지로 돌아와서 연결할 수 있습니다.
+                    {translate(
+                      "chapterNew.projects.newProjectDialog.createDescription"
+                    )}
                   </p>
                 </div>
               </div>
@@ -1031,10 +1071,12 @@ function NewChapterPageContent() {
                 </div>
                 <div className="flex-1">
                   <h4 className="text-sm font-medium text-amber-900 dark:text-amber-200 mb-1">
-                    참고 사항
+                    {translate("chapterNew.projects.newProjectDialog.note")}
                   </h4>
                   <p className="text-xs text-amber-700 dark:text-amber-300">
-                    현재 작성 중인 챕터 정보는 저장되므로 안심하고 이동하세요.
+                    {translate(
+                      "chapterNew.projects.newProjectDialog.noteDescription"
+                    )}
                   </p>
                 </div>
               </div>
@@ -1047,11 +1089,16 @@ function NewChapterPageContent() {
                     currentUrl
                   )}`}
                 >
-                  <Plus className="mr-2 h-4 w-4" />새 프로젝트 만들기
+                  <Plus className="mr-2 h-4 w-4" />
+                  {translate("chapterNew.projects.createNew")}
                 </Link>
               </Button>
               <Button variant="outline" asChild>
-                <Link href="/para?tab=projects">기존 프로젝트 목록 보기</Link>
+                <Link href="/para?tab=projects">
+                  {translate(
+                    "chapterNew.projects.newProjectDialog.viewProjects"
+                  )}
+                </Link>
               </Button>
             </div>
           </div>
@@ -1061,7 +1108,7 @@ function NewChapterPageContent() {
               variant="secondary"
               onClick={() => setShowNewProjectDialog(false)}
             >
-              취소
+              {translate("chapterNew.projects.newProjectDialog.cancel")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1071,23 +1118,35 @@ function NewChapterPageContent() {
       <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>기존 챕터가 있습니다</DialogTitle>
+            <DialogTitle>
+              {translate("chapterNew.duplicateChapter.title")}
+            </DialogTitle>
             <DialogDescription>
-              선택한 월에 이미 챕터가 존재합니다. 기존 챕터를 대체하고 새로운
-              챕터를 생성하시겠습니까?
+              {translate("chapterNew.duplicateChapter.description")}
             </DialogDescription>
           </DialogHeader>
 
           {existingChapter && (
             <div className="my-4 p-4 bg-muted/50 rounded-lg">
-              <h4 className="font-medium mb-2">기존 챕터 정보</h4>
+              <h4 className="font-medium mb-2">
+                {translate("chapterNew.duplicateChapter.existingChapterInfo")}
+              </h4>
               <div className="text-sm text-muted-foreground space-y-1">
-                <div>제목: {existingChapter.title}</div>
                 <div>
-                  기간: {formatDate(existingChapter.startDate)} ~{" "}
+                  {translate("chapterNew.duplicateChapter.titleLabel")}:{" "}
+                  {existingChapter.title}
+                </div>
+                <div>
+                  {translate("chapterNew.duplicateChapter.periodLabel")}:{" "}
+                  {formatDate(existingChapter.startDate)} ~{" "}
                   {formatDate(existingChapter.endDate)}
                 </div>
-                <div>연결된 프로젝트: 0개</div>
+                <div>
+                  {translate(
+                    "chapterNew.duplicateChapter.connectedProjectsLabel"
+                  )}
+                  : {translate("chapterNew.duplicateChapter.projectsCount")}
+                </div>
               </div>
             </div>
           )}
@@ -1095,15 +1154,11 @@ function NewChapterPageContent() {
           <div className="flex flex-col gap-2 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <span className="text-primary">💡</span>
-              <span>
-                연결된 프로젝트는 삭제되지 않고 챕터 연결만 해제됩니다.
-              </span>
+              <span>{translate("chapterNew.duplicateChapter.tip")}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-amber-500">⚠️</span>
-              <span>
-                기존 챕터는 "챕터 생성하기" 버튼을 누를 때 삭제됩니다.
-              </span>
+              <span>{translate("chapterNew.duplicateChapter.warning")}</span>
             </div>
           </div>
 
@@ -1112,13 +1167,13 @@ function NewChapterPageContent() {
               variant="outline"
               onClick={() => handleDuplicateConfirm(false)}
             >
-              취소
+              {translate("chapterNew.duplicateChapter.cancel")}
             </Button>
             <Button
               variant="destructive"
               onClick={() => handleDuplicateConfirm(true)}
             >
-              기존 챕터 대체하고 계속
+              {translate("chapterNew.duplicateChapter.replace")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1131,15 +1186,16 @@ function NewChapterPageContent() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>챕터 생성 확인</DialogTitle>
+            <DialogTitle>
+              {translate("chapterNew.finalConfirm.title")}
+            </DialogTitle>
             <DialogDescription>
-              선택한 월에 기존 챕터가 있거나 이전에 취소한 월입니다. 정말로
-              챕터를 생성하시겠습니까?
+              {translate("chapterNew.finalConfirm.description")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="text-sm text-muted-foreground">
-            <p>⚠️ 기존 챕터가 있는 경우 삭제되고 새로운 챕터가 생성됩니다.</p>
+            <p>{translate("chapterNew.finalConfirm.warning")}</p>
           </div>
 
           <DialogFooter>
@@ -1147,7 +1203,7 @@ function NewChapterPageContent() {
               variant="outline"
               onClick={() => setShowFinalConfirmDialog(false)}
             >
-              취소
+              {translate("chapterNew.finalConfirm.cancel")}
             </Button>
             <Button
               variant="destructive"
@@ -1157,7 +1213,7 @@ function NewChapterPageContent() {
                 createChapter(formData);
               }}
             >
-              확인, 챕터 생성
+              {translate("chapterNew.finalConfirm.confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -90,7 +90,7 @@ export default function ArchiveDetailPage({
 
         <Alert>
           <AlertDescription>
-            회고를 불러오는 중 오류가 발생했습니다. 다시 시도해주세요.
+            {translate("para.archives.detail.error.loadError")}
           </AlertDescription>
         </Alert>
       </div>
@@ -112,7 +112,9 @@ export default function ArchiveDetailPage({
         </div>
 
         <Alert>
-          <AlertDescription>해당 회고를 찾을 수 없습니다.</AlertDescription>
+          <AlertDescription>
+            {translate("para.archives.detail.error.notFound")}
+          </AlertDescription>
         </Alert>
       </div>
     );
@@ -189,16 +191,16 @@ export default function ArchiveDetailPage({
               <div>
                 <h3 className="font-medium mb-1">
                   {retrospective.chapterId
-                    ? translate("paraArchiveDetail.relatedItem.chapter")
-                    : translate("paraArchiveDetail.relatedItem.project")}
+                    ? translate("para.paraArchiveDetail.relatedItem.chapter")
+                    : translate("para.paraArchiveDetail.relatedItem.project")}
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   {retrospective.chapterId
                     ? translate(
-                        "paraArchiveDetail.relatedItem.chapterDescription"
+                        "para.paraArchiveDetail.relatedItem.chapterDescription"
                       )
                     : translate(
-                        "paraArchiveDetail.relatedItem.projectDescription"
+                        "para.paraArchiveDetail.relatedItem.projectDescription"
                       )}
                 </p>
               </div>
@@ -211,8 +213,12 @@ export default function ArchiveDetailPage({
                   }
                 >
                   {retrospective.chapterId
-                    ? translate("paraArchiveDetail.relatedItem.viewChapter")
-                    : translate("paraArchiveDetail.relatedItem.viewProject")}
+                    ? translate(
+                        "para.paraArchiveDetail.relatedItem.viewChapter"
+                      )
+                    : translate(
+                        "para.paraArchiveDetail.relatedItem.viewProject"
+                      )}
                 </Link>
               </Button>
             </div>
@@ -223,10 +229,10 @@ export default function ArchiveDetailPage({
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="official">
-              {translate("paraArchiveDetail.tabs.retrospective")}
+              {translate("para.paraArchiveDetail.tabs.retrospective")}
             </TabsTrigger>
             <TabsTrigger value="freeform">
-              {translate("paraArchiveDetail.tabs.note")}
+              {translate("para.paraArchiveDetail.tabs.note")}
             </TabsTrigger>
           </TabsList>
 
@@ -236,7 +242,9 @@ export default function ArchiveDetailPage({
               <Card>
                 <div className="p-4">
                   <h3 className="font-medium mb-2">
-                    {translate("paraArchiveDetail.retrospective.bestMoment")}
+                    {translate(
+                      "para.paraArchiveDetail.retrospective.bestMoment"
+                    )}
                   </h3>
                   <p className="text-sm text-muted-foreground">
                     {retrospective.bestMoment}
@@ -250,7 +258,7 @@ export default function ArchiveDetailPage({
                 <div className="p-4">
                   <h3 className="font-medium mb-2">
                     {translate(
-                      "paraArchiveDetail.retrospective.routineAdherence"
+                      "para.paraArchiveDetail.retrospective.routineAdherence"
                     )}
                   </h3>
                   <p className="text-sm text-muted-foreground">
@@ -263,7 +271,11 @@ export default function ArchiveDetailPage({
             {retrospective.unexpectedObstacles && (
               <Card>
                 <div className="p-4">
-                  <h3 className="font-medium mb-2">예상치 못한 장애물</h3>
+                  <h3 className="font-medium mb-2">
+                    {translate(
+                      "para.paraArchiveDetail.retrospective.unexpectedObstacles"
+                    )}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
                     {retrospective.unexpectedObstacles}
                   </p>
@@ -274,7 +286,11 @@ export default function ArchiveDetailPage({
             {retrospective.nextChapterApplication && (
               <Card>
                 <div className="p-4">
-                  <h3 className="font-medium mb-2">다음 챕터 적용 방안</h3>
+                  <h3 className="font-medium mb-2">
+                    {translate(
+                      "para.paraArchiveDetail.retrospective.nextChapterApplication"
+                    )}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
                     {retrospective.nextChapterApplication}
                   </p>
@@ -355,7 +371,7 @@ export default function ArchiveDetailPage({
               <Card>
                 <div className="p-4">
                   <h3 className="font-medium mb-2">
-                    {translate("paraArchiveDetail.retrospective.note")}
+                    {translate("para.paraArchiveDetail.retrospective.note")}
                   </h3>
                   <div className="whitespace-pre-wrap text-sm text-muted-foreground">
                     {chapter.note.content}
@@ -368,7 +384,7 @@ export default function ArchiveDetailPage({
             ) : (
               <div className="text-center py-8">
                 <p className="text-sm text-muted-foreground">
-                  {translate("paraArchiveDetail.notes.noContent")}
+                  {translate("para.paraArchiveDetail.notes.noContent")}
                 </p>
               </div>
             )}

@@ -44,6 +44,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // 로딩 스켈레톤 컴포넌트
 function AreaDetailSkeleton() {
@@ -80,6 +81,7 @@ export default function AreaDetailPage({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   // 연결된 데이터를 함께 삭제할지 사용자가 선택
   const [deleteWithItems, setDeleteWithItems] = useState(false);
+  const { translate } = useLanguage();
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -93,18 +95,18 @@ export default function AreaDetailPage({
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       queryClient.invalidateQueries({ queryKey: ["resources"] });
       toast({
-        title: "영역 삭제 완료",
+        title: translate("para.areas.detail.success.deleteComplete"),
         description: deleteWithItems
-          ? "영역과 연결된 모든 항목이 삭제되었습니다."
-          : "영역이 삭제되었습니다. 연결된 프로젝트와 자료는 유지됩니다.",
+          ? translate("para.areas.detail.success.deleteWithItems")
+          : translate("para.areas.detail.success.deleteWithoutItems"),
       });
       router.push("/para?tab=areas");
     },
     onError: (error: Error) => {
       console.error("영역 삭제 실패:", error);
       toast({
-        title: "삭제 실패",
-        description: "영역 삭제에 실패했습니다.",
+        title: translate("para.areas.detail.error.deleteFailed"),
+        description: translate("para.areas.detail.error.deleteError"),
         variant: "destructive",
       });
     },
@@ -163,7 +165,7 @@ export default function AreaDetailPage({
 
         <Alert>
           <AlertDescription>
-            영역을 불러오는 중 오류가 발생했습니다. 다시 시도해주세요.
+            {translate("para.areas.detail.error.loadError")}
           </AlertDescription>
         </Alert>
       </div>
@@ -185,7 +187,9 @@ export default function AreaDetailPage({
         </div>
 
         <Alert>
-          <AlertDescription>해당 영역을 찾을 수 없습니다.</AlertDescription>
+          <AlertDescription>
+            {translate("para.areas.detail.error.notFound")}
+          </AlertDescription>
         </Alert>
       </div>
     );
@@ -283,7 +287,7 @@ export default function AreaDetailPage({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Folder className="h-4 w-4" />
-              연결된 프로젝트
+              {translate("para.areas.detail.connectedProjects")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -302,15 +306,21 @@ export default function AreaDetailPage({
                           const status = getProjectStatus(project);
                           switch (status) {
                             case "scheduled":
-                              return "예정";
+                              return translate("para.projects.status.planned");
                             case "in_progress":
-                              return "진행 중";
+                              return translate(
+                                "para.projects.status.inProgress"
+                              );
                             case "completed":
-                              return "완료됨";
+                              return translate(
+                                "para.projects.status.completed"
+                              );
                             case "overdue":
-                              return "기한 지남";
+                              return translate("para.projects.status.overdue");
                             default:
-                              return "진행 중";
+                              return translate(
+                                "para.projects.status.inProgress"
+                              );
                           }
                         })()}
                       </Badge>
@@ -320,7 +330,7 @@ export default function AreaDetailPage({
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                연결된 프로젝트가 없습니다.
+                {translate("para.areas.detail.noConnectedProjects")}
               </p>
             )}
           </CardContent>
@@ -331,7 +341,7 @@ export default function AreaDetailPage({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BookOpen className="h-4 w-4" />
-              연결된 자료
+              {translate("para.areas.detail.connectedResources")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -357,7 +367,7 @@ export default function AreaDetailPage({
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                연결된 자료가 없습니다.
+                {translate("para.areas.detail.noConnectedResources")}
               </p>
             )}
           </CardContent>
@@ -367,16 +377,16 @@ export default function AreaDetailPage({
         <ConfirmDialog
           open={showDeleteDialog}
           onOpenChange={setShowDeleteDialog}
-          title="영역 삭제"
-          description="이 영역을 삭제하시겠습니까?"
+          title={translate("para.areas.detail.delete.title")}
+          description={translate("para.areas.detail.delete.description")}
           type="delete"
           showCheckbox={true}
-          checkboxLabel="연결된 프로젝트와 자료도 함께 삭제"
+          checkboxLabel={translate("para.areas.detail.delete.withItems")}
           checkboxChecked={deleteWithItems}
           onCheckboxChange={setDeleteWithItems}
           warningMessage={
             deleteWithItems
-              ? "연결된 모든 프로젝트와 자료가 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
+              ? translate("para.areas.detail.delete.warning")
               : undefined
           }
           onConfirm={() => {

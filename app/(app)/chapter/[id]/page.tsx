@@ -11,7 +11,7 @@ import {
   AlertCircle,
   Bookmark,
   Edit,
-  Gift,
+  Award,
   Trash2,
   FileText,
   PenTool,
@@ -673,7 +673,7 @@ export function ChapterDetailPage({
       <Card className="mb-6 p-4">
         <h2 className="mb-2 text-xl font-bold">{chapter.title}</h2>
         <div className="mb-4 flex items-center gap-2 text-sm">
-          <Gift className="h-4 w-4 text-purple-500" />
+          <Award className="h-4 w-4 text-purple-500" />
           <span>
             {translate("chapterDetail.reward")}:{" "}
             {chapter.reward || translate("chapterDetail.noReward")}
@@ -771,7 +771,7 @@ export function ChapterDetailPage({
               } else {
                 return (
                   <span className="text-xs text-muted-foreground">
-                    중점 영역이 설정되지 않았습니다.
+                    {translate("chapterDetail.noFocusAreas")}
                   </span>
                 );
               }
@@ -780,10 +780,12 @@ export function ChapterDetailPage({
         </div>
       </Card>
 
-      {/* 2. 📂 연결된 프로젝트들 */}
+      {/* 2. 📂 Connected Projects */}
       <section className="mb-6">
         <div className="mb-4">
-          <h3 className="font-medium">연결된 프로젝트 ({projects.length}/5)</h3>
+          <h3 className="font-medium">
+            {translate("chapterDetail.connectedProjects")} ({projects.length})
+          </h3>
         </div>
 
         {projectsLoading ? (
@@ -799,13 +801,15 @@ export function ChapterDetailPage({
         ) : projects.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center">
             <p className="text-muted-foreground mb-2">
-              이 챕터에 연결된 프로젝트가 없어요
+              {translate("chapterDetail.noConnectedProjects")}
             </p>
             <p className="text-xs text-muted-foreground">
-              연결된 프로젝트가 없으면 달성률을 측정할 수 없어요
+              {translate(
+                "chapterDetail.noProjectsForCompletionRateDescription"
+              )}
             </p>
             <p className="text-xs text-muted-foreground mt-2">
-              프로젝트를 연결하려면 상단의 "챕터 수정" 버튼을 사용하세요
+              {translate("chapterDetail.connectProjectsHint")}
             </p>
           </div>
         ) : (

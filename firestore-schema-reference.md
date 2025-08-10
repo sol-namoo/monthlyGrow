@@ -116,8 +116,8 @@ interface Project {
   category?: "repetitive" | "task_based"; // 프로젝트 유형
   areaId?: string; // 소속 영역 ID
   area?: string; // 영역 이름 (denormalized - DB에 저장되지 않고 쿼리 시 함께 제공)
-  target: number; // 목표 개수 (반복형: 목표 횟수, 작업형: 목표 작업 수)
-  completedTasks: number; // 실제 완료된 태스크 수
+  target: number; // 전체 목표 개수 (반복형: 목표 횟수, 작업형: 목표 작업 수)
+  completedTasks: number; // 전체 실제 완료된 태스크 수
   startDate: Date; // 시작일
   endDate: Date; // 마감일
   createdAt: Date; // 생성일시
@@ -145,8 +145,6 @@ interface Project {
 // - overdue: endDate < now && completionRate < 100%
 ```
 
-````
-
 **서브컬렉션:**
 
 - `tasks`: 프로젝트의 세부 작업들 (projects/{projectId}/tasks/{taskId})
@@ -164,6 +162,13 @@ interface Project {
 각 챕터는 사용자가 한 달 동안 집중할 프로젝트들과 목표를 묶은 단위입니다.
 
 ```typescript
+// 챕터별 프로젝트 목표치 인터페이스
+interface ConnectedProjectGoal {
+  projectId: string; // 프로젝트 ID
+  chapterTargetCount: number; // 이번 루프에서 목표로 하는 태스크 수
+  chapterDoneCount: number; // 이번 루프에서 실제 완료한 태스크 수
+}
+
 interface Chapter {
   id: string;
   userId: string;
@@ -171,10 +176,10 @@ interface Chapter {
   startDate: Date; // 시작일 (보통 월초)
   endDate: Date; // 종료일 (보통 월말)
   focusAreas: string[]; // 중점 영역 ID 배열
-  projectIds: string[]; // 연결된 프로젝트 ID 배열
   reward?: string; // 목표 달성 시 보상
-  doneCount: number; // 실제 완료된 횟수
-  targetCount: number; // 목표 횟수
+  doneCount: number; // 전체 완료 수 (legacy - 하위 호환성)
+  targetCount: number; // 전체 목표 수 (legacy - 하위 호환성)
+  connectedProjects: ConnectedProjectGoal[]; // 챕터별 프로젝트 목표치
   createdAt: Date;
   updatedAt: Date;
   retrospective?: Retrospective; // 챕터 회고 (완료 후)
@@ -183,13 +188,18 @@ interface Chapter {
   // 로컬 계산 필드 (DB에 저장되지 않음)
   status?: "planned" | "in_progress" | "ended"; // startDate와 endDate를 기반으로 클라이언트에서 계산
 }
-````
+```
 
 **상태 계산 로직:**
 
 - `planned`: 현재 날짜 < 시작일
 - `in_progress`: 시작일 ≤ 현재 날짜 ≤ 종료일
 - `ended`: 현재 날짜 > 종료일
+
+**챕터별 목표치 계산:**
+
+- 챕터 달성률 = Σ(chapterDoneCount) / Σ(chapterTargetCount)
+- 프로젝트별 챕터 진행률 = chapterDoneCount / chapterTargetCount
 
 ---
 
@@ -334,7 +344,8 @@ interface Snapshot {
 ### 5. Chapter → Projects (1:N)
 
 - 챕터 하나가 여러 프로젝트를 가질 수 있음
-- Chapter의 `projectIds[]`로 연결
+- Chapter의 `connectedProjects[]`로 연결
+- 각 프로젝트마다 챕터별 목표치와 진행률 관리
 - Project에서 Chapter 정보가 필요한 경우 쿼리 시 조인
 
 ### 6. Chapter → Retrospective (1:1)
@@ -375,8 +386,14 @@ interface Snapshot {
 ### 4. 배열 제약
 
 - `focusAreas`: 최대 4개 (권장 2개)
-- `projectIds`: 최대 5개 (권장 2-3개)
+- `connectedProjects`: 최대 5개 (권장 2-3개)
 - `connectedChapters`: 제한 없음
+
+### 5. 챕터별 목표치 제약
+
+- `chapterTargetCount`: 0 이상의 정수
+- `chapterDoneCount`: 0 이상의 정수, chapterTargetCount 이하
+- `connectedProjects`: 중복된 projectId 불허용
 
 ---
 
@@ -427,4 +444,59 @@ match /chapters/{chapterId} {
 ### 2. 인덱싱 전략
 
 - **사용자별 조회**: `userId` 단일 인덱스
-- **상태별 조회**: `
+- **상태별 조회**: `userId` + `status` 복합 인덱스
+- **날짜별 조회**: `userId` + `createdAt` 복합 인덱스
+
+### 3. 챕터별 목표치 관리
+
+- **챕터 생성/수정**: `connectedProjects[*].chapterTargetCount` 입력/갱신
+- **태스크 완료**: 해당 프로젝트가 활성 챕터와 연결된 경우 `chapterDoneCount` 업데이트
+- **조회**: 챕터별 진행률 = `chapterDoneCount / chapterTargetCount`
+
+---
+
+## 🔄 데이터 마이그레이션
+
+### 기존 데이터 호환성
+
+- 기존 Chapter의 `doneCount`, `targetCount` 필드는 legacy로 유지
+- 새로운 `connectedProjects` 배열이 우선적으로 사용됨
+- 마이그레이션 시 기존 데이터를 `connectedProjects`로 변환하는 로직 필요
+
+### 마이그레이션 규칙
+
+1. **챕터 생성 시**: `connectedProjects` 배열 초기화
+2. **프로젝트 연결 시**: `ConnectedProjectGoal` 객체 생성
+3. **태스크 완료 시**: 프로젝트 전체 진행률과 챕터별 진행률 동시 업데이트
+4. **챕터 완료 시**: 스냅샷에 챕터별 목표치 정보 포함
+
+---
+
+## 📝 쓰기 규칙
+
+### 생성/수정
+
+- 챕터 생성/편집 시 `connectedProjects[*].chapterTargetCount`를 입력/갱신
+- 동일 트랜잭션/배치로 각 프로젝트의 `connectedChapters`에 표시용 메타를 동기화
+
+### 태스크 완료 이벤트
+
+- 해당 태스크의 `projectId`가 활성 사이클의 `connectedProjects`에 있으면 그 항목의 `chapterDoneCount++`
+- 프로젝트의 전체 진행률 갱신은 기존 로직대로
+
+### 삭제/해제
+
+- 챕터에서 프로젝트 연결 해제 ⇒ `connectedProjects`에서 제거
+- Project의 `connectedChapters`에서도 해당 챕터 메타 제거
+
+### 조회 패턴
+
+- 루프 상세: `connectedProjects`만으로 이번 달 달성률 계산/표시
+- 프로젝트 상세: "이번 달 진행"은 활성 루프를 찾아 `connectedProjects`에서 매칭해 읽어옴
+- 히스토리: 과거 루프의 `connectedProjects`를 그대로 읽으면 그 달 목표/실적 복원 가능
+
+### 인덱스 & 무결성
+
+- 인덱스: `chapters(userId, startDate)`, `projects(userId, createdAt)` 등 기본 + 필요 복합
+- 무결성: "목표 수치는 챕터만 편집"을 UI/서버 규칙으로 고정
+- 동기화는 배치/트랜잭션으로 (챕터와 프로젝트 메타 동시 업데이트 시)

@@ -17,8 +17,9 @@ import {
   Calendar,
   Clock,
   Award,
-  Target,
+  BookOpen,
   Plus,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -89,6 +90,11 @@ export default function HomePage() {
       addedMidway: translate("home.addedMidway"),
       showMore: translate("home.showMore"),
       showMoreSuffix: translate("home.showMoreSuffix"),
+
+      // AI 계획 생성
+      aiPlanGenerator: translate("home.aiPlanGenerator"),
+      aiPlanGeneratorDescription: translate("home.aiPlanGeneratorDescription"),
+      generateWithAI: translate("home.generateWithAI"),
 
       // 대시보드
       yearlyStats: translate("home.yearlyStats"),
@@ -227,7 +233,7 @@ export default function HomePage() {
     : "";
 
   const total = currentChapterProjects.reduce(
-    (sum, project) => sum + project.target,
+    (sum, project) => sum + (project.targetCount || project.completedTasks),
     0
   );
   const actualDoneCount = currentChapterProjects.reduce(
@@ -395,6 +401,15 @@ export default function HomePage() {
               <h2 className="text-xl font-bold">
                 {texts.currentChapterProjects}
               </h2>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => router.push("/ai-plan-generator")}
+                className="text-purple-600 border-purple-200 hover:bg-purple-50"
+              >
+                <Sparkles className="h-4 w-4 mr-1" />
+                {texts.generateWithAI}
+              </Button>
             </div>
 
             <div className="space-y-3">
@@ -405,12 +420,25 @@ export default function HomePage() {
                   <p className="text-sm text-muted-foreground mb-3">
                     {texts.noProjectsDescription}
                   </p>
-                  <Link href="/para/projects/new">
-                    <Button size="sm">
-                      <Plus className="h-4 w-4 mr-1" />
-                      {texts.addProject}
+                  <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                    <Link href="/para/projects/new">
+                      <Button size="sm" variant="outline">
+                        <Plus className="h-4 w-4 mr-1" />
+                        {texts.addProject}
+                      </Button>
+                    </Link>
+                    <Button
+                      size="sm"
+                      onClick={() => router.push("/ai-plan-generator")}
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+                    >
+                      <Sparkles className="h-4 w-4 mr-1" />
+                      {texts.generateWithAI}
                     </Button>
-                  </Link>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {texts.aiPlanGeneratorDescription}
+                  </p>
                 </Card>
               ) : (
                 <>
@@ -419,7 +447,7 @@ export default function HomePage() {
                       key={project.id}
                       title={project.title}
                       progress={project.completedTasks}
-                      total={project.target}
+                      total={project.targetCount || project.completedTasks}
                     >
                       <div className="mt-2 flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
@@ -502,7 +530,7 @@ export default function HomePage() {
                   </span>
                 </div>
               }
-              icon={<Target className="h-4 w-4 text-muted-foreground" />}
+              icon={<BookOpen className="h-4 w-4 text-muted-foreground" />}
             />
           </div>
 
@@ -511,7 +539,7 @@ export default function HomePage() {
               title={texts.completedChapters}
               value={yearlyStats?.completedChapters || 0}
               description={texts.completedChaptersDescription}
-              icon={<Target className="h-4 w-4 text-muted-foreground" />}
+              icon={<BookOpen className="h-4 w-4 text-muted-foreground" />}
             />
             <StatsCard
               title={texts.totalRewards}

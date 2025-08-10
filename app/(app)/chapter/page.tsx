@@ -9,13 +9,13 @@ import {
   Bookmark,
   Clock,
   CalendarDays,
-  Target,
+  BookOpen,
   AlertCircle,
   Calendar,
   Zap,
-  Gift,
+  Award,
   Edit,
-  Sparkles,
+  BookOpen as BookOpenIcon,
   Plus,
   Archive,
 } from "lucide-react";
@@ -364,7 +364,7 @@ function ChapterPageContent() {
                   </div>
 
                   <div className="mb-4 flex items-center gap-2 text-sm">
-                    <Gift className="h-4 w-4 text-purple-500" />
+                    <Award className="h-4 w-4 text-purple-500" />
                     <span>
                       {translate("chapter.currentChapter.reward")}:{" "}
                       {currentChapter.reward}
@@ -450,7 +450,7 @@ function ChapterPageContent() {
               <Card className="border-2 border-dashed border-primary/30 p-8 text-center">
                 <div className="mb-4 flex justify-center">
                   <div className="rounded-full bg-primary/10 p-4">
-                    <Target className="h-8 w-8 text-primary" />
+                    <BookOpen className="h-8 w-8 text-primary" />
                   </div>
                 </div>
                 <h3 className="mb-2 text-lg font-bold">
@@ -509,7 +509,7 @@ function ChapterPageContent() {
                       </div>
 
                       <div className="mb-4 flex items-center gap-2 text-sm">
-                        <Gift className="h-4 w-4 text-purple-500 dark:text-purple-400" />
+                        <Award className="h-4 w-4 text-purple-500 dark:text-purple-400" />
                         <span>
                           {translate("chapter.futureChapters.reward")}:{" "}
                           {chapter.reward}
@@ -567,7 +567,7 @@ function ChapterPageContent() {
             <Card className="border-2 border-dashed border-primary/30 p-8 text-center">
               <div className="mb-4 flex justify-center">
                 <div className="rounded-full bg-primary/10 p-4">
-                  <Sparkles className="h-8 w-8 text-primary" />
+                  <BookOpenIcon className="h-8 w-8 text-primary" />
                 </div>
               </div>
               <h3 className="mb-2 text-lg font-bold">

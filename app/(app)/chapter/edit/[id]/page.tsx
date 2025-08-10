@@ -38,12 +38,14 @@ import {
   fetchChapterById,
   fetchAllAreasByUserId,
   updateChapter,
+  updateProject,
   fetchProjectsByChapterId,
   fetchAllProjectsByUserId,
   fetchUnconnectedProjects,
 } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { RecommendationBadge } from "@/components/ui/recommendation-badge";
+import { ProjectSelectionSheet } from "@/components/ui/project-selection-sheet";
 import {
   Compass,
   Heart,
@@ -117,13 +119,22 @@ export default function EditChapterPage({
       if (!user?.uid || !chapterId) return null;
 
       // 병렬로 필요한 데이터만 가져오기
-      const [chapter, areas, connectedProjects, unconnectedProjects] =
+      const [chapter, areas, connectedProjects, allProjects] =
         await Promise.all([
           fetchChapterById(chapterId),
           fetchAllAreasByUserId(user.uid),
           fetchProjectsByChapterId(chapterId, user.uid),
-          fetchUnconnectedProjects(user.uid, chapterId),
+          fetchAllProjectsByUserId(user.uid),
         ]);
+
+      // 연결되지 않은 프로젝트 계산
+      const unconnectedProjects = allProjects.filter((project) => {
+        const connectedChapters = project.connectedChapters || [];
+        return (
+          !connectedChapters.includes(chapterId) &&
+          project.chapterId !== chapterId
+        );
+      });
 
       return {
         chapter,
@@ -142,6 +153,7 @@ export default function EditChapterPage({
   const areas = editChapterData?.areas || [];
   const connectedProjects = editChapterData?.connectedProjects || [];
   const unconnectedProjects = editChapterData?.unconnectedProjects || [];
+  const allProjects = connectedProjects.concat(unconnectedProjects);
   const projectsLoading = isLoading;
 
   // 수정 가능한 필드 상태
@@ -272,6 +284,7 @@ export default function EditChapterPage({
 
   // 프로젝트 추가 모달 열기
   const handleOpenAddProjectModal = () => {
+    // 현재 연결된 프로젝트들을 선택된 상태로 초기화
     setSelectedProjectIds(connectedProjects.map((p: any) => p.id));
     setSearchTerm("");
     setShowAddProjectModal(true);
@@ -303,7 +316,74 @@ export default function EditChapterPage({
       focusAreas: selectedAreaIds,
     };
 
+    // 프로젝트 연결 정보도 함께 저장
     updateChapterMutation.mutate(updatedData);
+
+    // 선택된 프로젝트들의 연결 상태 업데이트
+    if (selectedProjectIds.length > 0) {
+      // 기존에 연결된 프로젝트들 중에서 선택되지 않은 것들은 연결 해제
+      const projectsToDisconnect = connectedProjects
+        .filter((project) => !selectedProjectIds.includes(project.id))
+        .map((project) => project.id);
+
+      // 새로 선택된 프로젝트들은 연결
+      const projectsToConnect = selectedProjectIds.filter(
+        (projectId) => !connectedProjects.some((p) => p.id === projectId)
+      );
+
+      // 배치 업데이트
+      const updatePromises: Promise<void>[] = [];
+
+      // 연결 해제할 프로젝트들
+      projectsToDisconnect.forEach((projectId) => {
+        // 현재 프로젝트의 connectedChapters에서 현재 챕터 ID만 제거
+        const project = connectedProjects.find((p) => p.id === projectId);
+        if (project) {
+          const updatedConnectedChapters = (
+            project.connectedChapters || []
+          ).filter((connectedChapterId) => connectedChapterId !== chapterId);
+
+          const updateData: any = {
+            connectedChapters: updatedConnectedChapters,
+          };
+
+          // chapterId가 있을 때만 추가
+          if (updatedConnectedChapters.length > 0) {
+            updateData.chapterId = updatedConnectedChapters[0];
+          }
+
+          updatePromises.push(updateProject(projectId, updateData));
+        }
+      });
+
+      // 연결할 프로젝트들
+      projectsToConnect.forEach((projectId) => {
+        // 현재 프로젝트의 connectedChapters에 현재 챕터 ID 추가
+        const project = allProjects.find((p: any) => p.id === projectId);
+        if (project) {
+          const currentConnectedChapters = project.connectedChapters || [];
+          const updatedConnectedChapters = currentConnectedChapters.includes(
+            chapterId
+          )
+            ? currentConnectedChapters
+            : [...currentConnectedChapters, chapterId];
+
+          const updateData: any = {
+            connectedChapters: updatedConnectedChapters,
+            chapterId: chapterId,
+          };
+
+          updatePromises.push(updateProject(projectId, updateData));
+        }
+      });
+
+      // 모든 업데이트 실행
+      Promise.all(updatePromises).then(() => {
+        // 쿼리 무효화
+        queryClient.invalidateQueries({ queryKey: ["chapters"] });
+        queryClient.invalidateQueries({ queryKey: ["projects"] });
+      });
+    }
   };
 
   // 로딩 상태
@@ -472,21 +552,23 @@ export default function EditChapterPage({
             </div>
           </Card>
 
-          {/* 중점 Areas */}
+          {/* Focus Areas */}
           <Card className="p-6">
             <div className="mb-4">
-              <h2 className="text-lg font-semibold">중점 Areas (최대 4개)</h2>
+              <h2 className="text-lg font-semibold">
+                {translate("chapterNew.focusAreas.title")}
+              </h2>
             </div>
 
             <div className="mb-4 space-y-2">
               <RecommendationBadge
                 type="info"
-                message="권장: 2개 영역에 집중하면 챕터의 효과를 높일 수 있어요"
+                message={translate("chapterNew.focusAreas.recommendation")}
               />
               {selectedAreaIds.length > 2 && (
                 <RecommendationBadge
                   type="warning"
-                  message="많은 영역을 선택하면 집중도가 떨어질 수 있습니다"
+                  message={translate("chapterNew.focusAreas.warning")}
                 />
               )}
             </div>
@@ -554,7 +636,7 @@ export default function EditChapterPage({
                   } else {
                     return (
                       <span className="text-xs text-muted-foreground">
-                        중점 영역이 설정되지 않았습니다.
+                        {translate("chapterDetail.noFocusAreas")}
                       </span>
                     );
                   }
@@ -563,13 +645,14 @@ export default function EditChapterPage({
             )}
           </Card>
 
-          {/* 프로젝트 연결 */}
+          {/* Project Connection */}
           <Card className="p-6">
             <div className="mb-4">
-              <h2 className="text-lg font-semibold mb-2">프로젝트 연결</h2>
+              <h2 className="text-lg font-semibold mb-2">
+                {translate("chapterNew.projects.title")}
+              </h2>
               <p className="text-sm text-muted-foreground mb-4">
-                이 챕터와 연결할 프로젝트를 선택하거나 새 프로젝트를
-                만들어보세요. 프로젝트는 나중에 추가할 수도 있습니다.
+                {translate("chapterNew.projects.description")}
               </p>
             </div>
 
@@ -581,7 +664,7 @@ export default function EditChapterPage({
                   onClick={handleOpenAddProjectModal}
                   className="flex-1"
                 >
-                  기존 프로젝트 선택
+                  {translate("chapterNew.projects.selectExisting")}
                 </Button>
                 <Button
                   type="button"
@@ -589,7 +672,8 @@ export default function EditChapterPage({
                   onClick={() => setShowNewProjectDialog(true)}
                   className="flex-1"
                 >
-                  <Plus className="mr-2 h-4 w-4" />새 프로젝트 만들기
+                  <Plus className="mr-2 h-4 w-4" />
+                  {translate("chapterNew.projects.createNew")}
                 </Button>
               </div>
             </div>
@@ -598,9 +682,11 @@ export default function EditChapterPage({
             {selectedProjectIds.length > 0 && (
               <div className="space-y-3 mb-4 p-3 bg-muted/30 rounded-lg">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium">연결된 프로젝트</h3>
+                  <h3 className="text-sm font-medium">
+                    {translate("chapterNew.projects.connectedProjects")}
+                  </h3>
                   <Badge variant="secondary" className="text-xs">
-                    {selectedProjectIds.length}개
+                    {selectedProjectIds.length}
                   </Badge>
                 </div>
                 <div className="space-y-2">
@@ -697,7 +783,7 @@ export default function EditChapterPage({
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  아직 연결된 프로젝트가 없습니다
+                  {translate("chapterNew.projects.noConnectedProjects")}
                 </p>
               </div>
             )}
@@ -705,13 +791,13 @@ export default function EditChapterPage({
             <div className="mt-4 space-y-2">
               <RecommendationBadge
                 type="info"
-                message="권장: 2~3개 프로젝트에 집중하면 챕터의 효과를 높일 수 있어요"
+                message={translate("chapterNew.projects.recommendation")}
               />
 
               {selectedProjectIds.length > 3 && (
                 <RecommendationBadge
                   type="warning"
-                  message="많은 프로젝트를 선택하면 집중도가 떨어질 수 있습니다"
+                  message={translate("chapterNew.projects.warning")}
                 />
               )}
             </div>
@@ -724,165 +810,26 @@ export default function EditChapterPage({
             size="lg"
             disabled={updateChapterMutation.isPending}
           >
-            {updateChapterMutation.isPending ? "저장 중..." : "변경사항 저장"}
+            {updateChapterMutation.isPending
+              ? translate("chapterEdit.saving")
+              : translate("chapterEdit.save")}
           </Button>
         </form>
 
-        {/* 프로젝트 추가/제거 모달 */}
-        <Dialog
+        {/* 프로젝트 선택 바텀시트 */}
+        <ProjectSelectionSheet
           open={showAddProjectModal}
           onOpenChange={setShowAddProjectModal}
-        >
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>프로젝트 추가/제거</DialogTitle>
-              <DialogDescription>
-                이 챕터에 연결할 프로젝트를 선택하세요. 최대 5개까지 연결할 수
-                있습니다.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4">
-              {/* 검색 입력 */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="프로젝트 검색..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-
-              {/* 프로젝트 목록 */}
-              <div className="max-h-60 overflow-y-auto space-y-2">
-                {(() => {
-                  // 검색어로 필터링
-                  const filteredProjects = unconnectedProjects.filter(
-                    (project) =>
-                      project.title
-                        .toLowerCase()
-                        .includes(searchTerm.toLowerCase()) ||
-                      project.description
-                        ?.toLowerCase()
-                        .includes(searchTerm.toLowerCase())
-                  );
-
-                  if (filteredProjects.length === 0) {
-                    return (
-                      <div className="text-center py-8">
-                        <p className="text-muted-foreground">
-                          {searchTerm
-                            ? "검색 결과가 없습니다."
-                            : "생성된 프로젝트가 없습니다."}
-                        </p>
-                        {!searchTerm && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            asChild
-                            className="mt-2"
-                          >
-                            <Link href="/para/projects/new">
-                              <Plus className="mr-2 h-4 w-4" />새 프로젝트 생성
-                            </Link>
-                          </Button>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  return filteredProjects.map((project) => {
-                    const isSelected = selectedProjectIds.includes(project.id);
-                    const isConnected = connectedProjects.some(
-                      (p) => p.id === project.id
-                    );
-
-                    return (
-                      <div
-                        key={project.id}
-                        className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
-                          isSelected
-                            ? "bg-primary/10 border-primary"
-                            : "bg-background hover:bg-muted/50"
-                        }`}
-                        onClick={() => handleProjectToggle(project.id)}
-                      >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-medium">{project.title}</h4>
-                            {isConnected && (
-                              <Badge variant="outline" className="text-xs">
-                                연결됨
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
-                            {project.description || "설명 없음"}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Area:{" "}
-                            {(() => {
-                              // 프로젝트의 area ID를 사용해서 실제 area 이름 찾기
-                              if (project.areaId) {
-                                const area = areas.find(
-                                  (a) => a.id === project.areaId
-                                );
-                                return area ? area.name : "미분류";
-                              }
-                              return "미분류";
-                            })()}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                              isSelected
-                                ? "bg-primary border-primary"
-                                : "border-muted-foreground"
-                            }`}
-                          >
-                            {isSelected && (
-                              <div className="w-2 h-2 bg-primary-foreground rounded" />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
-
-              {/* 선택된 프로젝트 수 표시 */}
-              <div className="flex items-center justify-between text-sm">
-                <span>선택된 프로젝트: {selectedProjectIds.length}/5</span>
-                {selectedProjectIds.length > 5 && (
-                  <span className="text-red-500 text-xs">
-                    최대 5개까지만 선택할 수 있습니다
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowAddProjectModal(false)}
-              >
-                취소
-              </Button>
-              <Button
-                onClick={handleSaveProjectChanges}
-                disabled={
-                  selectedProjectIds.length > 5 ||
-                  updateChapterMutation.isPending
-                }
-              >
-                {updateChapterMutation.isPending ? "저장 중..." : "저장"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          selectedProjects={selectedProjectIds}
+          onProjectToggle={handleProjectToggle}
+          onConfirm={handleSaveProjectChanges}
+          maxProjects={5}
+          projects={[...connectedProjects, ...unconnectedProjects]}
+          areas={areas}
+          projectsLoading={isLoading}
+          areasLoading={isLoading}
+          currentChapterId={chapterId}
+        />
 
         {/* 새 프로젝트 만들기 안내 다이얼로그 */}
         <Dialog
@@ -891,9 +838,11 @@ export default function EditChapterPage({
         >
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>새 프로젝트 만들기</DialogTitle>
+              <DialogTitle>
+                {translate("chapterNew.projects.modal.title")}
+              </DialogTitle>
               <DialogDescription>
-                새 프로젝트를 만들어 챕터에 연결하시겠습니까?
+                {translate("chapterNew.projects.modal.description")}
               </DialogDescription>
             </DialogHeader>
 

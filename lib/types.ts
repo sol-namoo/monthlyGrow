@@ -24,6 +24,13 @@ export interface Resource {
   updatedAt: Date;
 }
 
+// 챕터별 프로젝트 목표치 인터페이스
+export interface ConnectedProjectGoal {
+  projectId: string;
+  chapterTargetCount: number; // 이번 루프에서 목표로 하는 태스크 수
+  chapterDoneCount: number; // 이번 루프에서 실제 완료한 태스크 수
+}
+
 export interface Project {
   id: string;
   userId: string;
@@ -32,8 +39,9 @@ export interface Project {
   category?: "repetitive" | "task_based"; // 프로젝트 유형
   areaId?: string;
   area?: string; // Area 이름 (denormalized - DB에 저장되지 않고 쿼리 시 함께 제공)
-  target: number; // 목표 개수 (반복형: 목표 횟수, 작업형: 목표 작업 수)
-  completedTasks: number; // 실제 완료된 태스크 수
+  target: string; // 목표 설명 (작업형: "완성된 이력서 1부", 반복형: "주요 개념 정리")
+  targetCount?: number; // 반복형일 때만 사용 (목표 개수)
+  completedTasks: number; // 전체 실제 완료된 태스크 수
   startDate: Date;
   endDate: Date;
   createdAt: Date;
@@ -78,8 +86,9 @@ export interface Chapter {
   reward?: string;
   createdAt: Date;
   updatedAt: Date;
-  doneCount: number;
-  targetCount: number;
+  doneCount: number; // 전체 완료 수 (legacy - 하위 호환성)
+  targetCount: number; // 전체 목표 수 (legacy - 하위 호환성)
+  connectedProjects?: ConnectedProjectGoal[]; // 챕터별 프로젝트 목표치
   retrospective?: Retrospective; // 챕터 회고
   note?: Note; // 챕터 노트 (선택)
 
@@ -179,6 +188,102 @@ export interface User {
   profile: UserProfile;
   settings: UserSettings;
   preferences: UserPreferences;
+}
+
+// AI 계획 생성 관련 타입들
+export interface PlanConstraints {
+  projectWeeks?: number; // 프로젝트 기간 (주) - 설정되지 않으면 maxProjectWeeks 사용
+  maxProjectWeeks?: number; // 프로젝트 최대 기간 (주) - 제약사항이 없을 때 사용
+  dailyTimeSlots?: {
+    minutesPerDay?: number; // 일일 가용 시간 (분) - 설정되지 않으면 maxMinutesPerDay 사용
+    maxMinutesPerDay?: number; // 일일 최대 가용 시간 (분) - 제약사항이 없을 때 사용
+    daysPerWeek?: number; // 주당 가능한 일수 - 설정되지 않으면 maxDaysPerWeek 사용
+    maxDaysPerWeek?: number; // 주당 최대 가능한 일수 - 제약사항이 없을 때 사용
+    preferredTimes?: string[]; // 선호 시간대
+  };
+  difficulty?: "beginner" | "intermediate" | "advanced"; // 현재 수준
+  focusIntensity?: "light" | "moderate" | "intensive"; // 진행 강도
+  budget?: {
+    min: number;
+    max: number;
+    currency: "KRW" | "USD";
+  };
+  existingSkills?: string[]; // 기존 보유 스킬/경험
+  preferredActivityStyle?: "visual" | "auditory" | "kinesthetic" | "reading"; // 활동 스타일
+}
+
+export interface GeneratedPlan {
+  areas: Array<{
+    name: string;
+    description: string;
+    icon: string;
+    color: string;
+    existingId?: string; // 기존 Areas와 매칭된 경우 ID
+  }>;
+  projects: Array<{
+    title: string;
+    description: string;
+    category: "repetitive" | "task_based";
+    areaName: string;
+    target: string; // 목표 설명 (작업형: "완성된 이력서 1부", 반복형: "주요 개념 정리")
+    targetCount?: number; // 반복형일 때만 사용 (목표 개수)
+    durationWeeks: number;
+    estimatedDailyTime: number; // 분 단위
+    difficulty: string;
+    tasks: Array<{
+      title: string;
+      description: string;
+      duration: number;
+      requirements: string[];
+      resources: string[];
+      estimatedTime: number; // 분 단위
+      prerequisites?: string[];
+    }>;
+    milestones: Array<{
+      week: number;
+      description: string;
+      successMetric: string;
+    }>;
+    resources: Array<{
+      type: "book" | "website" | "app" | "tool" | "course";
+      name: string;
+      description: string;
+      url?: string;
+      cost?: number;
+      priority: "essential" | "recommended" | "optional";
+    }>;
+  }>;
+  timeline: {
+    totalWeeks: number;
+    weeklySchedule: Array<{
+      week: number;
+      focus: string;
+      dailyTasks: string[];
+      timeAllocation: Record<string, number>; // 프로젝트별 시간 배분
+    }>;
+  };
+  successMetrics: Array<{
+    metric: string;
+    measurementMethod: string;
+    targetValue: string;
+    checkpoints: number[]; // 주차별 체크포인트
+  }>;
+}
+
+// Firebase Functions 응답 타입 정의
+export interface GeneratePlanResponse {
+  success: boolean;
+  plan?: GeneratedPlan;
+  error?: string;
+  originalResponse?: string;
+  existingAreas?: number; // 기존 Areas 재사용 개수
+}
+
+// AI 계획 생성 요청 타입
+export interface GeneratePlanRequest {
+  userInput: string;
+  constraints?: PlanConstraints;
+  existingAreas?: Area[];
 }
 
 // Archive는 Chapter나 Project의 완료된 상태를 나타내는 뷰

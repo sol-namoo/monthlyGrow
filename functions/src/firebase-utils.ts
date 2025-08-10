@@ -1,14 +1,28 @@
 // Cloud Functions용 Firebase 유틸리티 함수들
 // functions/src/firebase-utils.ts
 
+import { initializeApp, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+
+// Firebase Admin 초기화 (이미 초기화된 경우 스킵)
+if (getApps().length === 0) {
+  initializeApp();
+}
 
 const db = getFirestore();
 
 // 타입 정의
+interface ConnectedProjectGoal {
+  projectId: string;
+  chapterTargetCount: number; // 이번 루프에서 목표로 하는 태스크 수
+  chapterDoneCount: number; // 이번 루프에서 실제 완료한 태스크 수
+}
+
 interface Project {
   id: string;
   title: string;
+  target: number; // 전체 목표 개수
+  completedTasks: number; // 전체 실제 완료된 태스크 수
   connectedChapters?: any[];
   migrationStatus?: string;
   originalChapterId?: string;
@@ -20,7 +34,9 @@ interface Chapter {
   title: string;
   startDate: any;
   endDate: any;
-  projectIds?: string[];
+  connectedProjects?: ConnectedProjectGoal[]; // 챕터별 프로젝트 목표치
+  doneCount?: number; // 전체 완료 수 (legacy)
+  targetCount?: number; // 전체 목표 수 (legacy)
   [key: string]: any;
 }
 
@@ -193,12 +209,8 @@ export const connectPendingProjectsToNewChapter = async (
         updatedAt: new Date(),
       });
 
-      // 프로젝트를 새 챕터에 연결 (projectIds는 더 이상 사용하지 않음)
-      console.log(
-        `Connected pending project ${
-          (project as unknown as Project).title
-        } to new chapter ${newChapterId}`
-      );
+      // 프로젝트를 새 챕터에 연결 (connectedProjects 사용)
+      await addProjectToChapter(newChapterId, project.id);
 
       console.log(
         `Connected pending project ${
@@ -207,6 +219,171 @@ export const connectPendingProjectsToNewChapter = async (
       );
     } catch (error) {
       console.error(`Failed to connect project ${project.id}:`, error);
+    }
+  }
+};
+
+// 챕터에 프로젝트 추가 (새로운 구조)
+export const addProjectToChapter = async (
+  chapterId: string,
+  projectId: string,
+  targetCount?: number
+): Promise<void> => {
+  const chapterRef = db.collection("chapters").doc(chapterId);
+  const projectRef = db.collection("projects").doc(projectId);
+
+  // 트랜잭션으로 동시 업데이트
+  await db.runTransaction(async (transaction) => {
+    const chapterDoc = await transaction.get(chapterRef);
+    const projectDoc = await transaction.get(projectRef);
+
+    if (!chapterDoc.exists) {
+      throw new Error(`Chapter ${chapterId} not found`);
+    }
+    if (!projectDoc.exists) {
+      throw new Error(`Project ${projectId} not found`);
+    }
+
+    const chapterData = chapterDoc.data() as Chapter;
+    const projectData = projectDoc.data() as Project;
+
+    // 챕터의 connectedProjects 업데이트
+    const connectedProjects = chapterData.connectedProjects || [];
+    const existingProject = connectedProjects.find(
+      (goal) => goal.projectId === projectId
+    );
+
+    if (!existingProject) {
+      // 기본 목표치 계산 (프로젝트 전체 목표치를 챕터 기간에 비례하여 분배)
+      const defaultTarget =
+        targetCount ||
+        calculateDefaultChapterTarget(
+          projectData,
+          chapterData.startDate.toDate(),
+          chapterData.endDate.toDate()
+        );
+
+      const newGoal: ConnectedProjectGoal = {
+        projectId,
+        chapterTargetCount: defaultTarget,
+        chapterDoneCount: 0,
+      };
+
+      connectedProjects.push(newGoal);
+
+      transaction.update(chapterRef, {
+        connectedProjects,
+        updatedAt: new Date(),
+      });
+    }
+
+    // 프로젝트의 connectedChapters 업데이트
+    const connectedChapters = projectData.connectedChapters || [];
+    const isAlreadyConnected = connectedChapters.some((chapter: any) =>
+      typeof chapter === "string"
+        ? chapter === chapterId
+        : chapter.id === chapterId
+    );
+
+    if (!isAlreadyConnected) {
+      const updatedChapters = [...connectedChapters, { id: chapterId }];
+      transaction.update(projectRef, {
+        connectedChapters: updatedChapters,
+        updatedAt: new Date(),
+      });
+    }
+  });
+};
+
+// 챕터에서 프로젝트 제거
+export const removeProjectFromChapter = async (
+  chapterId: string,
+  projectId: string
+): Promise<void> => {
+  const chapterRef = db.collection("chapters").doc(chapterId);
+  const projectRef = db.collection("projects").doc(projectId);
+
+  // 트랜잭션으로 동시 업데이트
+  await db.runTransaction(async (transaction) => {
+    const chapterDoc = await transaction.get(chapterRef);
+    const projectDoc = await transaction.get(projectRef);
+
+    if (!chapterDoc.exists) {
+      throw new Error(`Chapter ${chapterId} not found`);
+    }
+    if (!projectDoc.exists) {
+      throw new Error(`Project ${projectId} not found`);
+    }
+
+    const chapterData = chapterDoc.data() as Chapter;
+    const projectData = projectDoc.data() as Project;
+
+    // 챕터의 connectedProjects에서 제거
+    const connectedProjects = chapterData.connectedProjects || [];
+    const updatedProjects = connectedProjects.filter(
+      (goal) => goal.projectId !== projectId
+    );
+
+    transaction.update(chapterRef, {
+      connectedProjects: updatedProjects,
+      updatedAt: new Date(),
+    });
+
+    // 프로젝트의 connectedChapters에서 제거
+    const connectedChapters = projectData.connectedChapters || [];
+    const updatedChapters = connectedChapters.filter((chapter: any) =>
+      typeof chapter === "string"
+        ? chapter !== chapterId
+        : chapter.id !== chapterId
+    );
+
+    transaction.update(projectRef, {
+      connectedChapters: updatedChapters,
+      updatedAt: new Date(),
+    });
+  });
+};
+
+// 태스크 완료 시 챕터별 진행률 업데이트
+export const updateChapterProgress = async (
+  userId: string,
+  projectId: string,
+  increment: number = 1
+): Promise<void> => {
+  // 활성 챕터 찾기
+  const activeChapters = await findActiveChaptersByUserId(userId);
+
+  for (const chapter of activeChapters) {
+    const chapterData = chapter as unknown as Chapter;
+    const connectedProjects = chapterData.connectedProjects || [];
+    const projectGoal = connectedProjects.find(
+      (goal) => goal.projectId === projectId
+    );
+
+    if (projectGoal) {
+      // 챕터별 진행률 업데이트
+      const updatedProjects = connectedProjects.map((goal) => {
+        if (goal.projectId === projectId) {
+          return {
+            ...goal,
+            chapterDoneCount: Math.min(
+              goal.chapterDoneCount + increment,
+              goal.chapterTargetCount
+            ),
+          };
+        }
+        return goal;
+      });
+
+      const chapterRef = db.collection("chapters").doc(chapter.id);
+      await chapterRef.update({
+        connectedProjects: updatedProjects,
+        updatedAt: new Date(),
+      });
+
+      console.log(
+        `Updated chapter progress for project ${projectId} in chapter ${chapter.id}`
+      );
     }
   }
 };
@@ -256,6 +433,30 @@ const fetchAllChaptersByUserId = async (userId: string) => {
   });
 };
 
+// 활성 챕터 찾기
+const findActiveChaptersByUserId = async (userId: string) => {
+  const chaptersQuery = db.collection("chapters").where("userId", "==", userId);
+  const querySnapshot = await chaptersQuery.get();
+
+  const allChapters = querySnapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      startDate: data.startDate?.toDate(),
+      endDate: data.endDate?.toDate(),
+      createdAt: data.createdAt.toDate(),
+      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+    };
+  });
+
+  // 현재 진행 중인 챕터만 필터링
+  return allChapters.filter((chapter) => {
+    const status = getChapterStatus(chapter);
+    return status === "in_progress";
+  });
+};
+
 // 프로젝트를 챕터 간 이동 (추가 방식)
 const moveProjectToChapter = async (
   projectId: string,
@@ -290,22 +491,42 @@ const moveProjectToChapter = async (
       updatedAt: new Date(),
     });
 
-    // 대상 챕터의 projectIds에 추가
-    const targetChapterRef = db.collection("chapters").doc(toChapterId);
-    const targetChapterDoc = await targetChapterRef.get();
-
-    if (targetChapterDoc.exists) {
-      const targetChapterData = targetChapterDoc.data();
-      const projectIds = targetChapterData?.projectIds || [];
-
-      if (!projectIds.includes(projectId)) {
-        await targetChapterRef.update({
-          projectIds: [...projectIds, projectId],
-          updatedAt: new Date(),
-        });
-      }
-    }
+    // 대상 챕터에 프로젝트 추가
+    await addProjectToChapter(toChapterId, projectId);
   }
+};
+
+// 챕터별 목표치의 기본값을 계산합니다.
+const calculateDefaultChapterTarget = (
+  project: Project,
+  chapterStartDate: Date,
+  chapterEndDate: Date
+): number => {
+  const projectStart = new Date(project.startDate);
+  const projectEnd = new Date(project.endDate);
+
+  // 프로젝트와 챕터의 겹치는 기간 계산
+  const overlapStart = new Date(
+    Math.max(projectStart.getTime(), chapterStartDate.getTime())
+  );
+  const overlapEnd = new Date(
+    Math.min(projectEnd.getTime(), chapterEndDate.getTime())
+  );
+
+  if (overlapEnd <= overlapStart) {
+    return 0; // 겹치는 기간이 없음
+  }
+
+  // 전체 프로젝트 기간
+  const totalProjectDays =
+    (projectEnd.getTime() - projectStart.getTime()) / (1000 * 60 * 60 * 24);
+  // 겹치는 기간
+  const overlapDays =
+    (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24);
+
+  // 비례하여 목표치 계산
+  const ratio = overlapDays / totalProjectDays;
+  return Math.round(project.target * ratio);
 };
 
 // 챕터 상태 확인
@@ -319,6 +540,6 @@ const getChapterStatus = (chapter: any): string => {
   } else if (now >= startDate && now <= endDate) {
     return "in_progress";
   } else {
-    return "completed";
+    return "ended";
   }
 };

@@ -105,8 +105,12 @@ export default function ChapterSummaryPage() {
           {projects && projects.length > 0 ? (
             projects.map((project, index) => {
               const projProgress =
-                project.target > 0
-                  ? Math.round((project.completedTasks / project.target) * 100)
+                (project.targetCount || project.completedTasks) > 0
+                  ? Math.round(
+                      (project.completedTasks /
+                        (project.targetCount || project.completedTasks)) *
+                        100
+                    )
                   : 0;
               return (
                 <Card key={project.id} className="p-4">
@@ -114,7 +118,8 @@ export default function ChapterSummaryPage() {
                   <div className="mb-1 flex justify-between text-sm">
                     <span>달성률: {projProgress}%</span>
                     <span>
-                      {project.completedTasks}/{project.target}
+                      {project.completedTasks}/
+                      {project.targetCount || project.completedTasks}
                     </span>
                   </div>
                   <div className="progress-bar">
