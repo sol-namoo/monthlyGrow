@@ -36,12 +36,14 @@ import { auth } from "@/lib/firebase";
 import { Chapter, Retrospective } from "@/lib/types";
 import {
   fetchAllChaptersByUserId,
-  fetchProjectsByChapterId,
-  getTaskCountsForMultipleProjects,
   fetchProjectCountsByChapterIds,
   fetchChaptersWithProjectCounts,
 } from "@/lib/firebase";
-import { formatDate, getChapterStatus } from "@/lib/utils";
+import {
+  formatDate,
+  getChapterStatus,
+  calculateChapterProgressInfo,
+} from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/hooks/useLanguage";
 
@@ -135,76 +137,6 @@ function ChapterPageContent() {
     }
   }, [user?.uid, chapters]);
 
-  // 각 챕터의 태스크 개수 데이터 가져오기 (현재 탭의 챕터만)
-  const { data: chapterTaskCounts = {}, isLoading: taskCountsLoading } =
-    useQuery({
-      queryKey: [
-        "chapterTaskCounts",
-        user?.uid,
-        currentTab,
-        chapters.length,
-        Object.keys(chapterProjectCounts).join(","),
-      ],
-      queryFn: async () => {
-        const taskCountsMap: {
-          [chapterId: string]: { totalTasks: number; completedTasks: number };
-        } = {};
-
-        // 현재 탭에 해당하는 챕터만 처리
-        let targetChapters: Chapter[] = [];
-
-        if (currentTab === "active") {
-          const currentChapter = chapters.find(
-            (chapter) => getChapterStatus(chapter) === "in_progress"
-          );
-          if (currentChapter) targetChapters = [currentChapter];
-        } else if (currentTab === "future") {
-          targetChapters = chapters.filter(
-            (chapter) => getChapterStatus(chapter) === "planned"
-          );
-        } else if (currentTab === "past") {
-          targetChapters = chapters.filter(
-            (chapter) => getChapterStatus(chapter) === "ended"
-          );
-        }
-
-        for (const chapter of targetChapters) {
-          const projectCount = chapterProjectCounts[chapter.id] || 0;
-
-          if (projectCount > 0) {
-            // 프로젝트가 있을 때만 상세 조회
-            const projects = await fetchProjectsByChapterId(
-              chapter.id,
-              user?.uid
-            );
-            if (projects.length > 0) {
-              const projectIds = projects.map((p) => p.id);
-              const taskCounts = await getTaskCountsForMultipleProjects(
-                projectIds
-              );
-              const totalTasks = Object.values(taskCounts).reduce(
-                (sum, counts) => sum + counts.totalTasks,
-                0
-              );
-              const completedTasks = Object.values(taskCounts).reduce(
-                (sum, counts) => sum + counts.completedTasks,
-                0
-              );
-              taskCountsMap[chapter.id] = { totalTasks, completedTasks };
-            } else {
-              taskCountsMap[chapter.id] = { totalTasks: 0, completedTasks: 0 };
-            }
-          } else {
-            taskCountsMap[chapter.id] = { totalTasks: 0, completedTasks: 0 };
-          }
-        }
-        return taskCountsMap;
-      },
-      enabled: !!user?.uid && chapters.length > 0 && !projectCountsLoading,
-      staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
-      refetchOnWindowFocus: true, // 윈도우 포커스 시 재페칭
-    });
-
   // 초기 로딩 상태 (사용자 인증, 챕터 목록 로딩)
   if (userLoading || chaptersLoading) {
     return (
@@ -244,20 +176,15 @@ function ChapterPageContent() {
 
   // 계산된 값들을 위한 헬퍼 함수들
   const getCompletionRate = (chapter: Chapter) => {
-    const taskCounts = chapterTaskCounts[chapter.id];
-    if (taskCounts && taskCounts.totalTasks > 0) {
-      return Math.round(
-        (taskCounts.completedTasks / taskCounts.totalTasks) * 100
-      );
-    }
-    return 0;
+    const progressInfo = calculateChapterProgressInfo(chapter);
+    return Math.round(progressInfo.progress * 100);
   };
 
   const getTaskCounts = (chapter: Chapter) => {
-    const taskCounts = chapterTaskCounts[chapter.id];
+    const progressInfo = calculateChapterProgressInfo(chapter);
     return {
-      completed: taskCounts?.completedTasks || 0,
-      total: taskCounts?.totalTasks || 0,
+      completed: progressInfo.doneCounts,
+      total: progressInfo.targetCounts,
     };
   };
 
@@ -378,14 +305,10 @@ function ChapterPageContent() {
                         {getCompletionRate(currentChapter)}%
                       </span>
                       <span>
-                        {taskCountsLoading ? (
-                          <Skeleton className="h-4 w-12" />
-                        ) : (
-                          (() => {
-                            const counts = getTaskCounts(currentChapter);
-                            return `${counts.completed}/${counts.total}`;
-                          })()
-                        )}
+                        {(() => {
+                          const counts = getTaskCounts(currentChapter);
+                          return `${counts.completed}/${counts.total}`;
+                        })()}
                       </span>
                     </div>
                     <div className="progress-bar">
@@ -632,14 +555,10 @@ function ChapterPageContent() {
                             {getCompletionRate(chapter)}%
                           </span>
                           <span>
-                            {taskCountsLoading ? (
-                              <Skeleton className="h-4 w-12" />
-                            ) : (
-                              (() => {
-                                const counts = getTaskCounts(chapter);
-                                return `${counts.completed}/${counts.total}`;
-                              })()
-                            )}
+                            {(() => {
+                              const counts = getTaskCounts(chapter);
+                              return `${counts.completed}/${counts.total}`;
+                            })()}
                           </span>
                         </div>
                         <div className="progress-bar">

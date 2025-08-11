@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -24,6 +25,7 @@ import {
   fetchChapterById,
   fetchUnconnectedProjects,
   updateProject,
+  updateChapter,
 } from "@/lib/firebase";
 import { getProjectStatus } from "@/lib/utils";
 import type { Chapter, Project } from "@/lib/types";
@@ -67,7 +69,8 @@ function AddExistingProjectPageContent() {
     onSuccess: () => {
       toast({
         title: "프로젝트 연결 완료",
-        description: "선택한 프로젝트가 챕터에 연결되었습니다.",
+        description:
+          "선택한 프로젝트가 챕터에 연결되었습니다. 챕터 수정 페이지에서 각 프로젝트의 목표를 설정할 수 있습니다.",
       });
       queryClient.invalidateQueries({ queryKey: ["chapter", chapterId] });
       queryClient.invalidateQueries({
@@ -100,7 +103,7 @@ function AddExistingProjectPageContent() {
       setSelectedProjects(selectedProjects.filter((id) => id !== projectId));
     } else {
       // 프로젝트 개수 제한 확인 (현재 챕터 프로젝트 + 선택된 프로젝트 <= 5)
-      const currentProjectCount = currentChapter.connectedChapters?.length || 0;
+      const currentProjectCount = currentChapter.connectedProjects?.length || 0;
       if (currentProjectCount + selectedProjects.length < 5) {
         setSelectedProjects([...selectedProjects, projectId]);
       }
@@ -108,7 +111,7 @@ function AddExistingProjectPageContent() {
   };
 
   // 프로젝트 추가 가능 여부 확인
-  const currentProjectCount = currentChapter.connectedChapters?.length || 0;
+  const currentProjectCount = currentChapter.connectedProjects?.length || 0;
   const canAddMoreProjects = currentProjectCount + selectedProjects.length < 5;
 
   // 프로젝트 추가 처리 함수

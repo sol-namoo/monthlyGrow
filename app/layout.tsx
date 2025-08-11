@@ -4,6 +4,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import QueryClientProvider from "@/components/QueryClientProvider";
 import { ThemeProvider } from "@/components/theme-provider";
+import { InitialTimeZoneDetector } from "@/components/InitialTimeZoneDetector";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -25,6 +26,7 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning>
       <body className={inter.className}>
+        <InitialTimeZoneDetector />
         <QueryClientProvider>
           <ThemeProvider
             attribute="class"

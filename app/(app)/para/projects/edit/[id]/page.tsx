@@ -18,6 +18,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -42,6 +43,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { getProjectStatus, formatDate, formatDateForInput } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
@@ -58,6 +60,7 @@ import {
   deleteTaskFromProject,
   addTaskToProject,
   updateTaskInProject,
+  updateChapter,
 } from "@/lib/firebase";
 import {
   CustomAlert,
@@ -65,6 +68,7 @@ import {
   AlertTitle,
 } from "@/components/ui/custom-alert";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { Alert } from "@/components/ui/alert";
 
 // 프로젝트 편집 폼 스키마 정의
 const editProjectFormSchema = z
@@ -77,7 +81,9 @@ const editProjectFormSchema = z
     areaId: z.string().optional(),
     startDate: z.string().min(1, "시작일을 입력해주세요"),
     endDate: z.string().min(1, "종료일을 입력해주세요"),
-    total: z.number().min(0, "목표를 입력해주세요"),
+    target: z.string().min(1, "목표 설명을 입력해주세요"),
+    targetCount: z.number().min(0, "목표 개수를 입력해주세요"),
+    total: z.number().min(0, "목표 개수를 입력해주세요"),
     tasks: z.array(
       z.object({
         id: z.any(), // 시스템에서 자동 생성하므로 검증 불필요
@@ -145,6 +151,7 @@ export default function EditProjectPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { translate } = useLanguage();
   const router = useRouter();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -160,6 +167,9 @@ export default function EditProjectPage({
   const [showChapterConnectionDialog, setShowChapterConnectionDialog] =
     useState(false);
   const [selectedChapterIds, setSelectedChapterIds] = useState<string[]>([]);
+  const [chapterTargetCounts, setChapterTargetCounts] = useState<
+    Record<string, number>
+  >({});
 
   // 카테고리 변경 다이얼로그 상태
   const [showCategoryChangeDialog, setShowCategoryChangeDialog] =
@@ -234,7 +244,8 @@ export default function EditProjectPage({
       areaId: "",
       startDate: "",
       endDate: "",
-      total: 1,
+      target: "",
+      targetCount: 1,
       tasks: [],
     },
   });
@@ -265,13 +276,65 @@ export default function EditProjectPage({
 
   const availableChaptersForConnection = getAvailableChaptersForConnection();
 
+  // 챕터별 기본 태스크 개수 계산 (프로젝트 기간과 챕터 기간을 고려)
+  const getDefaultTargetCount = (chapter: any) => {
+    const projectStartDate = new Date(form.watch("startDate"));
+    const projectEndDate = new Date(form.watch("endDate"));
+    const chapterStartDate = new Date(chapter.startDate);
+    const chapterEndDate = new Date(chapter.endDate);
+
+    // 프로젝트와 챕터의 겹치는 기간 계산
+    const overlapStart = new Date(
+      Math.max(projectStartDate.getTime(), chapterStartDate.getTime())
+    );
+    const overlapEnd = new Date(
+      Math.min(projectEndDate.getTime(), chapterEndDate.getTime())
+    );
+
+    if (overlapEnd <= overlapStart) return 1;
+
+    const overlapDays = Math.ceil(
+      (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    const totalProjectDays = Math.ceil(
+      (projectEndDate.getTime() - projectStartDate.getTime()) /
+        (1000 * 60 * 60 * 24)
+    );
+    const targetCount = form.watch("targetCount") || 1;
+
+    // 겹치는 기간 비율에 따라 태스크 개수 계산
+    return Math.max(
+      1,
+      Math.round((overlapDays / totalProjectDays) * targetCount)
+    );
+  };
+
+  // 챕터별 태스크 개수 업데이트 핸들러
+  const updateChapterTargetCount = (chapterId: string, count: number) => {
+    setChapterTargetCounts((prev) => ({
+      ...prev,
+      [chapterId]: Math.max(1, count), // 최소 1개
+    }));
+  };
+
   // 챕터 선택/해제 핸들러
   const toggleChapterSelection = (chapterId: string) => {
-    setSelectedChapterIds((prev) =>
-      prev.includes(chapterId)
+    setSelectedChapterIds((prev) => {
+      const newSelection = prev.includes(chapterId)
         ? prev.filter((id) => id !== chapterId)
-        : [...prev, chapterId]
-    );
+        : [...prev, chapterId];
+
+      // 챕터가 해제되면 해당 챕터의 태스크 개수도 제거
+      if (!newSelection.includes(chapterId)) {
+        setChapterTargetCounts((prev) => {
+          const newCounts = { ...prev };
+          delete newCounts[chapterId];
+          return newCounts;
+        });
+      }
+
+      return newSelection;
+    });
   };
 
   // 카테고리 변경 핸들러
@@ -293,23 +356,6 @@ export default function EditProjectPage({
       // 태스크가 없으면 바로 변경
       applyCategoryChange(newCategory);
     }
-  };
-
-  // 다이얼로그에서 확인 선택 (태스크 초기화)
-  const handleConfirmCategoryChange = () => {
-    if (pendingCategoryChange) {
-      form.setValue("category", pendingCategoryChange);
-
-      // 태스크 초기화
-      replace([]);
-
-      // 반복형으로 변경하는 경우 기본값 설정
-      if (pendingCategoryChange === "repetitive") {
-        form.setValue("total", 1);
-      }
-    }
-    setShowCategoryChangeDialog(false);
-    setPendingCategoryChange(null);
   };
 
   // 카테고리 변경 적용
@@ -352,18 +398,40 @@ export default function EditProjectPage({
         areaId: project.areaId || (areas.length > 0 ? areas[0].id : ""),
         startDate: formatDateForInput(project.startDate),
         endDate: formatDateForInput(project.endDate),
-        total: project.target, // project.total 대신 project.target 사용
+        target: project.target || "",
+        targetCount: project.targetCount || 1,
+        total: project.targetCount || 1,
         tasks: [], // 초기값 설정
       });
 
       // 현재 연결된 챕터들을 selectedChapterIds에 설정
       if (project.connectedChapters) {
-        setSelectedChapterIds(
-          project.connectedChapters.map((chapter) => chapter.id)
-        );
+        setSelectedChapterIds(project.connectedChapters);
+      }
+
+      // 기존 챕터별 태스크 개수 정보 로드
+      if (
+        project.connectedChapters &&
+        project.connectedChapters.length > 0 &&
+        allChapters.length > 0
+      ) {
+        const targetCounts: Record<string, number> = {};
+        project.connectedChapters.forEach((chapterId) => {
+          // 챕터에서 이 프로젝트의 목표 개수 찾기
+          const chapterData = allChapters.find((c) => c.id === chapterId);
+          if (chapterData && chapterData.connectedProjects) {
+            const projectGoal = chapterData.connectedProjects.find(
+              (goal) => goal.projectId === projectId
+            );
+            if (projectGoal) {
+              targetCounts[chapterId] = projectGoal.chapterTargetCount;
+            }
+          }
+        });
+        setChapterTargetCounts(targetCounts);
       }
     }
-  }, [project, form, areas]);
+  }, [project, form, areas, allChapters, projectId]);
 
   // useFieldArray for tasks (form 초기화 이후에 정의)
   const { fields, append, remove, replace } = useFieldArray({
@@ -501,14 +569,7 @@ export default function EditProjectPage({
 
     try {
       // 1. 프로젝트 정보 업데이트
-      const connectedChapters = allChapters
-        .filter((chapter) => selectedChapterIds.includes(chapter.id))
-        .map((chapter) => ({
-          id: chapter.id,
-          title: chapter.title,
-          startDate: chapter.startDate,
-          endDate: chapter.endDate,
-        }));
+      const connectedChapters = selectedChapterIds;
 
       const updateData: Partial<Omit<Project, "id" | "userId" | "createdAt">> =
         {
@@ -517,7 +578,8 @@ export default function EditProjectPage({
           category: data.category,
           startDate: new Date(data.startDate),
           endDate: new Date(data.endDate),
-          target: data.total,
+          target: data.target,
+          targetCount: data.targetCount,
           connectedChapters,
           updatedAt: new Date(),
         };
@@ -595,6 +657,51 @@ export default function EditProjectPage({
         queryClient.invalidateQueries({ queryKey: ["tasks", projectId] }),
         queryClient.invalidateQueries({ queryKey: ["taskCounts", projectId] }),
       ]);
+
+      // 선택된 챕터들에 프로젝트 연결 및 태스크 개수 설정
+      if (selectedChapterIds.length > 0) {
+        try {
+          const chapterUpdatePromises = selectedChapterIds.map(
+            async (chapterId) => {
+              const chapter = allChapters.find((c) => c.id === chapterId);
+              if (!chapter) return;
+
+              // 기존 connectedProjects 배열 가져오기
+              const existingConnectedProjects = chapter.connectedProjects || [];
+
+              // 새로운 프로젝트 목표 추가
+              const newProjectGoal = {
+                projectId: projectId,
+                chapterTargetCount:
+                  chapterTargetCounts[chapterId] ||
+                  getDefaultTargetCount(chapter),
+                chapterDoneCount: 0,
+              };
+
+              // 기존에 같은 프로젝트가 있는지 확인하고 업데이트
+              const updatedConnectedProjects = existingConnectedProjects.filter(
+                (goal) => goal.projectId !== projectId
+              );
+              updatedConnectedProjects.push(newProjectGoal);
+
+              // 챕터 업데이트
+              await updateChapter(chapterId, {
+                connectedProjects: updatedConnectedProjects,
+              });
+            }
+          );
+
+          await Promise.all(chapterUpdatePromises);
+        } catch (chapterError) {
+          console.error("챕터 업데이트 실패:", chapterError);
+          // 챕터 업데이트 실패해도 프로젝트는 수정되었으므로 경고만 표시
+          toast({
+            title: "프로젝트 수정 완료 (챕터 연결 실패)",
+            description: "프로젝트는 수정되었지만 챕터 연결에 실패했습니다.",
+            variant: "destructive",
+          });
+        }
+      }
 
       router.replace(`/para/projects/${project.id}`);
     } catch (error) {
@@ -838,7 +945,7 @@ export default function EditProjectPage({
                   id="startDate"
                   type="date"
                   {...form.register("startDate")}
-                  disabled={projectWithStatus.status !== "planned"}
+                  disabled={projectWithStatus.status !== "scheduled"}
                 />
                 {form.formState.errors.startDate && (
                   <p className="mt-1 text-sm text-red-500">
@@ -878,7 +985,7 @@ export default function EditProjectPage({
               <Info className="h-4 w-4" />
               <AlertTitle>기간 정보</AlertTitle>
               <AlertDescription>
-                {projectWithStatus.status !== "planned" && (
+                {projectWithStatus.status !== "scheduled" && (
                   <>
                     프로젝트가 시작된 후에는 시작일을 변경할 수 없습니다.
                     <br />
@@ -908,15 +1015,40 @@ export default function EditProjectPage({
             )}
 
             <div>
-              <Label htmlFor="total">
-                목표{" "}
-                {form.watch("category") === "repetitive" ? "횟수" : "태스크 수"}
+              <Label htmlFor="target">목표 설명</Label>
+              <Input
+                id="target"
+                type="text"
+                {...form.register("target")}
+                placeholder={
+                  form.watch("category") === "repetitive"
+                    ? "예: 주요 개념 정리"
+                    : "예: 완성된 이력서 1부"
+                }
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                {form.watch("category") === "repetitive"
+                  ? "반복할 행동의 구체적인 목표를 설명하세요"
+                  : "완성할 결과물의 구체적인 목표를 설명하세요"}
+              </p>
+              {form.formState.errors.target && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.target.message}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="targetCount">
+                {form.watch("category") === "repetitive"
+                  ? translate("para.projects.targetCount.repetitive")
+                  : translate("para.projects.targetCount.taskBased")}
               </Label>
               <div className="flex items-center gap-2">
                 <Input
-                  id="total"
+                  id="targetCount"
                   type="number"
-                  {...form.register("total", { valueAsNumber: true })}
+                  {...form.register("targetCount", { valueAsNumber: true })}
                   min="1"
                   placeholder={
                     form.watch("category") === "repetitive"
@@ -946,9 +1078,9 @@ export default function EditProjectPage({
                   {form.watch("category") === "repetitive" ? "회" : "개"}
                 </span>
               </div>
-              {form.formState.errors.total && (
+              {form.formState.errors.targetCount && (
                 <p className="mt-1 text-sm text-red-500">
-                  {form.formState.errors.total.message}
+                  {form.formState.errors.targetCount.message}
                 </p>
               )}
             </div>
@@ -966,7 +1098,7 @@ export default function EditProjectPage({
             </div>
             {(form.watch("category") === "task_based" ||
               (form.watch("category") === "repetitive" &&
-                completedTasks >= form.watch("total"))) && (
+                completedTasks >= form.watch("targetCount"))) && (
               <div className="flex gap-2">
                 {selectedTasks.length > 0 && (
                   <Button
@@ -1061,7 +1193,7 @@ export default function EditProjectPage({
                     {/* 선택 체크박스 (카드 위쪽) - 작업형 또는 반복형에서 추가된 태스크만 표시 */}
                     {(form.watch("category") === "task_based" ||
                       (form.watch("category") === "repetitive" &&
-                        index >= form.watch("total"))) && (
+                        index >= form.watch("targetCount"))) && (
                       <div className="flex justify-start mb-2">
                         <Checkbox
                           checked={selectedTasks.includes(field.id)}
@@ -1106,7 +1238,7 @@ export default function EditProjectPage({
                             }`}
                             readOnly={
                               form.watch("category") === "repetitive" &&
-                              index < form.watch("total")
+                              index < form.watch("targetCount")
                             }
                           />
                         </div>
@@ -1123,7 +1255,7 @@ export default function EditProjectPage({
                               max={form.watch("endDate")}
                               readOnly={
                                 form.watch("category") === "repetitive" &&
-                                index < form.watch("total")
+                                index < form.watch("targetCount")
                               }
                             />
                           </div>
@@ -1143,7 +1275,7 @@ export default function EditProjectPage({
                               className="w-16 text-sm"
                               readOnly={
                                 form.watch("category") === "repetitive" &&
-                                index < form.watch("total")
+                                index < form.watch("targetCount")
                               }
                             />
                             <span className="text-sm text-muted-foreground">
@@ -1191,28 +1323,93 @@ export default function EditProjectPage({
                     .map((chapter) => (
                       <div
                         key={chapter.id}
-                        className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
+                        className="p-3 border rounded-lg bg-muted/30"
                       >
-                        <div>
-                          <span className="font-medium">{chapter.title}</span>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDate(chapter.startDate)} ~{" "}
-                            {formatDate(chapter.endDate)}
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <span className="font-medium">{chapter.title}</span>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(chapter.startDate)} ~{" "}
+                              {formatDate(chapter.endDate)}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              // 챕터 연결 해제
+                              setSelectedChapterIds((prev) =>
+                                prev.filter((id) => id !== chapter.id)
+                              );
+                              // 챕터가 해제되면 해당 챕터의 태스크 개수도 제거
+                              setChapterTargetCounts((prev) => {
+                                const newCounts = { ...prev };
+                                delete newCounts[chapter.id];
+                                return newCounts;
+                              });
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        {/* 기존 연결된 챕터의 태스크 개수 표시 */}
+                        <div className="mt-3 pt-3 border-t border-border">
+                          <div className="flex items-center gap-2">
+                            <Label
+                              htmlFor={`target-${chapter.id}`}
+                              className="text-sm font-medium"
+                            >
+                              이 챕터에서 완성할 태스크 개수
+                            </Label>
+                            <Badge variant="secondary" className="text-xs">
+                              권장: {getDefaultTargetCount(chapter)}개
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Input
+                              id={`target-${chapter.id}`}
+                              type="number"
+                              min="1"
+                              max="100"
+                              value={
+                                chapterTargetCounts[chapter.id] ||
+                                getDefaultTargetCount(chapter)
+                              }
+                              onChange={(e) => {
+                                const value = parseInt(e.target.value) || 1;
+                                updateChapterTargetCount(chapter.id, value);
+                              }}
+                              className="w-20"
+                            />
+                            <span className="text-sm text-muted-foreground">
+                              개
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                updateChapterTargetCount(
+                                  chapter.id,
+                                  getDefaultTargetCount(chapter)
+                                );
+                              }}
+                              className="text-xs"
+                            >
+                              권장값 적용
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            프로젝트 기간과 챕터 기간을 고려한 권장 개수입니다.
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            (프로젝트 정보: 미완료 태스크{" "}
+                            {form.watch("targetCount") || 0}개 / 총 태스크{" "}
+                            {form.watch("targetCount") || 0}개)
                           </p>
                         </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            // 챕터 연결 해제
-                            setSelectedChapterIds((prev) =>
-                              prev.filter((id) => id !== chapter.id)
-                            );
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
                       </div>
                     ))}
                 </div>
@@ -1288,46 +1485,50 @@ export default function EditProjectPage({
                   {availableChaptersForConnection.map((chapter) => (
                     <div
                       key={chapter.id}
-                      className={`p-3 border rounded-lg cursor-pointer ${
+                      className={`p-3 border rounded-lg ${
                         selectedChapterIds.includes(chapter.id)
                           ? "border-primary bg-primary/5"
                           : "border-border"
                       }`}
-                      onClick={() => toggleChapterSelection(chapter.id)}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-medium">{chapter.title}</h4>
-                          {selectedChapterIds.includes(chapter.id) && (
-                            <Badge variant="outline" className="text-xs">
-                              선택됨
-                            </Badge>
-                          )}
-                        </div>
-                        <span
-                          className={`text-xs px-2 py-1 rounded-full ${
-                            getChapterStatus(chapter) === "in_progress"
-                              ? "bg-green-100 text-green-700"
+                      <div
+                        className="cursor-pointer"
+                        onClick={() => toggleChapterSelection(chapter.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium">{chapter.title}</h4>
+                            {selectedChapterIds.includes(chapter.id) && (
+                              <Badge variant="outline" className="text-xs">
+                                선택됨
+                              </Badge>
+                            )}
+                          </div>
+                          <span
+                            className={`text-xs px-2 py-1 rounded-full ${
+                              getChapterStatus(chapter) === "in_progress"
+                                ? "bg-green-100 text-green-700"
+                                : getChapterStatus(chapter) === "planned"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {getChapterStatus(chapter) === "in_progress"
+                              ? "진행 중"
                               : getChapterStatus(chapter) === "planned"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-gray-100 text-gray-700"
-                          }`}
-                        >
-                          {getChapterStatus(chapter) === "in_progress"
-                            ? "진행 중"
-                            : getChapterStatus(chapter) === "planned"
-                            ? "예정"
-                            : "완료"}
-                        </span>
+                              ? "예정"
+                              : "완료"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {formatDate(chapter.startDate)} -{" "}
+                          {formatDate(chapter.endDate)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          연결된 프로젝트:{" "}
+                          {getConnectedProjectCount(chapter.id)}개
+                        </p>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {formatDate(chapter.startDate)} -{" "}
-                        {formatDate(chapter.endDate)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        연결된 프로젝트: {getConnectedProjectCount(chapter.id)}
-                        개
-                      </p>
                     </div>
                   ))}
                 </div>
@@ -1350,9 +1551,7 @@ export default function EditProjectPage({
                     onClick={() => {
                       // 변경사항 취소 - 원래 연결된 챕터들로 되돌리기
                       if (project?.connectedChapters) {
-                        setSelectedChapterIds(
-                          project.connectedChapters.map((chapter) => chapter.id)
-                        );
+                        setSelectedChapterIds(project.connectedChapters);
                       } else {
                         setSelectedChapterIds([]);
                       }
@@ -1378,37 +1577,40 @@ export default function EditProjectPage({
           <DialogHeader>
             <DialogTitle>프로젝트 유형 변경</DialogTitle>
             <DialogDescription>
-              프로젝트 유형을 변경하면 현재 태스크 목록이 초기화됩니다.
+              프로젝트 유형을 변경하면 기존에 생성된 모든 태스크가 삭제됩니다.
               계속하시겠습니까?
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-muted-foreground">
-              현재 태스크: {fields.length}개
-            </p>
-            <p className="text-sm text-muted-foreground">
-              변경할 유형:{" "}
-              {pendingCategoryChange === "repetitive" ? "반복형" : "작업형"}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              모든 태스크가 삭제되고 새로 시작됩니다.
+          <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+              ⚠️ 현재 {fields.length}개의 태스크가 생성되어 있습니다. 이 작업은
+              되돌릴 수 없습니다.
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={handleConfirmCategoryChange} className="flex-1">
-              계속하기
-            </Button>
+          <DialogFooter>
             <Button
+              variant="outline"
               onClick={() => {
                 setShowCategoryChangeDialog(false);
                 setPendingCategoryChange(null);
               }}
-              variant="outline"
-              className="flex-1"
             >
               취소
             </Button>
-          </div>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (pendingCategoryChange) {
+                  applyCategoryChange(pendingCategoryChange);
+                  replace([]); // 태스크 초기화
+                }
+                setShowCategoryChangeDialog(false);
+                setPendingCategoryChange(null);
+              }}
+            >
+              유형 변경하기
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

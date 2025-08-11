@@ -81,6 +81,7 @@ export const chapterDetail = {
   connectProjectsHint:
     '프로젝트를 연결하려면 상단의 "챕터 수정" 버튼을 사용하세요',
   noFocusAreas: "중점 영역이 설정되지 않았습니다.",
+  connectedProjects: "연결된 프로젝트",
   tabs: {
     retrospective: "회고",
     note: "노트",

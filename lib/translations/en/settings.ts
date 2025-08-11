@@ -19,6 +19,7 @@ export const settings = {
   themeSettings: "Theme Settings",
   theme: "Theme",
   language: "Language",
+  deviceSettingsNote: "May not apply depending on device settings such as power saving mode.",
   account: "Account",
   logout: "Logout",
   logoutDescription: "Log out from the current account.",

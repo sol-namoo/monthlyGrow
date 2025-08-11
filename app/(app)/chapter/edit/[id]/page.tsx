@@ -161,6 +161,9 @@ export default function EditChapterPage({
   const [reward, setReward] = useState("");
   const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>([]);
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [projectTargetCounts, setProjectTargetCounts] = useState<
+    Record<string, number>
+  >({});
 
   // 프로젝트 추가 모달 상태
   const [showAddProjectModal, setShowAddProjectModal] = useState(false);
@@ -225,6 +228,15 @@ export default function EditChapterPage({
       // 연결된 프로젝트 IDs 설정
       const projectIds = connectedProjects.map((p: any) => p.id);
       setSelectedProjectIds(projectIds);
+
+      // 기존 프로젝트별 태스크 개수 정보 로드
+      if (chapter.connectedProjects && chapter.connectedProjects.length > 0) {
+        const targetCounts: Record<string, number> = {};
+        chapter.connectedProjects.forEach((projectGoal: any) => {
+          targetCounts[projectGoal.projectId] = projectGoal.chapterTargetCount;
+        });
+        setProjectTargetCounts(targetCounts);
+      }
     }
   }, [chapter, areas, connectedProjects, chapterId, queryClient]);
 
@@ -263,6 +275,47 @@ export default function EditChapterPage({
         ? prev.filter((id) => id !== areaId)
         : [...prev, areaId]
     );
+  };
+
+  // 프로젝트별 기본 태스크 개수 계산 (프로젝트 기간과 챕터 기간을 고려)
+  const getDefaultTargetCount = (project: any) => {
+    const projectStartDate = new Date(project.startDate);
+    const projectEndDate = new Date(project.endDate);
+    const chapterStartDate = new Date(chapter!.startDate);
+    const chapterEndDate = new Date(chapter!.endDate);
+
+    // 프로젝트와 챕터의 겹치는 기간 계산
+    const overlapStart = new Date(
+      Math.max(projectStartDate.getTime(), chapterStartDate.getTime())
+    );
+    const overlapEnd = new Date(
+      Math.min(projectEndDate.getTime(), chapterEndDate.getTime())
+    );
+
+    if (overlapEnd <= overlapStart) return 1;
+
+    const overlapDays = Math.ceil(
+      (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    const totalProjectDays = Math.ceil(
+      (projectEndDate.getTime() - projectStartDate.getTime()) /
+        (1000 * 60 * 60 * 24)
+    );
+    const targetCount = project.target || 1;
+
+    // 겹치는 기간 비율에 따라 태스크 개수 계산
+    return Math.max(
+      1,
+      Math.round((overlapDays / totalProjectDays) * targetCount)
+    );
+  };
+
+  // 프로젝트별 태스크 개수 업데이트 핸들러
+  const updateProjectTargetCount = (projectId: string, count: number) => {
+    setProjectTargetCounts((prev) => ({
+      ...prev,
+      [projectId]: Math.max(1, count), // 최소 1개
+    }));
   };
 
   // 프로젝트 선택/해제 핸들러
@@ -310,10 +363,26 @@ export default function EditChapterPage({
       return;
     }
 
+    // 프로젝트별 태스크 개수 정보 구성
+    const connectedProjectsData = selectedProjectIds.map((projectId) => {
+      const project =
+        connectedProjects.find((p) => p.id === projectId) ||
+        unconnectedProjects.find((p) => p.id === projectId);
+
+      return {
+        projectId,
+        chapterTargetCount:
+          projectTargetCounts[projectId] ||
+          (project ? getDefaultTargetCount(project) : 1),
+        chapterDoneCount: 0,
+      };
+    });
+
     const updatedData = {
       title: title.trim(),
       reward: reward.trim(),
       focusAreas: selectedAreaIds,
+      connectedProjects: connectedProjectsData,
     };
 
     // 프로젝트 연결 정보도 함께 저장
@@ -736,37 +805,104 @@ export default function EditChapterPage({
                     return (
                       <div
                         key={projectId}
-                        className="flex items-center justify-between p-2 bg-background rounded border"
+                        className="p-3 bg-background rounded border"
                       >
-                        <div>
-                          <p className="text-sm font-medium">{project.title}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {(() => {
-                              // 프로젝트의 area ID를 사용해서 실제 area 이름 찾기
-                              if (project.areaId) {
-                                const area = areas.find(
-                                  (a) => a.id === project.areaId
-                                );
-                                return area ? area.name : "미분류";
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <p className="text-sm font-medium">
+                              {project.title}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {(() => {
+                                // 프로젝트의 area ID를 사용해서 실제 area 이름 찾기
+                                if (project.areaId) {
+                                  const area = areas.find(
+                                    (a) => a.id === project.areaId
+                                  );
+                                  return area ? area.name : "미분류";
+                                }
+                                return "미분류";
+                              })()}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(project.startDate)} ~{" "}
+                              {formatDate(project.endDate)}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedProjectIds(
+                                selectedProjectIds.filter(
+                                  (id) => id !== projectId
+                                )
+                              );
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        {/* 프로젝트별 태스크 개수 설정 */}
+                        <div className="mt-3 pt-3 border-t border-border">
+                          <div className="flex items-center gap-2">
+                            <Label
+                              htmlFor={`target-${projectId}`}
+                              className="text-sm font-medium"
+                            >
+                              {translate(
+                                "para.projects.targetCount.chapter.label"
+                              )}
+                            </Label>
+                            <Badge variant="secondary" className="text-xs">
+                              권장: {getDefaultTargetCount(project)}개
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Input
+                              id={`target-${projectId}`}
+                              type="number"
+                              min="1"
+                              max="100"
+                              value={
+                                projectTargetCounts[projectId] ||
+                                getDefaultTargetCount(project)
                               }
-                              return "미분류";
-                            })()}
+                              onChange={(e) => {
+                                const value = parseInt(e.target.value) || 1;
+                                updateProjectTargetCount(projectId, value);
+                              }}
+                              className="w-20"
+                            />
+                            <span className="text-sm text-muted-foreground">
+                              개
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                updateProjectTargetCount(
+                                  projectId,
+                                  getDefaultTargetCount(project)
+                                );
+                              }}
+                              className="text-xs"
+                            >
+                              권장값 적용
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            프로젝트 기간과 챕터 기간을 고려한 권장 개수입니다.
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            (프로젝트 정보: 미완료 태스크{" "}
+                            {project.targetCount || 0}개 / 총 태스크{" "}
+                            {project.targetCount || 0}개)
                           </p>
                         </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedProjectIds(
-                              selectedProjectIds.filter(
-                                (id) => id !== projectId
-                              )
-                            );
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
                       </div>
                     );
                   })}

@@ -1073,17 +1073,25 @@ export default function ProjectDetailPage({
 
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">
+              {translate("paraProjectDetail.target")}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {project.target}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">
               {translate("paraProjectDetail.target")}{" "}
               {project.category === "repetitive"
                 ? translate("paraProjectDetail.targetLabels.count")
                 : translate("paraProjectDetail.targetLabels.tasks")}
             </span>
             <span className="text-sm text-muted-foreground">
-              {project.category === "repetitive" && project.targetCount
-                ? `${project.target} ${project.targetCount}${translate(
-                    "paraProjectDetail.targetLabels.times"
-                  )}`
-                : project.target}
+              {project.targetCount || 0}
+              {project.category === "repetitive"
+                ? translate("paraProjectDetail.targetLabels.times")
+                : translate("paraProjectDetail.targetLabels.tasks")}
             </span>
           </div>
 

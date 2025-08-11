@@ -61,6 +61,7 @@ import {
 } from "@/lib/firebase";
 
 import { getChapterStatus, formatDate, formatDateForInput } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   Dialog,
   DialogContent,
@@ -83,11 +84,12 @@ const projectFormSchema = z
     chapter: z.string().optional(),
     startDate: z.string().min(1, "시작일을 입력해주세요"),
     dueDate: z.string().min(1, "목표 완료일을 입력해주세요"),
+    target: z.string().min(1, "목표 설명을 입력해주세요"),
     targetCount: z.string().refine((val) => {
       if (!val) return false;
       const num = parseInt(val);
       return !isNaN(num) && num >= 0;
-    }, "목표를 입력해주세요"),
+    }, "목표 개수를 입력해주세요"),
     tasks: z
       .array(
         z.object({
@@ -148,11 +150,16 @@ const projectFormSchema = z
 type ProjectFormData = z.infer<typeof projectFormSchema>;
 
 function NewProjectPageContent() {
+  const { translate } = useLanguage();
+
   // 상태 관리
   const [selectedCategory, setSelectedCategory] = useState<
     "repetitive" | "task_based"
   >("repetitive");
   const [selectedChapterIds, setSelectedChapterIds] = useState<string[]>([]);
+  const [chapterTargetCounts, setChapterTargetCounts] = useState<
+    Record<string, number>
+  >({});
 
   // 선택된 태스크들을 관리하는 상태
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
@@ -245,6 +252,7 @@ function NewProjectPageContent() {
       chapter: "",
       startDate: getDefaultDates().startDate,
       dueDate: getDefaultDates().endDate,
+      target: "",
       targetCount: "",
       tasks: [], // 빈 배열로 시작
     },
@@ -374,14 +382,20 @@ function NewProjectPageContent() {
 
   const getTargetPlaceholder = (category: "repetitive" | "task_based") => {
     return category === "repetitive"
-      ? "목표 횟수 (예: 30)"
-      : "총 작업 수 (예: 8)";
+      ? "목표 설명 (예: 주요 개념 정리)"
+      : "목표 설명 (예: 완성된 이력서 1부)";
+  };
+
+  const getTargetCountPlaceholder = (category: "repetitive" | "task_based") => {
+    return category === "repetitive"
+      ? translate("para.projects.targetCount.repetitivePlaceholder")
+      : translate("para.projects.targetCount.taskBasedPlaceholder");
   };
 
   const getTargetDescription = (category: "repetitive" | "task_based") => {
     return category === "repetitive"
-      ? "동일한 행동을 몇 번 반복할지 설정하세요"
-      : "완료해야 할 총 작업의 개수를 설정하세요";
+      ? translate("para.projects.targetCount.description.repetitive")
+      : translate("para.projects.targetCount.description.taskBased");
   };
 
   // 현재 챕터 정보 가져오기 (chapterId가 있는 경우)
@@ -422,45 +436,65 @@ function NewProjectPageContent() {
     // 작업형으로 변경 시 기존 태스크 유지
   };
 
-  // 다이얼로그에서 태스크 유지 선택
-  const handleKeepTasks = () => {
-    if (pendingCategoryChange) {
-      const currentTasks = form.watch("tasks") || [];
-      form.setValue("category", pendingCategoryChange);
-      setSelectedCategory(pendingCategoryChange);
+  // 챕터별 기본 태스크 개수 계산 (프로젝트 기간과 챕터 기간을 고려)
+  const getDefaultTargetCount = (chapter: any) => {
+    const projectStartDate = new Date(form.watch("startDate"));
+    const projectEndDate = new Date(form.watch("dueDate"));
+    const chapterStartDate = new Date(chapter.startDate);
+    const chapterEndDate = new Date(chapter.endDate);
 
-      // 반복형으로 변경하는 경우 목표 횟수를 기존 태스크 개수로 조정
-      if (pendingCategoryChange === "repetitive") {
-        form.setValue("targetCount", currentTasks.length.toString());
-      }
-    }
-    setShowCategoryChangeDialog(false);
-    setPendingCategoryChange(null);
+    // 프로젝트와 챕터의 겹치는 기간 계산
+    const overlapStart = new Date(
+      Math.max(projectStartDate.getTime(), chapterStartDate.getTime())
+    );
+    const overlapEnd = new Date(
+      Math.min(projectEndDate.getTime(), chapterEndDate.getTime())
+    );
+
+    if (overlapEnd <= overlapStart) return 1;
+
+    const overlapDays = Math.ceil(
+      (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    const totalProjectDays = Math.ceil(
+      (projectEndDate.getTime() - projectStartDate.getTime()) /
+        (1000 * 60 * 60 * 24)
+    );
+    const targetCount = parseInt(form.watch("targetCount")) || 1;
+
+    // 겹치는 기간 비율에 따라 태스크 개수 계산
+    return Math.max(
+      1,
+      Math.round((overlapDays / totalProjectDays) * targetCount)
+    );
   };
 
-  // 다이얼로그에서 태스크 초기화 선택
-  const handleClearTasks = () => {
-    if (pendingCategoryChange) {
-      form.setValue("category", pendingCategoryChange);
-      setSelectedCategory(pendingCategoryChange);
-
-      // 반복형으로 변경하는 경우 태스크 초기화
-      if (pendingCategoryChange === "repetitive") {
-        replace([]);
-        form.setValue("targetCount", "");
-      }
-    }
-    setShowCategoryChangeDialog(false);
-    setPendingCategoryChange(null);
+  // 챕터별 태스크 개수 업데이트 핸들러
+  const updateChapterTargetCount = (chapterId: string, count: number) => {
+    setChapterTargetCounts((prev) => ({
+      ...prev,
+      [chapterId]: Math.max(1, count), // 최소 1개
+    }));
   };
 
   // 챕터 선택/해제 핸들러
   const toggleChapterSelection = (chapterId: string) => {
-    setSelectedChapterIds((prev) =>
-      prev.includes(chapterId)
+    setSelectedChapterIds((prev) => {
+      const newSelection = prev.includes(chapterId)
         ? prev.filter((id) => id !== chapterId)
-        : [...prev, chapterId]
-    );
+        : [...prev, chapterId];
+
+      // 챕터가 해제되면 해당 챕터의 태스크 개수도 제거
+      if (!newSelection.includes(chapterId)) {
+        setChapterTargetCounts((prev) => {
+          const newCounts = { ...prev };
+          delete newCounts[chapterId];
+          return newCounts;
+        });
+      }
+
+      return newSelection;
+    });
   };
 
   // 반복형 프로젝트에서 목표 횟수에 따라 태스크 목록 동적 생성
@@ -552,6 +586,12 @@ function NewProjectPageContent() {
 
   const onSubmit = async (data: ProjectFormData) => {
     setIsSubmitting(true); // 로딩 상태 시작
+
+    // 사용자에게 즉시 피드백 제공
+    toast({
+      title: "프로젝트 생성 중...",
+      description: "프로젝트를 생성하고 있습니다. 잠시만 기다려주세요.",
+    });
 
     try {
       // areaId는 필수이므로 그대로 사용
@@ -664,7 +704,8 @@ function NewProjectPageContent() {
         areaId, // 필수 필드
         startDate: createValidDate(data.startDate),
         endDate: createValidDate(data.dueDate),
-        target: parseInt(data.targetCount),
+        target: data.target,
+        targetCount: parseInt(data.targetCount),
         completedTasks: 0,
         connectedChapters, // 선택된 챕터 ID 배열
         notes: [], // 초기에는 빈 배열
@@ -704,8 +745,8 @@ function NewProjectPageContent() {
       }
 
       toast({
-        title: "프로젝트 생성 완료",
-        description: `${data.title} 프로젝트가 생성되었습니다.${
+        title: "프로젝트 생성 완료!",
+        description: `${data.title} 프로젝트가 성공적으로 생성되었습니다.${
           selectedChapters.length > 0
             ? ` (${selectedChapters.length}개 챕터에 연결됨)`
             : ""
@@ -776,11 +817,14 @@ function NewProjectPageContent() {
   return (
     <div
       className={`container max-w-md px-4 py-6 relative ${
-        isSubmitting ? "pointer-events-none" : ""
+        isSubmitting ? "pointer-events-none opacity-60" : ""
       }`}
     >
       {/* 로딩 오버레이 */}
-      <LoadingOverlay isVisible={isSubmitting} message="프로젝트 생성 중..." />
+      <LoadingOverlay
+        isVisible={isSubmitting}
+        message="프로젝트를 생성하고 있습니다..."
+      />
       <div className="mb-6 flex items-center">
         <Button
           variant="ghost"
@@ -823,7 +867,7 @@ function NewProjectPageContent() {
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             현재 챕터에 연결된 프로젝트:{" "}
-            {currentChapter.connectedChapters?.length || 0}개
+            {currentChapter.connectedProjects?.length || 0}개
           </p>
         </Card>
       )}
@@ -1025,13 +1069,10 @@ function NewProjectPageContent() {
               </div>
             )}
 
-            <CustomAlert variant="info">
-              <Info className="h-4 w-4" />
-              <AlertTitle>기간 정보</AlertTitle>
-              <AlertDescription>
-                종료일은 이번달 이후 6개월까지만 설정 가능합니다
-              </AlertDescription>
-            </CustomAlert>
+            <div className="text-xs text-muted-foreground flex items-center gap-1">
+              <Info className="h-3 w-3" />
+              <span>종료일은 이번달 이후 6개월까지만 설정 가능합니다</span>
+            </div>
 
             {duration > 56 && (
               <CustomAlert variant="warning">
@@ -1045,8 +1086,36 @@ function NewProjectPageContent() {
             )}
 
             <div>
+              <Label htmlFor="target">목표 설명</Label>
+              <Controller
+                name="target"
+                control={form.control}
+                render={({ field }) => (
+                  <Input
+                    id="target"
+                    type="text"
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder={getTargetPlaceholder(form.watch("category"))}
+                    className="flex-1"
+                  />
+                )}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                {form.watch("category") === "repetitive"
+                  ? "반복할 행동의 구체적인 목표를 설명하세요"
+                  : "완성할 결과물의 구체적인 목표를 설명하세요"}
+              </p>
+              {form.formState.errors.target && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.target.message}
+                </p>
+              )}
+            </div>
+
+            <div>
               <Label htmlFor="targetCount">
-                목표 설정
+                {translate("para.projects.targetCount.label")}
                 <span className="ml-1 text-xs text-muted-foreground">
                   ({getUnitLabel(form.watch("category"))})
                 </span>
@@ -1089,7 +1158,9 @@ function NewProjectPageContent() {
                           }
                         }
                       }}
-                      placeholder={getTargetPlaceholder(form.watch("category"))}
+                      placeholder={getTargetCountPlaceholder(
+                        form.watch("category")
+                      )}
                       className="flex-1"
                     />
                   )}
@@ -1121,16 +1192,18 @@ function NewProjectPageContent() {
               </div>
             )}
 
-            {weeklyAverage < 2 && weeklyAverage > 0 && (
-              <CustomAlert variant="warning">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>활동 빈도 낮음</AlertTitle>
-                <AlertDescription>
-                  주당 평균이 2회 미만입니다. 더 자주 활동할 수 있도록 목표를
-                  조정해보세요.
-                </AlertDescription>
-              </CustomAlert>
-            )}
+            {weeklyAverage < 2 &&
+              weeklyAverage > 0 &&
+              form.watch("category") === "repetitive" && (
+                <CustomAlert variant="warning">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>활동 빈도 낮음</AlertTitle>
+                  <AlertDescription>
+                    주당 평균이 2회 미만입니다. 더 자주 활동할 수 있도록 목표를
+                    조정해보세요.
+                  </AlertDescription>
+                </CustomAlert>
+              )}
 
             {/* 권장사항 아코디언 */}
             <Accordion type="single" collapsible className="w-full">
@@ -1222,8 +1295,8 @@ function NewProjectPageContent() {
           {form.watch("category") === "repetitive" && (
             <div className="mb-4 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg">
               <p className="text-sm text-muted-foreground">
-                💡 반복형 프로젝트는 목표 횟수에 따라 태스크가 자동으로
-                생성됩니다.
+                💡{" "}
+                {translate("para.projects.targetCount.description.repetitive")}
               </p>
               <p className="text-sm text-muted-foreground mt-1">
                 🎯 목표 달성 후 초과 달성 태스크를 추가할 수 있어요
@@ -1237,10 +1310,10 @@ function NewProjectPageContent() {
               {fields.length === 0 ? (
                 <div className="text-center py-8 border-2 border-dashed rounded-lg">
                   <p className="text-muted-foreground mb-2">
-                    목표 횟수를 입력하면 태스크가 자동으로 생성됩니다
+                    {translate("para.projects.targetCount.hint.repetitive")}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    목표 횟수와 프로젝트 기간을 설정해주세요
+                    {translate("para.projects.targetCount.hint.setup")}
                   </p>
                 </div>
               ) : (
@@ -1438,28 +1511,93 @@ function NewProjectPageContent() {
                     .map((chapter) => (
                       <div
                         key={chapter.id}
-                        className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
+                        className="p-3 border rounded-lg bg-muted/30"
                       >
-                        <div>
-                          <span className="font-medium">{chapter.title}</span>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDate(chapter.startDate)} ~{" "}
-                            {formatDate(chapter.endDate)}
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <span className="font-medium">{chapter.title}</span>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(chapter.startDate)} ~{" "}
+                              {formatDate(chapter.endDate)}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              // 챕터 연결 해제
+                              setSelectedChapterIds((prev) =>
+                                prev.filter((id) => id !== chapter.id)
+                              );
+                              // 챕터가 해제되면 해당 챕터의 태스크 개수도 제거
+                              setChapterTargetCounts((prev) => {
+                                const newCounts = { ...prev };
+                                delete newCounts[chapter.id];
+                                return newCounts;
+                              });
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        {/* 챕터별 태스크 개수 설정 */}
+                        <div className="mt-3 pt-3 border-t border-border">
+                          <div className="flex items-center gap-2">
+                            <Label
+                              htmlFor={`target-${chapter.id}`}
+                              className="text-sm font-medium"
+                            >
+                              이 챕터에서 완성할 태스크 개수
+                            </Label>
+                            <Badge variant="secondary" className="text-xs">
+                              권장: {getDefaultTargetCount(chapter)}개
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Input
+                              id={`target-${chapter.id}`}
+                              type="number"
+                              min="1"
+                              max="100"
+                              value={
+                                chapterTargetCounts[chapter.id] ||
+                                getDefaultTargetCount(chapter)
+                              }
+                              onChange={(e) => {
+                                const value = parseInt(e.target.value) || 1;
+                                updateChapterTargetCount(chapter.id, value);
+                              }}
+                              className="w-20"
+                            />
+                            <span className="text-sm text-muted-foreground">
+                              개
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                updateChapterTargetCount(
+                                  chapter.id,
+                                  getDefaultTargetCount(chapter)
+                                );
+                              }}
+                              className="text-xs"
+                            >
+                              권장값 적용
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            프로젝트 기간과 챕터 기간을 고려한 권장 개수입니다.
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            (프로젝트 정보: 미완료 태스크{" "}
+                            {form.watch("targetCount") || 1}개 / 총 태스크{" "}
+                            {form.watch("targetCount") || 1}개)
                           </p>
                         </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            // 챕터 연결 해제
-                            setSelectedChapterIds((prev) =>
-                              prev.filter((id) => id !== chapter.id)
-                            );
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
                       </div>
                     ))}
                 </div>
@@ -1486,7 +1624,14 @@ function NewProjectPageContent() {
 
         <div className="flex gap-3">
           <Button type="submit" className="flex-1" disabled={isSubmitting}>
-            {isSubmitting ? "생성 중..." : "프로젝트 생성"}
+            {isSubmitting ? (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                프로젝트 생성 중...
+              </div>
+            ) : (
+              "프로젝트 생성"
+            )}
           </Button>
           <Button
             type="button"
@@ -1508,39 +1653,35 @@ function NewProjectPageContent() {
           <DialogHeader>
             <DialogTitle>프로젝트 유형 변경</DialogTitle>
             <DialogDescription>
-              프로젝트 유형을 변경하시겠습니까? 기존에 생성된 태스크를 어떻게
-              처리할지 선택해주세요.
+              프로젝트 유형을 변경하면 기존에 생성된 모든 태스크가 삭제됩니다.
+              계속하시겠습니까?
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="p-4 bg-muted/50 rounded-lg">
-              <p className="text-sm font-medium mb-2">현재 상황</p>
-              <p className="text-sm text-muted-foreground">
-                현재 {form.watch("tasks")?.length || 0}개의 태스크가 생성되어
-                있습니다.
-              </p>
-            </div>
-            <div className="space-y-3">
-              <div className="p-3 border rounded-lg">
-                <h4 className="font-medium mb-1">태스크 유지하기</h4>
-                <p className="text-sm text-muted-foreground">
-                  기존 태스크를 그대로 유지하고, 목표 횟수를 태스크 개수로 자동
-                  조정합니다.
-                </p>
-              </div>
-              <div className="p-3 border rounded-lg">
-                <h4 className="font-medium mb-1">태스크 초기화</h4>
-                <p className="text-sm text-muted-foreground">
-                  기존 태스크를 모두 삭제하고 새로 시작합니다.
-                </p>
-              </div>
-            </div>
+          <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+              ⚠️ 현재 {form.watch("tasks")?.length || 0}개의 태스크가 생성되어
+              있습니다. 이 작업은 되돌릴 수 없습니다.
+            </p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={handleClearTasks}>
-              태스크 초기화
+            <Button
+              variant="outline"
+              onClick={() => setShowCategoryChangeDialog(false)}
+            >
+              취소
             </Button>
-            <Button onClick={handleKeepTasks}>태스크 유지하기</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (pendingCategoryChange) {
+                  applyCategoryChange(pendingCategoryChange);
+                }
+                setShowCategoryChangeDialog(false);
+                setPendingCategoryChange(null);
+              }}
+            >
+              유형 변경하기
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

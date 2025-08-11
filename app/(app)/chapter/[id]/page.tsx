@@ -865,7 +865,7 @@ export function ChapterDetailPage({
                     {/* 프로젝트 정보 */}
                     <div className="space-y-1">
                       {/* 기간 정보 */}
-                      <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 text-xs">
                         <span className="text-muted-foreground">기간:</span>
                         <span className="text-muted-foreground">
                           {projectDuration}
@@ -873,7 +873,7 @@ export function ChapterDetailPage({
                       </div>
 
                       {/* 영역 정보 */}
-                      <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 text-xs">
                         <span className="text-muted-foreground">Area:</span>
                         <span className="text-muted-foreground">
                           {(() => {

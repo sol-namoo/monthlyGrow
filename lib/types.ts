@@ -94,6 +94,8 @@ export interface Chapter {
 
   // 로컬 계산 필드 (DB에 저장되지 않음)
   status?: "planned" | "in_progress" | "ended"; // startDate와 endDate를 기반으로 클라이언트에서 계산
+  chaptertargetcounts?: number; // 챕터 전체 목표 수 (실시간 계산)
+  chapterdonecounts?: number; // 챕터 전체 완료 수 (실시간 계산)
 }
 
 export interface Snapshot {

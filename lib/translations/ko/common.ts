@@ -18,7 +18,7 @@ export const theme = {
   light: "라이트",
   dark: "다크",
   system: "시스템",
-  mobileNotice: "모바일 환경에서는 기기 설정에 따라 적용되지 않을 수 있습니다",
+  mobileNotice: "절전모드 등의 기기 설정에 따라 적용되지 않을 수 있습니다",
 } as const;
 
 export const language = {

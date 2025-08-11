@@ -22,20 +22,37 @@ export const getBrowserLocale = (): string => {
   return locale;
 };
 
+// 타임존 캐시 변수
+let cachedTimeZone: string | null = null;
+
 /**
- * 사용자의 현재 시간대를 감지
+ * 사용자의 타임존을 가져오는 함수 (캐싱)
  */
 export const getUserTimeZone = (): string => {
-  if (typeof window === "undefined") return "UTC";
+  // 이미 캐시된 타임존이 있으면 반환
+  if (cachedTimeZone) {
+    return cachedTimeZone;
+  }
 
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  // 개발 환경에서 시간대 정보 출력
+  // 개발 환경에서 시간대 정보 출력 (한 번만)
   if (process.env.NODE_ENV === "development") {
     console.log("User timezone detected:", timeZone);
   }
 
+  // 타임존을 캐시에 저장
+  cachedTimeZone = timeZone;
+
   return timeZone;
+};
+
+/**
+ * 타임존 캐시를 초기화하는 함수
+ * 사용자 로그인 후 또는 설정 변경 시 호출
+ */
+export const resetTimeZoneCache = (): void => {
+  cachedTimeZone = null;
 };
 
 /**
@@ -207,7 +224,7 @@ export function getProjectStatus(project: {
   startDate: Date;
   endDate: Date;
   completedTasks?: number;
-  target?: number;
+  targetCount?: number;
 }): "scheduled" | "in_progress" | "completed" | "overdue" {
   const now = new Date();
   const startDate = new Date(project.startDate);
@@ -215,8 +232,8 @@ export function getProjectStatus(project: {
 
   // 완료율 계산
   const completionRate =
-    project.target && project.completedTasks
-      ? (project.completedTasks / project.target) * 100
+    project.targetCount && project.completedTasks
+      ? (project.completedTasks / project.targetCount) * 100
       : 0;
 
   // 완료된 경우 (완료율이 100% 이상)
@@ -242,7 +259,7 @@ export function isProjectInProgress(project: {
   startDate: Date;
   endDate: Date;
   completedTasks?: number;
-  target?: number;
+  targetCount?: number;
 }): boolean {
   return getProjectStatus(project) === "in_progress";
 }
@@ -251,7 +268,7 @@ export function isProjectScheduled(project: {
   startDate: Date;
   endDate: Date;
   completedTasks?: number;
-  target?: number;
+  targetCount?: number;
 }): boolean {
   return getProjectStatus(project) === "scheduled";
 }
@@ -260,7 +277,7 @@ export function isProjectCompleted(project: {
   startDate: Date;
   endDate: Date;
   completedTasks?: number;
-  target?: number;
+  targetCount?: number;
 }): boolean {
   return getProjectStatus(project) === "completed";
 }
@@ -269,7 +286,7 @@ export function isProjectOverdue(project: {
   startDate: Date;
   endDate: Date;
   completedTasks?: number;
-  target?: number;
+  targetCount?: number;
 }): boolean {
   return getProjectStatus(project) === "overdue";
 }
@@ -277,11 +294,11 @@ export function isProjectOverdue(project: {
 // 프로젝트 완료율을 동적으로 계산하는 함수
 export function getProjectCompletionRate(project: {
   completedTasks?: number;
-  target?: number;
+  targetCount?: number;
 }): number {
-  if (!project.target || project.target === 0) return 0;
+  if (!project.targetCount || project.targetCount === 0) return 0;
   if (!project.completedTasks) return 0;
-  return Math.round((project.completedTasks / project.target) * 100);
+  return Math.round((project.completedTasks / project.targetCount) * 100);
 }
 
 /**
@@ -290,10 +307,10 @@ export function getProjectCompletionRate(project: {
  * @returns 진행률 (0-1 사이의 값)
  */
 export function calculateProjectProgress(project: Project): number {
-  if (project.target === 0) {
+  if (!project.targetCount || project.targetCount === 0) {
     return 0;
   }
-  return project.completedTasks / project.target;
+  return project.completedTasks / project.targetCount;
 }
 
 // 프로젝트가 활성 상태인지 확인하는 함수
@@ -301,7 +318,7 @@ export function isProjectActive(project: {
   startDate: Date;
   endDate: Date;
   completedTasks?: number;
-  target?: number;
+  targetCount?: number;
 }): boolean {
   const status = getProjectStatus(project);
   return status === "in_progress" || status === "overdue";
@@ -371,6 +388,59 @@ export function calculateChapterProgress(chapter: Chapter): number {
   );
 
   return totalTarget > 0 ? totalDone / totalTarget : 0;
+}
+
+/**
+ * 챕터의 전체 목표 수를 계산합니다.
+ * @param chapter 챕터 객체
+ * @returns 전체 목표 수
+ */
+export function calculateChapterTargetCounts(chapter: Chapter): number {
+  if (!chapter.connectedProjects || chapter.connectedProjects.length === 0) {
+    return 0;
+  }
+
+  return chapter.connectedProjects.reduce(
+    (sum, project) => sum + project.chapterTargetCount,
+    0
+  );
+}
+
+/**
+ * 챕터의 전체 완료 수를 계산합니다.
+ * @param chapter 챕터 객체
+ * @returns 전체 완료 수
+ */
+export function calculateChapterDoneCounts(chapter: Chapter): number {
+  if (!chapter.connectedProjects || chapter.connectedProjects.length === 0) {
+    return 0;
+  }
+
+  return chapter.connectedProjects.reduce(
+    (sum, project) => sum + project.chapterDoneCount,
+    0
+  );
+}
+
+/**
+ * 챕터의 진행률 정보를 계산합니다.
+ * @param chapter 챕터 객체
+ * @returns 진행률 정보 객체
+ */
+export function calculateChapterProgressInfo(chapter: Chapter): {
+  progress: number;
+  targetCounts: number;
+  doneCounts: number;
+} {
+  const targetCounts = calculateChapterTargetCounts(chapter);
+  const doneCounts = calculateChapterDoneCounts(chapter);
+  const progress = targetCounts > 0 ? doneCounts / targetCounts : 0;
+
+  return {
+    progress,
+    targetCounts,
+    doneCounts,
+  };
 }
 
 /**
@@ -558,5 +628,7 @@ export function calculateDefaultChapterTarget(
 
   // 비례하여 목표치 계산
   const ratio = overlapDays / totalProjectDays;
-  return Math.round(project.target * ratio);
+  // project.target은 string이므로 숫자로 변환 필요
+  const targetNumber = typeof project.target === "number" ? project.target : 0;
+  return Math.round(targetNumber * ratio);
 }

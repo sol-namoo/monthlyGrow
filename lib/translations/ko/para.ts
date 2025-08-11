@@ -9,6 +9,28 @@ export const para = {
   projects: {
     description: "목표 달성을 위한 프로젝트들을 관리하세요",
     newProject: "새 프로젝트",
+    targetCount: {
+      label: "목표 개수",
+      placeholder: "목표 개수를 입력해주세요",
+      repetitive: "목표 횟수",
+      taskBased: "목표 태스크 수",
+      repetitivePlaceholder: "목표 횟수 (예: 30)",
+      taskBasedPlaceholder: "목표 태스크 수 (예: 10)",
+      description: {
+        repetitive: "반복형 프로젝트는 목표 횟수에 따라 태스크가 자동으로 생성됩니다",
+        taskBased: "작업형 프로젝트는 목표 태스크 수에 따라 빈 태스크가 생성됩니다",
+      },
+      hint: {
+        repetitive: "목표 횟수를 입력하면 태스크가 자동으로 생성됩니다",
+        taskBased: "목표 태스크 수를 입력하면 빈 태스크가 생성됩니다",
+        setup: "목표 횟수와 프로젝트 기간을 설정해주세요",
+      },
+      chapter: {
+        label: "챕터 목표 개수",
+        recommended: "권장: {count}개",
+        current: "{current}개 / 총 태스크 {total}개",
+      },
+    },
     filter: {
       all: "전체",
       allWithCount: "전체 ({count}개)",

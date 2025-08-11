@@ -4,6 +4,7 @@ import type React from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { BottomNav } from "@/components/widgets/bottom-nav";
 import Loading from "@/components/feedback/Loading";
+import { TimeZoneInitializer } from "@/components/TimeZoneInitializer";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth(true); // 인증 필요
@@ -20,6 +21,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <TimeZoneInitializer />
       <main className="flex-1 pb-16">{children}</main>
       <BottomNav />
     </div>

@@ -219,6 +219,9 @@ function NewChapterPageContent() {
   >();
   const [projectModalRefreshKey, setProjectModalRefreshKey] = useState(0);
   const [currentUrl, setCurrentUrl] = useState("/chapter/new");
+  const [projectTargetCounts, setProjectTargetCounts] = useState<
+    Record<string, number>
+  >({});
 
   // 월 선택 변경 핸들러
   const handleMonthChange = async (selectedMonth: string) => {
@@ -466,6 +469,47 @@ function NewChapterPageContent() {
     }
   };
 
+  // 프로젝트별 기본 태스크 개수 계산 (프로젝트 기간과 챕터 기간을 고려)
+  const getDefaultTargetCount = (project: any) => {
+    const projectStartDate = new Date(project.startDate);
+    const projectEndDate = new Date(project.endDate);
+    const chapterStartDate = new Date(form.watch("startDate"));
+    const chapterEndDate = new Date(form.watch("endDate"));
+
+    // 프로젝트와 챕터의 겹치는 기간 계산
+    const overlapStart = new Date(
+      Math.max(projectStartDate.getTime(), chapterStartDate.getTime())
+    );
+    const overlapEnd = new Date(
+      Math.min(projectEndDate.getTime(), chapterEndDate.getTime())
+    );
+
+    if (overlapEnd <= overlapStart) return 1;
+
+    const overlapDays = Math.ceil(
+      (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    const totalProjectDays = Math.ceil(
+      (projectEndDate.getTime() - projectStartDate.getTime()) /
+        (1000 * 60 * 60 * 24)
+    );
+    const targetCount = project.targetCount || 1;
+
+    // 겹치는 기간 비율에 따라 태스크 개수 계산
+    return Math.max(
+      1,
+      Math.round((overlapDays / totalProjectDays) * targetCount)
+    );
+  };
+
+  // 프로젝트별 태스크 개수 업데이트 핸들러
+  const updateProjectTargetCount = (projectId: string, count: number) => {
+    setProjectTargetCounts((prev) => ({
+      ...prev,
+      [projectId]: Math.max(1, count), // 최소 1개
+    }));
+  };
+
   const toggleExistingProject = (projectId: string) => {
     const currentProjects = form.getValues("selectedExistingProjects");
     if (currentProjects.includes(projectId)) {
@@ -473,6 +517,12 @@ function NewChapterPageContent() {
         "selectedExistingProjects",
         currentProjects.filter((id) => id !== projectId)
       );
+      // 프로젝트가 해제되면 해당 프로젝트의 태스크 개수도 제거
+      setProjectTargetCounts((prev) => {
+        const newCounts = { ...prev };
+        delete newCounts[projectId];
+        return newCounts;
+      });
     } else {
       // 프로젝트 개수 제한 (최대 5개)
       if (currentProjects.length < 5) {
@@ -547,6 +597,27 @@ function NewChapterPageContent() {
       if (data.selectedExistingProjects.length > 0) {
         const batch = writeBatch(db);
 
+        // 챕터에 프로젝트 목표 정보 추가
+        const connectedProjectsData = data.selectedExistingProjects.map(
+          (projectId) => {
+            const project = unconnectedProjects.find((p) => p.id === projectId);
+            return {
+              projectId,
+              chapterTargetCount:
+                projectTargetCounts[projectId] ||
+                (project ? getDefaultTargetCount(project) : 1),
+              chapterDoneCount: 0,
+            };
+          }
+        );
+
+        // 챕터 업데이트 - connectedProjects 정보 추가
+        const chapterRef = doc(db, "chapters", newChapterId.id);
+        batch.update(chapterRef, {
+          connectedProjects: connectedProjectsData,
+        });
+
+        // 프로젝트에 챕터 연결
         for (const projectId of data.selectedExistingProjects) {
           const projectRef = doc(db, "projects", projectId);
           const projectDoc = await getDoc(projectRef);
@@ -943,30 +1014,95 @@ function NewChapterPageContent() {
                   return (
                     <div
                       key={projectId}
-                      className="flex items-center justify-between p-2 bg-background rounded border"
+                      className="p-2 bg-background rounded border"
                     >
-                      <div>
-                        <p className="text-sm font-medium">{project.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {project.area || "미분류"}
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="text-sm font-medium">{project.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {project.area || "미분류"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(project.startDate)} ~{" "}
+                            {formatDate(project.endDate)}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const current = form.getValues(
+                              "selectedExistingProjects"
+                            );
+                            form.setValue(
+                              "selectedExistingProjects",
+                              current.filter((id) => id !== projectId)
+                            );
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      {/* 프로젝트별 태스크 개수 설정 */}
+                      <div className="mt-3 pt-3 border-t border-border">
+                        <div className="flex items-center gap-2">
+                          <Label
+                            htmlFor={`target-${projectId}`}
+                            className="text-sm font-medium"
+                          >
+                            {translate(
+                              "para.projects.targetCount.chapter.label"
+                            )}
+                          </Label>
+                          <Badge variant="secondary" className="text-xs">
+                            권장: {getDefaultTargetCount(project)}개
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Input
+                            id={`target-${projectId}`}
+                            type="number"
+                            min="1"
+                            max="100"
+                            value={
+                              projectTargetCounts[projectId] ||
+                              getDefaultTargetCount(project)
+                            }
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value) || 1;
+                              updateProjectTargetCount(projectId, value);
+                            }}
+                            className="w-20"
+                          />
+                          <span className="text-sm text-muted-foreground">
+                            개
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              updateProjectTargetCount(
+                                projectId,
+                                getDefaultTargetCount(project)
+                              );
+                            }}
+                            className="text-xs"
+                          >
+                            권장값 적용
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          프로젝트 기간과 챕터 기간을 고려한 권장 개수입니다.
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          (프로젝트 정보: 미완료 태스크{" "}
+                          {project.targetCount || 0}개 / 총 태스크{" "}
+                          {project.targetCount || 0}개)
                         </p>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          const current = form.getValues(
-                            "selectedExistingProjects"
-                          );
-                          form.setValue(
-                            "selectedExistingProjects",
-                            current.filter((id) => id !== projectId)
-                          );
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
                     </div>
                   );
                 })}

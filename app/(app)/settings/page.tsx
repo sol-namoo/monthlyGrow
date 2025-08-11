@@ -22,6 +22,7 @@ import {
   uploadProfilePicture,
   updateUserProfilePicture,
 } from "@/lib/firebase";
+import { resetTimeZoneCache } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { Edit2, Check, X, Save, Loader2 } from "lucide-react";
 import Image from "next/image";
@@ -88,6 +89,7 @@ export default function SettingsPage() {
     themeSettings: translate("settings.themeSettings"),
     theme: translate("settings.theme"),
     language: translate("settings.language"),
+    deviceSettingsNote: translate("settings.deviceSettingsNote"),
 
     // 계정 섹션
     account: translate("settings.account"),
@@ -192,6 +194,9 @@ export default function SettingsPage() {
         texts.language + " " + texts.saveSuccess
       );
 
+      // 언어 변경 시 타임존 캐시 초기화
+      resetTimeZoneCache();
+
       // 언어 변경 후 페이지 새로고침
       window.location.reload();
     }
@@ -205,6 +210,9 @@ export default function SettingsPage() {
     if (value !== currentValue) {
       form.setValue("theme", value);
       await saveSetting("theme", value, texts.theme + " " + texts.saveSuccess);
+
+      // 테마 변경 후 페이지 새로고침
+      window.location.reload();
     }
   };
 
@@ -616,7 +624,7 @@ export default function SettingsPage() {
                   <option value="system">{texts.themeSystem}</option>
                 </select>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {translate("theme.mobileNotice")}
+                  {texts.deviceSettingsNote}
                 </p>
               </div>
 
@@ -636,6 +644,9 @@ export default function SettingsPage() {
                 </select>
               </div>
             </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              {texts.deviceSettingsNote}
+            </p>
           </Card>
         </section>
       </div>

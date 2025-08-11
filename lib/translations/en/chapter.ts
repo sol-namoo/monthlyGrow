@@ -80,6 +80,7 @@ export const chapterDetail = {
     "Cannot measure completion rate without connected projects",
   connectProjectsHint: 'Use the "Edit" button at the top to connect projects',
   noFocusAreas: "No focus areas have been set.",
+  connectedProjects: "Connected Projects",
   tabs: {
     retrospective: "Retrospective",
     note: "Notes",

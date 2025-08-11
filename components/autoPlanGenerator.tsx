@@ -17,6 +17,7 @@ import {
 } from "../lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../lib/firebase";
+import { useLanguage } from "../hooks/useLanguage";
 import { Button } from "./ui/button";
 import { generateConstraintsGuide } from "../functions/src/constraints-guide";
 import {
@@ -587,6 +588,7 @@ function PlanPreview({
   ) => void;
   onAreaMatchingComplete: () => void;
 }) {
+  const { translate } = useLanguage();
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [isEditing, setIsEditing] = useState(false);
@@ -1010,10 +1012,12 @@ function PlanPreview({
                 </p>
                 <div className="flex flex-wrap gap-2 text-sm">
                   <span className="bg-gray-100 px-2 py-1 rounded">
-                    📊 목표:{" "}
-                    {project.category === "repetitive" && project.targetCount
-                      ? `${project.target} ${project.targetCount}회`
-                      : project.target}
+                    📊 목표: {project.target}
+                  </span>
+                  <span className="bg-gray-100 px-2 py-1 rounded">
+                    📈 {translate("para.projects.targetCount.label")}:{" "}
+                    {project.targetCount || 0}
+                    {project.category === "repetitive" ? "회" : "개"}
                   </span>
                   <span className="bg-gray-100 px-2 py-1 rounded">
                     ⏰ 일일{" "}

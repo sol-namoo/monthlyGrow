@@ -18,6 +18,8 @@ export const settings = {
   themeSettings: "테마 설정",
   theme: "테마",
   language: "언어",
+  deviceSettingsNote:
+    "절전모드 등의 기기 설정에 따라 적용되지 않을 수 있습니다.",
   account: "계정",
   logout: "로그아웃",
   logoutDescription: "현재 계정에서 로그아웃합니다.",

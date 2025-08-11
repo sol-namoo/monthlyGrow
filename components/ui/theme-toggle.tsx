@@ -26,6 +26,8 @@ export function ThemeToggle() {
     // Firestore에 설정 저장
     try {
       await updateSettings({ theme: newTheme });
+      // 테마 변경 후 페이지 새로고침
+      window.location.reload();
     } catch (error) {
       console.error("테마 설정 저장 실패:", error);
     }
@@ -34,6 +36,8 @@ export function ThemeToggle() {
   const handleLanguageChange = async (newLanguage: "ko" | "en") => {
     try {
       await updateSettings({ language: newLanguage });
+      // 언어 변경 후 페이지 새로고침
+      window.location.reload();
     } catch (error) {
       console.error("언어 설정 저장 실패:", error);
     }

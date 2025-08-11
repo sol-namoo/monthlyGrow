@@ -9,6 +9,28 @@ export const para = {
   projects: {
     description: "Manage projects to achieve your goals",
     newProject: "New Project",
+    targetCount: {
+      label: "Target Count",
+      placeholder: "Please enter target count",
+      repetitive: "Target Count",
+      taskBased: "Target Task Count",
+      repetitivePlaceholder: "Target count (e.g., 30)",
+      taskBasedPlaceholder: "Target task count (e.g., 10)",
+      description: {
+        repetitive: "Repetitive projects automatically generate tasks based on target count",
+        taskBased: "Task-based projects generate empty tasks based on target task count",
+      },
+      hint: {
+        repetitive: "Enter target count to automatically generate tasks",
+        taskBased: "Enter target task count to generate empty tasks",
+        setup: "Please set target count and project duration",
+      },
+      chapter: {
+        label: "Chapter Target Count",
+        recommended: "Recommended: {count}",
+        current: "{current} / Total Tasks {total}",
+      },
+    },
     filter: {
       all: "All",
       allWithCount: "All ({count})",

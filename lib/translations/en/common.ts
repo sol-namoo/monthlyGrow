@@ -18,7 +18,8 @@ export const theme = {
   light: "Light",
   dark: "Dark",
   system: "System",
-  mobileNotice: "May not apply on mobile devices due to device settings",
+  mobileNotice:
+    "May not apply depending on device settings such as power saving mode",
 } as const;
 
 export const language = {

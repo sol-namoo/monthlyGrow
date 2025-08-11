@@ -277,6 +277,7 @@ export const fetchAllProjectsByUserId = async (
       endDate: data.endDate?.toDate(),
       createdAt: data.createdAt.toDate(),
       updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      connectedChapters: data.connectedChapters || [],
     } as Project;
   });
 };
@@ -299,6 +300,7 @@ export const fetchActiveProjectsByUserId = async (
       endDate: data.endDate?.toDate(),
       createdAt: data.createdAt.toDate(),
       updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      connectedChapters: data.connectedChapters || [],
     } as Project;
   });
 };
@@ -321,6 +323,7 @@ export const fetchArchivedProjectsByUserId = async (
       endDate: data.endDate?.toDate(),
       createdAt: data.createdAt.toDate(),
       updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      connectedChapters: data.connectedChapters || [],
     } as Project;
   });
 };
@@ -338,6 +341,7 @@ export const fetchProjectById = async (projectId: string): Promise<Project> => {
       endDate: data.endDate.toDate(),
       createdAt: data.createdAt.toDate(),
       updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      connectedChapters: data.connectedChapters || [],
     } as Project;
 
     console.log("🔥 Firestore: Project data:", {
@@ -368,6 +372,7 @@ export const fetchProjectsByAreaId = async (
       endDate: data.endDate?.toDate(),
       createdAt: data.createdAt.toDate(),
       updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      connectedChapters: data.connectedChapters || [],
     } as Project;
   });
 };
@@ -395,6 +400,7 @@ export const fetchProjectsByChapterId = async (
       endDate: data.endDate?.toDate(),
       createdAt: data.createdAt.toDate(),
       updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      connectedChapters: data.connectedChapters || [],
     } as Project;
   });
 
@@ -427,6 +433,7 @@ export const fetchCurrentChapterProjects = async (
       endDate: data.endDate?.toDate(),
       createdAt: data.createdAt.toDate(),
       updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      connectedChapters: data.connectedChapters || [],
     } as Project;
   });
 
@@ -457,6 +464,7 @@ export const fetchUnconnectedProjects = async (
       endDate: data.endDate?.toDate(),
       createdAt: data.createdAt.toDate(),
       updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      connectedChapters: data.connectedChapters || [],
     } as Project;
   });
 
@@ -1183,12 +1191,14 @@ export const createProject = async (
     areaId: projectData.areaId,
     area: projectData.area,
     target: projectData.target,
+    targetCount: projectData.targetCount,
     completedTasks: projectData.completedTasks || 0,
     startDate: projectData.startDate,
     endDate: projectData.endDate,
     createdAt: new Date(),
     updatedAt: new Date(),
     chapterId: projectData.chapterId,
+    connectedChapters: projectData.connectedChapters || [],
 
     addedMidway: projectData.addedMidway,
     retrospective: projectData.retrospective,
@@ -1351,6 +1361,7 @@ export const createChapter = async (
     status: chapterData.status || "planned",
     retrospective: chapterData.retrospective,
     focusAreas: chapterData.focusAreas || [],
+    connectedProjects: chapterData.connectedProjects || [],
     createdAt: new Date(),
     updatedAt: new Date(),
   } as Chapter;
@@ -1998,8 +2009,8 @@ export const fetchCompletedProjects = async (
     // 완료율 100%인 프로젝트들도 포함
     return projects.filter((project) => {
       const completionRate =
-        project.target && project.completedTasks
-          ? (project.completedTasks / project.target) * 100
+        project.targetCount && project.completedTasks
+          ? (project.completedTasks / project.targetCount) * 100
           : 0;
       return completionRate >= 100;
     });
@@ -2089,14 +2100,14 @@ export const fetchYearlyActivityStats = async (
       });
 
       const totalFocusTime = yearProjects.reduce(
-        (sum, project) => sum + (project.target || 0),
+        (sum, project) => sum + (project.targetCount || 0),
         0
       );
 
       const completedProjects = yearProjects.filter((project) => {
         const completionRate =
-          project.target && project.completedTasks
-            ? (project.completedTasks / project.target) * 100
+          project.targetCount && project.completedTasks
+            ? (project.completedTasks / project.targetCount) * 100
             : 0;
         return completionRate >= 100;
       });
@@ -2131,7 +2142,9 @@ export const fetchYearlyActivityStats = async (
         monthChapters.length > 0
           ? Math.round(
               (monthChapters.filter(
-                (chapter) => chapter.doneCount >= chapter.targetCount
+                (chapter) =>
+                  (chapter.targetCount || 0) > 0 &&
+                  chapter.doneCount >= (chapter.targetCount || 0)
               ).length /
                 monthChapters.length) *
                 100
@@ -2157,8 +2170,10 @@ export const fetchYearlyActivityStats = async (
             completedChapters.reduce(
               (sum, chapter) =>
                 sum +
-                (chapter.targetCount > 0
-                  ? Math.round((chapter.doneCount / chapter.targetCount) * 100)
+                ((chapter.targetCount || 0) > 0
+                  ? Math.round(
+                      (chapter.doneCount / (chapter.targetCount || 0)) * 100
+                    )
                   : 0),
               0
             ) / completedChapters.length
