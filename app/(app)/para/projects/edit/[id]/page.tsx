@@ -91,7 +91,7 @@ const editProjectFormSchema = z
         date: z.string().min(1, "태스크 날짜를 입력해주세요"),
         duration: z
           .number()
-          .min(0, "소요 시간은 0 이상이어야 합니다")
+          .min(0.1, "소요 시간은 0.1 이상이어야 합니다")
           .multipleOf(0.1, "소요 시간은 소수점 첫째 자리까지 입력 가능합니다"),
         done: z.boolean(),
       })
@@ -230,8 +230,16 @@ export default function EditProjectPage({
   // 진행률 계산 (완료된 Tasks / 전체 Tasks)
   const completedTasks = tasks.filter((task) => task.done).length;
   const totalTasks = tasks.length;
+
+  // 진행률 계산 - 반복형은 targetCount 기준, 작업형은 실제 태스크 개수 기준
   const progressPercentage =
-    totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    project?.category === "repetitive"
+      ? project?.targetCount && project.targetCount > 0
+        ? Math.round((completedTasks / project.targetCount) * 100)
+        : 0
+      : totalTasks > 0
+      ? Math.round((completedTasks / totalTasks) * 100)
+      : 0;
 
   // 연결 가능한 챕터 필터링 (프로젝트 기간과 겹치는 챕터들, 최대 6개월 후까지)
   // react-hook-form 설정
@@ -1269,8 +1277,8 @@ export default function EditProjectPage({
                                 onChange: (e) => {},
                                 onBlur: (e) => {},
                               })}
-                              placeholder="시간"
-                              min="0"
+                              placeholder="1.0"
+                              min="0.1"
                               step="0.1"
                               className="w-16 text-sm"
                               readOnly={

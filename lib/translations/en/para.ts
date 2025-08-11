@@ -17,8 +17,10 @@ export const para = {
       repetitivePlaceholder: "Target count (e.g., 30)",
       taskBasedPlaceholder: "Target task count (e.g., 10)",
       description: {
-        repetitive: "Repetitive projects automatically generate tasks based on target count",
-        taskBased: "Task-based projects generate empty tasks based on target task count",
+        repetitive:
+          "Repetitive projects automatically generate tasks based on target count",
+        taskBased:
+          "Task-based projects generate empty tasks based on target task count",
       },
       hint: {
         repetitive: "Enter target count to automatically generate tasks",
@@ -29,6 +31,8 @@ export const para = {
         label: "Chapter Target Count",
         recommended: "Recommended: {count}",
         current: "{current} / Total Tasks {total}",
+        setToTotal: "Set to Total",
+        setToRecommended: "Set to Recommended",
       },
     },
     filter: {
@@ -51,8 +55,13 @@ export const para = {
       inProgress: "In Progress",
       completed: "Completed",
       overdue: "Overdue",
+      undefined: "No Status",
     },
     uncategorized: "Uncategorized",
+    category: {
+      repetitive: "Repetitive",
+      taskBased: "Task-based",
+    },
     noProjects: {
       title: "No projects",
       description: "Create a new project to achieve your goals",
@@ -89,16 +98,14 @@ export const para = {
       error: {
         loadError: "An error occurred while loading the area. Please try again",
         notFound: "Area not found",
+        deleteFailed: "Delete failed",
+        deleteError: "Failed to delete area",
       },
       success: {
         deleteComplete: "Area deleted",
         deleteWithItems: "Area and all connected items have been deleted",
         deleteWithoutItems:
           "Area has been deleted. Connected projects and resources are maintained",
-      },
-      error: {
-        deleteFailed: "Delete failed",
-        deleteError: "Failed to delete area",
       },
     },
     // Area create/edit page
@@ -109,7 +116,7 @@ export const para = {
         "Areas are criteria for systematically categorizing and managing projects and resources. Create your own area",
       name: "Area Name",
       namePlaceholder: "Enter area name",
-      description: "Area Description",
+      descriptionLabel: "Area Description",
       descriptionPlaceholder: "Describe what you want to manage in this area",
       color: "Color",
       icon: "Icon",
@@ -137,6 +144,7 @@ export const para = {
     description: "Store useful information and resources",
     count: "Total {count} resources",
     newResource: "New Resource",
+    other: "Other",
     sort: {
       latest: "Latest",
       oldest: "Oldest",
@@ -152,6 +160,7 @@ export const para = {
       title: "Resource Detail",
       link: "Link",
       content: "Content",
+      noContent: "No link or content available",
       delete: {
         title: "Delete Resource",
         description:
@@ -172,7 +181,7 @@ export const para = {
         "Resources are places to store useful information and materials. Create your own resource",
       name: "Resource Name",
       namePlaceholder: "Enter resource name",
-      description: "Resource Description",
+      descriptionLabel: "Resource Description",
       descriptionPlaceholder: "Enter description for this resource",
       link: "Link",
       linkPlaceholder: "https://example.com",
@@ -195,18 +204,98 @@ export const para = {
         descriptionRequired: "Please enter resource description",
       },
     },
+    // Resource add page
+    add: {
+      title: "Add Resource",
+      description: "Add a new resource",
+      explanation:
+        "Resources are reference information, links, etc. for areas.",
+      titleLabel: "Resource Title",
+      titlePlaceholder: "e.g., Effective Time Management",
+      areaLabel: "Area",
+      areaPlaceholder: "Select an area",
+      descriptionLabel: "Description (Optional)",
+      descriptionPlaceholder:
+        "Enter a brief description of the resource (displayed as preview in the list)",
+      linkLabel: "Link (Optional)",
+      linkPlaceholder: "https://example.com",
+      contentLabel: "Content (Optional)",
+      contentPlaceholder:
+        "Enter detailed content of the resource (long text, notes, summary, etc.)",
+      submit: "Create Resource",
+      cancel: "Cancel",
+      loading: "Creating resource...",
+      success: {
+        title: "Resource Created",
+        description: "{title} resource has been created.",
+      },
+      error: {
+        title: "Resource Creation Failed",
+        description: "An error occurred while creating the resource.",
+      },
+      validation: {
+        titleRequired: "Please enter resource title",
+        urlInvalid: "Please enter a valid URL",
+        areaRequired: "Please select an area",
+      },
+    },
+    // Resource edit page
+    edit: {
+      title: "Edit Resource",
+      description: "Edit the resource",
+      explanation:
+        "You can change the content or connected area of the resource to keep it up to date.",
+      titleLabel: "Resource Title",
+      titlePlaceholder: "e.g., Effective Time Management",
+      areaLabel: "Area",
+      areaPlaceholder: "Select an area",
+      descriptionLabel: "Description (Optional)",
+      descriptionPlaceholder:
+        "Enter a brief description of the resource (displayed as preview in the list)",
+      linkLabel: "Link (Optional)",
+      linkPlaceholder: "https://example.com",
+      contentLabel: "Content (Optional)",
+      contentPlaceholder:
+        "Enter detailed content of the resource (long text, notes, summary, etc.)",
+      submit: "Edit Resource",
+      submitting: "Editing...",
+      cancel: "Cancel",
+      success: {
+        title: "Resource Updated",
+        description: "Resource has been successfully updated.",
+      },
+      error: {
+        title: "Resource Update Failed",
+        description: "An error occurred while updating the resource.",
+      },
+      validation: {
+        titleRequired: "Please enter resource title",
+        urlInvalid: "Please enter a valid URL",
+        areaRequired: "Please select an area",
+      },
+    },
   },
   archives: {
     description: "Store completed items",
     count: "Total {count} archives",
+    filter: {
+      all: "All",
+      chapter: "Chapter",
+      project: "Project",
+    },
     sort: {
       latest: "Latest",
       oldest: "Oldest",
       name: "Name",
+      rating: "Rating",
     },
     noArchives: {
       title: "No archives",
       description: "Completed items will be displayed here",
+    },
+    types: {
+      chapterRetrospective: "Chapter Retrospective",
+      projectRetrospective: "Project Retrospective",
     },
     // Archive detail page
     detail: {
@@ -247,6 +336,21 @@ export const para = {
     },
     notes: {
       noContent: "No note content",
+    },
+    // Project retrospective related fields
+    projectRetrospective: {
+      goalAchieved: "Goal Achievement",
+      memorableTask: "Most Memorable Task",
+      stuckPoints: "Stuck Points",
+      newLearnings: "New Learnings",
+      nextProjectImprovements: "Next Project Improvements",
+    },
+    // Common fields
+    common: {
+      createdAt: "Created",
+      rating: "Rating",
+      loading: "Loading...",
+      error: "An error occurred",
     },
   },
 } as const;

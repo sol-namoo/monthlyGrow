@@ -108,7 +108,6 @@ export async function savePlanToFirestore(options: SavePlanOptions) {
         endDate: projectEndDate,
         connectedChapters: [], // Chapter 생성 없음
         difficulty: project.difficulty || "intermediate", // 기본값 설정
-        estimatedDailyTime: project.estimatedDailyTime || 60, // 기본값 60분
         createdAt: now,
         updatedAt: now,
         retrospective: null,
@@ -146,12 +145,11 @@ export async function savePlanToFirestore(options: SavePlanOptions) {
             title: task.title || `Task ${i + 1}`,
             description: task.description || "",
             date: taskDate,
-            duration: task.duration || 1,
+            duration: task.duration || 1.0,
             done: false,
             status: "active",
             requirements: task.requirements || [],
             resources: task.resources || [],
-            estimatedTime: task.estimatedTime || 60, // 기본값 60분
             prerequisites: task.prerequisites || [],
             createdAt: now,
             updatedAt: now,
@@ -177,12 +175,11 @@ export async function savePlanToFirestore(options: SavePlanOptions) {
           title: "프로젝트 시작",
           description: `${project.title} 프로젝트를 시작합니다.`,
           date: taskDate,
-          duration: 1,
+          duration: 1.0,
           done: false,
           status: "active",
           requirements: [],
           resources: [],
-          estimatedTime: 60,
           prerequisites: [],
           createdAt: now,
           updatedAt: now,

@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  Suspense,
+  lazy,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -18,6 +25,14 @@ import {
   BookOpen as BookOpenIcon,
   Plus,
   Archive,
+  Target,
+  BarChart3,
+  CheckCircle,
+  TrendingUp,
+  Users,
+  FileText,
+  Settings,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,7 +45,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useRouter, useSearchParams } from "next/navigation";
 import Loading from "@/components/feedback/Loading";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
 import { Chapter, Retrospective } from "@/lib/types";
@@ -38,6 +57,10 @@ import {
   fetchAllChaptersByUserId,
   fetchProjectCountsByChapterIds,
   fetchChaptersWithProjectCounts,
+  fetchProjectsByChapterId,
+  fetchAllAreasByUserId,
+  fetchAllResourcesByUserId,
+  updateChapter,
 } from "@/lib/firebase";
 import {
   formatDate,
@@ -46,98 +69,96 @@ import {
 } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useSettings } from "@/hooks/useSettings";
+import { useToast } from "@/hooks/use-toast";
+import { ProgressCard } from "@/components/widgets/progress-card";
+import { ChapterCard } from "@/components/widgets/chapter-card";
+import { ProjectCard } from "@/components/widgets/project-card";
+
+// Lazy loaded components for other tabs
+const FutureChaptersTab = lazy(() => import("./components/FutureChaptersTab"));
+const PastChaptersTab = lazy(() => import("./components/PastChaptersTab"));
 
 function ChapterPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, userLoading] = useAuthState(auth);
   const { translate, currentLanguage } = useLanguage();
+  const { settings } = useSettings();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   // 상태 관리
   const [sortBy, setSortBy] = useState<"latest" | "oldest" | "completionRate">(
     "latest"
   );
   const [currentTab, setCurrentTab] = useState(
-    searchParams.get("tab") || "active"
+    searchParams.get("tab") || "current"
   );
 
   // useEffect를 useQuery 전에 호출
   useEffect(() => {
-    setCurrentTab(searchParams.get("tab") || "active");
+    setCurrentTab(searchParams.get("tab") || "current");
   }, [searchParams]);
 
-  // Firestore에서 데이터 가져오기 - 임시로 이전 방식 사용
+  // Firestore에서 데이터 가져오기
   const { data: chapters = [], isLoading: chaptersLoading } = useQuery({
     queryKey: ["chapters", user?.uid],
     queryFn: () => fetchAllChaptersByUserId(user?.uid || ""),
     enabled: !!user?.uid,
   });
 
-  // 각 챕터의 프로젝트 개수만 효율적으로 가져오기
+  // 현재 챕터의 프로젝트들 (Current 탭에서만 로드)
+  const currentChapter =
+    chapters.find((chapter) => getChapterStatus(chapter) === "in_progress") ||
+    null;
+
+  const {
+    data: currentChapterProjects = [],
+    isLoading: currentProjectsLoading,
+  } = useQuery({
+    queryKey: ["currentChapterProjects", user?.uid, currentChapter?.id],
+    queryFn: () =>
+      currentChapter && user
+        ? fetchProjectsByChapterId(currentChapter.id, user.uid)
+        : [],
+    enabled: !!user && !!currentChapter && currentTab === "current",
+  });
+
+  // 영역 데이터 (Current 탭에서만 로드)
+  const { data: areas = [] } = useQuery({
+    queryKey: ["areas", user?.uid],
+    queryFn: () => (user ? fetchAllAreasByUserId(user.uid) : []),
+    enabled: !!user && currentTab === "current",
+  });
+
+  // 리소스 데이터 (Current 탭에서만 로드)
+  const { data: resources = [] } = useQuery({
+    queryKey: ["resources", user?.uid],
+    queryFn: () => (user ? fetchAllResourcesByUserId(user.uid) : []),
+    enabled: !!user && currentTab === "current",
+  });
+
+  // 각 챕터의 프로젝트 개수 (Future/Past 탭에서만 로드)
   const { data: chapterProjectCounts = {}, isLoading: projectCountsLoading } =
     useQuery({
       queryKey: ["chapterProjectCounts", user?.uid],
       queryFn: async () => {
         if (!user?.uid || chapters.length === 0) return {};
         const chapterIds = chapters.map((chapter) => chapter.id);
-        console.log("🔍 프로젝트 개수 조회 - 챕터 IDs:", chapterIds);
         const counts = await fetchProjectCountsByChapterIds(
           chapterIds,
           user.uid
         );
-        console.log("📊 프로젝트 개수 결과:", counts);
         return counts;
       },
-      enabled: !!user?.uid && chapters.length > 0,
+      enabled:
+        !!user?.uid &&
+        chapters.length > 0 &&
+        (currentTab === "future" || currentTab === "past"),
     });
 
-  // 디버깅: 각 챕터의 프로젝트 상태 출력
-  useEffect(() => {
-    if (chapters.length > 0) {
-      console.log("🔍 챕터별 프로젝트 상태:");
-      chapters.forEach((chapter) => {
-        const projectCount = chapterProjectCounts[chapter.id] || 0;
-        const status = getChapterStatus(chapter);
-        console.log(
-          `- ${chapter.title} (${status}): ${projectCount}개 프로젝트`
-        );
-      });
-    }
-  }, [chapters, chapterProjectCounts]);
-
-  // 디버깅: 실제 챕터별 프로젝트 쿼리 결과 확인
-  useEffect(() => {
-    if (user?.uid && chapters.length > 0) {
-      console.log("🔍 챕터별 프로젝트 쿼리 디버깅 시작");
-      console.log("총 챕터 수:", chapters.length);
-
-      chapters.forEach(async (chapter) => {
-        console.log(`\n📊 챕터 "${chapter.title}" (${chapter.id}) 조회 중...`);
-
-        try {
-          // 실제 쿼리 실행
-          const projects = await fetchProjectsByChapterId(chapter.id, user.uid);
-          console.log(`- 연결된 프로젝트 수: ${projects.length}개`);
-
-          if (projects.length > 0) {
-            console.log("- 연결된 프로젝트들:");
-            projects.forEach((project, index) => {
-              console.log(
-                `  ${index + 1}. ${project.title} (ID: ${project.id})`
-              );
-              console.log(`     connectedChapters:`, project.connectedChapters);
-            });
-          } else {
-            console.log("- 연결된 프로젝트 없음");
-          }
-        } catch (error) {
-          console.error(`❌ 챕터 "${chapter.title}" 조회 실패:`, error);
-        }
-      });
-    }
-  }, [user?.uid, chapters]);
-
-  // 초기 로딩 상태 (사용자 인증, 챕터 목록 로딩)
+  // 초기 로딩 상태
   if (userLoading || chaptersLoading) {
     return (
       <div className="container max-w-md px-4 py-6 pb-20">
@@ -156,9 +177,6 @@ function ChapterPageContent() {
   }
 
   // 챕터 상태별 분류
-  const currentChapter =
-    chapters.find((chapter) => getChapterStatus(chapter) === "in_progress") ||
-    null;
   const futureChapters = chapters.filter(
     (chapter) => getChapterStatus(chapter) === "planned"
   );
@@ -166,7 +184,7 @@ function ChapterPageContent() {
     (chapter) => getChapterStatus(chapter) === "ended"
   );
 
-  // 정렬: 미래 챕터는 시작일 순, 과거 챕터는 최신순
+  // 정렬
   futureChapters.sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
@@ -197,26 +215,62 @@ function ChapterPageContent() {
   };
 
   const handleCreateChapter = (monthOffset: number) => {
-    // monthOffset에 따라 챕터 생성 페이지로 이동
     const searchParams = new URLSearchParams();
     searchParams.set("monthOffset", monthOffset.toString());
     router.push(`/chapter/new?${searchParams.toString()}`);
   };
 
-  const renderStars = (rating: number | undefined) => {
-    if (!rating) return null;
-    return (
-      <div className="flex items-center gap-1">
-        {[...Array(5)].map((_, i) => (
-          <Star
-            key={i}
-            className={`h-3 w-3 ${
-              i < rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
-            }`}
-          />
-        ))}
-      </div>
-    );
+  // 현재 챕터 통계 계산
+  const currentChapterStats = currentChapter
+    ? {
+        totalProjects: currentChapterProjects.length,
+        completedProjects: currentChapterProjects.filter(
+          (p) => p.completedTasks >= (p.targetCount || p.completedTasks)
+        ).length,
+        totalTasks: currentChapterProjects.reduce(
+          (sum, p) => sum + (p.targetCount || p.completedTasks),
+          0
+        ),
+        completedTasks: currentChapterProjects.reduce(
+          (sum, p) => sum + p.completedTasks,
+          0
+        ),
+        progress:
+          currentChapterProjects.length > 0
+            ? Math.round(
+                (currentChapterProjects.reduce(
+                  (sum, p) => sum + p.completedTasks,
+                  0
+                ) /
+                  currentChapterProjects.reduce(
+                    (sum, p) => sum + (p.targetCount || p.completedTasks),
+                    0
+                  )) *
+                  100
+              )
+            : 0,
+        daysLeft: Math.max(
+          0,
+          Math.ceil(
+            (currentChapter.endDate.getTime() - new Date().getTime()) /
+              (1000 * 60 * 60 * 24)
+          )
+        ),
+      }
+    : null;
+
+  // areaId → area명 매핑 함수
+  const getAreaName = (areaId?: string) =>
+    areaId ? areas.find((a) => a.id === areaId)?.name || "-" : "-";
+
+  const texts = {
+    currentChapter: translate("chapter.currentChapter.title"),
+    daysLeft: translate("chapter.currentChapter.daysLeft"),
+    reward: translate("chapter.currentChapter.reward"),
+    noReward: translate("chapter.currentChapter.noReward"),
+    progress: translate("chapter.currentChapter.progress"),
+    progressSuffix: translate("chapter.currentChapter.progressSuffix"),
+    addedMidway: translate("chapter.currentChapter.addedMidway"),
   };
 
   return (
@@ -227,8 +281,8 @@ function ChapterPageContent() {
 
       <Tabs value={currentTab} onValueChange={handleTabChange} className="mb-6">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="active">
-            {translate("chapter.tabs.active")}
+          <TabsTrigger value="current">
+            {translate("chapter.tabs.current")}
           </TabsTrigger>
           <TabsTrigger value="future" className="relative">
             {translate("chapter.tabs.future")}
@@ -248,362 +302,228 @@ function ChapterPageContent() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="active" className="mt-6 space-y-8">
-          {/* 현재 챕터 섹션 */}
-          <section>
-            <div className="mb-4 flex items-center justify-between">
-              {currentChapter && (
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  <span>
-                    {getChapterStatus(currentChapter) === "ended"
-                      ? translate("chapter.currentChapter.status.completed")
-                      : translate("chapter.currentChapter.status.inProgress")}
-                  </span>
+        <TabsContent value="current" className="mt-6 space-y-6">
+          {currentChapter ? (
+            <>
+              {/* 현재 챕터 헤더 - 새로운 디자인 */}
+              <section>
+                <div className="flex items-center gap-3 justify-between mb-4 ">
+                  <h2 className="text-xl font-bold">{texts.currentChapter}</h2>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => router.push(`/chapter/${currentChapter.id}`)}
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                  >
+                    {translate("chapter.currentChapter.viewDetails")}
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
                 </div>
-              )}
-            </div>
-            {currentChapter ? (
-              <Link href={`/chapter/${currentChapter.id}`}>
-                <Card className="border-2 border-primary/20 p-4 mb-6 cursor-pointer hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-lg font-bold">
-                      {currentChapter.title}
-                    </h3>
-                    <div className="flex items-center gap-2">
-                      {getChapterStatus(currentChapter) === "ended" ? (
-                        <Badge variant="default">완료</Badge>
-                      ) : (
-                        <Badge variant="secondary">
-                          D-
-                          {Math.max(
-                            0,
-                            Math.ceil(
-                              (currentChapter.endDate.getTime() -
-                                new Date().getTime()) /
-                                (1000 * 60 * 60 * 24)
-                            )
-                          )}
-                        </Badge>
-                      )}
-                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                  </div>
 
-                  <div className="mb-4 flex items-center gap-2 text-sm">
-                    <Award className="h-4 w-4 text-purple-500" />
-                    <span>
-                      {translate("chapter.currentChapter.reward")}:{" "}
-                      {currentChapter.reward}
-                    </span>
-                  </div>
+                <ChapterCard
+                  chapter={currentChapter}
+                  daysLeft={currentChapterStats?.daysLeft || 0}
+                  progress={currentChapterStats?.progress || 0}
+                  completedTasks={currentChapterStats?.completedTasks || 0}
+                  totalTasks={currentChapterStats?.totalTasks || 0}
+                  currentLanguage={currentLanguage}
+                  texts={{
+                    daysLeft: texts.daysLeft,
+                    reward: texts.reward,
+                    noReward: texts.noReward,
+                    progress: texts.progress,
+                    progressSuffix: texts.progressSuffix,
+                  }}
+                  href={`/chapter/${currentChapter.id}`}
+                  showLink={false}
+                />
+              </section>
 
-                  <div className="mb-4">
-                    <div className="mb-1 flex justify-between text-sm">
-                      <span>
-                        {translate("chapter.currentChapter.completionRate")}:{" "}
-                        {getCompletionRate(currentChapter)}%
-                      </span>
-                      <span>
-                        {(() => {
-                          const counts = getTaskCounts(currentChapter);
-                          return `${counts.completed}/${counts.total}`;
-                        })()}
-                      </span>
-                    </div>
-                    <div className="progress-bar">
-                      <div
-                        className="progress-value"
-                        style={{
-                          width: `${getCompletionRate(currentChapter)}%`,
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    <span>
-                      {formatDate(currentChapter.startDate, currentLanguage)} ~{" "}
-                      {formatDate(currentChapter.endDate, currentLanguage)}
-                    </span>
-                  </div>
-
-                  <div className="mb-4">
-                    <h4 className="mb-2 font-medium">
-                      {translate("chapter.currentChapter.focusAreas")}
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {currentChapter.focusAreas?.map((areaId) => (
-                        <span
-                          key={areaId}
-                          className="rounded-full bg-primary/10 px-3 py-1 text-xs"
-                        >
-                          {areaId}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="mb-2 font-medium">
-                      {translate("chapter.currentChapter.projects")} (
-                      {getProjectCount(currentChapter)}개)
-                    </h4>
-                    {projectCountsLoading ? (
-                      <Skeleton className="h-4 w-32" />
-                    ) : getProjectCount(currentChapter) > 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        {translate(
-                          "chapter.currentChapter.projectsConnected"
-                        ).replace(
-                          "{count}",
-                          getProjectCount(currentChapter).toString()
-                        )}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        {translate("chapter.currentChapter.noProjects")}
-                      </p>
+              {/* 프로젝트 목록 */}
+              <section>
+                <div className="mb-4">
+                  <h3 className="text-lg font-bold flex items-center gap-2">
+                    <BookOpen className="h-5 w-5" />
+                    {translate("chapter.currentChapter.projectCount").replace(
+                      "{count}",
+                      currentChapterProjects.length.toString()
                     )}
-                  </div>
-                </Card>
-              </Link>
-            ) : (
-              <Card className="border-2 border-dashed border-primary/30 p-8 text-center">
-                <div className="mb-4 flex justify-center">
-                  <div className="rounded-full bg-primary/10 p-4">
-                    <BookOpen className="h-8 w-8 text-primary" />
-                  </div>
+                  </h3>
                 </div>
-                <h3 className="mb-2 text-lg font-bold">
-                  {translate("chapter.currentChapter.noChapter.title")}
-                </h3>
-                <p className="mb-6 text-xs text-muted-foreground max-w-sm mx-auto">
-                  {translate("chapter.currentChapter.noChapter.description")}
-                </p>
-                <Button onClick={() => handleCreateChapter(0)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  {translate("chapter.currentChapter.noChapter.button")}
-                </Button>
-              </Card>
-            )}
-          </section>
-        </TabsContent>
 
-        <TabsContent value="future" className="mt-6 space-y-8">
-          {/* 미래 챕터 헤더 */}
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              {translate("chapter.futureChapters.totalCount").replace(
-                "{count}",
-                futureChapters.length.toString()
-              )}
-            </div>
-            <Button onClick={() => handleCreateChapter(1)}>
-              <Plus className="mr-2 h-4 w-4" />
-              {translate("chapter.futureChapters.button")}
-            </Button>
-          </div>
+                {currentProjectsLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(3)].map((_, i) => (
+                      <Skeleton key={i} className="h-24 w-full" />
+                    ))}
+                  </div>
+                ) : currentChapterProjects.length === 0 ? (
+                  <Card className="p-6 text-center">
+                    <div className="mb-3 text-4xl">🎯</div>
+                    <h3 className="mb-2 font-medium">
+                      {translate("chapter.currentChapter.noProjectsTitle")}
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {translate(
+                        "chapter.currentChapter.noProjectsDescription"
+                      )}
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        onClick={() => router.push("/ai-plan-generator")}
+                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+                      >
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        {translate("chapter.currentChapter.aiPlanGenerator")}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => router.push("/para/projects/new")}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        {translate("chapter.currentChapter.manualAddProject")}
+                      </Button>
+                    </div>
+                  </Card>
+                ) : (
+                  <div className="space-y-3">
+                    {currentChapterProjects.map((project) => {
+                      // 챕터별 목표 데이터 찾기
+                      const chapterProject =
+                        currentChapter?.connectedProjects?.find(
+                          (cp) => cp.projectId === project.id
+                        );
 
-          {/* 미래 챕터 리스트 */}
-          {futureChapters.length > 0 ? (
-            <div className="space-y-4">
-              {futureChapters.map((chapter, index) => (
-                <div key={chapter.id} className={index > 0 ? "mt-4" : ""}>
-                  <Link href={`/chapter/${chapter.id}`}>
-                    <Card className="border-2 border-purple-200 dark:border-purple-700 bg-purple-50/50 dark:bg-purple-950/30 p-4 cursor-pointer hover:shadow-md transition-shadow">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-lg font-bold">{chapter.title}</h3>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            className="bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700"
-                          >
-                            {new Date(chapter.startDate).toLocaleDateString(
-                              currentLanguage === "ko" ? "ko-KR" : "en-UK",
-                              {
-                                month: "long",
-                              }
+                      return (
+                        <ProjectCard
+                          key={project.id}
+                          project={project}
+                          mode="chapter"
+                          chapterTargetCount={
+                            chapterProject?.chapterTargetCount
+                          }
+                          chapterDoneCount={chapterProject?.chapterDoneCount}
+                          showBothProgress={
+                            settings?.chapterProjectCardDisplay === "both"
+                          }
+                          showTargetButtons={true}
+                          onTargetCountChange={(projectId, newCount) => {
+                            // 챕터의 connectedProjects 업데이트
+                            const updatedConnectedProjects =
+                              currentChapter?.connectedProjects?.map((cp) =>
+                                cp.projectId === projectId
+                                  ? { ...cp, chapterTargetCount: newCount }
+                                  : cp
+                              ) || [];
+
+                            // 챕터 업데이트
+                            updateChapter(currentChapter?.id || "", {
+                              connectedProjects: updatedConnectedProjects,
+                            })
+                              .then(() => {
+                                // 캐시 무효화
+                                queryClient.invalidateQueries({
+                                  queryKey: ["chapters"],
+                                });
+                                queryClient.invalidateQueries({
+                                  queryKey: ["currentChapterProjects"],
+                                });
+
+                                toast({
+                                  title: "목표 개수 업데이트 완료",
+                                  description:
+                                    "챕터별 목표 개수가 업데이트되었습니다.",
+                                });
+                              })
+                              .catch((error) => {
+                                console.error(
+                                  "목표 개수 업데이트 실패:",
+                                  error
+                                );
+                                toast({
+                                  title: "업데이트 실패",
+                                  description:
+                                    "목표 개수 업데이트에 실패했습니다.",
+                                  variant: "destructive",
+                                });
+                              });
+                          }}
+                        >
+                          <div className="mt-2 flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">
+                              {getAreaName(project.areaId)}{" "}
+                              {translate("chapter.currentChapter.areaSuffix")}
+                            </span>
+                            {project.addedMidway && (
+                              <Badge
+                                variant="outline"
+                                className="bg-amber-100 text-amber-800 text-xs"
+                              >
+                                {texts.addedMidway}
+                              </Badge>
                             )}
-                          </Badge>
-                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                      </div>
-
-                      <div className="mb-4 flex items-center gap-2 text-sm">
-                        <Award className="h-4 w-4 text-purple-500 dark:text-purple-400" />
-                        <span>
-                          {translate("chapter.futureChapters.reward")}:{" "}
-                          {chapter.reward}
-                        </span>
-                      </div>
-
-                      <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        <span>
-                          {formatDate(chapter.startDate, currentLanguage)} ~{" "}
-                          {formatDate(chapter.endDate, currentLanguage)}
-                        </span>
-                      </div>
-
-                      <div className="mb-4">
-                        <h4 className="mb-2 font-medium">
-                          {translate("chapter.futureChapters.target")}
-                        </h4>
-                        <div className="mb-1 flex justify-between text-sm">
-                          <span>
-                            {translate(
-                              "chapter.futureChapters.targetCount"
-                            ).replace(
-                              "{count}",
-                              chapter.targetCount.toString()
-                            )}
-                          </span>
-                          <span>
-                            {projectCountsLoading ? (
-                              <Skeleton className="h-4 w-8" />
-                            ) : (
-                              translate(
-                                "chapter.futureChapters.connectedProjects"
-                              ).replace(
-                                "{count}",
-                                getProjectCount(chapter).toString()
-                              )
-                            )}
-                          </span>
-                        </div>
-                        {projectCountsLoading ? (
-                          <Skeleton className="h-4 w-48" />
-                        ) : getProjectCount(chapter) === 0 ? (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {translate("chapter.futureChapters.noProjects")}
-                          </p>
-                        ) : null}
-                      </div>
-                    </Card>
-                  </Link>
-                </div>
-              ))}
-            </div>
+                          </div>
+                        </ProjectCard>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            </>
           ) : (
             <Card className="border-2 border-dashed border-primary/30 p-8 text-center">
               <div className="mb-4 flex justify-center">
                 <div className="rounded-full bg-primary/10 p-4">
-                  <BookOpenIcon className="h-8 w-8 text-primary" />
+                  <BookOpen className="h-8 w-8 text-primary" />
                 </div>
               </div>
               <h3 className="mb-2 text-lg font-bold">
-                {translate("chapter.futureChapters.noChapters.title")}
+                {translate("chapter.currentChapter.noChapter.title")}
               </h3>
-              <p className="mb-6 text-sm text-muted-foreground max-w-sm mx-auto">
-                {translate("chapter.futureChapters.noChapters.description")}
+              <p className="mb-6 text-xs text-muted-foreground max-w-sm mx-auto">
+                {translate("chapter.currentChapter.noChapter.description")}
               </p>
-              <Button onClick={() => handleCreateChapter(1)}>
+              <Button onClick={() => handleCreateChapter(0)}>
                 <Plus className="mr-2 h-4 w-4" />
-                {translate("chapter.futureChapters.noChapters.button")}
+                {translate("chapter.currentChapter.noChapter.button")}
               </Button>
             </Card>
           )}
         </TabsContent>
 
-        <TabsContent value="past" className="mt-6 space-y-8">
-          {/* 지난 챕터 헤더 */}
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              {translate("chapter.pastChapters.totalCount").replace(
-                "{count}",
-                pastChapters.length.toString()
-              )}
-            </div>
-          </div>
-
-          {/* 지난 챕터 리스트 */}
-          {pastChapters.length > 0 ? (
-            <div className="space-y-4">
-              {pastChapters.map((chapter, index) => (
-                <div key={chapter.id} className={index > 0 ? "mt-4" : ""}>
-                  <Link href={`/chapter/${chapter.id}`}>
-                    <Card className="p-4 cursor-pointer hover:shadow-md transition-shadow">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-lg font-bold">{chapter.title}</h3>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary">
-                            {translate(
-                              "chapter.pastChapters.achievement"
-                            ).replace(
-                              "{rate}",
-                              getCompletionRate(chapter).toString()
-                            )}
-                          </Badge>
-                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                      </div>
-
-                      <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        <span>
-                          {formatDate(chapter.startDate, currentLanguage)} ~{" "}
-                          {formatDate(chapter.endDate, currentLanguage)}
-                        </span>
-                      </div>
-
-                      <div className="mb-4">
-                        <div className="mb-1 flex justify-between text-sm">
-                          <span>
-                            {translate("chapter.pastChapters.completionRate")}:{" "}
-                            {getCompletionRate(chapter)}%
-                          </span>
-                          <span>
-                            {(() => {
-                              const counts = getTaskCounts(chapter);
-                              return `${counts.completed}/${counts.total}`;
-                            })()}
-                          </span>
-                        </div>
-                        <div className="progress-bar">
-                          <div
-                            className="progress-value"
-                            style={{ width: `${getCompletionRate(chapter)}%` }}
-                          ></div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>
-                          {projectCountsLoading ? (
-                            <Skeleton className="h-4 w-8" />
-                          ) : (
-                            translate(
-                              "chapter.pastChapters.connectedProjects"
-                            ).replace(
-                              "{count}",
-                              getProjectCount(chapter).toString()
-                            )
-                          )}
-                        </span>
-                        {renderStars(chapter.retrospective?.userRating)}
-                      </div>
-                    </Card>
-                  </Link>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <Card className="border-2 border-dashed border-muted/30 p-8 text-center">
-              <div className="mb-4 flex justify-center">
-                <div className="rounded-full bg-muted/20 p-4">
-                  <Archive className="h-8 w-8 text-muted-foreground" />
-                </div>
+        <TabsContent value="future" className="mt-6">
+          <Suspense
+            fallback={
+              <div className="space-y-4">
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-32 w-full" />
               </div>
-              <h3 className="mb-2 text-lg font-bold">
-                {translate("chapter.pastChapters.noChapters.title")}
-              </h3>
-              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                {translate("chapter.pastChapters.noChapters.description")}
-              </p>
-            </Card>
-          )}
+            }
+          >
+            <FutureChaptersTab
+              chapters={futureChapters}
+              projectCounts={chapterProjectCounts}
+              projectCountsLoading={projectCountsLoading}
+              onCreateChapter={handleCreateChapter}
+            />
+          </Suspense>
+        </TabsContent>
+
+        <TabsContent value="past" className="mt-6">
+          <Suspense
+            fallback={
+              <div className="space-y-4">
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-32 w-full" />
+              </div>
+            }
+          >
+            <PastChaptersTab
+              chapters={pastChapters}
+              projectCounts={chapterProjectCounts}
+              projectCountsLoading={projectCountsLoading}
+            />
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>

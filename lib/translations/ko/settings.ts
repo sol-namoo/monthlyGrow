@@ -57,4 +57,11 @@ export const settings = {
     areaInfo: "Area 정보 로딩 중...",
     showMore: "더보기",
   },
+  chapterProjectCardDisplay: {
+    title: "챕터에 포함된 프로젝트의 카드 표시",
+    description:
+      "챕터 페이지에서 프로젝트 카드를 볼 때 표시할 정보를 선택하세요",
+    chapterOnly: "챕터별 목표만",
+    both: "챕터별 목표 + 전체 진행률",
+  },
 } as const;

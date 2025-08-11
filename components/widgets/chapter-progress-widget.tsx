@@ -15,7 +15,8 @@ export function ChapterProgressWidget({
   className,
 }: ChapterProgressWidgetProps) {
   const progressInfo = calculateChapterProgressInfo(chapter);
-  const progressPercentage = Math.round(progressInfo.progress * 100);
+  // NaN 방지를 위한 안전한 계산
+  const progressPercentage = isNaN(progressInfo.progress) ? 0 : Math.round(progressInfo.progress * 100);
 
   return (
     <Card className={`p-4 ${className || ""}`}>
@@ -36,11 +37,11 @@ export function ChapterProgressWidget({
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <div className="flex items-center gap-1">
           <Target className="h-3 w-3" />
-          <span>목표: {progressInfo.targetCounts}</span>
+          <span>목표: {progressInfo.targetCounts || 0}</span>
         </div>
         <div className="flex items-center gap-1">
           <CheckCircle className="h-3 w-3" />
-          <span>완료: {progressInfo.doneCounts}</span>
+          <span>완료: {progressInfo.doneCounts || 0}</span>
         </div>
       </div>
     </Card>

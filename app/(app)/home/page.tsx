@@ -7,6 +7,7 @@ import { StatsCard } from "@/components/widgets/stats-card";
 import { AreaActivityChart } from "@/components/widgets/area-activity-chart";
 import { ChapterComparisonChart } from "@/components/widgets/chapter-comparison-chart";
 import { UncategorizedStatsCard } from "@/components/widgets/uncategorized-stats-card";
+import { ChapterCard } from "@/components/widgets/chapter-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,6 +21,16 @@ import {
   BookOpen,
   Plus,
   Sparkles,
+  Target,
+  Zap,
+  Lightbulb,
+  Rocket,
+  CheckCircle,
+  AlertCircle,
+  ArrowRight,
+  Play,
+  Settings,
+  BarChart3,
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +49,7 @@ import {
   fetchYearlyActivityStats,
   fetchProjectsByChapterId,
   fetchCurrentChapterProjects,
+  getTodayTasks,
 } from "@/lib/firebase";
 import { getChapterStatus, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
@@ -63,12 +75,14 @@ export default function HomePage() {
       improvementSuffix: translate("home.improvementSuffix"),
 
       // 탭
-      summaryTab: translate("home.tabs.summary"),
+      todayTab: translate("home.tabs.today"),
       dashboardTab: translate("home.tabs.dashboard"),
 
       // 현재 챕터
       currentChapter: translate("home.currentChapter"),
       noChapter: translate("home.noChapter"),
+      noChapterDescription: translate("home.noChapterDescription"),
+      createChapter: translate("home.createChapter"),
       reward: translate("home.reward"),
       noReward: translate("home.noReward"),
       progress: translate("home.progress"),
@@ -95,6 +109,22 @@ export default function HomePage() {
       aiPlanGenerator: translate("home.aiPlanGenerator"),
       aiPlanGeneratorDescription: translate("home.aiPlanGeneratorDescription"),
       generateWithAI: translate("home.generateWithAI"),
+
+      // 오늘의 할 일
+      todayTasks: translate("home.todayTasks"),
+      todayTasksEmpty: translate("home.todayTasksEmpty"),
+      todayTasksEmptyDescription: translate("home.todayTasksEmptyDescription"),
+      todayDeadlineProjects: translate("home.todayDeadlineProjects"),
+      todayDeadlineProjectsEmpty: translate("home.todayDeadlineProjectsEmpty"),
+      todayDeadlineProjectsEmptyDescription: translate(
+        "home.todayDeadlineProjectsEmptyDescription"
+      ),
+      inProgressProjects: translate("home.inProgressProjects"),
+      quickActions: translate("home.quickActions"),
+      newProject: translate("home.newProject"),
+      addResource: translate("home.addResource"),
+      newChapter: translate("home.newChapter"),
+      viewAllProjects: translate("home.viewAllProjects"),
 
       // 대시보드
       yearlyStats: translate("home.yearlyStats"),
@@ -130,6 +160,19 @@ export default function HomePage() {
       router.push("/login");
     }
   }, [user, loading, toast, router, texts]);
+
+  // 사용자 ID 디버깅 (개발 환경에서만)
+  useEffect(() => {
+    if (user && process.env.NODE_ENV === "development") {
+      console.log("🏠 홈페이지 사용자 정보:", {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        providerId: user.providerId,
+        isAnonymous: user.isAnonymous,
+      });
+    }
+  }, [user]);
 
   // Firestore에서 직접 데이터 가져오기
   const { data: areas = [] } = useQuery({
@@ -181,6 +224,14 @@ export default function HomePage() {
   // 현재 챕터에 연결된 프로젝트들 (이미 필터링된 상태)
   const currentChapterProjects = projects;
 
+  // 오늘의 task들
+  const { data: todayTasks = [], isLoading: todayTasksLoading } = useQuery({
+    queryKey: ["todayTasks", user?.uid, currentChapter?.id],
+    queryFn: () =>
+      user && currentChapter ? getTodayTasks(user.uid, currentChapter.id) : [],
+    enabled: !!user && !!currentChapter,
+  });
+
   // 오늘 마감인 프로젝트들
   const { data: todayDeadlineProjects = [] } = useQuery({
     queryKey: ["todayDeadlineProjects", user?.uid],
@@ -216,14 +267,6 @@ export default function HomePage() {
     enabled: !!user,
   });
 
-  // 자동 완료 체크는 제거됨 - 프로젝트 상태는 동적으로 계산됨
-  // useEffect(() => {
-  //   if (user && !autoCompleteCheckedRef.current) {
-  //     checkAndAutoCompleteProjects(user.uid);
-  //     autoCompleteCheckedRef.current = true;
-  //   }
-  // }, [user]);
-
   // 현재 챕터 정보 계산
   const startDate = currentChapter
     ? formatDate(new Date(currentChapter.startDate), currentLanguage)
@@ -232,15 +275,22 @@ export default function HomePage() {
     ? formatDate(new Date(currentChapter.endDate), currentLanguage)
     : "";
 
-  const total = currentChapterProjects.reduce(
-    (sum, project) => sum + (project.targetCount || project.completedTasks),
-    0
-  );
-  const actualDoneCount = currentChapterProjects.reduce(
-    (sum, project) => sum + project.completedTasks,
-    0
-  );
-  const progress = total > 0 ? Math.round((actualDoneCount / total) * 100) : 0;
+  // 챕터 진행률 계산 - connectedProjects를 사용하여 정확한 계산
+  let total = 0;
+  let actualDoneCount = 0;
+  let progress = 0;
+
+  if (currentChapter && currentChapter.connectedProjects) {
+    total = currentChapter.connectedProjects.reduce(
+      (sum, project) => sum + (project.chapterTargetCount || 0),
+      0
+    );
+    actualDoneCount = currentChapter.connectedProjects.reduce(
+      (sum, project) => sum + (project.chapterDoneCount || 0),
+      0
+    );
+    progress = total > 0 ? Math.round((actualDoneCount / total) * 100) : 0;
+  }
 
   // 남은 일수 계산
   const today = new Date();
@@ -277,213 +327,275 @@ export default function HomePage() {
 
   return (
     <div className="container max-w-md px-4 py-6">
-      <div className="mb-6 flex items-center gap-4">
-        <CharacterAvatar level={5} />
-        <div>
-          <h1 className="text-2xl font-bold">
-            {texts.greeting}{" "}
-            {user?.displayName || user?.email?.split("@")[0] || texts.noName}
-            {texts.greetingSuffix}
-          </h1>
-          <p className="text-muted-foreground">{texts.encouragement}</p>
-          <div className="mt-1 flex items-center gap-1 text-xs text-green-600">
-            <TrendingUp className="h-3 w-3" />
-            <span>
-              {texts.improvement} {changeRate}
-              {texts.improvementSuffix}
-            </span>
+      {/* 헤더 섹션 */}
+      <div className="mb-8">
+        <div className="flex items-center gap-4 mb-6">
+          <CharacterAvatar level={5} />
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold">
+              {texts.greeting}{" "}
+              {user?.displayName || user?.email?.split("@")[0] || texts.noName}
+              {texts.greetingSuffix}
+            </h1>
+            <p className="text-muted-foreground">{texts.encouragement}</p>
+            <div className="mt-1 flex items-center gap-1 text-xs text-green-600">
+              <TrendingUp className="h-3 w-3" />
+              <span>
+                {texts.improvement} {changeRate}
+                {texts.improvementSuffix}
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      <Tabs defaultValue="summary" className="mb-6">
+      {/* AI 계획 생성기 독립 블록 */}
+      <Card className="mb-6 bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200">
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Sparkles className="h-6 w-6 text-purple-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-purple-900">
+                {texts.aiPlanGenerator}
+              </h3>
+              <p className="text-sm text-purple-700">
+                {texts.aiPlanGeneratorDescription}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3 mb-4">
+            <div className="flex items-center gap-2 text-sm text-purple-700">
+              <CheckCircle className="h-4 w-4" />
+              <span>목표 분석 및 단계별 계획 수립</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-purple-700">
+              <CheckCircle className="h-4 w-4" />
+              <span>시간 제약 및 난이도 고려</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-purple-700">
+              <CheckCircle className="h-4 w-4" />
+              <span>프로젝트와 작업 자동 생성</span>
+            </div>
+          </div>
+
+          <Button
+            onClick={() => router.push("/ai-plan-generator")}
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+          >
+            <Rocket className="h-4 w-4 mr-2" />
+            {texts.generateWithAI}
+          </Button>
+        </div>
+      </Card>
+
+      {/* 미분류 항목 통계 */}
+      <UncategorizedStatsCard
+        uncategorizedProjects={uncategorizedProjects}
+        uncategorizedResources={uncategorizedResources}
+        totalAreas={areas.length}
+      />
+
+      {/* 탭 네비게이션 */}
+      <Tabs defaultValue="today" className="mb-6">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="summary">{texts.summaryTab}</TabsTrigger>
+          <TabsTrigger value="today">{texts.todayTab}</TabsTrigger>
           <TabsTrigger value="dashboard">{texts.dashboardTab}</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="summary" className="mt-4 space-y-6">
-          {/* 미분류 항목 통계 카드 */}
-          <UncategorizedStatsCard
-            uncategorizedProjects={uncategorizedProjects}
-            uncategorizedResources={uncategorizedResources}
-            totalAreas={areas.length}
-          />
-
-          <section>
-            <div className="mb-4 flex items-center">
-              <h2 className="text-xl font-bold">{texts.currentChapter}</h2>
-            </div>
-
-            <Card className="relative overflow-hidden border-2 border-primary/20 p-4">
-              <div className="absolute right-0 top-0 rounded-bl-lg bg-primary/10 px-2 py-1 text-xs">
-                {texts.daysLeft}
-                {daysLeft}
+        <TabsContent value="today" className="mt-4 space-y-6">
+          {/* 현재 챕터 정보 */}
+          {currentChapter ? (
+            <ChapterCard
+              chapter={currentChapter}
+              daysLeft={daysLeft}
+              progress={progress}
+              completedTasks={actualDoneCount}
+              totalTasks={total}
+              currentLanguage={currentLanguage}
+              texts={{
+                daysLeft: texts.daysLeft,
+                reward: texts.reward,
+                noReward: texts.noReward,
+                progress: texts.progress,
+                progressSuffix: texts.progressSuffix,
+              }}
+              href={`/chapter/${currentChapter.id}`}
+            />
+          ) : (
+            <Card className="border-2 border-dashed border-primary/30 p-8 text-center">
+              <div className="mb-4 flex justify-center">
+                <div className="rounded-full bg-primary/10 p-4">
+                  <BookOpen className="h-8 w-8 text-primary" />
+                </div>
               </div>
-              <h3 className="mb-2 text-lg font-bold">
-                {currentChapter?.title || texts.noChapter}
-              </h3>
-              <div className="mb-4 flex items-center gap-2 text-sm">
-                <Star className="h-4 w-4 text-yellow-500" />
-                <span>
-                  {texts.reward}: {currentChapter?.reward || texts.noReward}
-                </span>
-              </div>
-              <div className="mb-1 flex justify-between text-sm">
-                <span>
-                  {texts.progress}: {progress}
-                  {texts.progressSuffix}
-                </span>
-                <span>
-                  {actualDoneCount}/{total}
-                </span>
-              </div>
-              <div className="progress-bar">
-                <div
-                  className="progress-value"
-                  style={{ width: `${progress}%` }}
-                ></div>
-              </div>
-              <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                <Calendar className="h-3 w-3" />
-                <span>
-                  {startDate} ~ {endDate}
-                </span>
-              </div>
+              <h3 className="mb-2 text-lg font-bold">{texts.noChapter}</h3>
+              <p className="mb-6 text-xs text-muted-foreground max-w-sm mx-auto">
+                {texts.noChapterDescription}
+              </p>
+              <Button onClick={() => router.push("/chapter/new")}>
+                <Plus className="mr-2 h-4 w-4" />
+                {texts.createChapter}
+              </Button>
             </Card>
-          </section>
-
-          {/* 오늘 마감 가이드 */}
-          {todayDeadlineProjects.length > 0 && (
-            <section className="mb-6">
-              <Card className="border-orange-200 bg-orange-50/50 p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Clock className="h-4 w-4 text-orange-600" />
-                  <h3 className="font-medium text-orange-800">
-                    {texts.todayDeadline}
-                  </h3>
-                </div>
-                <p className="text-sm text-orange-700 mb-3">
-                  {todayDeadlineProjects.length}
-                  {texts.todayDeadlineDescription}
-                </p>
-                <div className="space-y-2">
-                  {todayDeadlineProjects.slice(0, 3).map((project) => (
-                    <div
-                      key={project.id}
-                      className="flex items-center justify-between"
-                    >
-                      <span className="text-sm font-medium">
-                        {project.title}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="text-xs border-orange-300 text-orange-700"
-                      >
-                        {(() => {
-                          const taskCount = todayProjectTaskCounts[project.id];
-                          if (taskCount) {
-                            return `${taskCount.completedTasks}/${taskCount.totalTasks} ${texts.completed}`;
-                          }
-                          return texts.inProgress;
-                        })()}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </section>
           )}
 
-          {/* 현재 챕터 프로젝트들 */}
+          {/* 오늘의 task들 */}
           <section>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold">
-                {texts.currentChapterProjects}
-              </h2>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => router.push("/ai-plan-generator")}
-                className="text-purple-600 border-purple-200 hover:bg-purple-50"
-              >
-                <Sparkles className="h-4 w-4 mr-1" />
-                {texts.generateWithAI}
-              </Button>
+            <div className="flex items-center gap-2 mb-4">
+              <CheckCircle className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-bold">
+                {texts.todayTasks} ({todayTasks.length}개)
+              </h3>
             </div>
 
             <div className="space-y-3">
-              {currentChapterProjects.length === 0 ? (
-                <Card className="p-4 text-center">
-                  <div className="mb-2 text-4xl">🎯</div>
-                  <h3 className="mb-1 font-medium">{texts.noProjects}</h3>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    {texts.noProjectsDescription}
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                    <Link href="/para/projects/new">
-                      <Button size="sm" variant="outline">
-                        <Plus className="h-4 w-4 mr-1" />
-                        {texts.addProject}
-                      </Button>
-                    </Link>
-                    <Button
-                      size="sm"
-                      onClick={() => router.push("/ai-plan-generator")}
-                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
-                    >
-                      <Sparkles className="h-4 w-4 mr-1" />
-                      {texts.generateWithAI}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {texts.aiPlanGeneratorDescription}
+              {todayTasks.length > 0 ? (
+                todayTasks.map((task) => (
+                  <Card
+                    key={task.id}
+                    className="p-4 border border-border hover:shadow-sm transition-shadow"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h4 className="font-medium mb-1">{task.title}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {task.duration}일 소요
+                        </p>
+                      </div>
+                      <Badge
+                        variant={task.done ? "default" : "secondary"}
+                        className="text-xs"
+                      >
+                        {task.done ? "완료" : "진행중"}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        예상 소요시간: {task.duration}일
+                      </span>
+                      <span className="text-muted-foreground">
+                        {task.done ? "✅ 완료됨" : "⏳ 진행중"}
+                      </span>
+                    </div>
+                  </Card>
+                ))
+              ) : (
+                <Card className="p-6 text-center border-dashed border-border">
+                  <div className="mb-3 text-2xl">📝</div>
+                  <h3 className="mb-2 font-medium">{texts.todayTasksEmpty}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {texts.todayTasksEmptyDescription}
                   </p>
                 </Card>
-              ) : (
-                <>
-                  {displayedProjects.map((project) => (
-                    <ProgressCard
-                      key={project.id}
-                      title={project.title}
-                      progress={project.completedTasks}
-                      total={project.targetCount || project.completedTasks}
-                    >
-                      <div className="mt-2 flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">
-                          {texts.area}: {getAreaName(project.areaId)}
-                        </span>
-                        {project.addedMidway && (
-                          <Badge
-                            variant="outline"
-                            className="bg-amber-100 text-amber-800 text-xs"
-                          >
-                            {texts.addedMidway}
-                          </Badge>
-                        )}
-                      </div>
-                    </ProgressCard>
-                  ))}
-
-                  {!showAllProjects && hasMoreProjects && (
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full"
-                      onClick={() => setShowAllProjects(true)}
-                    >
-                      {texts.showMore} ({currentChapterProjects.length - 3}
-                      {texts.showMoreSuffix})
-                    </Button>
-                  )}
-                </>
               )}
+            </div>
+          </section>
+
+          {/* 오늘 마감 프로젝트들 */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <AlertCircle className="h-5 w-5 text-orange-600" />
+              <h3 className="text-lg font-bold">
+                {texts.todayDeadlineProjects} ({todayDeadlineProjects.length}개)
+              </h3>
+            </div>
+
+            <div className="space-y-3">
+              {todayDeadlineProjects.length > 0 ? (
+                todayDeadlineProjects.map((project) => (
+                  <Card
+                    key={project.id}
+                    className="p-4 border border-border hover:shadow-sm transition-shadow"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h4 className="font-medium mb-1">{project.title}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {getAreaName(project.areaId)} 영역
+                        </p>
+                      </div>
+                      <Badge variant="destructive" className="text-xs">
+                        마감
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        목표: {project.targetCount}개
+                      </span>
+                      <span className="text-muted-foreground">
+                        완료: {project.completedTasks}개
+                      </span>
+                    </div>
+                  </Card>
+                ))
+              ) : (
+                <Card className="p-6 text-center border-dashed border-border">
+                  <div className="mb-3 text-2xl">🎯</div>
+                  <h3 className="mb-2 font-medium">
+                    {texts.todayDeadlineProjectsEmpty}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {texts.todayDeadlineProjectsEmptyDescription}
+                  </p>
+                </Card>
+              )}
+            </div>
+          </section>
+
+          {/* 빠른 액션 */}
+          <section>
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <Zap className="h-5 w-5 text-primary" />
+              {texts.quickActions}
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant="outline"
+                onClick={() => router.push("/para/projects/new")}
+                className="h-16 flex flex-col gap-1 hover:bg-primary/5 hover:border-primary/30 transition-colors"
+              >
+                <Plus className="h-5 w-5" />
+                <span className="text-sm">{texts.newProject}</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => router.push("/para/resources/new")}
+                className="h-16 flex flex-col gap-1 hover:bg-primary/5 hover:border-primary/30 transition-colors"
+              >
+                <BookOpen className="h-5 w-5" />
+                <span className="text-sm">{texts.addResource}</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => router.push("/chapter/new")}
+                className="h-16 flex flex-col gap-1 hover:bg-primary/5 hover:border-primary/30 transition-colors"
+              >
+                <Target className="h-5 w-5" />
+                <span className="text-sm">{texts.newChapter}</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => router.push("/ai-plan-generator")}
+                className="h-16 flex flex-col gap-1 hover:bg-primary/5 hover:border-primary/30 transition-colors"
+              >
+                <Sparkles className="h-5 w-5" />
+                <span className="text-sm">{texts.generateWithAI}</span>
+              </Button>
             </div>
           </section>
         </TabsContent>
 
         <TabsContent value="dashboard" className="mt-4 space-y-6">
           <div className="rounded-lg border bg-muted/20 p-4 mb-4">
-            <h2 className="text-lg font-bold mb-2">{texts.yearlyStats}</h2>
+            <h2 className="text-lg font-bold mb-2 flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              {texts.yearlyStats}
+            </h2>
             <p className="text-sm text-muted-foreground">
               {texts.yearlyStatsDescription}
             </p>

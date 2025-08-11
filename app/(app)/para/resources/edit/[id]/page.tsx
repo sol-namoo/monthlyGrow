@@ -33,16 +33,13 @@ import {
 import { useAuthState } from "react-firebase-hooks/auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-// 폼 스키마 정의
-const resourceFormSchema = z.object({
-  title: z.string().min(1, "자료 제목을 입력해주세요"),
-  description: z.string().optional(),
-  url: z.string().url("올바른 URL을 입력해주세요").optional().or(z.literal("")),
-  text: z.string().optional(),
-  area: z.string().min(1, "영역을 선택해주세요"),
-});
-
-type ResourceFormData = z.infer<typeof resourceFormSchema>;
+type ResourceFormData = {
+  title: string;
+  description?: string;
+  url?: string;
+  text?: string;
+  area: string;
+};
 
 // 로딩 스켈레톤 컴포넌트
 function EditResourceSkeleton() {
@@ -73,6 +70,24 @@ export default function EditResourcePage({
   const { id } = use(params);
   const queryClient = useQueryClient();
   const [user, userLoading] = useAuthState(auth);
+  const { translate } = useLanguage();
+
+  // 폼 스키마 정의 (translate 함수 사용을 위해 컴포넌트 내부로 이동)
+  const resourceFormSchema = z.object({
+    title: z
+      .string()
+      .min(1, translate("para.resources.edit.validation.titleRequired")),
+    description: z.string().optional(),
+    url: z
+      .string()
+      .url(translate("para.resources.edit.validation.urlInvalid"))
+      .optional()
+      .or(z.literal("")),
+    text: z.string().optional(),
+    area: z
+      .string()
+      .min(1, translate("para.resources.edit.validation.areaRequired")),
+  });
 
   // react-hook-form 설정
   const form = useForm<ResourceFormData>({
@@ -118,15 +133,16 @@ export default function EditResourcePage({
       queryClient.invalidateQueries({ queryKey: ["resource", id] });
       queryClient.invalidateQueries({ queryKey: ["resources"] });
       toast({
-        title: "자료 수정 완료",
-        description: "자료가 성공적으로 수정되었습니다.",
+        title: translate("para.resources.edit.success.title"),
+        description: translate("para.resources.edit.success.description"),
       });
       router.push(`/para/resources/${id}`);
     },
     onError: (error: Error) => {
       toast({
-        title: "자료 수정 실패",
-        description: error.message || "자료 수정 중 오류가 발생했습니다.",
+        title: translate("para.resources.edit.error.title"),
+        description:
+          error.message || translate("para.resources.edit.error.description"),
         variant: "destructive",
       });
     },
@@ -162,12 +178,14 @@ export default function EditResourcePage({
               <ChevronLeft className="h-5 w-5" />
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold">자료 수정</h1>
+          <h1 className="text-2xl font-bold">
+            {translate("para.resources.edit.title")}
+          </h1>
         </div>
 
         <Alert>
           <AlertDescription>
-            자료를 불러오는 중 오류가 발생했습니다. 다시 시도해주세요.
+            {translate("para.resources.detail.error.loadError")}
           </AlertDescription>
         </Alert>
       </div>
@@ -183,7 +201,9 @@ export default function EditResourcePage({
               <ChevronLeft className="h-5 w-5" />
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold">자료 수정</h1>
+          <h1 className="text-2xl font-bold">
+            {translate("para.resources.edit.title")}
+          </h1>
         </div>
 
         <div className="mb-6 text-center">
@@ -192,21 +212,24 @@ export default function EditResourcePage({
               <Book className="h-8 w-8 text-primary" />
             </div>
           </div>
-          <h2 className="text-lg font-bold mb-2">자료를 수정해보세요</h2>
+          <h2 className="text-lg font-bold mb-2">
+            {translate("para.resources.edit.description")}
+          </h2>
           <p className="text-sm text-muted-foreground">
-            자료의 내용이나 연결된 영역을 변경하여 최신 상태로 유지할 수
-            있습니다.
+            {translate("para.resources.edit.explanation")}
           </p>
         </div>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="space-y-4">
             <div>
-              <Label htmlFor="title">자료 제목</Label>
+              <Label htmlFor="title">
+                {translate("para.resources.edit.titleLabel")}
+              </Label>
               <Input
                 id="title"
                 {...form.register("title")}
-                placeholder="예: 효과적인 시간 관리법"
+                placeholder={translate("para.resources.edit.titlePlaceholder")}
               />
               {form.formState.errors.title && (
                 <p className="mt-1 text-sm text-red-500">
@@ -216,13 +239,19 @@ export default function EditResourcePage({
             </div>
 
             <div>
-              <Label htmlFor="area">소속 영역</Label>
+              <Label htmlFor="area">
+                {translate("para.resources.edit.areaLabel")}
+              </Label>
               <Select
                 onValueChange={(value) => form.setValue("area", value)}
                 value={form.watch("area")}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="영역을 선택해주세요" />
+                  <SelectValue
+                    placeholder={translate(
+                      "para.resources.edit.areaPlaceholder"
+                    )}
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {allAreas.map((area) => (
@@ -240,22 +269,28 @@ export default function EditResourcePage({
             </div>
 
             <div>
-              <Label htmlFor="description">설명 (선택 사항)</Label>
+              <Label htmlFor="description">
+                {translate("para.resources.edit.descriptionLabel")}
+              </Label>
               <Textarea
                 id="description"
                 {...form.register("description")}
-                placeholder="자료에 대한 간단한 설명을 입력하세요 (리스트에서 미리보기로 표시됩니다)"
+                placeholder={translate(
+                  "para.resources.edit.descriptionPlaceholder"
+                )}
                 rows={3}
               />
             </div>
 
             <div>
-              <Label htmlFor="url">링크 (선택 사항)</Label>
+              <Label htmlFor="url">
+                {translate("para.resources.edit.linkLabel")}
+              </Label>
               <Input
                 id="url"
                 type="url"
                 {...form.register("url")}
-                placeholder="https://example.com"
+                placeholder={translate("para.resources.edit.linkPlaceholder")}
               />
               {form.formState.errors.url && (
                 <p className="mt-1 text-sm text-red-500">
@@ -265,11 +300,15 @@ export default function EditResourcePage({
             </div>
 
             <div>
-              <Label htmlFor="text">내용 (선택 사항)</Label>
+              <Label htmlFor="text">
+                {translate("para.resources.edit.contentLabel")}
+              </Label>
               <Textarea
                 id="text"
                 {...form.register("text")}
-                placeholder="자료의 상세한 내용을 입력하세요 (긴 텍스트, 메모, 요약 등)"
+                placeholder={translate(
+                  "para.resources.edit.contentPlaceholder"
+                )}
                 rows={4}
               />
             </div>
@@ -281,14 +320,16 @@ export default function EditResourcePage({
               className="flex-1"
               disabled={updateResourceMutation.isPending}
             >
-              {updateResourceMutation.isPending ? "수정 중..." : "자료 수정"}
+              {updateResourceMutation.isPending
+                ? translate("para.resources.edit.submitting")
+                : translate("para.resources.edit.submit")}
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={() => router.back()}
             >
-              취소
+              {translate("para.resources.edit.cancel")}
             </Button>
           </div>
         </form>

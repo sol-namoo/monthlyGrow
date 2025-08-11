@@ -3,8 +3,21 @@ export const common = {
   status: "상태",
   cancel: "취소",
   save: "저장",
+  delete: "삭제",
+  confirm: "확인",
   noSearchResults: "검색 결과가 없습니다.",
   progress: "진행률",
+  area: "영역",
+  category: "카테고리",
+  target: "목표",
+  uncategorized: "미분류",
+  chapterGoal: "이번 챕터 목표",
+  projectProgress: "전체 진행률",
+  errors: {
+    loginRequired: "로그인이 필요합니다.",
+    unexpectedResponse: "서버에서 예상치 못한 응답을 받았습니다.",
+    serviceError: "서비스 오류가 발생했습니다.",
+  },
 } as const;
 
 export const bottomNav = {

@@ -19,7 +19,8 @@ export const settings = {
   themeSettings: "Theme Settings",
   theme: "Theme",
   language: "Language",
-  deviceSettingsNote: "May not apply depending on device settings such as power saving mode.",
+  deviceSettingsNote:
+    "May not apply depending on device settings such as power saving mode.",
   account: "Account",
   logout: "Logout",
   logoutDescription: "Log out from the current account.",
@@ -56,5 +57,12 @@ export const settings = {
     loading: "Loading...",
     areaInfo: "Loading area information...",
     showMore: "Show More",
+  },
+  chapterProjectCardDisplay: {
+    title: "Project Card Display in Chapters",
+    description:
+      "Choose what information to show in project cards on chapter pages",
+    chapterOnly: "Chapter goals only",
+    both: "Chapter goals + Overall progress",
   },
 } as const;

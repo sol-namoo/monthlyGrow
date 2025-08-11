@@ -97,6 +97,7 @@ function processConstraints(constraints: PlanConstraints): PlanConstraints {
 }
 
 export default function PlanGenerator() {
+  const { translate } = useLanguage();
   const [userGoal, setUserGoal] = useState("");
   const [constraints, setConstraints] = useState<PlanConstraints>({});
   const [isGenerating, setIsGenerating] = useState(false);
@@ -139,12 +140,12 @@ export default function PlanGenerator() {
 
   const handleGenerate = async () => {
     if (!userGoal.trim()) {
-      setError("목표를 입력해주세요.");
+      setError(translate("aiPlanGenerator.errors.goalRequired"));
       return;
     }
 
     if (!user) {
-      setError("로그인이 필요합니다.");
+      setError(translate("common.errors.loginRequired"));
       return;
     }
 
@@ -286,14 +287,17 @@ export default function PlanGenerator() {
             setShowAreaMatching(true);
           }
         } else {
-          setError(result.data.error || "계획 생성에 실패했습니다.");
+          setError(
+            result.data.error ||
+              translate("aiPlanGenerator.errors.generationFailed")
+          );
         }
       } else {
-        setError("서버에서 예상치 못한 응답을 받았습니다.");
+        setError(translate("common.errors.unexpectedResponse"));
       }
     } catch (error) {
       console.error("계획 생성 오류:", error);
-      setError("서비스 오류가 발생했습니다.");
+      setError(translate("common.errors.serviceError"));
     } finally {
       setIsGenerating(false);
     }
@@ -301,17 +305,19 @@ export default function PlanGenerator() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">AI 계획 생성기</h1>
+      <h1 className="text-2xl font-bold mb-6">
+        {translate("aiPlanGenerator.title")}
+      </h1>
 
       {/* 기존 Areas 정보 */}
       {existingAreas.length > 0 && (
         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <h3 className="font-medium text-blue-900 mb-2">
-            📋 기존 영역 정보 ({existingAreas.length}개)
+            📋 {translate("aiPlanGenerator.existingAreas.title")} (
+            {existingAreas.length}개)
           </h3>
           <p className="text-sm text-blue-700 mb-3">
-            AI가 기존 영역과 유사한 영역을 발견하면 재사용하고, 새로운 영역만
-            생성합니다.
+            {translate("aiPlanGenerator.existingAreas.description")}
           </p>
           <div className="grid grid-cols-4 md:grid-cols-6 gap-1">
             {existingAreas.map((area) => {
@@ -347,12 +353,12 @@ export default function PlanGenerator() {
       {/* 목표 입력 */}
       <div className="mb-6">
         <label className="block text-sm font-medium mb-2">
-          달성하고 싶은 목표를 자세히 설명해주세요
+          {translate("aiPlanGenerator.form.goalLabel")}
         </label>
         <textarea
           value={userGoal}
           onChange={(e) => setUserGoal(e.target.value)}
-          placeholder="예: 지금 6.0인 IELTS 점수를 7.0으로 올리고 싶습니다. 특히 스피킹이 약해서 집중적으로 연습하고 싶어요."
+          placeholder={translate("aiPlanGenerator.form.goalPlaceholder")}
           className="w-full p-3 border rounded-lg h-24 resize-none"
           maxLength={200}
         />
@@ -365,10 +371,16 @@ export default function PlanGenerator() {
       <div className="grid md:grid-cols-2 gap-6 mb-6">
         {/* 시간 제약 */}
         <div className="border rounded-lg p-4">
-          <h3 className="font-medium mb-3">시간 설정</h3>
+          <h3 className="font-medium mb-3">
+            {translate("aiPlanGenerator.constraints.timeSettings.title")}
+          </h3>
 
           <div className="mb-3">
-            <label className="block text-sm mb-1">목표 달성 기간</label>
+            <label className="block text-sm mb-1">
+              {translate(
+                "aiPlanGenerator.constraints.timeSettings.projectDuration"
+              )}
+            </label>
             <select
               value={constraints.projectWeeks || ""}
               onChange={(e) =>
@@ -393,7 +405,11 @@ export default function PlanGenerator() {
           </div>
 
           <div className="mb-3">
-            <label className="block text-sm mb-1">주당 가능한 일수</label>
+            <label className="block text-sm mb-1">
+              {translate(
+                "aiPlanGenerator.constraints.timeSettings.daysPerWeek"
+              )}
+            </label>
             <select
               value={constraints.dailyTimeSlots?.daysPerWeek || ""}
               onChange={(e) =>
@@ -422,7 +438,9 @@ export default function PlanGenerator() {
           </div>
 
           <div className="mb-3">
-            <label className="block text-sm mb-1">일일 가용 시간</label>
+            <label className="block text-sm mb-1">
+              {translate("aiPlanGenerator.constraints.timeSettings.dailyTime")}
+            </label>
             <select
               value={constraints.dailyTimeSlots?.minutesPerDay || ""}
               onChange={(e) =>
@@ -451,10 +469,16 @@ export default function PlanGenerator() {
 
         {/* 기타 설정 */}
         <div className="border rounded-lg p-4">
-          <h3 className="font-medium mb-3">선호도 설정</h3>
+          <h3 className="font-medium mb-3">
+            {translate("aiPlanGenerator.constraints.preferences.title")}
+          </h3>
 
           <div className="mb-3">
-            <label className="block text-sm mb-1">현재 수준</label>
+            <label className="block text-sm mb-1">
+              {translate(
+                "aiPlanGenerator.constraints.preferences.currentLevel"
+              )}
+            </label>
             <select
               value={constraints.difficulty || ""}
               onChange={(e) =>
@@ -477,7 +501,9 @@ export default function PlanGenerator() {
           </div>
 
           <div className="mb-3">
-            <label className="block text-sm mb-1">진행 강도</label>
+            <label className="block text-sm mb-1">
+              {translate("aiPlanGenerator.constraints.preferences.intensity")}
+            </label>
             <select
               value={constraints.focusIntensity || ""}
               onChange={(e) =>
@@ -496,7 +522,11 @@ export default function PlanGenerator() {
           </div>
 
           <div className="mb-3">
-            <label className="block text-sm mb-1">활동 스타일</label>
+            <label className="block text-sm mb-1">
+              {translate(
+                "aiPlanGenerator.constraints.preferences.activityStyle"
+              )}
+            </label>
             <select
               value={constraints.preferredActivityStyle || ""}
               onChange={(e) =>
@@ -524,7 +554,9 @@ export default function PlanGenerator() {
           disabled={isGenerating || !userGoal.trim()}
           className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
         >
-          {isGenerating ? "계획 생성 중..." : "맞춤 계획 생성하기"}
+          {isGenerating
+            ? translate("aiPlanGenerator.mainSection.generating")
+            : translate("aiPlanGenerator.mainSection.generateButton")}
         </button>
       </div>
 
@@ -667,10 +699,10 @@ function PlanPreview({
           window.location.href = "/dashboard";
         }, 10000);
       } else {
-        setSaveError("계획 저장에 실패했습니다.");
+        setSaveError(translate("aiPlanGenerator.errors.saveFailed"));
       }
     } catch (error) {
-      setSaveError("계획 저장에 실패했습니다. 다시 시도해주세요.");
+      setSaveError(translate("aiPlanGenerator.errors.saveFailed"));
     } finally {
       setIsSaving(false);
     }
@@ -706,19 +738,21 @@ function PlanPreview({
   return (
     <div className="border rounded-lg p-6 bg-gray-50">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">생성된 계획</h2>
+        <h2 className="text-xl font-bold">
+          {translate("aiPlanGenerator.result.title")}
+        </h2>
         <div className="flex gap-2">
           {!isEditing ? (
             <Button size="sm" variant="outline" onClick={handleEdit}>
-              수정하기
+              {translate("aiPlanGenerator.result.editButton")}
             </Button>
           ) : (
             <>
               <Button size="sm" onClick={handleSaveEdit}>
-                수정 완료
+                {translate("common.save")}
               </Button>
               <Button size="sm" variant="outline" onClick={handleCancelEdit}>
-                취소
+                {translate("common.cancel")}
               </Button>
             </>
           )}
@@ -727,23 +761,28 @@ function PlanPreview({
 
       {/* 계획 요약 및 영역 선택 */}
       <div className="mb-6 p-4 bg-white rounded-lg border">
-        <h3 className="font-medium text-lg mb-2">생성된 계획 요약</h3>
+        <h3 className="font-medium text-lg mb-2">
+          {translate("aiPlanGenerator.result.summary.title")}
+        </h3>
         <div className="flex flex-wrap gap-2 mb-4">
           <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
-            📁 {editedPlan.areas.length}개 영역
+            📁 {editedPlan.areas.length}
+            {translate("aiPlanGenerator.result.summary.areas")}
           </span>
           <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-sm">
-            📋 {editedPlan.projects.length}개 프로젝트
+            📋 {editedPlan.projects.length}
+            {translate("aiPlanGenerator.result.summary.projects")}
           </span>
         </div>
 
         {/* 영역 선택 UI */}
         {showAreaMatching && (
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <h4 className="font-medium text-blue-900 mb-2">🔄 영역 선택</h4>
+            <h4 className="font-medium text-blue-900 mb-2">
+              {translate("aiPlanGenerator.areaMatching.title")}
+            </h4>
             <p className="text-sm text-blue-700 mb-3">
-              AI가 제안한 영역들을 기존 영역과 매칭하거나 새로 생성할지
-              선택해주세요.
+              {translate("aiPlanGenerator.areaMatching.description")}
             </p>
 
             <div className="space-y-3">
@@ -751,7 +790,7 @@ function PlanPreview({
               {existingAreas.length > 0 && (
                 <div>
                   <p className="text-sm font-medium text-gray-700 mb-2">
-                    기존 영역 중 선택:
+                    {translate("aiPlanGenerator.areaMatching.selectExisting")}
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {existingAreas.map((area) => {
@@ -812,7 +851,9 @@ function PlanPreview({
                             </span>
                             {isSelected && (
                               <span className="text-blue-600 text-xs">
-                                ✓ 선택됨
+                                {translate(
+                                  "aiPlanGenerator.areaMatching.selected"
+                                )}
                               </span>
                             )}
                           </div>
@@ -826,7 +867,7 @@ function PlanPreview({
               {/* AI 제안 영역들을 새로 생성하는 카드들 */}
               <div>
                 <p className="text-sm font-medium text-gray-700 mb-2">
-                  새 영역으로 생성:
+                  {translate("aiPlanGenerator.areaMatching.createNew")}
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {Object.entries(areaMatchingChoices).map(
@@ -882,7 +923,9 @@ function PlanPreview({
                             </span>
                             {isSelected && (
                               <span className="text-green-600 text-xs">
-                                ✓ 선택됨
+                                {translate(
+                                  "aiPlanGenerator.areaMatching.selected"
+                                )}
                               </span>
                             )}
                           </div>
@@ -897,7 +940,7 @@ function PlanPreview({
         )}
 
         <p className="text-sm text-gray-500">
-          AI가 생성한 영역, 프로젝트, 작업들을 확인하고 저장하세요.
+          {translate("aiPlanGenerator.result.summary.description")}
         </p>
       </div>
 
@@ -909,7 +952,7 @@ function PlanPreview({
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    프로젝트 제목
+                    {translate("aiPlanGenerator.edit.projectTitle")}
                   </label>
                   <input
                     type="text"
@@ -930,7 +973,7 @@ function PlanPreview({
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    프로젝트 설명
+                    {translate("aiPlanGenerator.edit.projectDescription")}
                   </label>
                   <textarea
                     value={project.description}
@@ -951,7 +994,7 @@ function PlanPreview({
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-sm font-medium mb-1">
-                      목표
+                      {translate("aiPlanGenerator.edit.target")}
                     </label>
                     <input
                       type="text"
@@ -972,7 +1015,7 @@ function PlanPreview({
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">
-                      일일 시간 (분)
+                      {translate("aiPlanGenerator.edit.dailyTime")}
                     </label>
                     <input
                       type="number"
@@ -1004,7 +1047,9 @@ function PlanPreview({
                         : "bg-orange-100 text-orange-800"
                     }`}
                   >
-                    {project.category === "repetitive" ? "반복형" : "작업형"}
+                    {project.category === "repetitive"
+                      ? translate("aiPlanGenerator.projectTypes.repetitive")
+                      : translate("aiPlanGenerator.projectTypes.task")}
                   </span>
                 </div>
                 <p className="text-gray-600 text-sm mb-2">
@@ -1012,25 +1057,30 @@ function PlanPreview({
                 </p>
                 <div className="flex flex-wrap gap-2 text-sm">
                   <span className="bg-gray-100 px-2 py-1 rounded">
-                    📊 목표: {project.target}
+                    📊 {translate("aiPlanGenerator.projectDetails.target")}:{" "}
+                    {project.target}
                   </span>
                   <span className="bg-gray-100 px-2 py-1 rounded">
-                    📈 {translate("para.projects.targetCount.label")}:{" "}
-                    {project.targetCount || 0}
-                    {project.category === "repetitive" ? "회" : "개"}
+                    📈 {translate("aiPlanGenerator.projectDetails.targetCount")}
+                    : {project.targetCount || 0}
+                    {project.category === "repetitive"
+                      ? translate("aiPlanGenerator.projectDetails.times")
+                      : translate("aiPlanGenerator.projectDetails.items")}
                   </span>
                   <span className="bg-gray-100 px-2 py-1 rounded">
-                    ⏰ 일일{" "}
+                    ⏰ {translate("aiPlanGenerator.projectDetails.dailyTime")}{" "}
                     {project.estimatedDailyTime
                       ? Math.round(project.estimatedDailyTime / 60)
                       : 0}
-                    시간
+                    {translate("aiPlanGenerator.projectDetails.hours")}
                   </span>
                 </div>
 
                 {/* 주요 작업들 미리보기 */}
                 <div className="mt-3">
-                  <p className="text-sm font-medium mb-1">주요 작업:</p>
+                  <p className="text-sm font-medium mb-1">
+                    {translate("aiPlanGenerator.projectDetails.mainTasks")}
+                  </p>
                   <ul className="text-sm text-gray-600 space-y-1">
                     {project.tasks
                       .slice(
@@ -1043,7 +1093,13 @@ function PlanPreview({
                     {project.tasks.length > 3 &&
                       !expandedProjects.has(index) && (
                         <li className="text-gray-400">
-                          ... 외 {project.tasks.length - 3}개 작업
+                          ...{" "}
+                          {translate(
+                            "aiPlanGenerator.projectDetails.moreTasks"
+                          ).replace(
+                            "{count}",
+                            String(project.tasks.length - 3)
+                          )}
                         </li>
                       )}
                   </ul>
@@ -1052,7 +1108,9 @@ function PlanPreview({
                       onClick={() => toggleProjectExpansion(index)}
                       className="mt-2 text-sm text-blue-600 hover:text-blue-800 underline"
                     >
-                      {expandedProjects.has(index) ? "접기" : "더보기"}
+                      {expandedProjects.has(index)
+                        ? translate("aiPlanGenerator.projectDetails.showLess")
+                        : translate("aiPlanGenerator.projectDetails.showMore")}
                     </button>
                   )}
                 </div>
@@ -1075,7 +1133,9 @@ function PlanPreview({
           disabled={isSaving || isEditing}
           className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isSaving ? "저장 중..." : "이 계획으로 시작하기"}
+          {isSaving
+            ? translate("aiPlanGenerator.status.saving")
+            : translate("aiPlanGenerator.result.saveButton")}
         </Button>
       </div>
     </div>

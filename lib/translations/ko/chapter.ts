@@ -1,16 +1,21 @@
-export const chapter = {
-  title: "챕터",
+export const sprint = {
+  title: "스프린트",
   tabs: {
-    active: "진행 중",
+    current: "현재 스프린트",
     future: "예정",
     past: "완료",
   },
   currentChapter: {
+    title: "현재 챕터 요약",
     status: {
       inProgress: "진행 중",
       completed: "완료됨",
     },
     reward: "보상",
+    noReward: "보상 없음",
+    progress: "진행률",
+    progressSuffix: "%",
+    daysLeft: "D-",
     completionRate: "달성률",
     focusAreas: "중점 영역",
     projects: "프로젝트",
@@ -21,6 +26,15 @@ export const chapter = {
       description: "새로운 챕터를 생성하여 목표를 설정하고 달성해보세요",
       button: "챕터 생성하기",
     },
+    addedMidway: "중간 추가",
+    viewDetails: "상세보기",
+    projectList: "프로젝트 목록",
+    projectCount: "프로젝트 ({count}개)",
+    noProjectsTitle: "프로젝트가 없습니다",
+    noProjectsDescription: "이 챕터에 프로젝트를 추가해보세요",
+    aiPlanGenerator: "AI로 계획 생성하기",
+    manualAddProject: "수동으로 프로젝트 추가",
+    areaSuffix: "영역",
   },
   futureChapters: {
     reward: "보상",
@@ -39,6 +53,8 @@ export const chapter = {
   pastChapters: {
     achievement: "달성률: {rate}%",
     totalCount: "총 {count}개의 완료된 챕터",
+    completionRate: "달성률",
+    connectedProjects: "{count}개 연결됨",
     noChapters: {
       title: "완료된 챕터가 없습니다",
       description: "완료된 챕터가 여기에 표시됩니다",

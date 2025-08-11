@@ -27,16 +27,13 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useLanguage } from "@/hooks/useLanguage";
 
-// 폼 스키마 정의
-const resourceFormSchema = z.object({
-  title: z.string().min(1, "자료 제목을 입력해주세요"),
-  description: z.string().optional(),
-  url: z.string().url("올바른 URL을 입력해주세요").optional().or(z.literal("")),
-  text: z.string().optional(),
-  area: z.string().min(1, "영역을 선택해주세요"),
-});
-
-type ResourceFormData = z.infer<typeof resourceFormSchema>;
+type ResourceFormData = {
+  title: string;
+  description?: string;
+  url?: string;
+  text?: string;
+  area: string;
+};
 
 export default function NewResourcePage() {
   const router = useRouter();
@@ -44,6 +41,23 @@ export default function NewResourcePage() {
   const [user, userLoading] = useAuthState(auth);
   const [isSubmitting, setIsSubmitting] = useState(false); // Resource 생성 중 로딩 상태
   const { translate } = useLanguage();
+
+  // 폼 스키마 정의 (translate 함수 사용을 위해 컴포넌트 내부로 이동)
+  const resourceFormSchema = z.object({
+    title: z
+      .string()
+      .min(1, translate("para.resources.add.validation.titleRequired")),
+    description: z.string().optional(),
+    url: z
+      .string()
+      .url(translate("para.resources.add.validation.urlInvalid"))
+      .optional()
+      .or(z.literal("")),
+    text: z.string().optional(),
+    area: z
+      .string()
+      .min(1, translate("para.resources.add.validation.areaRequired")),
+  });
 
   // react-hook-form 설정
   const form = useForm<ResourceFormData>({
@@ -71,16 +85,18 @@ export default function NewResourcePage() {
 
     try {
       toast({
-        title: "자료 생성 완료",
-        description: `${data.title} 자료가 생성되었습니다.`,
+        title: translate("para.resources.add.success.title"),
+        description: translate(
+          "para.resources.add.success.description"
+        ).replace("{title}", data.title),
       });
 
       router.push("/para/resources");
     } catch (error) {
       console.error("Resource 생성 실패:", error);
       toast({
-        title: "자료 생성 실패",
-        description: "자료 생성 중 오류가 발생했습니다.",
+        title: translate("para.resources.add.error.title"),
+        description: translate("para.resources.add.error.description"),
         variant: "destructive",
       });
     } finally {
@@ -96,7 +112,10 @@ export default function NewResourcePage() {
         }`}
       >
         {/* 로딩 오버레이 */}
-        <LoadingOverlay isVisible={isSubmitting} message="자료 생성 중..." />
+        <LoadingOverlay
+          isVisible={isSubmitting}
+          message={translate("para.resources.add.loading")}
+        />
         <div className="mb-6 flex items-center">
           <Button
             variant="ghost"
@@ -106,7 +125,9 @@ export default function NewResourcePage() {
           >
             <ChevronLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-2xl font-bold">자료 추가하기</h1>
+          <h1 className="text-2xl font-bold">
+            {translate("para.resources.add.title")}
+          </h1>
         </div>
         <div className="text-center text-muted-foreground">
           {translate("settings.loading.loading")}
@@ -126,7 +147,9 @@ export default function NewResourcePage() {
         >
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <h1 className="text-2xl font-bold">자료 추가하기</h1>
+        <h1 className="text-2xl font-bold">
+          {translate("para.resources.add.title")}
+        </h1>
       </div>
 
       <div className="mb-6 text-center">
@@ -135,20 +158,24 @@ export default function NewResourcePage() {
             <Book className="h-8 w-8 text-primary" />
           </div>
         </div>
-        <h2 className="text-lg font-bold mb-2">새로운 자료를 추가해보세요</h2>
+        <h2 className="text-lg font-bold mb-2">
+          {translate("para.resources.add.description")}
+        </h2>
         <p className="text-sm text-muted-foreground">
-          자료는 영역에 대한 참고 정보, 링크 등입니다.
+          {translate("para.resources.add.explanation")}
         </p>
       </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <div className="space-y-4">
           <div>
-            <Label htmlFor="title">자료 제목</Label>
+            <Label htmlFor="title">
+              {translate("para.resources.add.titleLabel")}
+            </Label>
             <Input
               id="title"
               {...form.register("title")}
-              placeholder="예: 효과적인 시간 관리법"
+              placeholder={translate("para.resources.add.titlePlaceholder")}
             />
             {form.formState.errors.title && (
               <p className="mt-1 text-sm text-red-500">
@@ -158,10 +185,14 @@ export default function NewResourcePage() {
           </div>
 
           <div>
-            <Label htmlFor="area">소속 영역</Label>
+            <Label htmlFor="area">
+              {translate("para.resources.add.areaLabel")}
+            </Label>
             <Select onValueChange={(value) => form.setValue("area", value)}>
               <SelectTrigger>
-                <SelectValue placeholder="영역을 선택해주세요" />
+                <SelectValue
+                  placeholder={translate("para.resources.add.areaPlaceholder")}
+                />
               </SelectTrigger>
               <SelectContent>
                 {areas.map((area) => (
@@ -179,22 +210,28 @@ export default function NewResourcePage() {
           </div>
 
           <div>
-            <Label htmlFor="description">설명 (선택 사항)</Label>
+            <Label htmlFor="description">
+              {translate("para.resources.add.descriptionLabel")}
+            </Label>
             <Textarea
               id="description"
               {...form.register("description")}
-              placeholder="자료에 대한 간단한 설명을 입력하세요 (리스트에서 미리보기로 표시됩니다)"
+              placeholder={translate(
+                "para.resources.add.descriptionPlaceholder"
+              )}
               rows={3}
             />
           </div>
 
           <div>
-            <Label htmlFor="url">링크 (선택 사항)</Label>
+            <Label htmlFor="url">
+              {translate("para.resources.add.linkLabel")}
+            </Label>
             <Input
               id="url"
               type="url"
               {...form.register("url")}
-              placeholder="https://example.com"
+              placeholder={translate("para.resources.add.linkPlaceholder")}
             />
             {form.formState.errors.url && (
               <p className="mt-1 text-sm text-red-500">
@@ -204,11 +241,13 @@ export default function NewResourcePage() {
           </div>
 
           <div>
-            <Label htmlFor="text">내용 (선택 사항)</Label>
+            <Label htmlFor="text">
+              {translate("para.resources.add.contentLabel")}
+            </Label>
             <Textarea
               id="text"
               {...form.register("text")}
-              placeholder="자료의 상세한 내용을 입력하세요 (긴 텍스트, 메모, 요약 등)"
+              placeholder={translate("para.resources.add.contentPlaceholder")}
               rows={4}
             />
           </div>
@@ -216,10 +255,10 @@ export default function NewResourcePage() {
 
         <div className="flex gap-3">
           <Button type="submit" className="flex-1">
-            자료 생성
+            {translate("para.resources.add.submit")}
           </Button>
           <Button type="button" variant="outline" onClick={() => router.back()}>
-            취소
+            {translate("para.resources.add.cancel")}
           </Button>
         </div>
       </form>

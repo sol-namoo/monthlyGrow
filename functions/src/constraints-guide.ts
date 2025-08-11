@@ -123,5 +123,5 @@ export const CONSTRAINTS_SYSTEM_GUIDE = `
 
 ⚡ **Feasibility:**
 - Review if goals can be achieved within the set time
-- Must set estimatedTime for each task (in minutes)
+- Must set duration for each task (in hours, minimum 0.1, maximum 24)
 `;

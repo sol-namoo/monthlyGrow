@@ -17,8 +17,10 @@ export const para = {
       repetitivePlaceholder: "목표 횟수 (예: 30)",
       taskBasedPlaceholder: "목표 태스크 수 (예: 10)",
       description: {
-        repetitive: "반복형 프로젝트는 목표 횟수에 따라 태스크가 자동으로 생성됩니다",
-        taskBased: "작업형 프로젝트는 목표 태스크 수에 따라 빈 태스크가 생성됩니다",
+        repetitive:
+          "반복형 프로젝트는 목표 횟수에 따라 태스크가 자동으로 생성됩니다",
+        taskBased:
+          "작업형 프로젝트는 목표 태스크 수에 따라 빈 태스크가 생성됩니다",
       },
       hint: {
         repetitive: "목표 횟수를 입력하면 태스크가 자동으로 생성됩니다",
@@ -29,6 +31,8 @@ export const para = {
         label: "챕터 목표 개수",
         recommended: "권장: {count}개",
         current: "{current}개 / 총 태스크 {total}개",
+        setToTotal: "전체 태스크로 설정",
+        setToRecommended: "권장값으로 설정",
       },
     },
     filter: {
@@ -51,8 +55,13 @@ export const para = {
       inProgress: "진행 중",
       completed: "완료",
       overdue: "기한 지남",
+      undefined: "상태 없음",
     },
     uncategorized: "미분류",
+    category: {
+      repetitive: "반복형",
+      taskBased: "작업형",
+    },
     noProjects: {
       title: "프로젝트가 없습니다",
       description: "새로운 프로젝트를 생성하여 목표를 달성해보세요",
@@ -89,16 +98,14 @@ export const para = {
       error: {
         loadError: "영역을 불러오는 중 오류가 발생했습니다. 다시 시도해주세요",
         notFound: "해당 영역을 찾을 수 없습니다",
+        deleteFailed: "삭제 실패",
+        deleteError: "영역 삭제에 실패했습니다",
       },
       success: {
         deleteComplete: "영역 삭제 완료",
         deleteWithItems: "영역과 연결된 모든 항목이 삭제되었습니다",
         deleteWithoutItems:
           "영역이 삭제되었습니다. 연결된 프로젝트와 자료는 유지됩니다",
-      },
-      error: {
-        deleteFailed: "삭제 실패",
-        deleteError: "영역 삭제에 실패했습니다",
       },
     },
     // Area 생성/수정 페이지
@@ -109,7 +116,7 @@ export const para = {
         "영역은 프로젝트와 자료를 체계적으로 분류하고 관리하는 기준입니다. 자신만의 영역을 만들어보세요",
       name: "영역 이름",
       namePlaceholder: "영역 이름을 입력해주세요",
-      description: "영역 설명",
+      areaDescription: "영역 설명",
       descriptionPlaceholder: "이 영역에서 관리하고 싶은 내용을 설명해주세요",
       color: "색상",
       icon: "아이콘",
@@ -137,6 +144,7 @@ export const para = {
     description: "유용한 정보와 자료를 저장하세요",
     count: "총 {count}개 자원",
     newResource: "새 자원",
+    other: "기타",
     sort: {
       latest: "최신순",
       oldest: "오래된순",
@@ -152,6 +160,7 @@ export const para = {
       title: "자원 상세",
       link: "링크",
       content: "내용",
+      noContent: "링크나 내용이 없습니다",
       delete: {
         title: "자료 삭제",
         description: "이 자료를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다",
@@ -170,7 +179,7 @@ export const para = {
         "자원은 유용한 정보와 자료를 저장하는 곳입니다. 자신만의 자원을 만들어보세요",
       name: "자원 이름",
       namePlaceholder: "자원 이름을 입력해주세요",
-      description: "자원 설명",
+      resourceDescription: "자원 설명",
       descriptionPlaceholder: "이 자원에 대한 설명을 입력해주세요",
       link: "링크",
       linkPlaceholder: "https://example.com",
@@ -193,18 +202,99 @@ export const para = {
         descriptionRequired: "자원 설명을 입력해주세요",
       },
     },
+    // Resource 추가 페이지
+    add: {
+      title: "자료 추가하기",
+      description: "새로운 자료를 추가해보세요",
+      explanation: "자료는 영역에 대한 참고 정보, 링크 등입니다.",
+      titleLabel: "자료 제목",
+      titlePlaceholder: "예: 효과적인 시간 관리법",
+      areaLabel: "소속 영역",
+      areaPlaceholder: "영역을 선택해주세요",
+      descriptionLabel: "설명 (선택 사항)",
+      descriptionPlaceholder:
+        "자료에 대한 간단한 설명을 입력하세요 (리스트에서 미리보기로 표시됩니다)",
+      linkLabel: "링크 (선택 사항)",
+      linkPlaceholder: "https://example.com",
+      contentLabel: "내용 (선택 사항)",
+      contentPlaceholder:
+        "자료의 상세한 내용을 입력하세요 (긴 텍스트, 메모, 요약 등)",
+      submit: "자료 생성",
+      cancel: "취소",
+      loading: "자료 생성 중...",
+      success: {
+        title: "자료 생성 완료",
+        description: "{title} 자료가 생성되었습니다.",
+      },
+      error: {
+        title: "자료 생성 실패",
+        description: "자료 생성 중 오류가 발생했습니다.",
+      },
+      validation: {
+        titleRequired: "자료 제목을 입력해주세요",
+        urlInvalid: "올바른 URL을 입력해주세요",
+        areaRequired: "영역을 선택해주세요",
+      },
+    },
+    // Resource 수정 페이지
+    edit: {
+      title: "자료 수정",
+      description: "자료를 수정해보세요",
+      explanation:
+        "자료의 내용이나 연결된 영역을 변경하여 최신 상태로 유지할 수 있습니다.",
+      titleLabel: "자료 제목",
+      titlePlaceholder: "예: 효과적인 시간 관리법",
+      areaLabel: "소속 영역",
+      areaPlaceholder: "영역을 선택해주세요",
+      descriptionLabel: "설명 (선택 사항)",
+      descriptionPlaceholder:
+        "자료에 대한 간단한 설명을 입력하세요 (리스트에서 미리보기로 표시됩니다)",
+      linkLabel: "링크 (선택 사항)",
+      linkPlaceholder: "https://example.com",
+      contentLabel: "내용 (선택 사항)",
+      contentPlaceholder:
+        "자료의 상세한 내용을 입력하세요 (긴 텍스트, 메모, 요약 등)",
+      submit: "자료 수정",
+      submitting: "수정 중...",
+      cancel: "취소",
+      success: {
+        title: "자료 수정 완료",
+        description: "자료가 성공적으로 수정되었습니다.",
+      },
+      error: {
+        title: "자료 수정 실패",
+        description: "자료 수정 중 오류가 발생했습니다.",
+      },
+      validation: {
+        titleRequired: "자료 제목을 입력해주세요",
+        urlInvalid: "올바른 URL을 입력해주세요",
+        areaRequired: "영역을 선택해주세요",
+      },
+    },
   },
   archives: {
     description: "완료된 항목들을 보관하세요",
     count: "총 {count}개 아카이브",
+    filter: {
+      all: "전체",
+      chapter: "챕터",
+      project: "프로젝트",
+    },
     sort: {
       latest: "최신순",
       oldest: "오래된순",
       name: "이름순",
+      rating: "평점순",
     },
     noArchives: {
       title: "아카이브가 없습니다",
       description: "완료된 항목들이 여기에 표시됩니다",
+    },
+    noTitle: "제목 없음",
+    noSummary: "요약 없음",
+    types: {
+      chapterRetrospective: "챕터 회고",
+      projectRetrospective: "프로젝트 회고",
     },
     // Archive 상세페이지
     detail: {
@@ -242,6 +332,21 @@ export const para = {
     },
     notes: {
       noContent: "노트 내용이 없습니다",
+    },
+    // 프로젝트 회고 관련 필드들
+    projectRetrospective: {
+      goalAchieved: "목표 달성 여부",
+      memorableTask: "가장 기억에 남는 작업",
+      stuckPoints: "막힌 지점",
+      newLearnings: "새로운 학습",
+      nextProjectImprovements: "다음 프로젝트 개선사항",
+    },
+    // 공통 필드들
+    common: {
+      createdAt: "작성일",
+      rating: "평점",
+      loading: "불러오는 중...",
+      error: "오류가 발생했습니다",
     },
   },
 } as const;

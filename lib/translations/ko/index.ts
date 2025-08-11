@@ -13,6 +13,7 @@ import { para } from "./para";
 import { paraProjectDetail } from "./para-project-detail";
 import { settings } from "./settings";
 import { retrospective } from "./retrospective";
+import { aiPlanGenerator } from "./ai-plan-generator";
 
 export const ko = {
   common,
@@ -28,6 +29,7 @@ export const ko = {
   paraProjectDetail,
   settings,
   retrospective,
+  aiPlanGenerator,
   pageLoading,
   noteForm,
   charts,

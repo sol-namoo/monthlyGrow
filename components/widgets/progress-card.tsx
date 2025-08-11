@@ -17,7 +17,10 @@ export function ProgressCard({
   className,
   children,
 }: ProgressCardProps) {
-  const percentage = Math.min(100, Math.round((progress / total) * 100));
+  // NaN 방지를 위한 안전한 계산
+  const safeProgress = progress || 0;
+  const safeTotal = total || 0;
+  const percentage = safeTotal > 0 ? Math.min(100, Math.round((safeProgress / safeTotal) * 100)) : 0;
   const { translate } = useLanguage();
 
   return (
@@ -28,7 +31,7 @@ export function ProgressCard({
           {translate("common.progress")}: {percentage}%
         </span>
         <span>
-          {progress}/{total}
+          {safeProgress}/{safeTotal}
         </span>
       </div>
       <div className="progress-bar">

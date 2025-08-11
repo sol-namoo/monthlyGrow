@@ -73,6 +73,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatDateShort } from "@/lib/utils";
 import { useLanguage } from "@/hooks/useLanguage";
+import { ProjectCard } from "@/components/widgets/project-card";
 
 function ParaPageContent() {
   const router = useRouter();
@@ -80,6 +81,15 @@ function ParaPageContent() {
   const activeTab = searchParams.get("tab") || "projects";
   const [user, userLoading] = useAuthState(auth);
   const { translate, currentLanguage } = useLanguage();
+
+  // 디버깅: 번역 시스템 확인
+  useEffect(() => {
+    console.log("PARA 페이지 번역 디버깅:", {
+      currentLanguage,
+      testTranslation: translate("para.resources.other"),
+      testTranslation2: translate("para.archives.filter.all"),
+    });
+  }, [currentLanguage, translate]);
 
   const handleTabChange = (value: string) => {
     router.push(`/para?tab=${value}`, { scroll: false });
@@ -471,112 +481,28 @@ function ParaPageContent() {
               </Card>
             ) : (
               <>
-                {filteredProjects.map((project) => (
-                  <Card
-                    key={project.id}
-                    className="cursor-pointer transition-all hover:shadow-md"
-                    onClick={() => router.push(`/para/projects/${project.id}`)}
-                  >
-                    <div className="p-4">
-                      {/* 제목과 뱃지들 */}
-                      <div className="flex items-start justify-between mb-3">
-                        <h3 className="font-medium text-base flex-1 pr-2">
-                          {project.title}
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            className={`text-xs ${
-                              (() => {
-                                if (project.areaId) {
-                                  const area = areas.find(
-                                    (a) => a.id === project.areaId
-                                  );
-                                  return area
-                                    ? area.name
-                                    : translate("para.projects.uncategorized");
-                                }
-                                return translate("para.projects.uncategorized");
-                              })() === translate("para.projects.uncategorized")
-                                ? "border-red-300 text-red-700"
-                                : ""
-                            }`}
-                          >
-                            {(() => {
-                              if (project.areaId) {
-                                const area = areas.find(
-                                  (a) => a.id === project.areaId
-                                );
-                                return area
-                                  ? area.name
-                                  : translate("para.projects.uncategorized");
-                              }
-                              return translate("para.projects.uncategorized");
-                            })()}
-                          </Badge>
-                          <Badge
-                            variant={
-                              getProjectStatus(project) === "completed"
-                                ? "secondary"
-                                : "default"
-                            }
-                            className="text-xs"
-                          >
-                            {getProjectStatus(project) === "completed"
-                              ? translate("para.projects.status.completed")
-                              : translate("para.projects.status.inProgress")}
-                          </Badge>
+                {filteredProjects.map((project) => {
+                  const taskCounts = projectTaskCounts[project.id];
+
+                  return (
+                    <ProjectCard
+                      key={project.id}
+                      project={project}
+                      mode="project"
+                      taskCounts={taskCounts}
+                      onClick={() =>
+                        router.push(`/para/projects/${project.id}`)
+                      }
+                    >
+                      {/* 기한 초과 아이콘 - 진행 중이고 완료되지 않은 프로젝트만 */}
+                      {project.endDate && isOverdue(project.endDate) && (
+                        <div className="flex justify-end">
+                          <AlertCircle className="h-3 w-3 text-red-500" />
                         </div>
-                      </div>
-
-                      {/* 설명 */}
-                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                        {project.description}
-                      </p>
-
-                      {/* 하단 정보: 기간과 상태 아이콘 */}
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          <span>
-                            {project.startDate && project.endDate && (
-                              <>
-                                {formatDate(project.startDate, currentLanguage)}{" "}
-                                ~ {formatDate(project.endDate, currentLanguage)}
-                              </>
-                            )}
-                          </span>
-                          {/* 상태 이상 아이콘들 */}
-                          <div className="flex items-center gap-1">
-                            {/* 기한 초과 아이콘 - 진행 중이고 완료되지 않은 프로젝트만 */}
-                            {project.endDate && isOverdue(project.endDate) && (
-                              <AlertCircle className="h-3 w-3 text-red-500" />
-                            )}
-                          </div>
-                        </div>
-
-                        {/* 진행률 - 최적화된 태스크 개수 사용 */}
-                        <span className="text-xs">
-                          {(() => {
-                            const taskCount = projectTaskCounts[project.id];
-                            if (taskCount) {
-                              const targetCount =
-                                project.targetCount || taskCount.totalTasks;
-                              return `${taskCount.completedTasks}/${targetCount}`;
-                            }
-                            // 태스크 개수가 로딩 중일 때는 스켈레톤 표시
-                            if (taskCountsLoading) {
-                              return (
-                                <span className="inline-block w-8 h-3 bg-muted animate-pulse rounded" />
-                              );
-                            }
-                            // 데이터가 없을 때
-                            return "0/0";
-                          })()}
-                        </span>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
+                      )}
+                    </ProjectCard>
+                  );
+                })}
 
                 {/* 더보기 버튼 */}
                 {hasNextProjects && (
@@ -919,8 +845,16 @@ function ParaPageContent() {
             </div>
           ) : allArchives.length === 0 ? (
             <Card className="p-6 text-center border-dashed">
+              <div className="mb-4 flex justify-center">
+                <div className="rounded-full bg-muted/50 p-4">
+                  <Archive className="h-8 w-8 text-muted-foreground/50" />
+                </div>
+              </div>
+              <h3 className="text-lg font-bold mb-2">
+                {translate("para.archives.noArchives.title")}
+              </h3>
               <p className="text-muted-foreground">
-                {translate("para.archives.noArchives")}
+                {translate("para.archives.noArchives.description")}
               </p>
             </Card>
           ) : (

@@ -10,6 +10,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -38,7 +39,7 @@ export function ConfirmDialog({
   description,
   type = "info",
   confirmText,
-  cancelText = "취소",
+  cancelText,
   onConfirm,
   onCancel,
   destructive = false,
@@ -50,6 +51,8 @@ export function ConfirmDialog({
   children,
   confirmDisabled = false,
 }: ConfirmDialogProps) {
+  const { translate } = useLanguage();
+  const defaultCancelText = translate("common.cancel");
   const getIcon = () => {
     switch (type) {
       case "delete":
@@ -72,12 +75,12 @@ export function ConfirmDialog({
     if (confirmText) return confirmText;
     switch (type) {
       case "delete":
-        return "삭제";
+        return translate("common.delete");
       case "warning":
-        return "확인";
+        return translate("common.confirm");
       case "info":
       default:
-        return "확인";
+        return translate("common.confirm");
     }
   };
 
@@ -130,7 +133,7 @@ export function ConfirmDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel}>
-            {cancelText}
+            {cancelText || defaultCancelText}
           </Button>
           <Button
             variant={getConfirmButtonVariant()}

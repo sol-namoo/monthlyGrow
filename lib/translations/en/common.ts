@@ -3,8 +3,21 @@ export const common = {
   status: "Status",
   cancel: "Cancel",
   save: "Save",
+  delete: "Delete",
+  confirm: "Confirm",
   noSearchResults: "No search results found.",
   progress: "Progress",
+  area: "Area",
+  category: "Category",
+  target: "Target",
+  uncategorized: "Uncategorized",
+  chapterGoal: "This Chapter Goal",
+  projectProgress: "Overall Progress",
+  errors: {
+    loginRequired: "Login required.",
+    unexpectedResponse: "Unexpected response from server.",
+    serviceError: "Service error occurred.",
+  },
 } as const;
 
 export const bottomNav = {

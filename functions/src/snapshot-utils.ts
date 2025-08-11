@@ -101,7 +101,7 @@ export const createActivitySnapshotForUser = async (
       const areaProjects = allProjects.filter((p: any) => p.areaId === area.id);
       if (areaProjects.length > 0) {
         const areaFocusTime = areaProjects.reduce(
-          (sum, p: any) => sum + (p.estimatedTime || 0),
+          (sum, p: any) => sum + (p.duration || 0),
           0
         );
         const areaCompletedProjects = areaProjects.filter(

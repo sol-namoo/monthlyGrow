@@ -1,16 +1,21 @@
 export const chapter = {
   title: "Chapters",
   tabs: {
-    active: "Active",
+    current: "Current",
     future: "Future",
     past: "Completed",
   },
   currentChapter: {
+    title: "Current Chapter Summary",
     status: {
       inProgress: "In Progress",
       completed: "Completed",
     },
     reward: "Reward",
+    noReward: "No Reward",
+    progress: "Progress",
+    progressSuffix: "%",
+    daysLeft: "D-",
     completionRate: "Completion Rate",
     focusAreas: "Focus Areas",
     projects: "Projects",
@@ -21,6 +26,15 @@ export const chapter = {
       description: "Create a new chapter to set and achieve your goals",
       button: "Create Chapter",
     },
+    addedMidway: "Added Midway",
+    viewDetails: "View Details",
+    projectList: "Project List",
+    projectCount: "Projects ({count})",
+    noProjectsTitle: "No Projects",
+    noProjectsDescription: "Add projects to this chapter",
+    aiPlanGenerator: "Generate Plan with AI",
+    manualAddProject: "Add Project Manually",
+    areaSuffix: "Area",
   },
   futureChapters: {
     reward: "Reward",
@@ -39,6 +53,8 @@ export const chapter = {
   pastChapters: {
     achievement: "Achievement: {rate}%",
     totalCount: "Total {count} completed chapters",
+    completionRate: "Completion Rate",
+    connectedProjects: "{count} connected",
     noChapters: {
       title: "No Completed Chapters",
       description: "Completed chapters will appear here",
@@ -188,7 +204,7 @@ export const chapterDetail = {
 } as const;
 
 export const chapterEdit = {
-  title: "Edit Chapter",
+  title: "Edit",
   validation: {
     title: "Validation Error",
     titleRequired: "Please enter a chapter title",

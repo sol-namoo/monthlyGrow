@@ -174,10 +174,15 @@ export default function ArchiveDetailPage({
             </p>
           )}
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>작성일: {formatDate(retrospective.createdAt)}</span>
+            <span>
+              {translate("para.paraArchiveDetail.common.createdAt")}:{" "}
+              {formatDate(retrospective.createdAt)}
+            </span>
             {retrospective.userRating && (
               <div className="flex items-center gap-1">
-                <span>평점:</span>
+                <span>
+                  {translate("para.paraArchiveDetail.common.rating")}:
+                </span>
                 {renderStarRating(retrospective.userRating)}
               </div>
             )}
@@ -302,7 +307,11 @@ export default function ArchiveDetailPage({
             {retrospective.goalAchieved && (
               <Card>
                 <div className="p-4">
-                  <h3 className="font-medium mb-2">목표 달성 여부</h3>
+                  <h3 className="font-medium mb-2">
+                    {translate(
+                      "para.paraArchiveDetail.projectRetrospective.goalAchieved"
+                    )}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
                     {retrospective.goalAchieved}
                   </p>
@@ -313,7 +322,11 @@ export default function ArchiveDetailPage({
             {retrospective.memorableTask && (
               <Card>
                 <div className="p-4">
-                  <h3 className="font-medium mb-2">가장 기억에 남는 작업</h3>
+                  <h3 className="font-medium mb-2">
+                    {translate(
+                      "para.paraArchiveDetail.projectRetrospective.memorableTask"
+                    )}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
                     {retrospective.memorableTask}
                   </p>
@@ -324,7 +337,11 @@ export default function ArchiveDetailPage({
             {retrospective.stuckPoints && (
               <Card>
                 <div className="p-4">
-                  <h3 className="font-medium mb-2">막힌 지점</h3>
+                  <h3 className="font-medium mb-2">
+                    {translate(
+                      "para.paraArchiveDetail.projectRetrospective.stuckPoints"
+                    )}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
                     {retrospective.stuckPoints}
                   </p>
@@ -335,7 +352,11 @@ export default function ArchiveDetailPage({
             {retrospective.newLearnings && (
               <Card>
                 <div className="p-4">
-                  <h3 className="font-medium mb-2">새로운 학습</h3>
+                  <h3 className="font-medium mb-2">
+                    {translate(
+                      "para.paraArchiveDetail.projectRetrospective.newLearnings"
+                    )}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
                     {retrospective.newLearnings}
                   </p>
@@ -346,7 +367,11 @@ export default function ArchiveDetailPage({
             {retrospective.nextProjectImprovements && (
               <Card>
                 <div className="p-4">
-                  <h3 className="font-medium mb-2">다음 프로젝트 개선사항</h3>
+                  <h3 className="font-medium mb-2">
+                    {translate(
+                      "para.paraArchiveDetail.projectRetrospective.nextProjectImprovements"
+                    )}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
                     {retrospective.nextProjectImprovements}
                   </p>
@@ -364,7 +389,7 @@ export default function ArchiveDetailPage({
             ) : chapterError ? (
               <div className="text-center py-8">
                 <p className="text-sm text-muted-foreground">
-                  노트를 불러오는 중 오류가 발생했습니다.
+                  {translate("para.paraArchiveDetail.common.error")}
                 </p>
               </div>
             ) : chapter?.note ? (

@@ -65,6 +65,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/hooks/useLanguage";
+import { ProjectCard } from "@/components/widgets/project-card";
 
 // 로딩 스켈레톤 컴포넌트
 function ChapterDetailSkeleton() {
@@ -362,10 +363,22 @@ export function ChapterDetailPage({
   });
 
   // 프로젝트별 태스크 개수 가져오기
-  const { data: projectTaskCounts = {} } = useQuery({
-    queryKey: ["projectTaskCounts", "chapter", id],
-    queryFn: () => getTaskCountsForMultipleProjects(projects.map((p) => p.id)),
-    enabled: !!projects && projects.length > 0,
+  const { data: projectTaskCounts = {}, isLoading: projectTaskCountsLoading } =
+    useQuery({
+      queryKey: ["projectTaskCounts", "chapter", id],
+      queryFn: () =>
+        getTaskCountsForMultipleProjects(projects.map((p) => p.id)),
+      enabled: !!projects && projects.length > 0,
+    });
+
+  // 디버깅용 로그
+  console.log("🔍 Chapter Detail - Data Debug:", {
+    chapterId: id,
+    projectsCount: projects.length,
+    projectsLoading,
+    projectTaskCounts,
+    projectTaskCountsLoading,
+    projects: projects.map((p) => ({ id: p.id, title: p.title })),
   });
 
   // 노트 데이터
@@ -456,7 +469,8 @@ export function ChapterDetailPage({
 
   // 진행률 계산 (실제 프로젝트 데이터 기반)
   const completionRate = (() => {
-    if (projectsLoading || projects.length === 0) return 0;
+    if (projectsLoading || projectTaskCountsLoading || projects.length === 0)
+      return 0;
 
     const totalTasks = Object.values(projectTaskCounts).reduce(
       (sum, counts) => sum + counts.totalTasks,
@@ -466,6 +480,14 @@ export function ChapterDetailPage({
       (sum, counts) => sum + counts.completedTasks,
       0
     );
+
+    console.log("🔍 Chapter Detail - Progress Calculation:", {
+      totalTasks,
+      completedTasks,
+      projectTaskCounts,
+      completionRate:
+        totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
+    });
 
     return totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
   })();
@@ -652,10 +674,9 @@ export function ChapterDetailPage({
         </div>
         <div className="flex gap-2">
           {!isCompleted && (
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="ghost" size="sm" asChild>
               <Link href={`/chapter/edit/${chapter.id}`}>
-                <Edit className="mr-2 h-4 w-4" />
-                {translate("chapterEdit.title")}
+                <Edit className="h-4 w-4" />
               </Link>
             </Button>
           )}
@@ -819,89 +840,65 @@ export function ChapterDetailPage({
                 totalTasks: 0,
                 completedTasks: 0,
               };
-              const progressPercentage =
-                taskCounts.totalTasks > 0
-                  ? Math.round(
-                      (taskCounts.completedTasks / taskCounts.totalTasks) * 100
-                    )
-                  : 0;
 
-              const projectStatus = getProjectStatus(project);
-              const projectDuration = getProjectDuration(project);
+              // 챕터별 목표 데이터 찾기
+              const chapterProject = chapter?.connectedProjects?.find(
+                (cp) => cp.projectId === project.id
+              );
 
               return (
-                <Card
+                <ProjectCard
                   key={project.id}
-                  className="cursor-pointer transition-all hover:shadow-md"
+                  project={project}
+                  mode="chapter"
+                  chapterTargetCount={chapterProject?.chapterTargetCount}
+                  chapterDoneCount={chapterProject?.chapterDoneCount}
+                  taskCounts={taskCounts}
+                  showBothProgress={true}
+                  showTargetButtons={true}
+                  onTargetCountChange={(projectId, newCount) => {
+                    // 챕터의 connectedProjects 업데이트
+                    const updatedConnectedProjects = chapter?.connectedProjects?.map(cp => 
+                      cp.projectId === projectId 
+                        ? { ...cp, chapterTargetCount: newCount }
+                        : cp
+                    ) || [];
+                    
+                    // 챕터 업데이트
+                    updateChapter(chapter?.id || "", {
+                      connectedProjects: updatedConnectedProjects
+                    }).then(() => {
+                      // 캐시 무효화
+                      queryClient.invalidateQueries({ queryKey: ["chapter", id] });
+                      queryClient.invalidateQueries({ queryKey: ["chapters"] });
+                      
+                      toast({
+                        title: "목표 개수 업데이트 완료",
+                        description: "챕터별 목표 개수가 업데이트되었습니다.",
+                      });
+                    }).catch((error) => {
+                      console.error("목표 개수 업데이트 실패:", error);
+                      toast({
+                        title: "업데이트 실패",
+                        description: "목표 개수 업데이트에 실패했습니다.",
+                        variant: "destructive",
+                      });
+                    });
+                  }}
                   onClick={() => router.push(`/para/projects/${project.id}`)}
                 >
-                  <div className="p-3">
-                    {/* 프로젝트 제목과 상태 */}
-                    <div className="mb-2 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{project.title}</span>
-                        <Badge
-                          variant="outline"
-                          className={`text-xs ${projectStatus.color}`}
-                        >
-                          {projectStatus.status}
-                        </Badge>
-                      </div>
-                      <span className="text-sm font-medium">
-                        {taskCounts.completedTasks}/{taskCounts.totalTasks}
-                      </span>
+                  {/* 챕터 도중 추가 표시 */}
+                  {project.addedMidway && (
+                    <div className="flex justify-end">
+                      <Badge
+                        variant="outline"
+                        className="bg-amber-100 text-amber-800 text-xs"
+                      >
+                        💡 챕터 도중 추가됨
+                      </Badge>
                     </div>
-
-                    {/* 진행률 바 */}
-                    <div className="progress-bar mb-3">
-                      <div
-                        className="progress-value"
-                        style={{
-                          width: `${progressPercentage}%`,
-                        }}
-                      ></div>
-                    </div>
-
-                    {/* 프로젝트 정보 */}
-                    <div className="space-y-1">
-                      {/* 기간 정보 */}
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-muted-foreground">기간:</span>
-                        <span className="text-muted-foreground">
-                          {projectDuration}
-                        </span>
-                      </div>
-
-                      {/* 영역 정보 */}
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-muted-foreground">Area:</span>
-                        <span className="text-muted-foreground">
-                          {(() => {
-                            if (project.areaId) {
-                              const area = areas.find(
-                                (a) => a.id === project.areaId
-                              );
-                              return area ? area.name : "미분류";
-                            }
-                            return "미분류";
-                          })()}
-                        </span>
-                      </div>
-
-                      {/* 챕터 도중 추가 표시 */}
-                      {project.addedMidway && (
-                        <div className="flex justify-end">
-                          <Badge
-                            variant="outline"
-                            className="bg-amber-100 text-amber-800 text-xs"
-                          >
-                            💡 챕터 도중 추가됨
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </Card>
+                  )}
+                </ProjectCard>
               );
             })}
           </div>
@@ -1052,7 +1049,7 @@ export function ChapterDetailPage({
               variant="secondary"
               onClick={() => setShowAddProjectDialog(false)}
             >
-              취소
+              {translate("common.cancel")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1083,7 +1080,7 @@ export function ChapterDetailPage({
               onClick={() => setShowAddNoteDialog(false)}
               disabled={saveNoteMutation.isPending}
             >
-              취소
+              {translate("common.cancel")}
             </Button>
             <Button
               onClick={handleSaveNote}
@@ -1231,7 +1228,7 @@ export function ChapterDetailPage({
               onClick={() => setShowRetrospectiveDialog(false)}
               disabled={saveRetrospectiveMutation.isPending}
             >
-              취소
+              {translate("common.cancel")}
             </Button>
             <Button
               onClick={handleSaveRetrospective}
@@ -1385,8 +1382,8 @@ export function ChapterDetailPage({
           deleteChapterMutation.mutate();
           setShowDeleteDialog(false);
         }}
-        confirmText="삭제"
-        cancelText="취소"
+        confirmText={translate("common.delete")}
+        cancelText={translate("common.cancel")}
         destructive={true}
       />
     </div>

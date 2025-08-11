@@ -36,6 +36,7 @@ const settingsFormSchema = z.object({
   notifications: z.boolean(),
   theme: z.enum(["light", "dark", "system"]),
   language: z.enum(["ko", "en"]),
+  chapterProjectCardDisplay: z.enum(["chapter_only", "both"]),
 });
 
 type SettingsFormData = z.infer<typeof settingsFormSchema>;
@@ -104,6 +105,20 @@ export default function SettingsPage() {
     // 언어 옵션
     languageKorean: translate("language.korean"),
     languageEnglish: translate("language.english"),
+
+    // 프로젝트 카드 표시 옵션
+    chapterProjectCardDisplay: translate(
+      "settings.chapterProjectCardDisplay.title"
+    ),
+    chapterProjectCardDisplayDescription: translate(
+      "settings.chapterProjectCardDisplay.description"
+    ),
+    chapterProjectCardDisplayChapterOnly: translate(
+      "settings.chapterProjectCardDisplay.chapterOnly"
+    ),
+    chapterProjectCardDisplayBoth: translate(
+      "settings.chapterProjectCardDisplay.both"
+    ),
 
     // 토스트 메시지
     save: translate("settings.save"),
@@ -578,7 +593,7 @@ export default function SettingsPage() {
               </p>
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-6">
               <div>
                 <Label htmlFor="carryOver">{texts.carryOver}</Label>
                 <p className="text-xs text-muted-foreground">
@@ -598,6 +613,35 @@ export default function SettingsPage() {
                 }}
                 disabled={savingStates["carryOver"]}
               />
+            </div>
+
+            <div>
+              <Label htmlFor="chapterProjectCardDisplay">
+                {texts.chapterProjectCardDisplay}
+              </Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                {texts.chapterProjectCardDisplayDescription}
+              </p>
+              <select
+                id="chapterProjectCardDisplay"
+                value={form.watch("chapterProjectCardDisplay")}
+                onChange={(e) =>
+                  saveSetting(
+                    "chapterProjectCardDisplay",
+                    e.target.value as "chapter_only" | "both",
+                    texts.chapterProjectCardDisplay + " " + texts.saveSuccess
+                  )
+                }
+                disabled={savingStates["chapterProjectCardDisplay"]}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              >
+                <option value="chapter_only">
+                  {texts.chapterProjectCardDisplayChapterOnly}
+                </option>
+                <option value="both">
+                  {texts.chapterProjectCardDisplayBoth}
+                </option>
+              </select>
             </div>
           </Card>
         </section>

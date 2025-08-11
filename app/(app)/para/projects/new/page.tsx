@@ -98,7 +98,7 @@ const projectFormSchema = z
           date: z.string(),
           duration: z
             .number()
-            .min(0, "소요 시간은 0 이상이어야 합니다")
+            .min(0.1, "소요 시간은 0.1 이상이어야 합니다")
             .multipleOf(
               0.1,
               "소요 시간은 소수점 첫째 자리까지 입력 가능합니다"
@@ -1363,12 +1363,12 @@ function NewProjectPageContent() {
                                 <Input
                                   type="number"
                                   step="0.1"
-                                  min="0"
+                                  min="0.1"
                                   {...form.register(`tasks.${index}.duration`, {
                                     valueAsNumber: true,
                                   })}
                                   className="w-20 text-sm"
-                                  placeholder="소요시간"
+                                  placeholder="1.0"
                                 />
                                 <span className="text-xs text-muted-foreground">
                                   시간
@@ -1460,8 +1460,8 @@ function NewProjectPageContent() {
                                     }, 100);
                                   },
                                 })}
-                                placeholder="소요시간"
-                                min="0"
+                                placeholder="1.0"
+                                min="0.1"
                                 step="0.1"
                                 className="w-20 text-sm"
                               />
@@ -1594,8 +1594,8 @@ function NewProjectPageContent() {
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
                             (프로젝트 정보: 미완료 태스크{" "}
-                            {form.watch("targetCount") || 1}개 / 총 태스크{" "}
-                            {form.watch("targetCount") || 1}개)
+                            {form.watch("targetCount") || 0}개 / 총 태스크{" "}
+                            {form.watch("targetCount") || 0}개)
                           </p>
                         </div>
                       </div>
@@ -1639,7 +1639,7 @@ function NewProjectPageContent() {
             onClick={() => router.back()}
             disabled={isSubmitting}
           >
-            취소
+            {translate("common.cancel")}
           </Button>
         </div>
       </form>
@@ -1668,7 +1668,7 @@ function NewProjectPageContent() {
               variant="outline"
               onClick={() => setShowCategoryChangeDialog(false)}
             >
-              취소
+              {translate("common.cancel")}
             </Button>
             <Button
               variant="destructive"
@@ -1787,7 +1787,7 @@ function NewProjectPageContent() {
                     }}
                     className="flex-1"
                   >
-                    취소
+                    {translate("common.cancel")}
                   </Button>
                 </div>
               </>

@@ -88,7 +88,7 @@ const taskFormSchema = z.object({
   date: z.string().min(1, "날짜를 선택해주세요"),
   duration: z
     .number()
-    .min(0, "소요 시간은 0 이상이어야 합니다")
+    .min(0.1, "소요 시간은 0.1 이상이어야 합니다")
     .multipleOf(0.1, "소요 시간은 소수점 첫째 자리까지 입력 가능합니다"),
 });
 
@@ -730,18 +730,24 @@ export default function ProjectDetailPage({
 
   // 최적화된 태스크 개수 사용 (taskCounts 우선, 폴백으로 tasks 사용)
   const completedTasks =
-    taskCounts?.completedTasks ??
-    tasks?.filter((task: any) => task.done).length ??
-    0;
-  const totalTasks = taskCounts?.totalTasks ?? tasks?.length ?? 0;
+    (taskCounts?.completedTasks ?? 0) ||
+    (tasks?.filter((task: any) => task.done).length ?? 0);
+  const totalTasks = (taskCounts?.totalTasks ?? 0) || (tasks?.length ?? 0);
 
   // 반복형 프로젝트의 경우 targetCount 사용, 작업형의 경우 tasks 개수 사용
   const targetCount =
     project?.targetCount ||
     (project?.category === "repetitive" ? completedTasks : totalTasks);
 
+  // 진행률 계산 - 반복형은 targetCount 기준, 작업형은 실제 태스크 개수 기준
   const progressPercentage =
-    totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    project?.category === "repetitive"
+      ? project?.targetCount && project.targetCount > 0
+        ? Math.round((completedTasks / project.targetCount) * 100)
+        : 0
+      : totalTasks > 0
+      ? Math.round((completedTasks / totalTasks) * 100)
+      : 0;
 
   // 디버깅용 로그
   console.log("🔍 Project Detail - Task Counts:", {
@@ -778,6 +784,7 @@ export default function ProjectDetailPage({
     const projectStart = new Date(project.startDate);
 
     taskForm.setValue("date", formatDateForInput(projectStart));
+    taskForm.setValue("duration", 1.0); // 기본값 1.0시간 설정
     setShowTaskDialog(true);
   };
 
@@ -1956,9 +1963,10 @@ export default function ProjectDetailPage({
               <Input
                 id="task-duration"
                 type="number"
-                min="1"
+                min="0.1"
                 max="24"
-                placeholder="1"
+                step="0.1"
+                placeholder="1.0"
                 {...taskForm.register("duration", { valueAsNumber: true })}
               />
               {taskForm.formState.errors.duration && (
@@ -2050,9 +2058,10 @@ export default function ProjectDetailPage({
               <Input
                 id="edit-task-duration"
                 type="number"
-                min="1"
+                min="0.1"
                 max="24"
-                placeholder="1"
+                step="0.1"
+                placeholder="1.0"
                 {...editTaskForm.register("duration", { valueAsNumber: true })}
               />
               {editTaskForm.formState.errors.duration && (

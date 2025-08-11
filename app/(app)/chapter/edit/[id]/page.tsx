@@ -879,20 +879,36 @@ export default function EditChapterPage({
                             <span className="text-sm text-muted-foreground">
                               개
                             </span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                updateProjectTargetCount(
-                                  projectId,
-                                  getDefaultTargetCount(project)
-                                );
-                              }}
-                              className="text-xs"
-                            >
-                              권장값 적용
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  updateProjectTargetCount(
+                                    projectId,
+                                    getDefaultTargetCount(project)
+                                  );
+                                }}
+                                className="text-xs"
+                              >
+                                {translate("para.projects.targetCount.chapter.setToRecommended")}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  updateProjectTargetCount(
+                                    projectId,
+                                    project.targetCount || 1
+                                  );
+                                }}
+                                className="text-xs"
+                              >
+                                {translate("para.projects.targetCount.chapter.setToTotal")}
+                              </Button>
+                            </div>
                           </div>
                           <p className="text-xs text-muted-foreground mt-1">
                             프로젝트 기간과 챕터 기간을 고려한 권장 개수입니다.

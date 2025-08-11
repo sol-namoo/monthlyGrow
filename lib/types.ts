@@ -24,11 +24,10 @@ export interface Resource {
   updatedAt: Date;
 }
 
-// 챕터별 프로젝트 목표치 인터페이스
-export interface ConnectedProjectGoal {
+// 스프린트별 프로젝트 연결 인터페이스 (정량적 목표 제거)
+export interface ConnectedProject {
   projectId: string;
-  chapterTargetCount: number; // 이번 루프에서 목표로 하는 태스크 수
-  chapterDoneCount: number; // 이번 루프에서 실제 완료한 태스크 수
+  addedMidway?: boolean; // 스프린트 중간에 추가된 프로젝트 여부
 }
 
 export interface Project {
@@ -46,17 +45,17 @@ export interface Project {
   endDate: Date;
   createdAt: Date;
   updatedAt: Date;
-  chapterId?: string; // 현재 연결된 챕터 ID (legacy)
-  connectedChapters?: string[]; // 연결된 챕터 ID 배열
+  sprintId?: string; // 현재 연결된 스프린트 ID (legacy)
+  connectedSprints?: string[]; // 연결된 스프린트 ID 배열
 
-  addedMidway?: boolean; // 챕터 중간에 추가된 프로젝트 여부
+  addedMidway?: boolean; // 스프린트 중간에 추가된 프로젝트 여부
   retrospective?: Retrospective;
   notes: Note[];
   // tasks는 서브컬렉션으로 관리: projects/{projectId}/tasks/{taskId}
 
   // 미완료 프로젝트 이관 관련 필드
-  isCarriedOver?: boolean; // 이전 챕터에서 이관된 프로젝트 여부
-  originalChapterId?: string; // 원래 챕터 ID (이관된 경우)
+  isCarriedOver?: boolean; // 이전 스프린트에서 이관된 프로젝트 여부
+  originalSprintId?: string; // 원래 스프린트 ID (이관된 경우)
   carriedOverAt?: Date; // 이관된 날짜
   migrationStatus?: "pending" | "migrated" | "ignored"; // 이관 상태
 
@@ -76,26 +75,23 @@ export interface Task {
   updatedAt: Date;
 }
 
-export interface Chapter {
+export interface Sprint {
   id: string;
   userId: string;
   title: string;
   startDate: Date;
   endDate: Date;
   focusAreas: string[]; // Area ID 배열
+  objective: string; // 스프린트 목표 (정성적)
   reward?: string;
   createdAt: Date;
   updatedAt: Date;
-  doneCount: number; // 전체 완료 수 (legacy - 하위 호환성)
-  targetCount: number; // 전체 목표 수 (legacy - 하위 호환성)
-  connectedProjects?: ConnectedProjectGoal[]; // 챕터별 프로젝트 목표치
-  retrospective?: Retrospective; // 챕터 회고
-  note?: Note; // 챕터 노트 (선택)
+  connectedProjects?: ConnectedProject[]; // 연결된 프로젝트들
+  retrospective?: Retrospective; // 스프린트 회고
+  note?: Note; // 스프린트 노트 (선택)
 
   // 로컬 계산 필드 (DB에 저장되지 않음)
   status?: "planned" | "in_progress" | "ended"; // startDate와 endDate를 기반으로 클라이언트에서 계산
-  chaptertargetcounts?: number; // 챕터 전체 목표 수 (실시간 계산)
-  chapterdonecounts?: number; // 챕터 전체 완료 수 (실시간 계산)
 }
 
 export interface Snapshot {
@@ -113,17 +109,17 @@ export interface Snapshot {
 export interface Retrospective {
   id: string;
   userId: string;
-  chapterId?: string; // 챕터 회고인 경우
+  sprintId?: string; // 스프린트 회고인 경우
   projectId?: string; // 프로젝트 회고인 경우
   createdAt: Date;
   updatedAt: Date;
   content?: string; // 자유 회고
 
-  // 챕터용 필드
+  // 스프린트용 필드
   bestMoment?: string;
   routineAdherence?: string;
   unexpectedObstacles?: string;
-  nextChapterApplication?: string;
+  nextSprintApplication?: string;
 
   // 프로젝트용 필드
   goalAchieved?: string;
@@ -173,6 +169,7 @@ export interface UserSettings {
   notifications: boolean;
   theme: "light" | "dark" | "system";
   language: "ko" | "en";
+  sprintProjectCardDisplay: "sprint_only" | "both"; // 스프린트 페이지에서 프로젝트 카드 표시 방식
   // Firebase Auth에서 제공하는 정보는 제외:
   // - email (user.email)
   // - displayName (user.displayName)
@@ -230,7 +227,6 @@ export interface GeneratedPlan {
     target: string; // 목표 설명 (작업형: "완성된 이력서 1부", 반복형: "주요 개념 정리")
     targetCount?: number; // 반복형일 때만 사용 (목표 개수)
     durationWeeks: number;
-    estimatedDailyTime: number; // 분 단위
     difficulty: string;
     tasks: Array<{
       title: string;
@@ -238,7 +234,6 @@ export interface GeneratedPlan {
       duration: number;
       requirements: string[];
       resources: string[];
-      estimatedTime: number; // 분 단위
       prerequisites?: string[];
     }>;
     milestones: Array<{

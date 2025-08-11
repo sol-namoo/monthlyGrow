@@ -67,10 +67,9 @@ const SYSTEM_PROMPT = `당신은 Monthly Grow 앱의 계획 생성 어시스턴�
         {
           "title": "작업 제목",
           "description": "작업에 대한 상세 설명",
-          "duration": "소요 일수 - 반드시 숫자로 설정",
+          "duration": "소요 시간 (시간 단위, 최소 0.1시간, 최대 24시간) - 반드시 숫자로 설정",
           "requirements": ["필요한 도구나 준비사항 배열"],
           "resources": ["필요한 리소스 배열"],
-          "estimatedTime": "예상 소요 시간 (분) - 반드시 숫자로 설정",
           "prerequisites": ["선행 조건 배열"]
         }
       ]
@@ -100,10 +99,9 @@ const SYSTEM_PROMPT = `당신은 Monthly Grow 앱의 계획 생성 어시스턴�
 3. **Task (작업)**:
    - title: string (작업 제목)
    - description: string (작업 설명)
-   - duration: number (소요 일수)
+   - duration: number (소요 시간, 시간 단위)
    - requirements: string[] (필요한 도구/준비사항)
    - resources: string[] (필요한 리소스)
-   - estimatedTime: number (예상 소요 시간, 분 단위)
    - prerequisites: string[] (선행 조건)
 
 **필수 정보 채우기 규칙:**
@@ -119,8 +117,7 @@ const SYSTEM_PROMPT = `당신은 Monthly Grow 앱의 계획 생성 어시스턴�
 - 모든 프로젝트는 반드시 구체적인 태스크를 가져야 합니다
 - 태스크 제목은 명확하고 실행 가능해야 합니다
 - 태스크 설명은 구체적이고 이해하기 쉬워야 합니다
-- estimatedTime은 분 단위로 설정 (최소 30분, 최대 240분)
-- duration은 일 단위로 설정 (보통 1일)
+- duration은 시간 단위로 설정 (최소 0.1시간, 최대 24시간, 소수점 첫째 자리까지)
 
 ⚠️ 프로젝트 생성 규칙:
 
@@ -129,7 +126,7 @@ const SYSTEM_PROMPT = `당신은 Monthly Grow 앱의 계획 생성 어시스턴�
 - targetCount: 반복 횟수 (목표 달성에 필요한 횟수)
 - tasks: 반드시 "1회차", "2회차", "3회차" 형태로 생성
 - 예시: "알고리즘 문제 풀이 1회차", "알고리즘 문제 풀이 2회차", ...
-- 각 태스크의 estimatedTime: 가용 시간을 고려하여 적절히 설정
+- 각 태스크의 duration: 가용 시간을 고려하여 적절히 설정 (시간 단위)
 
 **작업형 프로젝트 (task_based):**
 - target: 구체적인 목표 (예: "완성된 이력서 1부", "포트폴리오 웹사이트 구축")
@@ -358,13 +355,12 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
 
             project.tasks = [];
             for (let i = 1; i <= targetCount; i++) {
-              project.tasks.push({
+              project.tasks.push(              {
                 title: `${baseActivity} ${i}회차`,
                 description: `${baseActivity} ${i}회차 수행`,
-                duration: 1,
+                duration: Math.max(0.1, Math.min(24, totalAvailableTime / targetCount / 60)),
                 requirements: [],
                 resources: [],
-                estimatedTime: Math.round(totalAvailableTime / targetCount),
                 prerequisites: [],
               });
             }
@@ -379,28 +375,25 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
               {
                 title: `${project.title} 시작`,
                 description: `${project.title} 프로젝트를 시작합니다.`,
-                duration: 1,
+                duration: Math.max(0.1, Math.min(24, totalAvailableTime / 3 / 60)),
                 requirements: [],
                 resources: [],
-                estimatedTime: Math.round(totalAvailableTime / 3),
                 prerequisites: [],
               },
               {
                 title: `${project.title} 진행`,
                 description: `${project.title} 프로젝트를 진행합니다.`,
-                duration: 1,
+                duration: Math.max(0.1, Math.min(24, totalAvailableTime / 3 / 60)),
                 requirements: [],
                 resources: [],
-                estimatedTime: Math.round(totalAvailableTime / 3),
                 prerequisites: [],
               },
               {
                 title: `${project.title} 완료`,
                 description: `${project.title} 프로젝트를 완료합니다.`,
-                duration: 1,
+                duration: Math.max(0.1, Math.min(24, totalAvailableTime / 3 / 60)),
                 requirements: [],
                 resources: [],
-                estimatedTime: Math.round(totalAvailableTime / 3),
                 prerequisites: [],
               },
             ];
@@ -432,10 +425,9 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
                 project.tasks.push({
                   title: `${baseActivity} ${newTaskNumber}회차`,
                   description: `${baseActivity} ${newTaskNumber}회차 수행`,
-                  duration: 1,
+                  duration: Math.max(0.1, Math.min(24, totalAvailableTime / targetCount / 60)),
                   requirements: [],
                   resources: [],
-                  estimatedTime: Math.round(totalAvailableTime / targetCount),
                   prerequisites: [],
                 });
               }
@@ -447,21 +439,19 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
           }
         }
 
-        // 6. 모든 태스크에 시간 분배 및 estimatedDailyTime 계산
+        // 6. 모든 태스크의 duration 검증 및 보정
         if (project.tasks && project.tasks.length > 0) {
-          const totalTasks = project.tasks.length;
-          const timePerTask = Math.round(totalAvailableTime / totalTasks);
-
-          // 태스크별 시간 분배 (균등 분배)
+          // 태스크별 duration 검증 및 보정
           project.tasks = project.tasks.map((task: any, index: number) => {
-            let taskTime = timePerTask;
-
-            // 최소 30분, 최대 4시간으로 제한
-            taskTime = Math.max(30, Math.min(240, taskTime));
+            // duration이 없거나 유효하지 않은 경우 기본값 설정
+            let taskDuration = task.duration || 1.0;
+            
+            // 최소 0.1시간, 최대 24시간으로 제한
+            taskDuration = Math.max(0.1, Math.min(24, taskDuration));
 
             return {
               ...task,
-              estimatedTime: taskTime,
+              duration: taskDuration,
             };
           });
 
@@ -476,7 +466,7 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
           }
 
           console.log(`프로젝트 "${project.title}" 최종 결과:`, {
-            totalTasks,
+            totalTasks: project.tasks.length,
             estimatedDailyTime: project.estimatedDailyTime,
             targetCount: project.targetCount,
             totalAvailableTime,

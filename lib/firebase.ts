@@ -90,6 +90,22 @@ export const createBaseData = (userId: string) => ({
 // 데이터 수정 시 updatedAt 필드 업데이트
 export const updateTimestamp = () => Timestamp.now();
 
+// Task 정렬 유틸리티 함수
+const sortTasksByDateAndTitle = (tasks: Task[]): Task[] => {
+  return tasks.sort((a, b) => {
+    const dateA = new Date(a.date);
+    const dateB = new Date(b.date);
+
+    // Date 비교
+    if (dateA.getTime() !== dateB.getTime()) {
+      return dateA.getTime() - dateB.getTime();
+    }
+
+    // 같은 date인 경우 제목으로 정렬
+    return a.title.localeCompare(b.title);
+  });
+};
+
 // --- Basic Data Fetching Functions ---
 
 // Areas
@@ -552,10 +568,12 @@ export const fetchAllTasksByUserId = async (
 ): Promise<Task[]> => {
   const q = query(collection(db, "tasks"), where("userId", "==", userId));
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => ({
+  const tasks = querySnapshot.docs.map((doc) => ({
     id: doc.id,
     ...doc.data(),
   })) as Task[];
+
+  return sortTasksByDateAndTitle(tasks);
 };
 
 export const fetchAllTasksByProjectId = async (
@@ -569,7 +587,8 @@ export const fetchAllTasksByProjectId = async (
       id: doc.id,
       ...doc.data(),
     })) as Task[];
-    return tasks;
+
+    return sortTasksByDateAndTitle(tasks);
   } catch (error) {
     // 서브컬렉션에서 실패하면 메인 컬렉션에서 시도 (fallback)
     const q = query(
@@ -581,7 +600,8 @@ export const fetchAllTasksByProjectId = async (
       id: doc.id,
       ...doc.data(),
     })) as Task[];
-    return tasks;
+
+    return sortTasksByDateAndTitle(tasks);
   }
 };
 
@@ -625,6 +645,8 @@ export const getTaskCountsForMultipleProjects = async (
 }> => {
   if (projectIds.length === 0) return {};
 
+  console.log("🔍 getTaskCountsForMultipleProjects 시작:", { projectIds });
+
   // 프로젝트별로 그룹화
   const counts: {
     [projectId: string]: { totalTasks: number; completedTasks: number };
@@ -648,13 +670,23 @@ export const getTaskCountsForMultipleProjects = async (
         ).length;
 
         counts[projectId] = { totalTasks, completedTasks };
+
+        console.log(`🔍 프로젝트 ${projectId} 서브컬렉션 결과:`, {
+          totalTasks,
+          completedTasks,
+          tasksFound: querySnapshot.docs.length,
+        });
       } catch (error) {
+        console.error(`❌ 프로젝트 ${projectId} 서브컬렉션 조회 실패:`, error);
         // 개별 프로젝트 실패 시 기본값 유지
       }
     }
 
+    console.log("🔍 최종 서브컬렉션 결과:", counts);
     return counts;
   } catch (error) {
+    console.error("❌ 서브컬렉션 전체 실패, 메인 컬렉션으로 폴백:", error);
+
     // 서브컬렉션에서 실패하면 메인 컬렉션에서 시도 (fallback)
     const q = query(
       collection(db, "tasks"),
@@ -674,6 +706,7 @@ export const getTaskCountsForMultipleProjects = async (
       }
     });
 
+    console.log("🔍 메인 컬렉션 폴백 결과:", counts);
     return counts;
   }
 };
@@ -2789,4 +2822,67 @@ export const fetchChaptersByIds = async (
   );
 
   return connectedChapters;
+};
+
+// 오늘 날짜의 task들을 가져오는 함수
+export const getTodayTasks = async (
+  userId: string,
+  currentChapterId?: string
+): Promise<Task[]> => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // 현재 챕터의 프로젝트들을 먼저 가져오기
+    let projectIds: string[] = [];
+
+    if (currentChapterId) {
+      // 특정 챕터의 프로젝트들만
+      const projects = await fetchProjectsByChapterId(currentChapterId, userId);
+      projectIds = projects.map((p) => p.id);
+    } else {
+      // 현재 진행 중인 챕터의 프로젝트들
+      const chapters = await fetchAllChaptersByUserId(userId);
+      const currentChapter = chapters.find((chapter) => {
+        const status = getChapterStatus(chapter);
+        return status === "in_progress";
+      });
+
+      if (currentChapter) {
+        const projects = await fetchProjectsByChapterId(
+          currentChapter.id,
+          userId
+        );
+        projectIds = projects.map((p) => p.id);
+      }
+    }
+
+    if (projectIds.length === 0) {
+      return [];
+    }
+
+    // 각 프로젝트에서 오늘 날짜의 task들을 가져오기
+    const todayTasks: Task[] = [];
+
+    for (const projectId of projectIds) {
+      try {
+        const tasks = await fetchAllTasksByProjectId(projectId);
+        const projectTodayTasks = tasks.filter((task) => {
+          const taskDate = new Date(task.date);
+          taskDate.setHours(0, 0, 0, 0);
+          return taskDate >= today && taskDate < tomorrow;
+        });
+        todayTasks.push(...projectTodayTasks);
+      } catch (error) {
+        console.error(`프로젝트 ${projectId}의 task 조회 실패:`, error);
+      }
+    }
+
+    return sortTasksByDateAndTitle(todayTasks);
+  } catch (error) {
+    console.error("오늘 task 조회 실패:", error);
+    return [];
+  }
 };

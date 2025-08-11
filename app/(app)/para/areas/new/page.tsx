@@ -42,6 +42,7 @@ import { useToast } from "@/hooks/use-toast";
 import { RecommendationBadge } from "@/components/ui/recommendation-badge";
 import Loading from "@/components/feedback/Loading";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // 폼 스키마 정의
 const areaFormSchema = z.object({
@@ -58,6 +59,7 @@ function NewAreaPageContent() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const [isSubmitting, setIsSubmitting] = useState(false); // Area 생성 중 로딩 상태
+  const { translate } = useLanguage();
 
   // react-hook-form 설정
   const form = useForm<AreaFormData>({
@@ -377,7 +379,7 @@ function NewAreaPageContent() {
             onClick={() => router.back()}
             disabled={isSubmitting}
           >
-            취소
+            {translate("common.cancel")}
           </Button>
         </div>
       </form>

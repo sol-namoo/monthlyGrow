@@ -63,6 +63,22 @@ export default function LoginPage() {
       newUser = user;
 
       console.log("✅ 계정 인증 성공:", user.uid, user.displayName);
+      console.log("🔍 사용자 정보 상세:", {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        providerId: user.providerId,
+        isAnonymous: user.isAnonymous,
+      });
+
+      // Google Identity Toolkit 응답 구조 확인
+      console.log("🔍 전체 사용자 객체:", user);
+      console.log("🔍 사용자 객체의 모든 속성:", Object.keys(user));
+
+      // providerData 확인 (Google 로그인의 경우)
+      if (user.providerData && user.providerData.length > 0) {
+        console.log("🔍 Provider Data:", user.providerData[0]);
+      }
       const userDoc = await getDoc(doc(db, "users", user.uid));
       if (!userDoc.exists()) {
         console.log(
@@ -114,6 +130,13 @@ export default function LoginPage() {
       newUser = user;
 
       console.log("✅ 이메일 회원가입 성공:", user.uid, user.email);
+      console.log("🔍 이메일 사용자 정보 상세:", {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        providerId: user.providerId,
+        isAnonymous: user.isAnonymous,
+      });
       const userDoc = await getDoc(doc(db, "users", user.uid));
       if (!userDoc.exists()) {
         console.log(
@@ -142,6 +165,13 @@ export default function LoginPage() {
       const user = result.user;
 
       console.log("✅ 이메일 로그인 성공:", user.uid, user.email);
+      console.log("🔍 이메일 로그인 사용자 정보 상세:", {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        providerId: user.providerId,
+        isAnonymous: user.isAnonymous,
+      });
       router.push("/home");
     } catch (error: any) {
       console.error("❌ 이메일 로그인 실패:", error);

@@ -201,38 +201,40 @@ export default function ResourceDetailPage({
         </div>
 
         {/* 자료 내용 */}
-        {(resource.link || resource.text) && (
-          <Card className="mb-4">
-            <div className="p-4 space-y-4">
-              {resource.link && (
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-2">
-                    {translate("para.resources.detail.link")}
-                  </p>
-                  <a
-                    href={resource.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline break-all"
-                  >
-                    {resource.link}
-                  </a>
+        <Card className="mb-4">
+          <div className="p-4 space-y-4">
+            {resource.link ? (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">
+                  {translate("para.resources.detail.link")}
+                </p>
+                <a
+                  href={resource.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline break-all"
+                >
+                  {resource.link}
+                </a>
+              </div>
+            ) : resource.text ? (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">
+                  {translate("para.resources.detail.content")}
+                </p>
+                <div className="whitespace-pre-wrap text-sm">
+                  {resource.text}
                 </div>
-              )}
-
-              {resource.text && (
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-2">
-                    {translate("para.resources.detail.content")}
-                  </p>
-                  <div className="whitespace-pre-wrap text-sm">
-                    {resource.text}
-                  </div>
-                </div>
-              )}
-            </div>
-          </Card>
-        )}
+              </div>
+            ) : (
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  {translate("para.resources.detail.noContent")}
+                </p>
+              </div>
+            )}
+          </div>
+        </Card>
 
         {/* 삭제 확인 다이얼로그 */}
         <ConfirmDialog

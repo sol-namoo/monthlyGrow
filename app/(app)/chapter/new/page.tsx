@@ -1099,8 +1099,9 @@ function NewChapterPageContent() {
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
                           (프로젝트 정보: 미완료 태스크{" "}
-                          {project.targetCount || 0}개 / 총 태스크{" "}
-                          {project.targetCount || 0}개)
+                          {(project.targetCount || 0) -
+                            (project.completedTasks || 0)}
+                          개 / 총 태스크 {project.targetCount || 0}개)
                         </p>
                       </div>
                     </div>

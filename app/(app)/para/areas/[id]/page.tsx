@@ -3,6 +3,7 @@ import { useEffect, useState, use, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ChevronLeft,
   MapPin,
@@ -283,95 +284,117 @@ export default function AreaDetailPage({
         </div>
 
         {/* 연결된 프로젝트 */}
-        <Card className="mb-4">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Folder className="h-4 w-4" />
-              {translate("para.areas.detail.connectedProjects")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {projectsWithStatus.length > 0 ? (
-              <div className="space-y-2">
-                {projectsWithStatus.map((project) => (
-                  <Link
-                    key={project.id}
-                    href={`/para/projects/${project.id}`}
-                    className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">{project.title}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {(() => {
-                          const status = getProjectStatus(project);
-                          switch (status) {
-                            case "scheduled":
-                              return translate("para.projects.status.planned");
-                            case "in_progress":
-                              return translate(
-                                "para.projects.status.inProgress"
-                              );
-                            case "completed":
-                              return translate(
-                                "para.projects.status.completed"
-                              );
-                            case "overdue":
-                              return translate("para.projects.status.overdue");
-                            default:
-                              return translate(
-                                "para.projects.status.inProgress"
-                              );
-                          }
-                        })()}
-                      </Badge>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {translate("para.areas.detail.noConnectedProjects")}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* 연결된 자료 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="h-4 w-4" />
-              {translate("para.areas.detail.connectedResources")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {areaResources.length > 0 ? (
-              <div className="space-y-2">
-                {areaResources.map((resource) => (
-                  <Link
-                    key={resource.id}
-                    href={`/para/resources/${resource.id}`}
-                    className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="font-medium">{resource.name}</span>
-                        <p className="text-xs text-muted-foreground">
-                          {resource.description}
-                        </p>
-                      </div>
-                      <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {translate("para.areas.detail.noConnectedResources")}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="projects" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="projects">
+              {translate("para.areas.detail.connectedProjects")} (
+              {projectsWithStatus.length})
+            </TabsTrigger>
+            <TabsTrigger value="resources">
+              {translate("para.areas.detail.connectedResources")} (
+              {areaResources.length})
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="projects">
+            <Card className="mb-4">
+              <CardContent className="pt-6">
+                {projectsWithStatus.length > 0 ? (
+                  <div className="space-y-2">
+                    {projectsWithStatus.map((project) => (
+                      <Link
+                        key={project.id}
+                        href={`/para/projects/${project.id}`}
+                        className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <span className="font-medium block">
+                              {project.title}
+                            </span>
+                            {project.description && (
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                {project.description}
+                              </p>
+                            )}
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className="text-xs flex-shrink-0 ml-2"
+                          >
+                            {(() => {
+                              const status = getProjectStatus(project);
+                              switch (status) {
+                                case "scheduled":
+                                  return translate(
+                                    "para.projects.status.planned"
+                                  );
+                                case "in_progress":
+                                  return translate(
+                                    "para.projects.status.inProgress"
+                                  );
+                                case "completed":
+                                  return translate(
+                                    "para.projects.status.completed"
+                                  );
+                                case "overdue":
+                                  return translate(
+                                    "para.projects.status.overdue"
+                                  );
+                                default:
+                                  return translate(
+                                    "para.projects.status.inProgress"
+                                  );
+                              }
+                            })()}
+                          </Badge>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {translate("para.areas.detail.noConnectedProjects")}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="resources">
+            <Card>
+              <CardContent className="pt-6">
+                {areaResources.length > 0 ? (
+                  <div className="space-y-2">
+                    {areaResources.map((resource) => (
+                      <Link
+                        key={resource.id}
+                        href={`/para/resources/${resource.id}`}
+                        className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <span className="font-medium block">
+                              {resource.name}
+                            </span>
+                            {resource.description && (
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                {resource.description}
+                              </p>
+                            )}
+                          </div>
+                          <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {translate("para.areas.detail.noConnectedResources")}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* 삭제 확인 다이얼로그 */}
         <ConfirmDialog
