@@ -7,14 +7,14 @@ export const settings = {
   noName: "이름 없음",
   email: "이메일",
   noEmail: "이메일 없음",
-  chapterSettings: "챕터 설정",
+  monthlySettings: "먼슬리 설정",
   defaultReward: "기본 보상 설정",
-  defaultRewardPlaceholder: "챕터 완료 시 기본 보상을 입력하세요",
-  defaultRewardEnabled: "새 챕터 생성 시 기본으로 설정될 보상입니다.",
+  defaultRewardPlaceholder: "먼슬리 완료 시 기본 보상을 입력하세요",
+  defaultRewardEnabled: "새 먼슬리 생성 시 기본으로 설정될 보상입니다.",
   defaultRewardDisabled:
-    "기본 보상 설정이 비활성화되어 있습니다. 활성화하면 새 챕터 생성 시 자동으로 보상이 채워집니다.",
+    "기본 보상 설정이 비활성화되어 있습니다. 활성화하면 새 먼슬리 생성 시 자동으로 보상이 채워집니다.",
   carryOver: "미완료 항목 이월",
-  carryOverDescription: "완료하지 못한 항목을 다음 챕터로 이월합니다.",
+  carryOverDescription: "완료하지 못한 항목을 다음 먼슬리로 이월합니다.",
   themeSettings: "테마 설정",
   theme: "테마",
   language: "언어",
@@ -56,12 +56,5 @@ export const settings = {
     loading: "로딩 중...",
     areaInfo: "Area 정보 로딩 중...",
     showMore: "더보기",
-  },
-  chapterProjectCardDisplay: {
-    title: "챕터에 포함된 프로젝트의 카드 표시",
-    description:
-      "챕터 페이지에서 프로젝트 카드를 볼 때 표시할 정보를 선택하세요",
-    chapterOnly: "챕터별 목표만",
-    both: "챕터별 목표 + 전체 진행률",
   },
 } as const;

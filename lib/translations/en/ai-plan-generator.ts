@@ -1,9 +1,9 @@
 export const aiPlanGenerator = {
   // 페이지 제목 및 헤더
   title: "AI Plan Generator",
-  subtitle: "Generate personalized plans with AI assistance",
+  subtitle: "Generate projects with AI and match them with appropriate areas",
   description:
-    "Create comprehensive plans for your projects, chapters, and goals using advanced AI technology.",
+    "Create comprehensive plans for your projects, monthlies, and goals using advanced AI technology.",
 
   // 메인 섹션
   mainSection: {
@@ -18,9 +18,12 @@ export const aiPlanGenerator = {
   // 입력 폼
   form: {
     title: "Plan Details",
+    inputTypeLabel: "Input Method",
+    manualInput: "Manual Input",
+    monthlyBased: "Monthly Based",
     goalLabel: "What's your main goal?",
     goalPlaceholder:
-      "e.g., Learn React development, Start a fitness routine, Launch a business",
+      "e.g., My current IELTS score is in the 6.0 range, and I want to improve it to 7.5. I want to focus mainly on improving my speaking skills.",
     timeframeLabel: "Timeframe",
     timeframeOptions: {
       week: "1 Week",
@@ -48,7 +51,7 @@ export const aiPlanGenerator = {
   // 결과 섹션
   result: {
     title: "Your Generated Plan",
-    saveButton: "Save to Chapter",
+    saveButton: "Save to Monthly",
     exportButton: "Export Plan",
     shareButton: "Share Plan",
     editButton: "Edit Plan",
@@ -87,17 +90,18 @@ export const aiPlanGenerator = {
 
   // 모달 및 다이얼로그
   modal: {
-    saveTitle: "Save Plan to Chapter",
-    saveDescription: "Choose which chapter to save this plan to:",
+    saveTitle: "Save Plan to Monthly",
+    saveDescription: "Choose which monthly to save this plan to:",
     saveButton: "Save Plan",
     cancelButton: "Cancel",
-    noChapters: "No chapters available. Create a chapter first.",
-    createChapterButton: "Create New Chapter",
+    noMonthlies: "No monthlies available. Create a monthly first.",
+    createMonthlyButton: "Create New Monthly",
   },
 
   // 에러 메시지
   errors: {
     goalRequired: "Please enter your main goal",
+    monthlyRequired: "Please select a Monthly",
     timeframeRequired: "Please select a timeframe",
     categoryRequired: "Please select a category",
     generationFailed:
@@ -121,7 +125,7 @@ export const aiPlanGenerator = {
   // 성공 메시지
   success: {
     planGenerated: "Your personalized plan has been generated!",
-    planSaved: "Plan has been saved to your chapter successfully!",
+    planSaved: "Plan has been saved to your monthly successfully!",
     planExported: "Plan has been exported successfully!",
   },
 

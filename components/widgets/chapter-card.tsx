@@ -2,11 +2,11 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ChevronRight, Star, Calendar } from "lucide-react";
-import { Chapter } from "@/lib/types";
+import { Monthly } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
-interface ChapterCardProps {
-  chapter: Chapter;
+interface MonthlyCardProps {
+  monthly: Monthly;
   daysLeft: number;
   progress: number;
   completedTasks: number;
@@ -23,8 +23,8 @@ interface ChapterCardProps {
   showLink?: boolean;
 }
 
-export function ChapterCard({
-  chapter,
+export function MonthlyCard({
+  monthly,
   daysLeft,
   progress,
   completedTasks,
@@ -33,7 +33,7 @@ export function ChapterCard({
   texts,
   href,
   showLink = true,
-}: ChapterCardProps) {
+}: MonthlyCardProps) {
   const cardContent = (
     <Card
       className={`relative overflow-hidden border-2 border-primary/20 p-4 mb-6 ${
@@ -42,10 +42,10 @@ export function ChapterCard({
     >
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <h3 className="text-lg font-bold">{chapter.title}</h3>
+          <h3 className="text-lg font-bold">{monthly.objective}</h3>
           <Badge
             variant="outline"
-            className="text-xs bg-primary/10 border-primary/20"
+            className="text-xs flex-shrink-0 bg-primary/10 border-primary/20"
           >
             {texts.daysLeft}
             {daysLeft}
@@ -56,7 +56,7 @@ export function ChapterCard({
       <div className="mb-4 flex items-center gap-2 text-sm">
         <Star className="h-4 w-4 text-yellow-500" />
         <span>
-          {texts.reward}: {chapter.reward || texts.noReward}
+          {texts.reward}: {monthly.reward || texts.noReward}
         </span>
       </div>
       <div className="mb-1 flex justify-between text-sm">
@@ -79,8 +79,8 @@ export function ChapterCard({
       <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
         <Calendar className="h-3 w-3" />
         <span>
-          {formatDate(chapter.startDate, currentLanguage)} ~{" "}
-          {formatDate(chapter.endDate, currentLanguage)}
+          {formatDate(monthly.startDate, currentLanguage as "ko" | "en")} ~{" "}
+          {formatDate(monthly.endDate, currentLanguage as "ko" | "en")}
         </span>
       </div>
     </Card>

@@ -9,7 +9,10 @@ import { useState, use, Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchResourceWithAreaById, deleteResourceById } from "@/lib/firebase";
+import {
+  fetchResourceWithAreaById,
+  deleteResourceById,
+} from "@/lib/firebase/index";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
@@ -184,12 +187,12 @@ export default function ResourceDetailPage({
               <Badge
                 variant="outline"
                 className={`text-xs ${
-                  resource.area.name === "미분류"
+                  resource.area === "미분류"
                     ? "border-red-300 text-red-700"
                     : ""
                 }`}
               >
-                {resource.area.name}
+                {resource.area}
               </Badge>
             )}
           </div>

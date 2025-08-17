@@ -20,11 +20,19 @@ export function ProgressCard({
   // NaN 방지를 위한 안전한 계산
   const safeProgress = progress || 0;
   const safeTotal = total || 0;
-  const percentage = safeTotal > 0 ? Math.min(100, Math.round((safeProgress / safeTotal) * 100)) : 0;
+  const percentage =
+    safeTotal > 0
+      ? Math.min(100, Math.round((safeProgress / safeTotal) * 100))
+      : 0;
   const { translate } = useLanguage();
 
   return (
-    <div className={cn("game-card", className)}>
+    <div
+      className={cn(
+        "game-card bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40",
+        className
+      )}
+    >
       <h3 className="mb-2 font-bold">{title}</h3>
       <div className="mb-1 flex justify-between text-sm">
         <span>

@@ -42,7 +42,7 @@ async function fetchUserAreas(userId: string) {
 }
 
 // 시스템 프롬프트 정의
-const SYSTEM_PROMPT = `당신은 Monthly Grow 앱의 계획 생성 어시스턴트입니다. 사용자의 자연어 계획을 받아서 영역(areas), 프로젝트(projects), 작업(tasks), 리소스(resources)만 생성해주세요. Chapter는 생성하지 마세요. 다음과 같은 JSON 형식으로 변환해주세요:
+const SYSTEM_PROMPT = `당신은 Monthly Grow 앱의 계획 생성 어시스턴트입니다. 사용자의 자연어 계획을 받아서 영역(areas), 프로젝트(projects), 작업(tasks), 리소스(resources)만 생성해주세요. Monthly는 생성하지 마세요. 다음과 같은 JSON 형식으로 변환해주세요:
 
 {
   "areas": [
@@ -59,8 +59,6 @@ const SYSTEM_PROMPT = `당신은 Monthly Grow 앱의 계획 생성 어시스턴�
       "description": "프로젝트에 대한 상세 설명",
       "category": "repetitive 또는 task_based (반드시 둘 중 하나 선택)",
       "areaName": "소속 영역명 (areas 배열의 name과 정확히 일치해야 함)",
-      "target": "목표 설명 (작업형: '완성된 이력서 1부', 반복형: '주요 개념 정리')",
-      "targetCount": "반복형일 때만 목표 개수 (예: 30) - 작업형은 설정하지 않음",
       "durationWeeks": "프로젝트 기간 (주) - 반드시 숫자로 설정",
       "estimatedDailyTime": "일일 예상 시간 (분) - 반드시 숫자로 설정",
       "tasks": [
@@ -90,8 +88,6 @@ const SYSTEM_PROMPT = `당신은 Monthly Grow 앱의 계획 생성 어시스턴�
    - description: string (프로젝트 설명)
    - category: "repetitive" | "task_based" (반드시 둘 중 하나)
    - areaName: string (areas 배열의 name과 정확히 일치)
-   - target: string (목표 설명)
-   - targetCount: number (반복형일 때만, 작업형은 undefined)
    - durationWeeks: number (프로젝트 기간)
    - estimatedDailyTime: number (일일 예상 시간, 분 단위)
    - tasks: Task[] (작업 목록)
@@ -122,18 +118,14 @@ const SYSTEM_PROMPT = `당신은 Monthly Grow 앱의 계획 생성 어시스턴�
 ⚠️ 프로젝트 생성 규칙:
 
 **반복형 프로젝트 (repetitive):**
-- target: 반복할 활동명 (예: "알고리즘 문제 풀이", "영어 학습")
-- targetCount: 반복 횟수 (목표 달성에 필요한 횟수)
 - tasks: 반드시 "1회차", "2회차", "3회차" 형태로 생성
 - 예시: "알고리즘 문제 풀이 1회차", "알고리즘 문제 풀이 2회차", ...
 - 각 태스크의 duration: 가용 시간을 고려하여 적절히 설정 (시간 단위)
 
 **작업형 프로젝트 (task_based):**
-- target: 구체적인 목표 (예: "완성된 이력서 1부", "포트폴리오 웹사이트 구축")
 - tasks: 목표 달성에 필요한 구체적인 작업들을 리스트업
 - 예시: "이력서 템플릿 찾기", "경력 사항 정리", "자기소개서 작성", "면접 실전 연습 1회차", "리뷰", "면접 실전 연습 2회차", "리뷰"
 - 작업형은 비슷한 작업을 여러 번 반복해도 됨 (면접 연습 → 리뷰 → 면접 연습 → 리뷰)
-- targetCount: 생성된 tasks의 개수 (자동 계산됨)
 
 ${CONSTRAINTS_SYSTEM_GUIDE}
 
@@ -160,7 +152,12 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
     );
   }
 
-  const { userInput, constraints } = data;
+  const {
+    userInput,
+    constraints,
+    inputType = "manual",
+    selectedMonthlyId,
+  } = data;
 
   if (!userInput || typeof userInput !== "string") {
     throw new functions.https.HttpsError(
@@ -172,6 +169,74 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
   try {
     // 1. 사용자의 기존 Areas 조회
     const existingAreas = await fetchUserAreas(context.auth.uid);
+
+    // 2. Monthly 기반 입력인 경우 Monthly 데이터 조회
+    let monthlyContext = "";
+    if (inputType === "monthly" && selectedMonthlyId) {
+      try {
+        const { getFirestore } = await import("firebase-admin/firestore");
+        const db = getFirestore();
+        const monthlyDoc = await db
+          .collection("monthlies")
+          .doc(selectedMonthlyId)
+          .get();
+
+        if (monthlyDoc.exists) {
+          const monthlyData = monthlyDoc.data();
+          if (monthlyData) {
+            // Monthly 데이터를 프롬프트에 포함할 형태로 변환
+            monthlyContext = `\n\n=== 선택된 Monthly 정보 ===\n`;
+            monthlyContext += `목표: ${monthlyData.objective}\n`;
+
+            if (monthlyData.objectiveDescription) {
+              monthlyContext += `목표 설명: ${monthlyData.objectiveDescription}\n`;
+            }
+
+            if (monthlyData.keyResults && monthlyData.keyResults.length > 0) {
+              monthlyContext += `\n주요 성과 지표 (Key Results):\n`;
+              monthlyData.keyResults.forEach((kr: any, index: number) => {
+                monthlyContext += `${index + 1}. ${kr.title}`;
+                if (kr.description) {
+                  monthlyContext += ` - ${kr.description}`;
+                }
+                if (kr.targetCount) {
+                  monthlyContext += ` (목표: ${kr.targetCount}회)`;
+                }
+                monthlyContext += `\n`;
+              });
+            }
+
+            if (monthlyData.focusAreas && monthlyData.focusAreas.length > 0) {
+              monthlyContext += `\n중점 영역: ${monthlyData.focusAreas.join(
+                ", "
+              )}\n`;
+            }
+
+            if (monthlyData.reward) {
+              monthlyContext += `보상: ${monthlyData.reward}\n`;
+            }
+
+            // Monthly 기간 계산 (참고용)
+            const startDate = monthlyData.startDate.toDate
+              ? monthlyData.startDate.toDate()
+              : monthlyData.startDate;
+            const endDate = monthlyData.endDate.toDate
+              ? monthlyData.endDate.toDate()
+              : monthlyData.endDate;
+            const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const monthlyWeeks = Math.ceil(diffDays / 7);
+
+            monthlyContext += `\nMonthly 기간: ${monthlyWeeks}주 (${diffDays}일) - 참고용`;
+            monthlyContext += `\n위 Monthly 정보를 바탕으로 구체적인 프로젝트와 태스크를 생성해주세요.`;
+            monthlyContext += `\n=== Monthly 정보 끝 ===\n`;
+          }
+        }
+      } catch (error) {
+        console.error("Monthly 데이터 조회 실패:", error);
+        // Monthly 데이터 조회 실패 시 수동 입력으로 fallback
+      }
+    }
 
     // 2. 기존 Areas 정보를 프롬프트에 포함
     const areasContext =
@@ -203,7 +268,7 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
       messages: [
         {
           role: "user",
-          content: `다음 계획을 Monthly Grow 앱 형식으로 변환해주세요:${constraintsContext}\n\n${userInput}`,
+          content: `다음 계획을 Monthly Grow 앱 형식으로 변환해주세요:${monthlyContext}${constraintsContext}\n\n${userInput}`,
         },
       ],
     });
@@ -355,10 +420,13 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
 
             project.tasks = [];
             for (let i = 1; i <= targetCount; i++) {
-              project.tasks.push(              {
+              project.tasks.push({
                 title: `${baseActivity} ${i}회차`,
                 description: `${baseActivity} ${i}회차 수행`,
-                duration: Math.max(0.1, Math.min(24, totalAvailableTime / targetCount / 60)),
+                duration: Math.max(
+                  0.1,
+                  Math.min(24, totalAvailableTime / targetCount / 60)
+                ),
                 requirements: [],
                 resources: [],
                 prerequisites: [],
@@ -375,7 +443,10 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
               {
                 title: `${project.title} 시작`,
                 description: `${project.title} 프로젝트를 시작합니다.`,
-                duration: Math.max(0.1, Math.min(24, totalAvailableTime / 3 / 60)),
+                duration: Math.max(
+                  0.1,
+                  Math.min(24, totalAvailableTime / 3 / 60)
+                ),
                 requirements: [],
                 resources: [],
                 prerequisites: [],
@@ -383,7 +454,10 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
               {
                 title: `${project.title} 진행`,
                 description: `${project.title} 프로젝트를 진행합니다.`,
-                duration: Math.max(0.1, Math.min(24, totalAvailableTime / 3 / 60)),
+                duration: Math.max(
+                  0.1,
+                  Math.min(24, totalAvailableTime / 3 / 60)
+                ),
                 requirements: [],
                 resources: [],
                 prerequisites: [],
@@ -391,7 +465,10 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
               {
                 title: `${project.title} 완료`,
                 description: `${project.title} 프로젝트를 완료합니다.`,
-                duration: Math.max(0.1, Math.min(24, totalAvailableTime / 3 / 60)),
+                duration: Math.max(
+                  0.1,
+                  Math.min(24, totalAvailableTime / 3 / 60)
+                ),
                 requirements: [],
                 resources: [],
                 prerequisites: [],
@@ -425,7 +502,10 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
                 project.tasks.push({
                   title: `${baseActivity} ${newTaskNumber}회차`,
                   description: `${baseActivity} ${newTaskNumber}회차 수행`,
-                  duration: Math.max(0.1, Math.min(24, totalAvailableTime / targetCount / 60)),
+                  duration: Math.max(
+                    0.1,
+                    Math.min(24, totalAvailableTime / targetCount / 60)
+                  ),
                   requirements: [],
                   resources: [],
                   prerequisites: [],
@@ -445,7 +525,7 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
           project.tasks = project.tasks.map((task: any, index: number) => {
             // duration이 없거나 유효하지 않은 경우 기본값 설정
             let taskDuration = task.duration || 1.0;
-            
+
             // 최소 0.1시간, 최대 24시간으로 제한
             taskDuration = Math.max(0.1, Math.min(24, taskDuration));
 

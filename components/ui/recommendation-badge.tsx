@@ -36,7 +36,11 @@ export function RecommendationBadge({
 
   return (
     <div
-      className={cn("rounded-lg border p-4 text-xs", getStyles(), className)}
+      className={cn(
+        "rounded-lg border p-4 text-xs flex-shrink-0",
+        getStyles(),
+        className
+      )}
     >
       <span>{message}</span>
     </div>

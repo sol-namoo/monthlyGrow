@@ -24,14 +24,15 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { auth } from "@/lib/firebase/index";
 import {
   fetchResourceById,
-  updateResource,
   fetchAllAreasByUserId,
-  auth,
-} from "@/lib/firebase";
+  updateResource,
+} from "@/lib/firebase/index";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useLanguage } from "@/hooks/useLanguage";
 
 type ResourceFormData = {
   title: string;

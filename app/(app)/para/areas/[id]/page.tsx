@@ -35,13 +35,14 @@ import { useRouter } from "next/navigation";
 import { getProjectStatus } from "@/lib/utils";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { auth } from "@/lib/firebase";
+import { auth } from "@/lib/firebase/index";
 import {
   fetchAreaById,
   fetchProjectsByAreaId,
   fetchAllResourcesByUserId,
+  updateArea,
   deleteAreaById,
-} from "@/lib/firebase";
+} from "@/lib/firebase/index";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
@@ -89,7 +90,7 @@ export default function AreaDetailPage({
 
   // 영역 삭제 mutation
   const deleteAreaMutation = useMutation({
-    mutationFn: () => deleteAreaById(id, deleteWithItems),
+    mutationFn: () => deleteAreaById(id),
     onSuccess: () => {
       // 성공 시 캐시 무효화 및 목록 페이지로 이동
       queryClient.invalidateQueries({ queryKey: ["areas"] });

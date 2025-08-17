@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { Chapter, ConnectedProjectGoal, Project } from "./types";
+import { Monthly, Project } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -67,6 +67,50 @@ export const getDateLocale = (language: "ko" | "en"): string => {
     default:
       return "en-UK";
   }
+};
+
+/**
+ * 타임존 안전한 날짜 생성 함수
+ * @param year 년도
+ * @param month 월 (1-12)
+ * @param day 일 (1-31)
+ * @returns 해당 날짜의 Date 객체 (로컬 타임존 기준)
+ */
+export const createLocalDate = (
+  year: number,
+  month: number,
+  day: number
+): Date => {
+  // month는 0-based이므로 1을 빼줌
+  const date = new Date(year, month - 1, day);
+
+  // 타임존 오프셋을 고려하여 정확한 날짜 생성
+  const timezoneOffset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() + timezoneOffset);
+};
+
+/**
+ * 특정 월의 첫 번째 날짜 생성
+ * @param year 년도
+ * @param month 월 (1-12)
+ * @returns 해당 월의 첫 번째 날짜
+ */
+export const getMonthStartDate = (year: number, month: number): Date => {
+  return createLocalDate(year, month, 1);
+};
+
+/**
+ * 특정 월의 마지막 날짜 생성
+ * @param year 년도
+ * @param month 월 (1-12)
+ * @returns 해당 월의 마지막 날짜
+ */
+export const getMonthEndDate = (year: number, month: number): Date => {
+  // 다음 달의 첫 번째 날에서 하루를 빼면 현재 달의 마지막 날
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? year + 1 : year;
+  const nextMonthStart = createLocalDate(nextYear, nextMonth, 1);
+  return new Date(nextMonthStart.getTime() - 24 * 60 * 60 * 1000);
 };
 
 /**
@@ -230,25 +274,21 @@ export function getProjectStatus(project: {
   const startDate = new Date(project.startDate);
   const endDate = new Date(project.endDate);
 
-  // 완료율 계산
-  const completionRate =
-    project.targetCount && project.completedTasks
-      ? (project.completedTasks / project.targetCount) * 100
-      : 0;
-
-  // 완료된 경우 (완료율이 100% 이상)
-  if (completionRate >= 100) {
-    return "completed";
-  }
-
-  // 종료일이 지났지만 완료되지 않은 경우
-  if (endDate < now && completionRate < 100) {
-    return "overdue";
-  }
-
   // 시작일이 미래인 경우
   if (startDate > now) {
     return "scheduled";
+  }
+
+  // 종료일이 지났지만 완료되지 않은 경우 (overdue)
+  if (endDate < now) {
+    // targetCount가 있고 completedTasks가 targetCount보다 작으면 overdue
+    if (project.targetCount && project.completedTasks !== undefined) {
+      if (project.completedTasks < project.targetCount) {
+        return "overdue";
+      }
+    }
+    // targetCount가 없거나 completedTasks가 targetCount 이상이면 completed
+    return "completed";
   }
 
   // 진행 중인 경우
@@ -259,7 +299,6 @@ export function isProjectInProgress(project: {
   startDate: Date;
   endDate: Date;
   completedTasks?: number;
-  targetCount?: number;
 }): boolean {
   return getProjectStatus(project) === "in_progress";
 }
@@ -268,7 +307,6 @@ export function isProjectScheduled(project: {
   startDate: Date;
   endDate: Date;
   completedTasks?: number;
-  targetCount?: number;
 }): boolean {
   return getProjectStatus(project) === "scheduled";
 }
@@ -277,7 +315,6 @@ export function isProjectCompleted(project: {
   startDate: Date;
   endDate: Date;
   completedTasks?: number;
-  targetCount?: number;
 }): boolean {
   return getProjectStatus(project) === "completed";
 }
@@ -286,7 +323,6 @@ export function isProjectOverdue(project: {
   startDate: Date;
   endDate: Date;
   completedTasks?: number;
-  targetCount?: number;
 }): boolean {
   return getProjectStatus(project) === "overdue";
 }
@@ -294,11 +330,9 @@ export function isProjectOverdue(project: {
 // 프로젝트 완료율을 동적으로 계산하는 함수
 export function getProjectCompletionRate(project: {
   completedTasks?: number;
-  targetCount?: number;
 }): number {
-  if (!project.targetCount || project.targetCount === 0) return 0;
   if (!project.completedTasks) return 0;
-  return Math.round((project.completedTasks / project.targetCount) * 100);
+  return project.completedTasks;
 }
 
 /**
@@ -307,10 +341,8 @@ export function getProjectCompletionRate(project: {
  * @returns 진행률 (0-1 사이의 값)
  */
 export function calculateProjectProgress(project: Project): number {
-  if (!project.targetCount || project.targetCount === 0) {
-    return 0;
-  }
-  return project.completedTasks / project.targetCount;
+  // 새로운 구조에서는 targetCount가 없으므로 completedTasks만 반환
+  return project.completedTasks || 0;
 }
 
 // 프로젝트가 활성 상태인지 확인하는 함수
@@ -318,21 +350,20 @@ export function isProjectActive(project: {
   startDate: Date;
   endDate: Date;
   completedTasks?: number;
-  targetCount?: number;
 }): boolean {
   const status = getProjectStatus(project);
   return status === "in_progress" || status === "overdue";
 }
 
-// === 챕터 상태 관련 함수들 (새로 추가) ===
+// === 먼슬리 상태 관련 함수들 (새로 추가) ===
 
-export function getChapterStatus(chapter: {
+export function getMonthlyStatus(monthly: {
   startDate: Date;
   endDate: Date;
 }): "planned" | "in_progress" | "ended" {
   const now = new Date();
-  const startDate = new Date(chapter.startDate);
-  const endDate = new Date(chapter.endDate);
+  const startDate = new Date(monthly.startDate);
+  const endDate = new Date(monthly.endDate);
 
   if (now < startDate) {
     return "planned";
@@ -343,97 +374,81 @@ export function getChapterStatus(chapter: {
   }
 }
 
-export function isChapterInProgress(chapter: {
+export function isMonthlyInProgress(monthly: {
   startDate: Date;
   endDate: Date;
 }): boolean {
-  return getChapterStatus(chapter) === "in_progress";
+  return getMonthlyStatus(monthly) === "in_progress";
 }
 
-export function isChapterEnded(chapter: {
+export function isMonthlyEnded(monthly: {
   startDate: Date;
   endDate: Date;
 }): boolean {
-  return getChapterStatus(chapter) === "ended";
+  return getMonthlyStatus(monthly) === "ended";
 }
 
-export function isChapterPlanned(chapter: {
+export function isMonthlyPlanned(monthly: {
   startDate: Date;
   endDate: Date;
 }): boolean {
-  return getChapterStatus(chapter) === "planned";
+  return getMonthlyStatus(monthly) === "planned";
 }
 
 /**
- * 챕터별 프로젝트 목표치 관련 유틸리티 함수들
+ * 먼슬리별 프로젝트 목표치 관련 유틸리티 함수들
  */
 
 /**
- * 챕터의 전체 달성률을 계산합니다.
- * @param chapter 챕터 객체
+ * 월간 계획의 전체 달성률을 계산합니다 (Key Results 기반).
+ * @param monthly 월간 계획 객체
  * @returns 달성률 (0-1 사이의 값)
  */
-export function calculateChapterProgress(chapter: Chapter): number {
-  if (!chapter.connectedProjects || chapter.connectedProjects.length === 0) {
+export function calculateMonthlyProgress(monthly: Monthly): number {
+  if (!monthly.keyResults || monthly.keyResults.length === 0) {
     return 0;
   }
 
-  const totalTarget = chapter.connectedProjects.reduce(
-    (sum, project) => sum + project.chapterTargetCount,
-    0
-  );
-  const totalDone = chapter.connectedProjects.reduce(
-    (sum, project) => sum + project.chapterDoneCount,
-    0
-  );
-
-  return totalTarget > 0 ? totalDone / totalTarget : 0;
+  const completedCount = monthly.keyResults.filter(
+    (kr) => kr.isCompleted
+  ).length;
+  return completedCount / monthly.keyResults.length;
 }
 
 /**
- * 챕터의 전체 목표 수를 계산합니다.
- * @param chapter 챕터 객체
- * @returns 전체 목표 수
+ * 월간 계획의 전체 Key Results 수를 계산합니다.
+ * @param monthly 월간 계획 객체
+ * @returns 전체 Key Results 수
  */
-export function calculateChapterTargetCounts(chapter: Chapter): number {
-  if (!chapter.connectedProjects || chapter.connectedProjects.length === 0) {
-    return 0;
-  }
-
-  return chapter.connectedProjects.reduce(
-    (sum, project) => sum + project.chapterTargetCount,
-    0
-  );
+export function calculateMonthlyTargetCounts(monthly: Monthly): number {
+  return monthly.keyResults?.length || 0;
 }
 
 /**
- * 챕터의 전체 완료 수를 계산합니다.
- * @param chapter 챕터 객체
+ * 월간 계획의 전체 완료된 Key Results 수를 계산합니다.
+ * @param monthly 월간 계획 객체
  * @returns 전체 완료 수
  */
-export function calculateChapterDoneCounts(chapter: Chapter): number {
-  if (!chapter.connectedProjects || chapter.connectedProjects.length === 0) {
+export function calculateMonthlyDoneCounts(monthly: Monthly): number {
+  if (!monthly.keyResults || monthly.keyResults.length === 0) {
     return 0;
   }
 
-  return chapter.connectedProjects.reduce(
-    (sum, project) => sum + project.chapterDoneCount,
-    0
-  );
+  return monthly.keyResults.filter((kr) => kr.isCompleted).length;
 }
 
 /**
- * 챕터의 진행률 정보를 계산합니다.
- * @param chapter 챕터 객체
+ * 월간 계획의 진행률 정보를 계산합니다.
+ * @param monthly 월간 계획 객체
  * @returns 진행률 정보 객체
  */
-export function calculateChapterProgressInfo(chapter: Chapter): {
+export function calculateMonthlyProgressInfo(monthly: Monthly): {
   progress: number;
   targetCounts: number;
   doneCounts: number;
 } {
-  const targetCounts = calculateChapterTargetCounts(chapter);
-  const doneCounts = calculateChapterDoneCounts(chapter);
+  const targetCounts = calculateMonthlyTargetCounts(monthly);
+  const doneCounts = calculateMonthlyDoneCounts(monthly);
   const progress = targetCounts > 0 ? doneCounts / targetCounts : 0;
 
   return {
@@ -444,191 +459,184 @@ export function calculateChapterProgressInfo(chapter: Chapter): {
 }
 
 /**
- * 특정 프로젝트의 챕터별 진행률을 계산합니다.
- * @param chapter 챕터 객체
+ * 새로운 구조에서는 프로젝트별 진행률 계산이 필요 없음
+ * @param monthly 월간 계획 객체
  * @param projectId 프로젝트 ID
- * @returns 진행률 (0-1 사이의 값), 프로젝트가 연결되지 않은 경우 0
+ * @returns 항상 0 (새로운 구조에서는 사용하지 않음)
  */
-export function calculateProjectChapterProgress(
-  chapter: Chapter,
+export function calculateProjectMonthlyProgress(
+  monthly: Monthly,
   projectId: string
 ): number {
-  if (!chapter.connectedProjects) {
-    return 0;
-  }
-
-  const projectGoal = chapter.connectedProjects.find(
-    (goal) => goal.projectId === projectId
-  );
-
-  if (!projectGoal || projectGoal.chapterTargetCount === 0) {
-    return 0;
-  }
-
-  return projectGoal.chapterDoneCount / projectGoal.chapterTargetCount;
+  return 0;
 }
 
 /**
- * 프로젝트가 챕터에 연결되어 있는지 확인합니다.
- * @param chapter 챕터 객체
+ * 새로운 구조에서는 프로젝트 연결 확인이 필요 없음
+ * @param monthly 월간 계획 객체
  * @param projectId 프로젝트 ID
- * @returns 연결 여부
+ * @returns 항상 false (새로운 구조에서는 사용하지 않음)
  */
-export function isProjectConnectedToChapter(
-  chapter: Chapter,
+export function isProjectConnectedToMonthly(
+  monthly: Monthly,
   projectId: string
 ): boolean {
-  return (
-    chapter.connectedProjects?.some((goal) => goal.projectId === projectId) ??
-    false
-  );
+  return false;
 }
 
 /**
- * 챕터에서 프로젝트 목표치를 가져옵니다.
- * @param chapter 챕터 객체
+ * 새로운 구조에서는 프로젝트 목표치가 필요 없음
+ * @param monthly 월간 계획 객체
  * @param projectId 프로젝트 ID
- * @returns 프로젝트 목표치 객체, 연결되지 않은 경우 null
+ * @returns 항상 null (새로운 구조에서는 사용하지 않음)
  */
-export function getProjectGoalFromChapter(
-  chapter: Chapter,
+export function getProjectGoalFromMonthly(
+  monthly: Monthly,
   projectId: string
-): ConnectedProjectGoal | null {
-  return (
-    chapter.connectedProjects?.find((goal) => goal.projectId === projectId) ??
-    null
-  );
+): any | null {
+  return null;
 }
 
 /**
- * 챕터에 프로젝트를 연결하고 목표치를 설정합니다.
- * @param chapter 챕터 객체
+ * 새로운 구조에서는 프로젝트 연결이 필요 없음
+ * @param monthly 월간 계획 객체
  * @param projectId 프로젝트 ID
- * @param targetCount 챕터별 목표치
- * @returns 업데이트된 챕터 객체
+ * @param targetCount 먼슬리별 목표치
+ * @returns 업데이트된 월간 계획 객체
  */
-export function connectProjectToChapter(
-  chapter: Chapter,
+export function connectProjectToMonthly(
+  monthly: Monthly,
   projectId: string,
   targetCount: number
-): Chapter {
-  const existingGoal = chapter.connectedProjects?.find(
-    (goal) => goal.projectId === projectId
-  );
-
-  if (existingGoal) {
-    // 기존 목표치 업데이트
-    existingGoal.chapterTargetCount = targetCount;
-    return chapter;
-  }
-
-  // 새로운 프로젝트 연결
-  const newGoal: ConnectedProjectGoal = {
-    projectId,
-    chapterTargetCount: targetCount,
-    chapterDoneCount: 0,
-  };
-
-  return {
-    ...chapter,
-    connectedProjects: [...(chapter.connectedProjects || []), newGoal],
-  };
+): Monthly {
+  // 새로운 구조에서는 프로젝트 연결이 필요 없으므로 그대로 반환
+  return monthly;
 }
 
 /**
- * 챕터에서 프로젝트 연결을 해제합니다.
- * @param chapter 챕터 객체
+ * 새로운 구조에서는 프로젝트 연결 해제가 필요 없음
+ * @param monthly 월간 계획 객체
  * @param projectId 프로젝트 ID
- * @returns 업데이트된 챕터 객체
+ * @returns 업데이트된 월간 계획 객체
  */
-export function disconnectProjectFromChapter(
-  chapter: Chapter,
+export function disconnectProjectFromMonthly(
+  monthly: Monthly,
   projectId: string
-): Chapter {
-  return {
-    ...chapter,
-    connectedProjects:
-      chapter.connectedProjects?.filter(
-        (goal) => goal.projectId !== projectId
-      ) || [],
-  };
+): Monthly {
+  // 새로운 구조에서는 프로젝트 연결이 필요 없으므로 그대로 반환
+  return monthly;
 }
 
 /**
- * 태스크 완료 시 챕터별 진행률을 업데이트합니다.
- * @param chapter 챕터 객체
+ * 새로운 구조에서는 태스크 완료 시 진행률 업데이트가 필요 없음
+ * @param monthly 월간 계획 객체
  * @param projectId 프로젝트 ID
  * @param increment 증가할 완료 수 (기본값: 1)
- * @returns 업데이트된 챕터 객체
+ * @returns 업데이트된 월간 계획 객체
  */
-export function updateChapterProgress(
-  chapter: Chapter,
+export function updateMonthlyProgress(
+  monthly: Monthly,
   projectId: string,
   increment: number = 1
-): Chapter {
-  if (!chapter.connectedProjects) {
-    return chapter;
-  }
-
-  const updatedProjects = chapter.connectedProjects.map((goal) => {
-    if (goal.projectId === projectId) {
-      return {
-        ...goal,
-        chapterDoneCount: Math.min(
-          goal.chapterDoneCount + increment,
-          goal.chapterTargetCount
-        ),
-      };
-    }
-    return goal;
-  });
-
-  return {
-    ...chapter,
-    connectedProjects: updatedProjects,
-  };
+): Monthly {
+  // 새로운 구조에서는 자동 진행률 업데이트가 필요 없으므로 그대로 반환
+  return monthly;
 }
 
 /**
- * 챕터별 목표치의 기본값을 계산합니다.
- * 프로젝트의 전체 목표치를 챕터 기간에 비례하여 분배합니다.
+ * 새로운 구조에서는 기본 목표치 계산이 필요 없음
  * @param project 프로젝트 객체
- * @param chapterStartDate 챕터 시작일
- * @param chapterEndDate 챕터 종료일
- * @returns 챕터별 목표치
+ * @param monthlyStartDate 월간 계획 시작일
+ * @param monthlyEndDate 월간 계획 종료일
+ * @returns 항상 0 (새로운 구조에서는 사용하지 않음)
  */
-export function calculateDefaultChapterTarget(
+export function calculateDefaultMonthlyTarget(
   project: Project,
-  chapterStartDate: Date,
-  chapterEndDate: Date
+  monthlyStartDate: Date,
+  monthlyEndDate: Date
 ): number {
-  const projectStart = new Date(project.startDate);
-  const projectEnd = new Date(project.endDate);
-  const chapterStart = new Date(chapterStartDate);
-  const chapterEnd = new Date(chapterEndDate);
+  // 새로운 구조에서는 프로젝트별 목표치가 필요 없으므로 0 반환
+  return 0;
+}
 
-  // 프로젝트와 챕터의 겹치는 기간 계산
-  const overlapStart = new Date(
-    Math.max(projectStart.getTime(), chapterStart.getTime())
-  );
-  const overlapEnd = new Date(
-    Math.min(projectEnd.getTime(), chapterEnd.getTime())
-  );
+// Monthly 데이터를 AI 계획 생성용으로 추출하는 함수
+export function extractMonthlyDataForAI(monthly: Monthly): {
+  objective: string;
+  objectiveDescription: string;
+  keyResults: Array<{
+    title: string;
+    description?: string;
+    targetCount?: number;
+  }>;
+  focusAreas: string[];
+  reward?: string;
+} {
+  return {
+    objective: monthly.objective,
+    objectiveDescription: monthly.objectiveDescription || "",
+    keyResults: monthly.keyResults.map((kr) => ({
+      title: kr.title,
+      description: kr.description,
+      targetCount: kr.targetCount,
+    })),
+    focusAreas: monthly.focusAreas,
+    reward: monthly.reward,
+  };
+}
 
-  if (overlapEnd <= overlapStart) {
-    return 0; // 겹치는 기간이 없음
+// Monthly 기간을 주 단위로 계산하는 함수
+export function calculateMonthlyWeeks(monthly: Monthly): number {
+  const startDate =
+    monthly.startDate instanceof Date
+      ? monthly.startDate
+      : (monthly.startDate as any).toDate();
+  const endDate =
+    monthly.endDate instanceof Date
+      ? monthly.endDate
+      : (monthly.endDate as any).toDate();
+
+  const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const diffWeeks = Math.ceil(diffDays / 7);
+
+  return diffWeeks;
+}
+
+// Monthly 데이터를 AI 프롬프트에 포함할 형태로 변환하는 함수
+export function formatMonthlyDataForPrompt(monthly: Monthly): string {
+  const data = extractMonthlyDataForAI(monthly);
+
+  let prompt = `\n\n=== 선택된 Monthly 정보 ===\n`;
+  prompt += `목표: ${data.objective}\n`;
+
+  if (data.objectiveDescription) {
+    prompt += `목표 설명: ${data.objectiveDescription}\n`;
   }
 
-  // 전체 프로젝트 기간
-  const totalProjectDays =
-    (projectEnd.getTime() - projectStart.getTime()) / (1000 * 60 * 60 * 24);
-  // 겹치는 기간
-  const overlapDays =
-    (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24);
+  if (data.keyResults.length > 0) {
+    prompt += `\n주요 성과 지표 (Key Results):\n`;
+    data.keyResults.forEach((kr, index) => {
+      prompt += `${index + 1}. ${kr.title}`;
+      if (kr.description) {
+        prompt += ` - ${kr.description}`;
+      }
+      if (kr.targetCount) {
+        prompt += ` (목표: ${kr.targetCount}회)`;
+      }
+      prompt += `\n`;
+    });
+  }
 
-  // 비례하여 목표치 계산
-  const ratio = overlapDays / totalProjectDays;
-  // project.target은 string이므로 숫자로 변환 필요
-  const targetNumber = typeof project.target === "number" ? project.target : 0;
-  return Math.round(targetNumber * ratio);
+  if (data.focusAreas.length > 0) {
+    prompt += `\n중점 영역: ${data.focusAreas.join(", ")}\n`;
+  }
+
+  if (data.reward) {
+    prompt += `보상: ${data.reward}\n`;
+  }
+
+  prompt += `\n위 Monthly 정보를 바탕으로 구체적인 프로젝트와 태스크를 생성해주세요.`;
+  prompt += `\n=== Monthly 정보 끝 ===\n`;
+
+  return prompt;
 }

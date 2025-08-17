@@ -10,7 +10,7 @@ import type { Retrospective } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
-import { fetchRetrospectiveById, fetchChapterById } from "@/lib/firebase";
+import { fetchRetrospectiveById, fetchMonthlyById } from "@/lib/firebase/index";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatDate } from "@/lib/utils";
@@ -63,15 +63,15 @@ export default function ArchiveDetailPage({
     enabled: !!id,
   });
 
-  // 노트 탭이 활성화되었을 때만 챕터 정보를 가져오기
+  // 노트 탭이 활성화되었을 때만 먼슬리 정보를 가져오기
   const {
-    data: chapter,
-    isLoading: chapterLoading,
-    error: chapterError,
+    data: monthly,
+    isLoading: monthlyLoading,
+    error: monthlyError,
   } = useQuery({
-    queryKey: ["chapter", retrospective?.chapterId],
-    queryFn: () => fetchChapterById(retrospective!.chapterId!),
-    enabled: !!retrospective?.chapterId && activeTab === "freeform",
+    queryKey: ["monthly", retrospective?.monthlyId],
+    queryFn: () => fetchMonthlyById(retrospective!.monthlyId!),
+    enabled: !!retrospective?.monthlyId && activeTab === "freeform",
   });
 
   // 에러 상태
@@ -189,20 +189,20 @@ export default function ArchiveDetailPage({
           </div>
         </div>
 
-        {/* 연관된 챕터/프로젝트 링크 */}
+        {/* 연관된 먼슬리/프로젝트 링크 */}
         <div className="mb-6">
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-medium mb-1">
-                  {retrospective.chapterId
-                    ? translate("para.paraArchiveDetail.relatedItem.chapter")
+                  {retrospective.monthlyId
+                    ? translate("para.paraArchiveDetail.relatedItem.monthly")
                     : translate("para.paraArchiveDetail.relatedItem.project")}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {retrospective.chapterId
+                  {retrospective.monthlyId
                     ? translate(
-                        "para.paraArchiveDetail.relatedItem.chapterDescription"
+                        "para.paraArchiveDetail.relatedItem.monthlyDescription"
                       )
                     : translate(
                         "para.paraArchiveDetail.relatedItem.projectDescription"
@@ -212,14 +212,14 @@ export default function ArchiveDetailPage({
               <Button variant="outline" size="sm" asChild>
                 <Link
                   href={
-                    retrospective.chapterId
-                      ? `/chapter/${retrospective.chapterId}`
+                    retrospective.monthlyId
+                      ? `/monthly/${retrospective.monthlyId}`
                       : `/para/projects/${retrospective.projectId}`
                   }
                 >
-                  {retrospective.chapterId
+                  {retrospective.monthlyId
                     ? translate(
-                        "para.paraArchiveDetail.relatedItem.viewChapter"
+                        "para.paraArchiveDetail.relatedItem.viewMonthly"
                       )
                     : translate(
                         "para.paraArchiveDetail.relatedItem.viewProject"
@@ -242,7 +242,7 @@ export default function ArchiveDetailPage({
           </TabsList>
 
           <TabsContent value="official" className="space-y-4">
-            {/* 챕터용 필드들 */}
+            {/* 먼슬리용 필드들 */}
             {retrospective.bestMoment && (
               <Card>
                 <div className="p-4">
@@ -288,16 +288,16 @@ export default function ArchiveDetailPage({
               </Card>
             )}
 
-            {retrospective.nextChapterApplication && (
+            {retrospective.nextMonthlyApplication && (
               <Card>
                 <div className="p-4">
                   <h3 className="font-medium mb-2">
                     {translate(
-                      "para.paraArchiveDetail.retrospective.nextChapterApplication"
+                      "para.paraArchiveDetail.retrospective.nextMonthlyApplication"
                     )}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {retrospective.nextChapterApplication}
+                    {retrospective.nextMonthlyApplication}
                   </p>
                 </div>
               </Card>
@@ -381,29 +381,26 @@ export default function ArchiveDetailPage({
           </TabsContent>
 
           <TabsContent value="freeform">
-            {chapterLoading ? (
+            {monthlyLoading ? (
               <div className="text-center py-8">
                 <Skeleton className="h-4 w-32 mx-auto mb-2" />
                 <Skeleton className="h-4 w-48 mx-auto" />
               </div>
-            ) : chapterError ? (
+            ) : monthlyError ? (
               <div className="text-center py-8">
                 <p className="text-sm text-muted-foreground">
                   {translate("para.paraArchiveDetail.common.error")}
                 </p>
               </div>
-            ) : chapter?.note ? (
+            ) : monthly?.note ? (
               <Card>
                 <div className="p-4">
                   <h3 className="font-medium mb-2">
                     {translate("para.paraArchiveDetail.retrospective.note")}
                   </h3>
                   <div className="whitespace-pre-wrap text-sm text-muted-foreground">
-                    {chapter.note.content}
+                    {monthly.note}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-3">
-                    {formatDate(chapter.note.createdAt)}
-                  </p>
                 </div>
               </Card>
             ) : (

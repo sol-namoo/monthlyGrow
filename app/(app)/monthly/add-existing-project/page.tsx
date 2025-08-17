@@ -20,75 +20,66 @@ import {
 import { AlertCircle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { auth } from "@/lib/firebase";
+import { auth } from "@/lib/firebase/index";
 import {
-  fetchChapterById,
-  fetchUnconnectedProjects,
-  updateProject,
-  updateChapter,
-} from "@/lib/firebase";
+  fetchMonthlyById,
+  fetchAllProjectsByUserId,
+  updateMonthly,
+} from "@/lib/firebase/index";
 import { getProjectStatus } from "@/lib/utils";
-import type { Chapter, Project } from "@/lib/types";
+import type { Monthly, Project } from "@/lib/types";
 
 function AddExistingProjectPageContent() {
   const router = useRouter();
   const { toast } = useToast();
   const searchParams = useSearchParams();
-  const chapterId = searchParams.get("chapterId");
+  const monthlyId = searchParams.get("monthlyId");
   const [user, userLoading] = useAuthState(auth);
   const queryClient = useQueryClient();
 
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [showOnlyUnconnected, setShowOnlyUnconnected] = useState(true);
 
-  // 현재 챕터 정보 가져오기
-  const { data: currentChapter, isLoading: chapterLoading } = useQuery({
-    queryKey: ["chapter", chapterId],
-    queryFn: () => fetchChapterById(chapterId!),
-    enabled: !!chapterId,
+  // 현재 먼슬리 정보 가져오기
+  const { data: currentMonthly, isLoading: monthlyLoading } = useQuery({
+    queryKey: ["monthly", monthlyId],
+    queryFn: () => fetchMonthlyById(monthlyId!),
+    enabled: !!monthlyId,
   });
 
   // 연결되지 않은 프로젝트들 가져오기
   const { data: unconnectedProjects = [], isLoading: projectsLoading } =
     useQuery({
-      queryKey: ["unconnectedProjects", user?.uid, chapterId],
-      queryFn: () => fetchUnconnectedProjects(user?.uid || "", chapterId!),
-      enabled: !!user?.uid && !!chapterId,
+      queryKey: ["unconnectedProjects", user?.uid, monthlyId],
+      queryFn: () => fetchAllProjectsByUserId(user?.uid || ""),
+      enabled: !!user?.uid && !!monthlyId,
     });
 
-  // 프로젝트를 챕터에 연결하는 mutation
+  // 프로젝트를 먼슬리에 연결하는 mutation
+  // 새로운 구조에서는 프로젝트 연결이 필요 없음
   const connectProjectsMutation = useMutation({
     mutationFn: async (projectIds: string[]) => {
-      const promises = projectIds.map((projectId) =>
-        updateProject(projectId, {
-          connectedChapters: [chapterId!],
-        })
-      );
-      await Promise.all(promises);
+      // 새로운 구조에서는 프로젝트 연결이 필요 없으므로 아무것도 하지 않음
+      console.log("새로운 구조에서는 프로젝트 연결이 필요 없습니다");
     },
     onSuccess: () => {
       toast({
-        title: "프로젝트 연결 완료",
-        description:
-          "선택한 프로젝트가 챕터에 연결되었습니다. 챕터 수정 페이지에서 각 프로젝트의 목표를 설정할 수 있습니다.",
+        title: "알림",
+        description: "새로운 구조에서는 프로젝트 연결이 필요 없습니다.",
       });
-      queryClient.invalidateQueries({ queryKey: ["chapter", chapterId] });
-      queryClient.invalidateQueries({
-        queryKey: ["unconnectedProjects", user?.uid, chapterId],
-      });
-      router.push(`/chapter/${chapterId}`);
+      router.push(`/monthly/${monthlyId}`);
     },
     onError: (error) => {
       toast({
-        title: "프로젝트 연결 실패",
-        description: "프로젝트 연결 중 오류가 발생했습니다.",
+        title: "오류",
+        description: "처리 중 오류가 발생했습니다.",
         variant: "destructive",
       });
     },
   });
 
   // 로딩 중이거나 데이터가 없으면 처리
-  if (chapterLoading || !currentChapter) {
+  if (monthlyLoading || !currentMonthly) {
     return <Loading />;
   }
 
@@ -102,17 +93,14 @@ function AddExistingProjectPageContent() {
     if (selectedProjects.includes(projectId)) {
       setSelectedProjects(selectedProjects.filter((id) => id !== projectId));
     } else {
-      // 프로젝트 개수 제한 확인 (현재 챕터 프로젝트 + 선택된 프로젝트 <= 5)
-      const currentProjectCount = currentChapter.connectedProjects?.length || 0;
-      if (currentProjectCount + selectedProjects.length < 5) {
-        setSelectedProjects([...selectedProjects, projectId]);
-      }
+      // 새로운 구조에서는 제한 없음
+      setSelectedProjects([...selectedProjects, projectId]);
     }
   };
 
-  // 프로젝트 추가 가능 여부 확인
-  const currentProjectCount = currentChapter.connectedProjects?.length || 0;
-  const canAddMoreProjects = currentProjectCount + selectedProjects.length < 5;
+  // 프로젝트 추가 가능 여부 확인 (새로운 구조에서는 항상 가능)
+  const currentProjectCount = 0; // 새로운 구조에서는 연결된 프로젝트가 없음
+  const canAddMoreProjects = true;
 
   // 프로젝트 추가 처리 함수
   const handleAddProjects = () => {
@@ -125,7 +113,7 @@ function AddExistingProjectPageContent() {
     <div className="container max-w-md px-4 py-6">
       <div className="mb-6 flex items-center">
         <Button variant="ghost" size="icon" asChild className="mr-2">
-          <Link href={`/chapter/${chapterId}`}>
+          <Link href={`/monthly/${monthlyId}`}>
             <ChevronLeft className="h-5 w-5" />
           </Link>
         </Button>
@@ -133,9 +121,9 @@ function AddExistingProjectPageContent() {
       </div>
 
       <Card className="mb-6 p-4">
-        <h2 className="mb-2 text-lg font-bold">{currentChapter.title}</h2>
+        <h2 className="mb-2 text-lg font-bold">{currentMonthly.objective}</h2>
         <p className="text-sm text-muted-foreground">
-          현재 챕터에 연결된 프로젝트: {currentProjectCount}/5
+          현재 먼슬리에 연결된 프로젝트: {currentProjectCount}/5
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
           추가 가능한 프로젝트: {Math.max(0, 5 - currentProjectCount)}개
@@ -147,9 +135,9 @@ function AddExistingProjectPageContent() {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>주의사항</AlertTitle>
           <AlertDescription>
-            기존 프로젝트를 챕터에 연결하면 해당 프로젝트의 기존 데이터가
-            유지됩니다. 프로젝트의 시작일과 목표 완료일이 챕터 기간과 맞지 않을
-            수 있습니다.
+            기존 프로젝트를 먼슬리에 연결하면 해당 프로젝트의 기존 데이터가
+            유지됩니다. 프로젝트의 시작일과 목표 완료일이 먼슬리 기간과 맞지
+            않을 수 있습니다.
           </AlertDescription>
         </CustomAlert>
       )}
@@ -161,7 +149,7 @@ function AddExistingProjectPageContent() {
           size="sm"
           onClick={() => setShowOnlyUnconnected(!showOnlyUnconnected)}
         >
-          {showOnlyUnconnected ? "모든 프로젝트 보기" : "챕터 미연결만 보기"}
+          {showOnlyUnconnected ? "모든 프로젝트 보기" : "먼슬리 미연결만 보기"}
         </Button>
       </div>
 
@@ -209,52 +197,24 @@ function AddExistingProjectPageContent() {
 
               <div className="mt-2">
                 <div className="mb-1 flex justify-between text-xs">
-                  <span>
-                    진행률:{" "}
-                    {(project.targetCount || project.completedTasks) > 0
-                      ? Math.round(
-                          (project.completedTasks /
-                            (project.targetCount || project.completedTasks)) *
-                            100
-                        )
-                      : 0}
-                    %
-                  </span>
+                  <span>완료된 태스크: {project.completedTasks}개</span>
                 </div>
                 <div className="progress-bar">
                   <div
                     className="progress-value"
                     style={{
-                      width: `${
-                        (project.targetCount || project.completedTasks) > 0
-                          ? Math.round(
-                              (project.completedTasks /
-                                (project.targetCount ||
-                                  project.completedTasks)) *
-                                100
-                            )
-                          : 0
-                      }%`,
+                      width: `${project.completedTasks > 0 ? 100 : 0}%`,
                     }}
                   ></div>
                 </div>
               </div>
-
-              {project.connectedChapters &&
-                project.connectedChapters.length > 0 && (
-                  <div className="mt-2">
-                    <Badge variant="secondary" className="text-xs">
-                      {project.connectedChapters.length}개 챕터에 연결됨
-                    </Badge>
-                  </div>
-                )}
             </div>
           ))
         ) : (
           <div className="rounded-lg border border-dashed p-6 text-center">
             <p className="text-muted-foreground">
               {showOnlyUnconnected
-                ? "챕터에 연결되지 않은 프로젝트가 없습니다"
+                ? "먼슬리에 연결되지 않은 프로젝트가 없습니다"
                 : "추가할 수 있는 프로젝트가 없습니다"}
             </p>
           </div>
@@ -274,7 +234,7 @@ function AddExistingProjectPageContent() {
             : `${selectedProjects.length}개 프로젝트 추가`}
         </Button>
         <Button variant="outline" asChild className="flex-1">
-          <Link href={`/chapter/${chapterId}`}>취소</Link>
+          <Link href={`/monthly/${monthlyId}`}>취소</Link>
         </Button>
       </div>
     </div>

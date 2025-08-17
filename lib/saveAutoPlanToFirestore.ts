@@ -77,7 +77,7 @@ export async function savePlanToFirestore(options: SavePlanOptions) {
       }
     }
 
-    // 2. Projects 및 Tasks 저장 (Chapter 생성 없음)
+    // 2. Projects 및 Tasks 저장 (Monthly 생성 없음)
     const startDate = customizations.startDate || new Date();
     const projectRefs: string[] = [];
 
@@ -106,7 +106,7 @@ export async function savePlanToFirestore(options: SavePlanOptions) {
         completedTasks: 0,
         startDate: projectStartDate,
         endDate: projectEndDate,
-        connectedChapters: [], // Chapter 생성 없음
+        connectedMonthlies: [], // Monthly 생성 없음
         difficulty: project.difficulty || "intermediate", // 기본값 설정
         createdAt: now,
         updatedAt: now,

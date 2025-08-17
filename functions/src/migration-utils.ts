@@ -7,11 +7,11 @@ const db = getFirestore();
 
 interface ConnectedProjectGoal {
   projectId: string;
-  chapterTargetCount: number;
-  chapterDoneCount: number;
+  monthlyTargetCount: number;
+  monthlyDoneCount: number;
 }
 
-interface LegacyChapter {
+interface LegacyMonthly {
   id: string;
   userId: string;
   title: string;
@@ -39,38 +39,38 @@ interface LegacyProject {
   completedTasks: number;
   startDate: any;
   endDate: any;
-  chapterId?: string; // 기존 구조
-  connectedChapters?: any[]; // 새로운 구조
+  monthlyId?: string; // 기존 구조
+  connectedMonthlies?: any[]; // 새로운 구조
   createdAt: any;
   updatedAt: any;
 }
 
 /**
- * 기존 Chapter 데이터를 새로운 구조로 마이그레이션합니다.
+ * 기존 Monthly 데이터를 새로운 구조로 마이그레이션합니다.
  * projectIds 배열을 connectedProjects 배열로 변환합니다.
  */
-export const migrateChapterStructure = async (
-  chapterId: string
+export const migrateMonthlyStructure = async (
+  monthlyId: string
 ): Promise<void> => {
-  const chapterRef = db.collection("chapters").doc(chapterId);
-  const chapterDoc = await chapterRef.get();
+  const monthlyRef = db.collection("monthlies").doc(monthlyId);
+  const monthlyDoc = await monthlyRef.get();
 
-  if (!chapterDoc.exists) {
-    throw new Error(`Chapter ${chapterId} not found`);
+  if (!monthlyDoc.exists) {
+    throw new Error(`Monthly ${monthlyId} not found`);
   }
 
-  const chapterData = chapterDoc.data() as LegacyChapter;
+  const monthlyData = monthlyDoc.data() as LegacyMonthly;
 
   // 이미 마이그레이션된 경우 스킵
   if (
-    chapterData.connectedProjects &&
-    chapterData.connectedProjects.length > 0
+    monthlyData.connectedProjects &&
+    monthlyData.connectedProjects.length > 0
   ) {
-    console.log(`Chapter ${chapterId} already migrated`);
+    console.log(`Monthly ${monthlyId} already migrated`);
     return;
   }
 
-  const projectIds = chapterData.projectIds || [];
+  const projectIds = monthlyData.projectIds || [];
   const connectedProjects: ConnectedProjectGoal[] = [];
 
   // 각 프로젝트에 대해 기본 목표치 계산
@@ -81,96 +81,100 @@ export const migrateChapterStructure = async (
     if (projectDoc.exists) {
       const projectData = projectDoc.data() as LegacyProject;
 
-      // 기본 목표치 계산 (프로젝트 전체 목표치를 챕터 기간에 비례하여 분배)
-      const defaultTarget = calculateDefaultChapterTarget(
+      // 기본 목표치 계산 (프로젝트 전체 목표치를 먼슬리 기간에 비례하여 분배)
+      const defaultTarget = calculateDefaultMonthlyTarget(
         projectData,
-        chapterData.startDate.toDate(),
-        chapterData.endDate.toDate()
+        monthlyData.startDate.toDate(),
+        monthlyData.endDate.toDate()
       );
 
-      // 챕터 기간 동안 완료된 태스크 수 계산
-      const chapterDoneCount = await calculateChapterDoneCount(
+      // 먼슬리 기간 동안 완료된 태스크 수 계산
+      const monthlyDoneCount = await calculateMonthlyDoneCount(
         projectId,
-        chapterData.startDate.toDate(),
-        chapterData.endDate.toDate()
+        monthlyData.startDate.toDate(),
+        monthlyData.endDate.toDate()
       );
 
       connectedProjects.push({
         projectId,
-        chapterTargetCount: defaultTarget,
-        chapterDoneCount,
+        monthlyTargetCount: defaultTarget,
+        monthlyDoneCount,
       });
     }
   }
 
-  // Chapter 업데이트
-  await chapterRef.update({
+  // Monthly 업데이트
+  await monthlyRef.update({
     connectedProjects,
     updatedAt: new Date(),
   });
 
   console.log(
-    `Migrated chapter ${chapterId} with ${connectedProjects.length} projects`
+    `Migrated monthly ${monthlyId} with ${connectedProjects.length} projects`
   );
 };
 
 /**
- * 모든 Chapter를 새로운 구조로 마이그레이션합니다.
+ * 모든 Monthly를 새로운 구조로 마이그레이션합니다.
  */
-export const migrateAllChapters = async (): Promise<void> => {
-  const chaptersQuery = db.collection("chapters");
-  const querySnapshot = await chaptersQuery.get();
+export const migrateAllMonthlies = async (): Promise<void> => {
+  const monthliesQuery = db.collection("monthlies");
+  const querySnapshot = await monthliesQuery.get();
 
-  console.log(`Found ${querySnapshot.docs.length} chapters to migrate`);
+  console.log(`Found ${querySnapshot.docs.length} monthlies to migrate`);
 
   for (const doc of querySnapshot.docs) {
     try {
-      await migrateChapterStructure(doc.id);
+      await migrateMonthlyStructure(doc.id);
     } catch (error) {
-      console.error(`Failed to migrate chapter ${doc.id}:`, error);
+      console.error(`Failed to migrate monthly ${doc.id}:`, error);
     }
   }
 
-  console.log("Chapter migration completed");
+  console.log("Monthly migration completed");
 };
 
 /**
- * 특정 사용자의 모든 Chapter를 마이그레이션합니다.
+ * 특정 사용자의 모든 Monthly를 마이그레이션합니다.
  */
-export const migrateUserChapters = async (userId: string): Promise<void> => {
-  const chaptersQuery = db.collection("chapters").where("userId", "==", userId);
-  const querySnapshot = await chaptersQuery.get();
+export const migrateUserMonthlies = async (userId: string): Promise<void> => {
+  const monthliesQuery = db
+    .collection("monthlies")
+    .where("userId", "==", userId);
+  const querySnapshot = await monthliesQuery.get();
 
-  console.log(`Found ${querySnapshot.docs.length} chapters for user ${userId}`);
+  console.log(
+    `Found ${querySnapshot.docs.length} monthlies for user ${userId}`
+  );
 
   for (const doc of querySnapshot.docs) {
     try {
-      await migrateChapterStructure(doc.id);
+      await migrateMonthlyStructure(doc.id);
     } catch (error) {
-      console.error(`Failed to migrate chapter ${doc.id}:`, error);
+      console.error(`Failed to migrate monthly ${doc.id}:`, error);
     }
   }
 
-  console.log(`User ${userId} chapter migration completed`);
+  console.log(`User ${userId} monthly migration completed`);
 };
 
 /**
- * 챕터별 목표치의 기본값을 계산합니다.
+ * 먼슬리별 목표치의 기본값을 계산합니다.
  */
-const calculateDefaultChapterTarget = (
+const calculateDefaultMonthlyTarget = (
   project: LegacyProject,
-  chapterStartDate: Date,
-  chapterEndDate: Date
+  monthlyStartDate: Date,
+  monthlyEndDate: Date
 ): number => {
   const projectStart = new Date(project.startDate);
   const projectEnd = new Date(project.endDate);
 
-  // 프로젝트와 챕터의 겹치는 기간 계산
+  // 프로젝트와 먼슬리의 겹치는 기간 계산
   const overlapStart = new Date(
-    Math.max(projectStart.getTime(), chapterStartDate.getTime())
+    Math.max(projectStart.getTime(), monthlyStartDate.getTime())
   );
   const overlapEnd = new Date(
-    Math.min(projectEnd.getTime(), chapterEndDate.getTime())
+    Math.min(projectEnd.getTime(), monthlyEndDate.getTime())
   );
 
   if (overlapEnd <= overlapStart) {
@@ -190,27 +194,27 @@ const calculateDefaultChapterTarget = (
 };
 
 /**
- * 챕터 기간 동안 완료된 태스크 수를 계산합니다.
+ * 먼슬리 기간 동안 완료된 태스크 수를 계산합니다.
  */
-const calculateChapterDoneCount = async (
+const calculateMonthlyDoneCount = async (
   projectId: string,
-  chapterStartDate: Date,
-  chapterEndDate: Date
+  monthlyStartDate: Date,
+  monthlyEndDate: Date
 ): Promise<number> => {
   const tasksQuery = db
     .collection("projects")
     .doc(projectId)
     .collection("tasks")
     .where("done", "==", true)
-    .where("date", ">=", chapterStartDate)
-    .where("date", "<=", chapterEndDate);
+    .where("date", ">=", monthlyStartDate)
+    .where("date", "<=", monthlyEndDate);
 
   const querySnapshot = await tasksQuery.get();
   return querySnapshot.docs.length;
 };
 
 /**
- * 기존 Project의 connectedChapters 배열을 업데이트합니다.
+ * 기존 Project의 connectedMonthlies 배열을 업데이트합니다.
  */
 export const migrateProjectConnections = async (
   projectId: string
@@ -226,39 +230,39 @@ export const migrateProjectConnections = async (
 
   // 이미 마이그레이션된 경우 스킵
   if (
-    projectData.connectedChapters &&
-    projectData.connectedChapters.length > 0
+    projectData.connectedMonthlies &&
+    projectData.connectedMonthlies.length > 0
   ) {
     console.log(`Project ${projectId} already migrated`);
     return;
   }
 
-  const connectedChapters: any[] = [];
+  const connectedMonthlies: any[] = [];
 
-  // chapterId가 있는 경우 추가
-  if (projectData.chapterId) {
-    connectedChapters.push({ id: projectData.chapterId });
+  // monthlyId가 있는 경우 추가
+  if (projectData.monthlyId) {
+    connectedMonthlies.push({ id: projectData.monthlyId });
   }
 
-  // projectIds를 가진 챕터들 찾기
-  const chaptersQuery = db.collection("chapters");
-  const querySnapshot = await chaptersQuery.get();
+  // projectIds를 가진 먼슬리들 찾기
+  const monthliesQuery = db.collection("monthlies");
+  const querySnapshot = await monthliesQuery.get();
 
   for (const doc of querySnapshot.docs) {
-    const chapterData = doc.data() as LegacyChapter;
-    if (chapterData.projectIds && chapterData.projectIds.includes(projectId)) {
-      connectedChapters.push({ id: doc.id });
+    const monthlyData = doc.data() as LegacyMonthly;
+    if (monthlyData.projectIds && monthlyData.projectIds.includes(projectId)) {
+      connectedMonthlies.push({ id: doc.id });
     }
   }
 
   // Project 업데이트
   await projectRef.update({
-    connectedChapters,
+    connectedMonthlies,
     updatedAt: new Date(),
   });
 
   console.log(
-    `Migrated project ${projectId} with ${connectedChapters.length} chapters`
+    `Migrated project ${projectId} with ${connectedMonthlies.length} monthlies`
   );
 };
 
@@ -309,8 +313,8 @@ export const migrateEntireDatabase = async (): Promise<void> => {
   console.log("Starting database migration...");
 
   try {
-    // 1. 모든 Chapter 마이그레이션
-    await migrateAllChapters();
+    // 1. 모든 Monthly 마이그레이션
+    await migrateAllMonthlies();
 
     // 2. 모든 Project 마이그레이션
     await migrateAllProjects();
@@ -329,8 +333,8 @@ export const migrateUserData = async (userId: string): Promise<void> => {
   console.log(`Starting migration for user ${userId}...`);
 
   try {
-    // 1. 사용자의 모든 Chapter 마이그레이션
-    await migrateUserChapters(userId);
+    // 1. 사용자의 모든 Monthly 마이그레이션
+    await migrateUserMonthlies(userId);
 
     // 2. 사용자의 모든 Project 마이그레이션
     await migrateUserProjects(userId);

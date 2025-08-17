@@ -19,7 +19,12 @@ export function StatsCard({
   className,
 }: StatsCardProps) {
   return (
-    <Card className={cn("", className)}>
+    <Card
+      className={cn(
+        "bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40",
+        className
+      )}
+    >
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         {icon}

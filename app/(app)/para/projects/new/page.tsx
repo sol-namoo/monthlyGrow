@@ -51,16 +51,16 @@ import { useToast } from "@/hooks/use-toast";
 import Loading from "@/components/feedback/Loading";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "@/lib/firebase/index";
 import {
-  auth,
-  fetchAllChaptersByUserId,
-  fetchAllAreasByUserId,
-  fetchChapterById,
   createProject,
+  fetchAllAreasByUserId,
+  fetchAllMonthliesByUserId,
+  fetchMonthlyById,
   addTaskToProject,
-} from "@/lib/firebase";
+} from "@/lib/firebase/index";
 
-import { getChapterStatus, formatDate, formatDateForInput } from "@/lib/utils";
+import { getMonthlyStatus, formatDate, formatDateForInput } from "@/lib/utils";
 import { useLanguage } from "@/hooks/useLanguage";
 import {
   Dialog,
@@ -81,7 +81,7 @@ const projectFormSchema = z
       required_error: "프로젝트 유형을 선택해주세요",
     }),
     area: z.string().min(1, "영역을 선택해주세요"),
-    chapter: z.string().optional(),
+    monthly: z.string().optional(),
     startDate: z.string().min(1, "시작일을 입력해주세요"),
     dueDate: z.string().min(1, "목표 완료일을 입력해주세요"),
     target: z.string().min(1, "목표 설명을 입력해주세요"),
@@ -156,16 +156,16 @@ function NewProjectPageContent() {
   const [selectedCategory, setSelectedCategory] = useState<
     "repetitive" | "task_based"
   >("repetitive");
-  const [selectedChapterIds, setSelectedChapterIds] = useState<string[]>([]);
-  const [chapterTargetCounts, setChapterTargetCounts] = useState<
+  const [selectedMonthlyIds, setSelectedMonthlyIds] = useState<string[]>([]);
+  const [monthlyTargetCounts, setMonthlyTargetCounts] = useState<
     Record<string, number>
   >({});
 
   // 선택된 태스크들을 관리하는 상태
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
 
-  // 챕터 연결 관리 상태
-  const [showChapterConnectionDialog, setShowChapterConnectionDialog] =
+  // 월간 연결 관리 상태
+  const [showMonthlyConnectionDialog, setShowMonthlyConnectionDialog] =
     useState(false);
 
   // 프로젝트 유형 변경 다이얼로그 상태
@@ -193,26 +193,26 @@ function NewProjectPageContent() {
     }
   }, [user, userLoading, toast, router]);
 
-  // URL 파라미터에서 chapterId와 addedMidway 값을 가져옴
-  const chapterId = searchParams.get("chapterId");
+  // URL 파라미터에서 monthlyId와 addedMidway 값을 가져옴
+  const monthlyId = searchParams.get("monthlyId");
   const addedMidway = searchParams.get("addedMidway") === "true";
   const returnUrl = searchParams.get("returnUrl");
 
-  // returnUrl에서 챕터 ID 추출 (챕터 수정 페이지에서 온 경우)
-  const extractChapterIdFromReturnUrl = () => {
+  // returnUrl에서 월간 ID 추출 (월간 수정 페이지에서 온 경우)
+  const extractMonthlyIdFromReturnUrl = () => {
     if (returnUrl) {
-      const match = returnUrl.match(/\/chapter\/edit\/([^/?]+)/);
+      const match = returnUrl.match(/\/monthly\/edit\/([^/?]+)/);
       return match ? match[1] : null;
     }
     return null;
   };
 
-  const returnUrlChapterId = extractChapterIdFromReturnUrl();
+  const returnUrlMonthlyId = extractMonthlyIdFromReturnUrl();
 
-  // 사용자의 모든 챕터 가져오기
-  const { data: allChapters = [], isLoading: chaptersLoading } = useQuery({
-    queryKey: ["chapters", user?.uid],
-    queryFn: () => fetchAllChaptersByUserId(user?.uid || ""),
+  // 사용자의 모든 월간 가져오기
+  const { data: allMonthlies = [], isLoading: monthliesLoading } = useQuery({
+    queryKey: ["monthlies", user?.uid],
+    queryFn: () => fetchAllMonthliesByUserId(user?.uid || ""),
     enabled: !!user?.uid,
   });
 
@@ -249,7 +249,7 @@ function NewProjectPageContent() {
       description: "",
       category: "repetitive",
       area: "", // 초기값은 빈 문자열로 설정
-      chapter: "",
+      monthly: "",
       startDate: getDefaultDates().startDate,
       dueDate: getDefaultDates().endDate,
       target: "",
@@ -263,48 +263,48 @@ function NewProjectPageContent() {
     name: "tasks",
   });
 
-  // 프로젝트 기간과 겹치는 챕터만 필터링 (현재 달로부터 6개월 이후까지의 기간과 겹치는 것만)
-  const getOverlappingChapters = () => {
+  // 프로젝트 기간과 겹치는 월간만 필터링 (현재 달로부터 6개월 이후까지의 기간과 겹치는 것만)
+  const getOverlappingMonthlies = () => {
     const startDate = form.watch("startDate");
     const dueDate = form.watch("dueDate");
 
     if (!startDate || !dueDate) {
-      // 날짜가 없으면 현재 달로부터 6개월 이후까지의 기간과 겹치는 챕터만 반환
+      // 날짜가 없으면 현재 달로부터 6개월 이후까지의 기간과 겹치는 월간만 반환
       const currentDate = new Date();
       const currentYear = currentDate.getFullYear();
       const currentMonth = currentDate.getMonth();
       const sixMonthsLater = new Date(currentYear, currentMonth + 6, 0);
 
-      return allChapters.filter((chapter) => {
-        const chapterStart = new Date(chapter.startDate);
-        const chapterEnd = new Date(chapter.endDate);
+      return allMonthlies.filter((monthly) => {
+        const monthlyStart = new Date(monthly.startDate);
+        const monthlyEnd = new Date(monthly.endDate);
 
-        // 챕터가 6개월 이후 범위와 겹치는지 확인
-        return chapterStart <= sixMonthsLater && chapterEnd >= currentDate;
+        // 월간이 6개월 이후 범위와 겹치는지 확인
+        return monthlyStart <= sixMonthsLater && monthlyEnd >= currentDate;
       });
     }
 
     const projectStart = new Date(startDate);
     const projectEnd = new Date(dueDate);
 
-    return allChapters.filter((chapter) => {
-      const chapterStart = new Date(chapter.startDate);
-      const chapterEnd = new Date(chapter.endDate);
+    return allMonthlies.filter((monthly) => {
+      const monthlyStart = new Date(monthly.startDate);
+      const monthlyEnd = new Date(monthly.endDate);
 
-      // 프로젝트 기간과 챕터 기간이 겹치는지 확인
+      // 프로젝트 기간과 월간 기간이 겹치는지 확인
       return (
-        (projectStart <= chapterEnd && projectEnd >= chapterStart) ||
-        // returnUrl에서 추출한 챕터는 항상 포함 (자동 선택용)
-        chapter.id === returnUrlChapterId
+        (projectStart <= monthlyEnd && projectEnd >= monthlyStart) ||
+        // returnUrl에서 추출한 월간은 항상 포함 (자동 선택용)
+        monthly.id === returnUrlMonthlyId
       );
     });
   };
 
-  const overlappingChapters = getOverlappingChapters();
+  const overlappingMonthlies = getOverlappingMonthlies();
 
-  // 선택된 챕터들 계산
-  const selectedChapters = overlappingChapters.filter((chapter) =>
-    selectedChapterIds.includes(chapter.id)
+  // 선택된 월간들 계산
+  const selectedMonthlies = overlappingMonthlies.filter((monthly) =>
+    selectedMonthlyIds.includes(monthly.id)
   );
 
   // 영역이 로드되면 첫 번째 영역(미분류)을 기본값으로 설정
@@ -314,17 +314,17 @@ function NewProjectPageContent() {
     }
   }, [areas, form]);
 
-  // returnUrl에서 추출한 챕터 ID가 있으면 자동으로 선택
+  // returnUrl에서 추출한 월간 ID가 있으면 자동으로 선택
   useEffect(() => {
-    if (returnUrlChapterId && overlappingChapters.length > 0) {
-      const targetChapter = overlappingChapters.find(
-        (chapter) => chapter.id === returnUrlChapterId
+    if (returnUrlMonthlyId && overlappingMonthlies.length > 0) {
+      const targetMonthly = overlappingMonthlies.find(
+        (monthly) => monthly.id === returnUrlMonthlyId
       );
-      if (targetChapter && !selectedChapterIds.includes(returnUrlChapterId)) {
-        setSelectedChapterIds((prev) => [...prev, returnUrlChapterId]);
+      if (targetMonthly && !selectedMonthlyIds.includes(returnUrlMonthlyId)) {
+        setSelectedMonthlyIds((prev) => [...prev, returnUrlMonthlyId]);
       }
     }
-  }, [returnUrlChapterId, overlappingChapters, selectedChapterIds]);
+  }, [returnUrlMonthlyId, overlappingMonthlies, selectedMonthlyIds]);
 
   // 반복형 프로젝트에서 카테고리나 날짜 변경 시 태스크 목록 자동 업데이트
   useEffect(() => {
@@ -360,19 +360,19 @@ function NewProjectPageContent() {
     replace,
   ]);
 
-  // 프로젝트 기간과 겹치는 챕터만 필터링 (연결용)
-  const availableChaptersForConnection = overlappingChapters.filter(
-    (chapter) => {
-      const status = getChapterStatus(chapter);
-      // 과거 챕터 제외 + 활성 챕터만
+  // 프로젝트 기간과 겹치는 월간만 필터링 (연결용)
+  const availableMonthliesForConnection = overlappingMonthlies.filter(
+    (monthly) => {
+      const status = getMonthlyStatus(monthly);
+      // 과거 월간 제외 + 활성 월간만
       return status === "in_progress" || status === "planned";
     }
   );
 
-  // 챕터에 연결된 프로젝트 개수 계산 (현재 선택된 챕터들 기준)
-  const getConnectedProjectCount = (chapterId: string) => {
-    // 현재 선택된 챕터들 중에서 해당 챕터가 포함되어 있는지 확인
-    return selectedChapterIds.includes(chapterId) ? 1 : 0;
+  // 월간에 연결된 프로젝트 개수 계산 (현재 선택된 월간들 기준)
+  const getConnectedProjectCount = (monthlyId: string) => {
+    // 현재 선택된 월간들 중에서 해당 월간이 포함되어 있는지 확인
+    return selectedMonthlyIds.includes(monthlyId) ? 1 : 0;
   };
 
   // 프로젝트 유형별 헬퍼 함수
@@ -398,11 +398,11 @@ function NewProjectPageContent() {
       : translate("para.projects.targetCount.description.taskBased");
   };
 
-  // 현재 챕터 정보 가져오기 (chapterId가 있는 경우)
-  const { data: currentChapter } = useQuery({
-    queryKey: ["chapter", chapterId],
-    queryFn: () => fetchChapterById(chapterId!),
-    enabled: !!chapterId,
+  // 현재 월간 정보 가져오기 (monthlyId가 있는 경우)
+  const { data: currentMonthly } = useQuery({
+    queryKey: ["monthly", monthlyId],
+    queryFn: () => fetchMonthlyById(monthlyId!),
+    enabled: !!monthlyId,
   });
 
   // 프로젝트 유형 변경 핸들러
@@ -436,19 +436,19 @@ function NewProjectPageContent() {
     // 작업형으로 변경 시 기존 태스크 유지
   };
 
-  // 챕터별 기본 태스크 개수 계산 (프로젝트 기간과 챕터 기간을 고려)
-  const getDefaultTargetCount = (chapter: any) => {
+  // 월간별 기본 태스크 개수 계산 (프로젝트 기간과 월간 기간을 고려)
+  const getDefaultTargetCount = (monthly: any) => {
     const projectStartDate = new Date(form.watch("startDate"));
     const projectEndDate = new Date(form.watch("dueDate"));
-    const chapterStartDate = new Date(chapter.startDate);
-    const chapterEndDate = new Date(chapter.endDate);
+    const monthlyStartDate = new Date(monthly.startDate);
+    const monthlyEndDate = new Date(monthly.endDate);
 
-    // 프로젝트와 챕터의 겹치는 기간 계산
+    // 프로젝트와 월간의 겹치는 기간 계산
     const overlapStart = new Date(
-      Math.max(projectStartDate.getTime(), chapterStartDate.getTime())
+      Math.max(projectStartDate.getTime(), monthlyStartDate.getTime())
     );
     const overlapEnd = new Date(
-      Math.min(projectEndDate.getTime(), chapterEndDate.getTime())
+      Math.min(projectEndDate.getTime(), monthlyEndDate.getTime())
     );
 
     if (overlapEnd <= overlapStart) return 1;
@@ -469,26 +469,26 @@ function NewProjectPageContent() {
     );
   };
 
-  // 챕터별 태스크 개수 업데이트 핸들러
-  const updateChapterTargetCount = (chapterId: string, count: number) => {
-    setChapterTargetCounts((prev) => ({
+  // 월간별 태스크 개수 업데이트 핸들러
+  const updateMonthlyTargetCount = (monthlyId: string, count: number) => {
+    setMonthlyTargetCounts((prev) => ({
       ...prev,
-      [chapterId]: Math.max(1, count), // 최소 1개
+      [monthlyId]: Math.max(1, count), // 최소 1개
     }));
   };
 
-  // 챕터 선택/해제 핸들러
-  const toggleChapterSelection = (chapterId: string) => {
-    setSelectedChapterIds((prev) => {
-      const newSelection = prev.includes(chapterId)
-        ? prev.filter((id) => id !== chapterId)
-        : [...prev, chapterId];
+  // 월간 선택/해제 핸들러
+  const toggleMonthlySelection = (monthlyId: string) => {
+    setSelectedMonthlyIds((prev) => {
+      const newSelection = prev.includes(monthlyId)
+        ? prev.filter((id) => id !== monthlyId)
+        : [...prev, monthlyId];
 
-      // 챕터가 해제되면 해당 챕터의 태스크 개수도 제거
-      if (!newSelection.includes(chapterId)) {
-        setChapterTargetCounts((prev) => {
+      // 월간이 해제되면 해당 월간의 태스크 개수도 제거
+      if (!newSelection.includes(monthlyId)) {
+        setMonthlyTargetCounts((prev) => {
           const newCounts = { ...prev };
-          delete newCounts[chapterId];
+          delete newCounts[monthlyId];
           return newCounts;
         });
       }
@@ -694,8 +694,8 @@ function NewProjectPageContent() {
         });
       }
 
-      // 선택된 챕터들을 ConnectedChapter 형식으로 변환
-      const connectedChapters = selectedChapters.map((chapter) => chapter.id);
+      // 선택된 월간들을 ConnectedMonthly 형식으로 변환
+      const connectedMonthlies = selectedMonthlies.map((monthly) => monthly.id);
 
       const projectData = {
         title: data.title,
@@ -707,7 +707,7 @@ function NewProjectPageContent() {
         target: data.target,
         targetCount: parseInt(data.targetCount),
         completedTasks: 0,
-        connectedChapters, // 선택된 챕터 ID 배열
+        connectedMonthlies, // 선택된 월간 ID 배열
         notes: [], // 초기에는 빈 배열
         tasks,
         userId: user!.uid,
@@ -730,6 +730,8 @@ function NewProjectPageContent() {
               date: taskData.date,
               duration: taskData.duration,
               done: taskData.done,
+              userId: user?.uid || "",
+              projectId: newProject.id,
             });
           });
 
@@ -747,13 +749,13 @@ function NewProjectPageContent() {
       toast({
         title: "프로젝트 생성 완료!",
         description: `${data.title} 프로젝트가 성공적으로 생성되었습니다.${
-          selectedChapters.length > 0
-            ? ` (${selectedChapters.length}개 챕터에 연결됨)`
+          selectedMonthlies.length > 0
+            ? ` (${selectedMonthlies.length}개 월간에 연결됨)`
             : ""
         }`,
       });
 
-      // 챕터 생성 페이지에서 왔다면 새 프로젝트 ID와 함께 돌아가기
+      // 월간 생성 페이지에서 왔다면 새 프로젝트 ID와 함께 돌아가기
       if (returnUrl) {
         const separator = returnUrl.includes("?") ? "&" : "?";
         const urlWithProjectId = `${returnUrl}${separator}newProjectId=${newProject.id}`;
@@ -773,9 +775,9 @@ function NewProjectPageContent() {
     }
   };
 
-  // 챕터 연결 대화상자 열기
-  const openChapterConnectionDialog = () => {
-    setShowChapterConnectionDialog(true);
+  // 월간 연결 대화상자 열기
+  const openMonthlyConnectionDialog = () => {
+    setShowMonthlyConnectionDialog(true);
   };
 
   const calculateDuration = (startDate: string, dueDate: string) => {
@@ -806,7 +808,7 @@ function NewProjectPageContent() {
   const weeklyAverage = calculateWeeklyAverage(form.watch("targetCount"));
 
   // 로딩 상태 확인
-  if (userLoading || chaptersLoading || areasLoading) {
+  if (userLoading || monthliesLoading || areasLoading) {
     return <Loading />;
   }
 
@@ -853,21 +855,21 @@ function NewProjectPageContent() {
         {returnUrl && (
           <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
             <p className="text-xs text-blue-700 dark:text-blue-300">
-              프로젝트 생성 완료 후 챕터 생성 페이지로 돌아갑니다.
+              프로젝트 생성 완료 후 먼슬리 생성 페이지로 돌아갑니다.
             </p>
           </div>
         )}
       </div>
 
-      {currentChapter && (
+      {currentMonthly && (
         <Card className="mb-6 p-4">
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-blue-500" />
-            <span className="font-medium">{currentChapter.title}</span>
+            <span className="font-medium">{currentMonthly.objective}</span>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            현재 챕터에 연결된 프로젝트:{" "}
-            {currentChapter.connectedProjects?.length || 0}개
+            현재 먼슬리에 추가된 프로젝트:{" "}
+            {currentMonthly.quickAccessProjects?.length || 0}개
           </p>
         </Card>
       )}
@@ -1039,7 +1041,7 @@ function NewProjectPageContent() {
                   })}
                   min={form.watch("startDate") || undefined}
                   max={(() => {
-                    // 이번달 이후 6개월까지만 가능 (챕터 생성 가능 월과 동일)
+                    // 이번달 이후 6개월까지만 가능 (먼슬리 생성 가능 월과 동일)
                     const currentDate = new Date();
                     const currentYear = currentDate.getFullYear();
                     const currentMonth = currentDate.getMonth();
@@ -1079,7 +1081,7 @@ function NewProjectPageContent() {
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>장기 프로젝트 안내</AlertTitle>
                 <AlertDescription>
-                  8주 이상의 장기 프로젝트입니다. 챕터 단위로 나누어 진행하는
+                  8주 이상의 장기 프로젝트입니다. 먼슬리 단위로 나누어 진행하는
                   것을 권장합니다.
                 </AlertDescription>
               </CustomAlert>
@@ -1226,7 +1228,7 @@ function NewProjectPageContent() {
                     {form.watch("category") === "repetitive" && (
                       <RecommendationBadge
                         type="info"
-                        message="목표 설정: 일주일에 2회 이상이면 챕터 집중에 도움이 돼요"
+                        message="목표 설정: 일주일에 2회 이상이면 먼슬리 집중에 도움이 돼요"
                       />
                     )}
                   </div>
@@ -1491,34 +1493,37 @@ function NewProjectPageContent() {
           )}
         </Card>
 
-        {/* 챕터 연결 섹션 */}
+        {/* 먼슬리 연결 섹션 */}
         <Card className="p-6">
-          <h2 className="mb-4 text-lg font-semibold">챕터 연결</h2>
+          <h2 className="mb-4 text-lg font-semibold">먼슬리 연결</h2>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              이 프로젝트를 특정 챕터에 연결하여 월별 목표로 관리할 수 있습니다.
+              이 프로젝트를 특정 먼슬리에 연결하여 월별 목표로 관리할 수
+              있습니다.
             </p>
 
-            {/* 현재 연결된 챕터들 표시 */}
-            {selectedChapterIds.length > 0 && allChapters.length > 0 && (
+            {/* 현재 연결된 먼슬리들 표시 */}
+            {selectedMonthlyIds.length > 0 && allMonthlies.length > 0 && (
               <div>
-                <Label>현재 연결된 챕터</Label>
+                <Label>현재 연결된 먼슬리</Label>
                 <div className="mt-2 space-y-2">
-                  {allChapters
-                    .filter((chapter) =>
-                      selectedChapterIds.includes(chapter.id)
+                  {allMonthlies
+                    .filter((monthly) =>
+                      selectedMonthlyIds.includes(monthly.id)
                     )
-                    .map((chapter) => (
+                    .map((monthly) => (
                       <div
-                        key={chapter.id}
+                        key={monthly.id}
                         className="p-3 border rounded-lg bg-muted/30"
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div>
-                            <span className="font-medium">{chapter.title}</span>
+                            <span className="font-medium">
+                              {monthly.objective}
+                            </span>
                             <p className="text-xs text-muted-foreground">
-                              {formatDate(chapter.startDate)} ~{" "}
-                              {formatDate(chapter.endDate)}
+                              {formatDate(monthly.startDate)} ~{" "}
+                              {formatDate(monthly.endDate)}
                             </p>
                           </div>
                           <Button
@@ -1526,14 +1531,14 @@ function NewProjectPageContent() {
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                              // 챕터 연결 해제
-                              setSelectedChapterIds((prev) =>
-                                prev.filter((id) => id !== chapter.id)
+                              // 먼슬리 연결 해제
+                              setSelectedMonthlyIds((prev) =>
+                                prev.filter((id) => id !== monthly.id)
                               );
-                              // 챕터가 해제되면 해당 챕터의 태스크 개수도 제거
-                              setChapterTargetCounts((prev) => {
+                              // 먼슬리가 해제되면 해당 먼슬리의 태스크 개수도 제거
+                              setMonthlyTargetCounts((prev) => {
                                 const newCounts = { ...prev };
-                                delete newCounts[chapter.id];
+                                delete newCounts[monthly.id];
                                 return newCounts;
                               });
                             }}
@@ -1542,32 +1547,32 @@ function NewProjectPageContent() {
                           </Button>
                         </div>
 
-                        {/* 챕터별 태스크 개수 설정 */}
+                        {/* 먼슬리별 태스크 개수 설정 */}
                         <div className="mt-3 pt-3 border-t border-border">
                           <div className="flex items-center gap-2">
                             <Label
-                              htmlFor={`target-${chapter.id}`}
+                              htmlFor={`target-${monthly.id}`}
                               className="text-sm font-medium"
                             >
-                              이 챕터에서 완성할 태스크 개수
+                              이 먼슬리에서 완성할 태스크 개수
                             </Label>
                             <Badge variant="secondary" className="text-xs">
-                              권장: {getDefaultTargetCount(chapter)}개
+                              권장: {getDefaultTargetCount(monthly)}개
                             </Badge>
                           </div>
                           <div className="flex items-center gap-2 mt-1">
                             <Input
-                              id={`target-${chapter.id}`}
+                              id={`target-${monthly.id}`}
                               type="number"
                               min="1"
                               max="100"
                               value={
-                                chapterTargetCounts[chapter.id] ||
-                                getDefaultTargetCount(chapter)
+                                monthlyTargetCounts[monthly.id] ||
+                                getDefaultTargetCount(monthly)
                               }
                               onChange={(e) => {
                                 const value = parseInt(e.target.value) || 1;
-                                updateChapterTargetCount(chapter.id, value);
+                                updateMonthlyTargetCount(monthly.id, value);
                               }}
                               className="w-20"
                             />
@@ -1579,9 +1584,9 @@ function NewProjectPageContent() {
                               variant="ghost"
                               size="sm"
                               onClick={() => {
-                                updateChapterTargetCount(
-                                  chapter.id,
-                                  getDefaultTargetCount(chapter)
+                                updateMonthlyTargetCount(
+                                  monthly.id,
+                                  getDefaultTargetCount(monthly)
                                 );
                               }}
                               className="text-xs"
@@ -1590,7 +1595,8 @@ function NewProjectPageContent() {
                             </Button>
                           </div>
                           <p className="text-xs text-muted-foreground mt-1">
-                            프로젝트 기간과 챕터 기간을 고려한 권장 개수입니다.
+                            프로젝트 기간과 먼슬리 기간을 고려한 권장
+                            개수입니다.
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
                             (프로젝트 정보: 미완료 태스크{" "}
@@ -1606,17 +1612,17 @@ function NewProjectPageContent() {
 
             <div className="text-center p-4 border-2 border-dashed rounded-lg">
               <p className="text-sm text-muted-foreground mb-2">
-                새로운 챕터에 연결하거나 기존 연결을 관리하세요
+                새로운 먼슬리에 연결하거나 기존 연결을 관리하세요
               </p>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  openChapterConnectionDialog();
+                  openMonthlyConnectionDialog();
                 }}
               >
                 <Plus className="h-4 w-4 mr-2" />
-                챕터 연결 관리
+                먼슬리 연결 관리
               </Button>
             </div>
           </div>
@@ -1686,53 +1692,53 @@ function NewProjectPageContent() {
         </DialogContent>
       </Dialog>
 
-      {/* 챕터 연결 대화상자 */}
+      {/* 먼슬리 연결 대화상자 */}
       <Dialog
-        open={showChapterConnectionDialog}
-        onOpenChange={setShowChapterConnectionDialog}
+        open={showMonthlyConnectionDialog}
+        onOpenChange={setShowMonthlyConnectionDialog}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>챕터에 연결</DialogTitle>
+            <DialogTitle>먼슬리에 연결</DialogTitle>
             <DialogDescription>
-              이 프로젝트를 연결할 챕터를 선택하세요. 연결된 챕터에서 프로젝트를
-              함께 관리할 수 있습니다.
+              이 프로젝트를 연결할 먼슬리를 선택하세요. 연결된 먼슬리에서
+              프로젝트를 함께 관리할 수 있습니다.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            {availableChaptersForConnection.length === 0 ? (
+            {availableMonthliesForConnection.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-muted-foreground">
-                  연결할 수 있는 챕터가 없습니다.
+                  연결할 수 있는 먼슬리가 없습니다.
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  6개월 이내의 챕터만 연결할 수 있습니다.
+                  6개월 이내의 먼슬리만 연결할 수 있습니다.
                 </p>
                 <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
                   <p className="text-xs text-blue-700 dark:text-blue-300">
                     💡 <strong>팁:</strong> AI 플래닝 기능(준비중)을 사용하면
-                    장기 목표에 맞는 여러 챕터를 자동으로 생성할 수 있습니다.
+                    장기 목표에 맞는 여러 먼슬리를 자동으로 생성할 수 있습니다.
                   </p>
                 </div>
               </div>
             ) : (
               <>
                 <div className="space-y-2">
-                  {availableChaptersForConnection.map((chapter) => (
+                  {availableMonthliesForConnection.map((monthly) => (
                     <div
-                      key={chapter.id}
+                      key={monthly.id}
                       className={`p-3 border rounded-lg cursor-pointer ${
-                        selectedChapterIds.includes(chapter.id)
+                        selectedMonthlyIds.includes(monthly.id)
                           ? "border-primary bg-primary/5"
                           : "border-border"
                       }`}
-                      onClick={() => toggleChapterSelection(chapter.id)}
+                      onClick={() => toggleMonthlySelection(monthly.id)}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <h4 className="font-medium">{chapter.title}</h4>
-                          {selectedChapterIds.includes(chapter.id) && (
+                          <h4 className="font-medium">{monthly.objective}</h4>
+                          {selectedMonthlyIds.includes(monthly.id) && (
                             <Badge variant="outline" className="text-xs">
                               선택됨
                             </Badge>
@@ -1740,22 +1746,22 @@ function NewProjectPageContent() {
                         </div>
                         <span
                           className={`text-xs px-2 py-1 rounded-full ${
-                            getChapterStatus(chapter) === "in_progress"
+                            getMonthlyStatus(monthly) === "in_progress"
                               ? "bg-green-100 text-green-700"
                               : "bg-blue-100 text-blue-700"
                           }`}
                         >
-                          {getChapterStatus(chapter) === "in_progress"
+                          {getMonthlyStatus(monthly) === "in_progress"
                             ? "진행 중"
                             : "예정"}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {formatDate(chapter.startDate)} -{" "}
-                        {formatDate(chapter.endDate)}
+                        {formatDate(monthly.startDate)} -{" "}
+                        {formatDate(monthly.endDate)}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        연결된 프로젝트: {getConnectedProjectCount(chapter.id)}
+                        연결된 프로젝트: {getConnectedProjectCount(monthly.id)}
                         개
                       </p>
                     </div>
@@ -1765,25 +1771,25 @@ function NewProjectPageContent() {
                 <div className="flex gap-2">
                   <Button
                     onClick={() => {
-                      setShowChapterConnectionDialog(false);
-                      if (selectedChapterIds.length > 0) {
+                      setShowMonthlyConnectionDialog(false);
+                      if (selectedMonthlyIds.length > 0) {
                         toast({
-                          title: "챕터 연결 완료",
-                          description: `${selectedChapterIds.length}개 챕터에 연결되었습니다.`,
+                          title: "먼슬리 연결 완료",
+                          description: `${selectedMonthlyIds.length}개 먼슬리에 연결되었습니다.`,
                         });
                       }
                     }}
                     className="flex-1"
                   >
-                    {selectedChapterIds.length > 0
-                      ? `연결하기 (${selectedChapterIds.length}개)`
+                    {selectedMonthlyIds.length > 0
+                      ? `연결하기 (${selectedMonthlyIds.length}개)`
                       : "연결 없이 진행"}
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => {
-                      setSelectedChapterIds([]);
-                      setShowChapterConnectionDialog(false);
+                      setSelectedMonthlyIds([]);
+                      setShowMonthlyConnectionDialog(false);
                     }}
                     className="flex-1"
                   >

@@ -41,13 +41,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { auth } from "@/lib/firebase";
+import { auth } from "@/lib/firebase/index";
 import {
   fetchAreaById,
+  updateArea,
   fetchAllProjectsByUserId,
   fetchAllResourcesByUserId,
-  updateArea,
-} from "@/lib/firebase";
+} from "@/lib/firebase/index";
 import { getProjectStatus } from "@/lib/utils";
 import type { Area, Project, Resource } from "@/lib/types";
 

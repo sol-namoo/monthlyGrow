@@ -14,17 +14,17 @@ const db = getFirestore();
 
 /**
  * 매월 1일 오전 4시에 실행되는 크론 작업
- * 완료된 챕터의 미완료 프로젝트를 자동으로 다음 챕터로 이관
+ * 완료된 먼슬리의 미완료 프로젝트를 자동으로 다음 먼슬리로 이관
  */
-export const checkCompletedChapters = functions
+export const checkCompletedMonthlies = functions
   .region("asia-northeast3") // 서울 리전
   .pubsub.schedule("0 4 1 * *") // 매월 1일 오전 4시 (KST)
   .timeZone("Asia/Seoul")
   .onRun(async (context: functions.EventContext) => {
-    console.log("Starting monthly chapter completion check...");
+    console.log("Starting monthly monthly completion check...");
 
     try {
-      // 지난 달 완료된 챕터 찾기 (매월 1일 실행이므로 지난 달 챕터들)
+      // 지난 달 완료된 먼슬리 찾기 (매월 1일 실행이므로 지난 달 먼슬리들)
       const lastMonth = new Date();
       lastMonth.setMonth(lastMonth.getMonth() - 1);
       lastMonth.setDate(1);
@@ -34,9 +34,9 @@ export const checkCompletedChapters = functions
       thisMonth.setDate(1);
       thisMonth.setHours(0, 0, 0, 0);
 
-      // 지난 달에 완료된 모든 챕터 찾기
-      const chaptersSnapshot = await db
-        .collection("chapters")
+      // 지난 달에 완료된 모든 먼슬리 찾기
+      const monthliesSnapshot = await db
+        .collection("monthlies")
         .where("endDate", ">=", lastMonth)
         .where("endDate", "<", thisMonth)
         .get();
@@ -44,10 +44,10 @@ export const checkCompletedChapters = functions
       const processedUsers = new Set<string>();
       let totalMigrations = 0;
 
-      for (const chapterDoc of chaptersSnapshot.docs) {
-        const chapterData = chapterDoc.data();
-        const userId = chapterData.userId;
-        const chapterId = chapterDoc.id;
+      for (const monthlyDoc of monthliesSnapshot.docs) {
+        const monthlyData = monthlyDoc.data();
+        const userId = monthlyData.userId;
+        const monthlyId = monthlyDoc.id;
 
         // 이미 처리된 사용자는 건너뛰기 (한 사용자당 한 번만 처리)
         if (processedUsers.has(userId)) {
@@ -55,7 +55,7 @@ export const checkCompletedChapters = functions
         }
 
         console.log(
-          `Processing incomplete projects for user ${userId}, chapter ${chapterId}`
+          `Processing incomplete projects for user ${userId}, monthly ${monthlyId}`
         );
 
         try {
@@ -64,7 +64,7 @@ export const checkCompletedChapters = functions
 
           if (carryOverEnabled) {
             // 미완료 프로젝트 자동 이관
-            await autoMigrateIncompleteProjects(userId, chapterId);
+            await autoMigrateIncompleteProjects(userId, monthlyId);
             console.log(
               `Carry over enabled for user ${userId}. Migration processed.`
             );
@@ -97,18 +97,18 @@ export const checkCompletedChapters = functions
       }
 
       console.log(
-        `Monthly chapter check completed. Processed ${totalMigrations} users.`
+        `Monthly monthly check completed. Processed ${totalMigrations} users.`
       );
       return { success: true, processedUsers: totalMigrations };
     } catch (error) {
-      console.error("Error in monthly chapter check:", error);
+      console.error("Error in monthly monthly check:", error);
       throw error;
     }
   });
 
 /**
  * 테스트용 HTTP 함수 (개발 중에만 사용)
- * https://your-project.cloudfunctions.net/testProjectMigration?userId=YOUR_USER_ID&chapterId=YOUR_CHAPTER_ID
+ * https://your-project.cloudfunctions.net/testProjectMigration?userId=YOUR_USER_ID&monthlyId=YOUR_CHAPTER_ID
  */
 export const testProjectMigration = functions
   .region("asia-northeast3")
@@ -119,10 +119,10 @@ export const testProjectMigration = functions
         return;
       }
 
-      const { userId, chapterId } = req.query;
+      const { userId, monthlyId } = req.query;
 
-      if (!userId || !chapterId) {
-        res.status(400).send("Missing userId or chapterId parameter");
+      if (!userId || !monthlyId) {
+        res.status(400).send("Missing userId or monthlyId parameter");
         return;
       }
 
@@ -133,11 +133,11 @@ export const testProjectMigration = functions
         if (carryOverEnabled) {
           await autoMigrateIncompleteProjects(
             userId as string,
-            chapterId as string
+            monthlyId as string
           );
           res.json({
             success: true,
-            message: `Migration completed for user ${userId}, chapter ${chapterId}`,
+            message: `Migration completed for user ${userId}, monthly ${monthlyId}`,
           });
         } else {
           res.json({

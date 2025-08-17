@@ -1,28 +1,38 @@
 export const retrospective = {
   form: {
     title: "회고 작성",
-    bestMoment: "가장 좋았던 순간",
-    bestMomentPlaceholder: "이번 챕터에서 가장 좋았던 순간을 기록해주세요",
-    routineAdherence: "루틴 준수율",
-    routineAdherencePlaceholder:
-      "계획한 루틴을 얼마나 잘 지켰는지 기록해주세요",
+    bestMoment: "가장 보람찼던 순간",
+    bestMomentPlaceholder: "이번 먼슬리에서 가장 보람찼던 순간을 기록해주세요",
     unexpectedObstacles: "예상치 못한 장애물",
     unexpectedObstaclesPlaceholder: "예상하지 못했던 어려움을 기록해주세요",
-    nextChapterApplication: "다음 챕터 적용 방안",
-    nextChapterApplicationPlaceholder:
-      "이번 경험을 다음 챕터에 어떻게 적용할지 기록해주세요",
+    keyResultsReview: "핵심 지표 평가",
+    keyResultsReviewPlaceholder: "각 Key Results의 달성 상황을 평가해주세요",
+    nextMonthlyApplication: "다음 먼슬리 적용 방안",
+    nextMonthlyApplicationPlaceholder:
+      "이번 경험을 다음 먼슬리에 어떻게 적용할지 기록해주세요",
     freeformContent: "자유 회고 (선택사항)",
     freeformContentPlaceholder:
       "추가로 기록하고 싶은 내용이 있다면 자유롭게 작성해주세요",
+    completedKeyResults: "완료된 Key Results",
+    failedKeyResults: "달성하지 못한 Key Results",
+    failedReason: "실패 이유",
+    failedReasonOptions: {
+      unrealisticGoal: "목표가 너무 높게 설정됨",
+      timeManagement: "시간 관리 실패",
+      priorityMismatch: "우선순위 설정 문제",
+      externalFactors: "외부 요인 (업무, 개인사 등)",
+      motivation: "동기 부족",
+      other: "기타",
+    },
     rating: "평점",
     bookmarked: "북마크에 추가",
     save: "저장",
     cancel: "취소",
     validation: {
-      bestMomentRequired: "가장 좋았던 순간을 입력해주세요",
-      routineAdherenceRequired: "루틴 준수율을 입력해주세요",
+      bestMomentRequired: "가장 보람찼던 순간을 입력해주세요",
       unexpectedObstaclesRequired: "예상치 못한 장애물을 입력해주세요",
-      nextChapterApplicationRequired: "다음 챕터 적용 방안을 입력해주세요",
+      keyResultsReviewRequired: "핵심 지표 평가를 입력해주세요",
+      nextMonthlyApplicationRequired: "다음 먼슬리 적용 방안을 입력해주세요",
     },
   },
   project: {

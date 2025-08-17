@@ -1,14 +1,14 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
-import { updateChapterProgress } from "./firebase-utils";
+import { updateMonthlyProgress } from "./firebase-utils";
 import { migrateEntireDatabase, migrateUserData } from "./migration-utils";
 import {
-  runLoopToChapterMigration,
-  createChaptersFromProjectLoopIds,
-  createChaptersFromProjectChapterIds,
+  runLoopToMonthlyMigration,
+  createMonthliesFromProjectLoopIds,
+  createMonthliesFromProjectMonthlyIds,
 } from "./check-loop-migration";
 
-// 태스크 완료 시 챕터별 진행률 업데이트
+// 태스크 완료 시 먼슬리별 진행률 업데이트
 export const onTaskCompleted = onDocumentUpdated(
   "projects/{projectId}/tasks/{taskId}",
   async (event) => {
@@ -22,13 +22,13 @@ export const onTaskCompleted = onDocumentUpdated(
 
       if (userId) {
         try {
-          await updateChapterProgress(userId, projectId, 1);
+          await updateMonthlyProgress(userId, projectId, 1);
           console.log(
-            `Updated chapter progress for task ${event.params.taskId} in project ${projectId}`
+            `Updated monthly progress for task ${event.params.taskId} in project ${projectId}`
           );
         } catch (error) {
           console.error(
-            `Failed to update chapter progress for task ${event.params.taskId}:`,
+            `Failed to update monthly progress for task ${event.params.taskId}:`,
             error
           );
         }
@@ -43,19 +43,19 @@ export const checkMigrationStatus = onRequest(async (req, res) => {
     const { getFirestore } = await import("firebase-admin/firestore");
     const db = getFirestore();
 
-    // 전체 챕터 수 확인
-    const chaptersSnapshot = await db.collection("chapters").get();
-    const totalChapters = chaptersSnapshot.docs.length;
+    // 전체 먼슬리 수 확인
+    const monthliesSnapshot = await db.collection("monthlies").get();
+    const totalMonthlies = monthliesSnapshot.docs.length;
 
-    // connectedProjects가 있는 챕터 수 확인
-    let migratedChapters = 0;
+    // connectedProjects가 있는 먼슬리 수 확인
+    let migratedMonthlies = 0;
     let totalProjects = 0;
     let migratedProjects = 0;
 
-    for (const doc of chaptersSnapshot.docs) {
+    for (const doc of monthliesSnapshot.docs) {
       const data = doc.data();
       if (data.connectedProjects && data.connectedProjects.length > 0) {
-        migratedChapters++;
+        migratedMonthlies++;
         totalProjects += data.connectedProjects.length;
       }
     }
@@ -64,10 +64,10 @@ export const checkMigrationStatus = onRequest(async (req, res) => {
     const projectsSnapshot = await db.collection("projects").get();
     const totalAllProjects = projectsSnapshot.docs.length;
 
-    // connectedChapters가 있는 프로젝트 수 확인
+    // connectedMonthlies가 있는 프로젝트 수 확인
     for (const doc of projectsSnapshot.docs) {
       const data = doc.data();
-      if (data.connectedChapters && data.connectedChapters.length > 0) {
+      if (data.connectedMonthlies && data.connectedMonthlies.length > 0) {
         migratedProjects++;
       }
     }
@@ -75,12 +75,12 @@ export const checkMigrationStatus = onRequest(async (req, res) => {
     res.json({
       success: true,
       migrationStatus: {
-        chapters: {
-          total: totalChapters,
-          migrated: migratedChapters,
+        monthlies: {
+          total: totalMonthlies,
+          migrated: migratedMonthlies,
           percentage:
-            totalChapters > 0
-              ? Math.round((migratedChapters / totalChapters) * 100)
+            totalMonthlies > 0
+              ? Math.round((migratedMonthlies / totalMonthlies) * 100)
               : 0,
         },
         projects: {
@@ -130,41 +130,41 @@ export const migrateUser = onRequest(async (req, res) => {
   }
 });
 
-// loop to chapter 마이그레이션
-export const migrateLoopToChapter = onRequest(async (req, res) => {
+// loop to monthly 마이그레이션
+export const migrateLoopToMonthly = onRequest(async (req, res) => {
   try {
-    await runLoopToChapterMigration();
-    res.json({ success: true, message: "Loop to chapter migration completed" });
+    await runLoopToMonthlyMigration();
+    res.json({ success: true, message: "Loop to monthly migration completed" });
   } catch (error) {
-    console.error("Loop to chapter migration failed:", error);
+    console.error("Loop to monthly migration failed:", error);
     res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
-// chapter 문서 생성 (loopId 기반)
-export const createChaptersFromLoopIds = onRequest(async (req, res) => {
+// monthly 문서 생성 (loopId 기반)
+export const createMonthliesFromLoopIds = onRequest(async (req, res) => {
   try {
-    await createChaptersFromProjectLoopIds();
+    await createMonthliesFromProjectLoopIds();
     res.json({
       success: true,
-      message: "Chapters created from project loopIds",
+      message: "Monthlies created from project loopIds",
     });
   } catch (error) {
-    console.error("Chapter creation failed:", error);
+    console.error("Monthly creation failed:", error);
     res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
-// chapter 문서 생성 (chapterId 기반)
-export const createChaptersFromChapterIds = onRequest(async (req, res) => {
+// monthly 문서 생성 (monthlyId 기반)
+export const createMonthliesFromMonthlyIds = onRequest(async (req, res) => {
   try {
-    await createChaptersFromProjectChapterIds();
+    await createMonthliesFromProjectMonthlyIds();
     res.json({
       success: true,
-      message: "Chapters created from project chapterIds",
+      message: "Monthlies created from project monthlyIds",
     });
   } catch (error) {
-    console.error("Chapter creation failed:", error);
+    console.error("Monthly creation failed:", error);
     res.status(500).json({ success: false, error: (error as Error).message });
   }
 });

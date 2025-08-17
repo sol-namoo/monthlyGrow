@@ -43,6 +43,9 @@ import { RecommendationBadge } from "@/components/ui/recommendation-badge";
 import Loading from "@/components/feedback/Loading";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useLanguage } from "@/hooks/useLanguage";
+import { createArea } from "@/lib/firebase/index";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "@/lib/firebase/index";
 
 // 폼 스키마 정의
 const areaFormSchema = z.object({
@@ -60,6 +63,7 @@ function NewAreaPageContent() {
   const searchParams = useSearchParams();
   const [isSubmitting, setIsSubmitting] = useState(false); // Area 생성 중 로딩 상태
   const { translate } = useLanguage();
+  const [user] = useAuthState(auth);
 
   // react-hook-form 설정
   const form = useForm<AreaFormData>({
@@ -148,13 +152,22 @@ function NewAreaPageContent() {
     setIsSubmitting(true); // 로딩 상태 시작
 
     try {
-      // 여기서 Area 생성 로직 구현
+      // Area 생성
+      const newArea = await createArea({
+        userId: user!.uid,
+        name: data.title,
+        description: data.description,
+        icon: data.icon,
+        color: data.color,
+        status: "active",
+      });
+
       toast({
         title: "Area 생성 완료",
         description: `${data.title} 영역이 생성되었습니다.`,
       });
 
-      // 챕터 생성 페이지에서 왔다면 다시 챕터 생성 페이지로 돌아가기
+      // 먼슬리 생성 페이지에서 왔다면 다시 먼슬리 생성 페이지로 돌아가기
       const returnUrl = searchParams.get("returnUrl");
       if (returnUrl) {
         router.replace(returnUrl);

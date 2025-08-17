@@ -1,12 +1,12 @@
-# 🌙 월간 챕터 기반 자기계발 앱 – MonthlyGrow
+# 🌙 월간 먼슬리 기반 자기계발 앱 – MonthlyGrow
 
-> 육성 게임에서 차용한 챕터형 구조로, '나'를 키우듯 목표를 실행하는 자기계발 게임 앱
+> 육성 게임에서 차용한 먼슬리형 구조로, '나'를 키우듯 목표를 실행하는 자기계발 게임 앱
 
 ---
 
 ## 🎯 개요
 
-**MonthlyGrow**는 사용자가 한 달 단위 챕터를 설정하고,  
+**MonthlyGrow**는 사용자가 한 달 단위 먼슬리를 설정하고,  
 PARA 시스템을 활용해 목표를 실행하며 성장해 나가는 **게임형 자기관리 도구**입니다.
 
 기획, 실행, 회고를 반복하며 스스로의 프로젝트를 관리하고,  
@@ -16,18 +16,18 @@ PARA 시스템을 활용해 목표를 실행하며 성장해 나가는 **게임�
 
 ## 🧩 주요 기능
 
-- **월간 챕터 생성 및 회고**
+- **월간 먼슬리 생성 및 회고**
   - 월초 목표 설정, 월말 자동 리포트
 - **PARA 기반 목표 구조화**
   - Projects / Areas / Resources / Archives
-- **챕터 내 Task 실행 관리**
+- **먼슬리 내 Task 실행 관리**
   - 실행 시간 기록, 진행률 시각화
-- **프로젝트-챕터 목표치 분리 시스템** 🆕
-  - 프로젝트 전체 목표와 챕터별 개별 목표 분리
+- **프로젝트-먼슬리 목표치 분리 시스템** 🆕
+  - 프로젝트 전체 목표와 먼슬리별 개별 목표 분리
   - 3개월 프로젝트도 이번 달에는 8개만 완료하면 달성으로 인정
-  - 챕터별 진행률과 프로젝트 전체 진행률 동시 관리
+  - 먼슬리별 진행률과 프로젝트 전체 진행률 동시 관리
 - **보상 시스템**
-  - 챕터 성공 시 사용자 정의 보상 제공
+  - 먼슬리 성공 시 사용자 정의 보상 제공
 - **다국어 지원**
   - 한국어 / 영어 전환 가능
 - **구글 로그인 지원**
@@ -74,7 +74,7 @@ http://localhost:3000
 ```
 /app
   /home          # 홈 및 요약 뷰
-  /chapter          # 챕터 생성 / 회고 / 상세
+  /monthly          # 먼슬리 생성 / 회고 / 상세
   /project       # 프로젝트 및 태스크 관리
   /para          # 전체 PARA 구조 정리
   /settings      # 언어 전환, 보상 설정
@@ -85,42 +85,42 @@ http://localhost:3000
 
 ## 🔄 데이터 구조 (v2.0)
 
-### 프로젝트-챕터 목표치 분리 시스템
+### 프로젝트-먼슬리 목표치 분리 시스템
 
 **기존 구조**: 프로젝트 전체 목표치만 관리
 
 ```
 Project: target: 40, completedTasks: 15
-Chapter: doneCount: 15, targetCount: 40
+Monthly: doneCount: 15, targetCount: 40
 ```
 
-**새로운 구조**: 프로젝트 전체 + 챕터별 개별 목표치 관리
+**새로운 구조**: 프로젝트 전체 + 먼슬리별 개별 목표치 관리
 
 ```
 Project: target: 40, completedTasks: 15 (전체)
-Chapter:
+Monthly:
   connectedProjects: [
-    { projectId: "proj1", chapterTargetCount: 8, chapterDoneCount: 6 },
-    { projectId: "proj2", chapterTargetCount: 5, chapterDoneCount: 3 }
+    { projectId: "proj1", monthlyTargetCount: 8, monthlyDoneCount: 6 },
+    { projectId: "proj2", monthlyTargetCount: 5, monthlyDoneCount: 3 }
   ]
 ```
 
 ### 주요 변경사항
 
-1. **Chapter 구조 개선**
+1. **Monthly 구조 개선**
 
    - `projectIds[]` → `connectedProjects[]` (목표치 포함)
-   - 각 프로젝트마다 챕터별 목표치와 진행률 관리
+   - 각 프로젝트마다 먼슬리별 목표치와 진행률 관리
 
 2. **진행률 계산 방식**
 
-   - 챕터 달성률 = Σ(chapterDoneCount) / Σ(chapterTargetCount)
-   - 프로젝트별 챕터 진행률 = chapterDoneCount / chapterTargetCount
+   - 먼슬리 달성률 = Σ(monthlyDoneCount) / Σ(monthlyTargetCount)
+   - 프로젝트별 먼슬리 진행률 = monthlyDoneCount / monthlyTargetCount
 
 3. **태스크 완료 이벤트**
 
    - 프로젝트 전체 진행률 업데이트
-   - 활성 챕터의 해당 프로젝트 chapterDoneCount 업데이트
+   - 활성 먼슬리의 해당 프로젝트 monthlyDoneCount 업데이트
 
 4. **마이그레이션 지원**
    - 기존 데이터를 새로운 구조로 자동 변환
@@ -130,9 +130,9 @@ Chapter:
 
 ## 🛠️ 향후 기능 예정 (v1+)
 
-- 🔮 AI 기반 챕터 목표 자동 추천 (MCP 활용)
+- 🔮 AI 기반 먼슬리 목표 자동 추천 (MCP 활용)
 - 📈 사용자별 성장 히스토리 뷰
-- 🧠 챕터 회고 자동 요약 / GPT 피드백
+- 🧠 먼슬리 회고 자동 요약 / GPT 피드백
 - 🧍 캐릭터 커스터마이징 (선택 기능)
 
 ---

@@ -58,18 +58,23 @@ import {
 } from "@/components/ui/select";
 import { getProjectStatus } from "@/lib/utils";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { auth } from "@/lib/firebase";
+import { auth } from "@/lib/firebase/index";
 import {
+  fetchAllProjectsByUserId,
   fetchAllAreasByUserId,
-  fetchProjectsByUserIdWithPaging,
-  fetchResourcesWithAreasByUserIdWithPaging,
-  fetchArchivesByUserIdWithPaging,
-  getTaskCountsForMultipleProjects,
+  fetchAllResourcesByUserId,
+  fetchActiveProjects,
+  fetchCompletedProjects,
+  getTodayDeadlineProjects,
   fetchAreaCountsByUserId,
   fetchProjectCountByUserId,
   fetchResourceCountByUserId,
   fetchArchiveCountByUserId,
-} from "@/lib/firebase";
+  fetchProjectsByUserIdWithPaging,
+  fetchResourcesWithAreasByUserIdWithPaging,
+  fetchArchivesByUserIdWithPaging,
+  getTaskCountsForMultipleProjects,
+} from "@/lib/firebase/index";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatDateShort } from "@/lib/utils";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -122,6 +127,42 @@ function ParaPageContent() {
     },
     enabled: !!user?.uid,
   });
+
+  // 전체 프로젝트 개수 가져오기 (DB에서 실제 개수)
+  const { data: totalProjectCount = 0, isLoading: totalProjectCountLoading } =
+    useQuery({
+      queryKey: ["totalProjectCount", user?.uid],
+      queryFn: async () => {
+        const count = await fetchProjectCountByUserId(user?.uid || "");
+        console.log("PARA: Total project count:", count);
+        return count;
+      },
+      enabled: !!user?.uid,
+    });
+
+  // 전체 리소스 개수 가져오기 (DB에서 실제 개수)
+  const { data: totalResourceCount = 0, isLoading: totalResourceCountLoading } =
+    useQuery({
+      queryKey: ["totalResourceCount", user?.uid],
+      queryFn: async () => {
+        const count = await fetchResourceCountByUserId(user?.uid || "");
+        console.log("PARA: Total resource count:", count);
+        return count;
+      },
+      enabled: !!user?.uid,
+    });
+
+  // 전체 아카이브 개수 가져오기 (DB에서 실제 개수)
+  const { data: totalArchiveCount = 0, isLoading: totalArchiveCountLoading } =
+    useQuery({
+      queryKey: ["totalArchiveCount", user?.uid],
+      queryFn: async () => {
+        const count = await fetchArchiveCountByUserId(user?.uid || "");
+        console.log("PARA: Total archive count:", count);
+        return count;
+      },
+      enabled: !!user?.uid,
+    });
 
   // 프로젝트 무한 쿼리
   const {
@@ -268,7 +309,21 @@ function ParaPageContent() {
   // 필터링된 프로젝트 목록
   const filteredProjects = projectsWithStatus.filter((project) => {
     if (projectFilter === "all") return true;
-    return getProjectStatus(project) === projectFilter;
+    const status = getProjectStatus(project);
+
+    // 디버깅: overdue 필터 확인
+    if (projectFilter === "overdue") {
+      console.log("Overdue filter check:", {
+        projectTitle: project.title,
+        status,
+        endDate: project.endDate,
+        completedTasks: project.completedTasks,
+        targetCount: project.targetCount,
+        isOverdue: status === "overdue",
+      });
+    }
+
+    return status === projectFilter;
   });
 
   const renderStars = (rating: number | undefined) => {
@@ -367,36 +422,14 @@ function ParaPageContent() {
                     <Filter className="mr-2 h-4 w-4 text-primary" />
                   )}
                   {projectFilter === "all"
-                    ? translate("para.projects.filter.allWithCount").replace(
-                        "{count}",
-                        filteredProjects.length.toString()
-                      )
-                    : projectFilter === "planned"
-                    ? translate(
-                        "para.projects.filter.plannedWithCount"
-                      ).replace(
-                        "{count}",
-                        projectsWithStatus
-                          .filter((p) => getProjectStatus(p) === "scheduled")
-                          .length.toString()
-                      )
+                    ? translate("para.projects.filter.all")
+                    : projectFilter === "scheduled"
+                    ? translate("para.projects.filter.planned")
                     : projectFilter === "in_progress"
-                    ? translate(
-                        "para.projects.filter.inProgressWithCount"
-                      ).replace(
-                        "{count}",
-                        projectsWithStatus
-                          .filter((p) => getProjectStatus(p) === "in_progress")
-                          .length.toString()
-                      )
-                    : translate(
-                        "para.projects.filter.completedWithCount"
-                      ).replace(
-                        "{count}",
-                        projectsWithStatus
-                          .filter((p) => p.status === "completed")
-                          .length.toString()
-                      )}
+                    ? translate("para.projects.filter.inProgress")
+                    : projectFilter === "overdue"
+                    ? translate("para.projects.filter.overdue")
+                    : translate("para.projects.filter.completed")}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
@@ -410,6 +443,9 @@ function ParaPageContent() {
                   onClick={() => setProjectFilter("in_progress")}
                 >
                   {translate("para.projects.filter.inProgress")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setProjectFilter("overdue")}>
+                  {translate("para.projects.filter.overdue")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setProjectFilter("completed")}>
                   {translate("para.projects.filter.completed")}
@@ -460,9 +496,9 @@ function ParaPageContent() {
                 <Skeleton className="h-32 w-full" />
               </div>
             ) : filteredProjects.length === 0 ? (
-              <Card className="p-6 text-center border-dashed">
+              <Card className="p-6 text-center border-dashed bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
                 <div className="mb-4 flex justify-center">
-                  <div className="rounded-full bg-muted/50 p-4">
+                  <div className="rounded-full bg-muted/50 dark:bg-muted/30 p-4">
                     <Briefcase className="h-8 w-8 text-muted-foreground/50" />
                   </div>
                 </div>
@@ -489,7 +525,10 @@ function ParaPageContent() {
                       key={project.id}
                       project={project}
                       mode="project"
-                      taskCounts={taskCounts}
+                      taskCounts={{
+                        totalTasks: taskCounts?.total || 0,
+                        completedTasks: taskCounts?.completed || 0,
+                      }}
                       onClick={() =>
                         router.push(`/para/projects/${project.id}`)
                       }
@@ -542,9 +581,9 @@ function ParaPageContent() {
             </Button>
           </div>
           {areas.length === 0 ? (
-            <Card className="p-6 text-center border-dashed">
+            <Card className="p-6 text-center border-dashed bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
               <div className="mb-4 flex justify-center">
-                <div className="rounded-full bg-muted/50 p-4">
+                <div className="rounded-full bg-muted/50 dark:bg-muted/30 p-4">
                   <Compass className="h-8 w-8 text-muted-foreground/50" />
                 </div>
               </div>
@@ -594,7 +633,10 @@ function ParaPageContent() {
                 const AreaIcon = getIconComponent(area.icon || "compass");
 
                 return (
-                  <Card key={area.id} className="p-4">
+                  <Card
+                    key={area.id}
+                    className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40"
+                  >
                     <Link href={`/para/areas/${area.id}`} className="block">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
@@ -694,9 +736,9 @@ function ParaPageContent() {
               <Skeleton className="h-32 w-full" />
             </div>
           ) : allResources.length === 0 ? (
-            <Card className="p-6 text-center border-dashed mt-4">
+            <Card className="p-6 text-center border-dashed mt-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
               <div className="mb-4 flex justify-center">
-                <div className="rounded-full bg-muted/50 p-4">
+                <div className="rounded-full bg-muted/50 dark:bg-muted/30 p-4">
                   <Folder className="h-8 w-8 text-muted-foreground/50" />
                 </div>
               </div>
@@ -716,7 +758,10 @@ function ParaPageContent() {
           ) : (
             <div className="space-y-4">
               {allResources.map((resource) => (
-                <Card key={resource.id} className="p-4">
+                <Card
+                  key={resource.id}
+                  className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40"
+                >
                   <Link
                     href={`/para/resources/${resource.id}`}
                     className="block"
@@ -793,8 +838,8 @@ function ParaPageContent() {
                   )}
                   {filterType === "all"
                     ? translate("para.archives.filter.all")
-                    : filterType === "chapter"
-                    ? translate("para.archives.filter.chapter")
+                    : filterType === "monthly"
+                    ? translate("para.archives.filter.monthly")
                     : translate("para.archives.filter.project")}
                 </Button>
               </DropdownMenuTrigger>
@@ -802,8 +847,8 @@ function ParaPageContent() {
                 <DropdownMenuItem onClick={() => setFilterType("all")}>
                   {translate("para.archives.filter.all")}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilterType("chapter")}>
-                  {translate("para.archives.filter.chapter")}
+                <DropdownMenuItem onClick={() => setFilterType("monthly")}>
+                  {translate("para.archives.filter.monthly")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setFilterType("project")}>
                   {translate("para.archives.filter.project")}
@@ -844,9 +889,9 @@ function ParaPageContent() {
               <Skeleton className="h-32 w-full" />
             </div>
           ) : allArchives.length === 0 ? (
-            <Card className="p-6 text-center border-dashed">
+            <Card className="p-6 text-center border-dashed bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
               <div className="mb-4 flex justify-center">
-                <div className="rounded-full bg-muted/50 p-4">
+                <div className="rounded-full bg-muted/50 dark:bg-muted/30 p-4">
                   <Archive className="h-8 w-8 text-muted-foreground/50" />
                 </div>
               </div>
@@ -862,12 +907,15 @@ function ParaPageContent() {
               {allArchives
                 .filter((archive) => {
                   if (filterType === "all") return true;
-                  if (filterType === "chapter") return archive.chapterId;
+                  if (filterType === "monthly") return archive.monthlyId;
                   if (filterType === "project") return archive.projectId;
                   return true;
                 })
                 .map((archive) => (
-                  <Card key={archive.id} className="p-4">
+                  <Card
+                    key={archive.id}
+                    className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40"
+                  >
                     <Link
                       href={`/para/archives/${archive.id}`}
                       className="block"
@@ -878,13 +926,13 @@ function ParaPageContent() {
                         </h3>
                         <Badge
                           className={`text-xs ${
-                            archive.chapterId
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-purple-100 text-purple-800"
+                            archive.monthlyId
+                              ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
+                              : "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300"
                           }`}
                         >
-                          {archive.chapterId
-                            ? translate("para.archives.chapterRetrospective")
+                          {archive.monthlyId
+                            ? translate("para.archives.monthlyRetrospective")
                             : translate("para.archives.projectRetrospective")}
                         </Badge>
                       </div>

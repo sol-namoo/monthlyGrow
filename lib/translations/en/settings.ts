@@ -7,15 +7,15 @@ export const settings = {
   noName: "No name",
   email: "Email",
   noEmail: "No email",
-  chapterSettings: "Chapter Settings",
+  monthlySettings: "Monthly Settings",
   defaultReward: "Default Reward Setting",
-  defaultRewardPlaceholder: "Enter default reward for chapter completion",
+  defaultRewardPlaceholder: "Enter default reward for monthly completion",
   defaultRewardEnabled:
-    "This will be the default reward set when creating new chapters.",
+    "This will be the default reward set when creating new monthlies.",
   defaultRewardDisabled:
-    "Default reward setting is disabled. Enable to automatically fill rewards when creating new chapters.",
+    "Default reward setting is disabled. Enable to automatically fill rewards when creating new monthlies.",
   carryOver: "Carry Over Incomplete Items",
-  carryOverDescription: "Carry over incomplete items to the next chapter.",
+  carryOverDescription: "Carry over incomplete items to the next monthly.",
   themeSettings: "Theme Settings",
   theme: "Theme",
   language: "Language",
@@ -57,12 +57,5 @@ export const settings = {
     loading: "Loading...",
     areaInfo: "Loading area information...",
     showMore: "Show More",
-  },
-  chapterProjectCardDisplay: {
-    title: "Project Card Display in Chapters",
-    description:
-      "Choose what information to show in project cards on chapter pages",
-    chapterOnly: "Chapter goals only",
-    both: "Chapter goals + Overall progress",
   },
 } as const;

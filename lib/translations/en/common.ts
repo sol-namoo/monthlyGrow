@@ -11,7 +11,7 @@ export const common = {
   category: "Category",
   target: "Target",
   uncategorized: "Uncategorized",
-  chapterGoal: "This Chapter Goal",
+  monthlyGoal: "This Monthly Goal",
   projectProgress: "Overall Progress",
   errors: {
     loginRequired: "Login required.",
@@ -22,7 +22,7 @@ export const common = {
 
 export const bottomNav = {
   home: "Home",
-  chapter: "Chapter",
+  monthly: "Monthly",
   para: "PARA",
   settings: "Settings",
 } as const;
@@ -57,7 +57,7 @@ export const charts = {
   areaActivity: "Area Activity",
   completionRate: "Completion Rate",
   focusTime: "Focus Time",
-  chapterComparison: "Chapter Comparison",
+  monthlyComparison: "Monthly Comparison",
   monthlyProgress: "Monthly Progress",
   yearlyStats: "Yearly Statistics",
   projectStatus: "Project Status",

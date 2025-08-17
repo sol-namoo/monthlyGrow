@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, BookOpen, Briefcase, Layers, Settings } from "lucide-react";
+import { Home, Calendar, Briefcase, Layers, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
@@ -10,7 +10,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 
 const navItems = [
   { href: "/home", labelKey: "bottomNav.home", icon: Home },
-  { href: "/chapter", labelKey: "bottomNav.chapter", icon: BookOpen },
+  { href: "/monthly", labelKey: "bottomNav.monthly", icon: Calendar },
   { href: "/para", labelKey: "bottomNav.para", icon: Layers },
   { href: "/settings", labelKey: "bottomNav.settings", icon: Settings },
 ];

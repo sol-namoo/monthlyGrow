@@ -1,9 +1,9 @@
 export const aiPlanGenerator = {
   // 페이지 제목 및 헤더
   title: "AI 계획 생성기",
-  subtitle: "AI 도움으로 개인화된 계획을 생성하세요",
+  subtitle: "AI를 활용해 프로젝트를 생성하고, 그에 어울리는 영역을 매칭합니다",
   description:
-    "고급 AI 기술을 사용하여 프로젝트, 챕터, 목표에 대한 포괄적인 계획을 만드세요.",
+    "고급 AI 기술을 사용하여 프로젝트, 먼슬리, 목표에 대한 포괄적인 계획을 만드세요.",
 
   // 메인 섹션
   mainSection: {
@@ -17,9 +17,12 @@ export const aiPlanGenerator = {
   // 입력 폼
   form: {
     title: "계획 세부사항",
+    inputTypeLabel: "입력 방식 선택",
+    manualInput: "수동 입력",
+    monthlyBased: "Monthly 기반",
     goalLabel: "주요 목표는 무엇인가요?",
     goalPlaceholder:
-      "예: React 개발 배우기, 피트니스 루틴 시작하기, 사업 시작하기",
+      "예: 현재 IELTS 점수가 6.0점대인데, 7.5점대로 높이고 싶습니다. 주로 스피킹 실력 향상에 집중하고 싶습니다.",
     timeframeLabel: "기간",
     timeframeOptions: {
       week: "1주",
@@ -47,7 +50,7 @@ export const aiPlanGenerator = {
   // 결과 섹션
   result: {
     title: "생성된 계획",
-    saveButton: "챕터에 저장",
+    saveButton: "먼슬리에 저장",
     exportButton: "계획 내보내기",
     shareButton: "계획 공유",
     editButton: "계획 편집",
@@ -84,17 +87,18 @@ export const aiPlanGenerator = {
 
   // 모달 및 다이얼로그
   modal: {
-    saveTitle: "챕터에 계획 저장",
-    saveDescription: "이 계획을 저장할 챕터를 선택하세요:",
+    saveTitle: "먼슬리에 계획 저장",
+    saveDescription: "이 계획을 저장할 먼슬리를 선택하세요:",
     saveButton: "계획 저장",
     cancelButton: "취소",
-    noChapters: "사용 가능한 챕터가 없습니다. 먼저 챕터를 만드세요.",
-    createChapterButton: "새 챕터 만들기",
+    noMonthlies: "사용 가능한 먼슬리가 없습니다. 먼저 먼슬리를 만드세요.",
+    createMonthlyButton: "새 먼슬리 만들기",
   },
 
   // 에러 메시지
   errors: {
     goalRequired: "주요 목표를 입력해주세요",
+    monthlyRequired: "Monthly를 선택해주세요",
     timeframeRequired: "기간을 선택해주세요",
     categoryRequired: "카테고리를 선택해주세요",
     generationFailed:
@@ -117,7 +121,7 @@ export const aiPlanGenerator = {
   // 성공 메시지
   success: {
     planGenerated: "개인화된 계획이 생성되었습니다!",
-    planSaved: "계획이 챕터에 성공적으로 저장되었습니다!",
+    planSaved: "계획이 먼슬리에 성공적으로 저장되었습니다!",
     planExported: "계획이 성공적으로 내보내졌습니다!",
   },
 

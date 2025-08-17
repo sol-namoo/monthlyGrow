@@ -8,12 +8,12 @@
 ### 핵심 엔티티
 
 - **User**: 사용자 프로필, 설정, 환경설정
-- **Chapter**: 월간 성장 사이클 (1-2개월)
+- **Monthly**: 월간 성장 사이클 (1-2개월)
 - **Project**: 구체적인 행동 단위 (2-8주 권장)
 - **Area**: 삶의 영역 분류 (건강, 자기계발, 가족 등)
 - **Resource**: 참고 자료 및 링크
 - **Task**: 프로젝트 내 세부 작업
-- **Retrospective**: 챕터/프로젝트 회고
+- **Retrospective**: 먼슬리/프로젝트 회고
 - **Note**: 자유 메모
 
 ## 🔄 데이터 관계도
@@ -31,29 +31,29 @@ User (개인화된 데이터)
 │   │   ├── Retrospective (프로젝트 회고)
 │   │   └── Notes (프로젝트 노트들)
 │   └── Resources (해당 영역의 참고 자료들)
-├── Chapters (월간 챕터)
+├── Monthlies (월간 먼슬리)
 │   ├── focusAreas[] (중점 영역들)
 │   ├── connectedProjects[] (연결된 프로젝트별 목표치)
 │   │   ├── projectId (프로젝트 ID)
-│   │   ├── chapterTargetCount (이번 달 목표)
-│   │   └── chapterDoneCount (이번 달 완료)
-│   ├── retrospective (챕터 회고)
-│   └── note (챕터 노트)
+│   │   ├── monthlyTargetCount (이번 달 목표)
+│   │   └── monthlyDoneCount (이번 달 완료)
+│   ├── retrospective (먼슬리 회고)
+│   └── note (먼슬리 노트)
 ├── Projects (행동 단위)
 │   ├── areaId (소속 영역)
 │   ├── target (전체 목표)
 │   ├── completedTasks (전체 완료)
-│   ├── connectedChapters[] (연결된 챕터들)
+│   ├── connectedMonthlies[] (연결된 먼슬리들)
 │   ├── tasks (서브컬렉션)
 │   ├── retrospective (프로젝트 회고)
 │   └── notes[] (프로젝트 노트들)
 └── Snapshots (월별 진척률 요약)
-    ├── chapterId (챕터 참조)
+    ├── monthlyId (먼슬리 참조)
     └── projectId (프로젝트 참조)
 
 ※ 모든 데이터는 사용자별로 완전히 격리됨
 ※ 다른 사용자가 동일한 데이터를 생성해도 서로 접근 불가
-※ Archive는 완료된 Chapter/Project의 필터링된 뷰
+※ Archive는 완료된 Monthly/Project의 필터링된 뷰
 ```
 
 ## 📝 컬렉션별 상세 구조
@@ -110,9 +110,9 @@ User (개인화된 데이터)
   endDate: Date;          // 마감일
   createdAt: Date;
   updatedAt: Date;
-  chapterId?: string;        // 현재 연결된 챕터 ID (legacy)
-  connectedChapters?: string[]; // 연결된 챕터 ID 배열
-  addedMidway?: boolean;  // 챕터 중간 추가 여부
+  monthlyId?: string;        // 현재 연결된 먼슬리 ID (legacy)
+  connectedMonthlies?: string[]; // 연결된 먼슬리 ID 배열
+  addedMidway?: boolean;  // 먼슬리 중간 추가 여부
   retrospective?: Retrospective; // 프로젝트 회고
   notes: Note[];          // 프로젝트 노트들
 
@@ -127,44 +127,49 @@ User (개인화된 데이터)
 // - overdue: endDate < now && completionRate < 100%
 ```
 
-### 4. Chapters 컬렉션
+### 4. Monthlies 컬렉션
 
 ```typescript
-// 챕터별 프로젝트 목표치 인터페이스
-interface ConnectedProjectGoal {
-  projectId: string; // 프로젝트 ID
-  chapterTargetCount: number; // 이번 루프에서 목표로 하는 태스크 수
-  chapterDoneCount: number;   // 이번 루프에서 실제 완료한 태스크 수
+// Key Result 인터페이스
+interface KeyResult {
+  id: string;
+  title: string; // "운동 총 8회"
+  description?: string; // 상세 설명 (선택사항)
+  isCompleted: boolean; // 사용자가 OX 체크
+  targetCount?: number; // 목표 수치
+  completedCount?: number; // 완료 수치
 }
 
 {
   id: string;
   userId: string;
-  title: string;          // 챕터 제목
-  startDate: Date;        // 시작일
-  endDate: Date;          // 종료일
-  focusAreas: string[];   // 중점 영역 ID 배열
-  reward?: string;        // 보상
-  doneCount: number;      // 전체 완료 수 (legacy - 하위 호환성)
-  targetCount: number;    // 전체 목표 수 (legacy - 하위 호환성)
-  connectedProjects: ConnectedProjectGoal[]; // 챕터별 프로젝트 목표치
+  objective: string; // OKR Objective (간단한 한 줄)
+  objectiveDescription?: string; // Objective 상세 설명 (선택사항)
+  startDate: Date; // 시작일
+  endDate: Date; // 종료일
+  focusAreas: string[]; // 중점 영역 ID 배열
+  keyResults: KeyResult[]; // Key Results
+  reward?: string; // 보상
   createdAt: Date;
   updatedAt: Date;
-  retrospective?: Retrospective; // 챕터 회고
-  note?: Note;            // 챕터 노트
+  retrospective?: Retrospective; // 먼슬리 회고
+  note?: string; // 먼슬리 노트
+
+  // 프로젝트 바로가기 (사용자 편의용, 스냅샷에는 포함되지 않음)
+  quickAccessProjects?: string[]; // 프로젝트 ID 배열
 
   // 로컬 계산 필드 (DB에 저장되지 않음)
   status?: "planned" | "in_progress" | "ended"; // startDate와 endDate를 기반으로 클라이언트에서 계산
 }
 
-// 챕터 상태 계산 로직:
+// 먼슬리 상태 계산 로직:
 // - planned: 오늘 < 시작일
 // - in_progress: 시작일 <= 오늘 <= 종료일
 // - ended: 오늘 > 종료일
 
-// 챕터별 목표치 계산:
-// - 챕터 달성률 = Σ(chapterDoneCount) / Σ(chapterTargetCount)
-// - 프로젝트별 챕터 진행률 = chapterDoneCount / chapterTargetCount
+// 먼슬리 목표 달성률:
+// - Key Results 완료율 = 완료된 Key Results 수 / 전체 Key Results 수
+// - 사용자가 완료된 태스크들을 보고 각 Key Result 달성 여부를 수동으로 평가
 ```
 
 ### 5. Tasks 컬렉션
@@ -190,15 +195,31 @@ interface ConnectedProjectGoal {
 {
   id: string;
   userId: string;
+  monthlyId?: string; // 먼슬리 회고인 경우
+  projectId?: string; // 프로젝트 회고인 경우
   createdAt: Date;
   updatedAt: Date;
-  content?: string;       // 자유 회고 내용
+  content?: string; // 자유 회고 내용
 
-  // 챕터용 필드
+  // 먼슬리용 필드
   bestMoment?: string;
   routineAdherence?: string;
   unexpectedObstacles?: string;
-  nextChapterApplication?: string;
+  nextMonthlyApplication?: string;
+
+  // Key Results 중심 필드 (Monthly 구조에 맞게 추가)
+  keyResultsReview?: {
+    completedKeyResults?: string[]; // 완료된 Key Results ID 목록
+    failedKeyResults?: {
+      keyResultId: string;
+      reason:
+        | "unrealisticGoal"
+        | "timeManagement"
+        | "priorityMismatch"
+        | "externalFactors"
+        | "other"; // 실패 이유
+    }[];
+  };
 
   // 프로젝트용 필드
   goalAchieved?: string;
@@ -207,11 +228,18 @@ interface ConnectedProjectGoal {
   newLearnings?: string;
   nextProjectImprovements?: string;
 
+  // 스마트 회고 필드 (완료율 90% 미만 시)
+  incompleteAnalysis?: {
+    planningNeedsImprovement?: boolean;
+    executionNeedsImprovement?: boolean;
+    otherReason?: string;
+  };
+
   // 공통 필드
-  userRating?: number;    // 별점 (1~5)
-  bookmarked?: boolean;   // 북마크 여부
-  title?: string;         // 회고 제목
-  summary?: string;       // 요약
+  userRating?: number; // 별점 (1~5)
+  bookmarked?: boolean; // 북마크 여부
+  title?: string; // 회고 제목
+  summary?: string; // 요약
 }
 ```
 
@@ -236,7 +264,7 @@ interface ConnectedProjectGoal {
 ```typescript
 {
   id: string; // 문서 ID (자동 생성)
-  chapterId: string; // 챕터 ID
+  monthlyId: string; // 먼슬리 ID
   projectId: string; // 프로젝트 ID
   year: number; // 년도
   month: number; // 월
@@ -249,14 +277,14 @@ interface ConnectedProjectGoal {
 
 ## 🔗 관계 관리
 
-### 1. Project-Chapter 연결 (개선된 구조)
+### 1. Project-Monthly 연결 (개선된 구조)
 
 - **양방향 관계**:
-  - Chapter의 `connectedProjects[]`로 프로젝트별 목표치 관리
-  - Project의 `connectedChapters[]`로 연결된 챕터 목록 관리
-- **챕터 생성 시**: 선택된 프로젝트들을 `connectedProjects[]`에 추가하고 각각의 `chapterTargetCount` 설정
-- **프로젝트 생성 시**: Chapter ID를 Project의 `connectedChapters[]`에 추가
-- **데이터 정합성**: 챕터별 목표치와 진행률을 Chapter에서 관리, 프로젝트 전체 진행률은 Project에서 관리
+  - Monthly의 `connectedProjects[]`로 프로젝트별 목표치 관리
+  - Project의 `connectedMonthlies[]`로 연결된 먼슬리 목록 관리
+- **먼슬리 생성 시**: 선택된 프로젝트들을 `connectedProjects[]`에 추가하고 각각의 `monthlyTargetCount` 설정
+- **프로젝트 생성 시**: Monthly ID를 Project의 `connectedMonthlies[]`에 추가
+- **데이터 정합성**: 먼슬리별 목표치와 진행률을 Monthly에서 관리, 프로젝트 전체 진행률은 Project에서 관리
 
 ### 2. Area-Project 연결
 
@@ -272,16 +300,16 @@ interface ConnectedProjectGoal {
 
 ## 📊 데이터 플로우
 
-### 1. 챕터 생성 플로우 (개선된 구조)
+### 1. 먼슬리 생성 플로우 (개선된 구조)
 
 ```
-1. 사용자가 챕터 정보 입력
+1. 사용자가 먼슬리 정보 입력
 2. 기존 프로젝트 선택 (선택사항)
-3. 각 프로젝트별 챕터 목표치(chapterTargetCount) 설정
+3. 각 프로젝트별 먼슬리 목표치(monthlyTargetCount) 설정
 4. 중점 영역 선택 (최대 4개, 권장 2개)
-5. 챕터 생성
-6. 선택된 프로젝트들의 connectedChapters[] 업데이트
-7. 챕터의 connectedProjects[] 업데이트
+5. 먼슬리 생성
+6. 선택된 프로젝트들의 connectedMonthlies[] 업데이트
+7. 먼슬리의 connectedProjects[] 업데이트
 ```
 
 ### 2. 프로젝트 생성 플로우
@@ -291,7 +319,7 @@ interface ConnectedProjectGoal {
 2. Area 선택
 3. 프로젝트 생성
 4. 선택된 Area 정보 denormalize하여 저장
-5. 챕터 연결 시 connectedChapters[] 업데이트
+5. 먼슬리 연결 시 connectedMonthlies[] 업데이트
 ```
 
 ### 3. 태스크 완료 플로우 (개선된 구조)
@@ -299,20 +327,20 @@ interface ConnectedProjectGoal {
 ```
 1. 사용자가 태스크 완료 체크
 2. 프로젝트의 전체 completedTasks 업데이트
-3. 해당 프로젝트가 활성 챕터와 연결된 경우:
-   - 챕터의 connectedProjects[].chapterDoneCount 업데이트
-4. 챕터 달성률 재계산
+3. 해당 프로젝트가 활성 먼슬리와 연결된 경우:
+   - 먼슬리의 connectedProjects[].monthlyDoneCount 업데이트
+4. 먼슬리 달성률 재계산
 5. 프로젝트 전체 진행률 재계산
 ```
 
-### 4. 챕터 완료 플로우
+### 4. 먼슬리 완료 플로우
 
 ```
-1. 챕터 상태를 "ended"로 변경
-2. 연결된 프로젝트들의 챕터별 진행률 최종 업데이트
+1. 먼슬리 상태를 "ended"로 변경
+2. 연결된 프로젝트들의 먼슬리별 진행률 최종 업데이트
 3. 회고 작성 가능 상태로 변경
 4. Archive 뷰에서 조회 가능
-5. 스냅샷 생성 (챕터별 목표치 정보 포함)
+5. 스냅샷 생성 (먼슬리별 목표치 정보 포함)
 ```
 
 ## ⚡ 성능 최적화
@@ -320,7 +348,7 @@ interface ConnectedProjectGoal {
 ### 1. Denormalization
 
 - **Area 정보**: Project, Resource에 Area 이름/색상 저장
-- **Chapter 정보**: Project에 연결된 Chapter 제목/기간 저장
+- **Monthly 정보**: Project에 연결된 Monthly 제목/기간 저장
 - **이유**: 조인 없이 UI 렌더링 가능
 
 ### 2. 인덱싱 전략
@@ -335,11 +363,11 @@ interface ConnectedProjectGoal {
 - **페이지네이션**: 무한 스크롤 지원
 - **캐싱**: TanStack Query로 클라이언트 캐싱
 
-### 4. 챕터별 목표치 관리
+### 4. 먼슬리별 목표치 관리
 
-- **챕터 생성/수정**: `connectedProjects[*].chapterTargetCount` 입력/갱신
-- **태스크 완료**: 해당 프로젝트가 활성 챕터와 연결된 경우 `chapterDoneCount` 업데이트
-- **조회**: 챕터별 진행률 = `chapterDoneCount / chapterTargetCount`
+- **먼슬리 생성/수정**: `connectedProjects[*].monthlyTargetCount` 입력/갱신
+- **태스크 완료**: 해당 프로젝트가 활성 먼슬리와 연결된 경우 `monthlyDoneCount` 업데이트
+- **조회**: 먼슬리별 진행률 = `monthlyDoneCount / monthlyTargetCount`
 
 ## 🔒 보안 규칙
 
@@ -358,19 +386,19 @@ match /{document=**} {
 - **필수 필드**: userId, createdAt, updatedAt
 - **상태 검증**: status 필드 유효성 검사
 - **관계 검증**: 외래키 참조 무결성
-- **챕터별 목표치 제약**: chapterTargetCount >= 0, chapterDoneCount <= chapterTargetCount
+- **먼슬리별 목표치 제약**: monthlyTargetCount >= 0, monthlyDoneCount <= monthlyTargetCount
 
 ## 📈 확장성 고려사항
 
 ### 1. 데이터 크기
 
 - **프로젝트당 작업**: 평균 10-20개
-- **챕터당 프로젝트**: 평균 2-3개 (최대 5개)
+- **먼슬리당 프로젝트**: 평균 2-3개 (최대 5개)
 - **사용자당 영역**: 평균 5-8개
 
 ### 2. 쿼리 패턴
 
-- **자주 조회**: 사용자별 활성 프로젝트/챕터
+- **자주 조회**: 사용자별 활성 프로젝트/먼슬리
 - **가끔 조회**: Archive, 통계 데이터
 - **드물게 조회**: 전체 히스토리, 백업
 
@@ -384,33 +412,33 @@ match /{document=**} {
 
 ### 기존 데이터 호환성
 
-- 기존 Chapter의 `doneCount`, `targetCount` 필드는 legacy로 유지
+- 기존 Monthly의 `doneCount`, `targetCount` 필드는 legacy로 유지
 - 새로운 `connectedProjects` 배열이 우선적으로 사용됨
 - 마이그레이션 시 기존 데이터를 `connectedProjects`로 변환하는 로직 필요
 
 ### 마이그레이션 규칙
 
-1. **챕터 생성 시**: `connectedProjects` 배열 초기화
+1. **먼슬리 생성 시**: `connectedProjects` 배열 초기화
 2. **프로젝트 연결 시**: `ConnectedProjectGoal` 객체 생성
-3. **태스크 완료 시**: 프로젝트 전체 진행률과 챕터별 진행률 동시 업데이트
-4. **챕터 완료 시**: 스냅샷에 챕터별 목표치 정보 포함
+3. **태스크 완료 시**: 프로젝트 전체 진행률과 먼슬리별 진행률 동시 업데이트
+4. **먼슬리 완료 시**: 스냅샷에 먼슬리별 목표치 정보 포함
 
 ## 📝 쓰기 규칙
 
 ### 생성/수정
 
-- 챕터 생성/편집 시 `connectedProjects[*].chapterTargetCount`를 입력/갱신
-- 동일 트랜잭션/배치로 각 프로젝트의 `connectedChapters`에 표시용 메타를 동기화
+- 먼슬리 생성/편집 시 `connectedProjects[*].monthlyTargetCount`를 입력/갱신
+- 동일 트랜잭션/배치로 각 프로젝트의 `connectedMonthlies`에 표시용 메타를 동기화
 
 ### 태스크 완료 이벤트
 
-- 해당 태스크의 `projectId`가 활성 사이클의 `connectedProjects`에 있으면 그 항목의 `chapterDoneCount++`
+- 해당 태스크의 `projectId`가 활성 사이클의 `connectedProjects`에 있으면 그 항목의 `monthlyDoneCount++`
 - 프로젝트의 전체 진행률 갱신은 기존 로직대로
 
 ### 삭제/해제
 
-- 챕터에서 프로젝트 연결 해제 ⇒ `connectedProjects`에서 제거
-- Project의 `connectedChapters`에서도 해당 챕터 메타 제거
+- 먼슬리에서 프로젝트 연결 해제 ⇒ `connectedProjects`에서 제거
+- Project의 `connectedMonthlies`에서도 해당 먼슬리 메타 제거
 
 ### 조회 패턴
 
@@ -420,6 +448,6 @@ match /{document=**} {
 
 ### 인덱스 & 무결성
 
-- 인덱스: `chapters(userId, startDate)`, `projects(userId, createdAt)` 등 기본 + 필요 복합
-- 무결성: "목표 수치는 챕터만 편집"을 UI/서버 규칙으로 고정
-- 동기화는 배치/트랜잭션으로 (챕터와 프로젝트 메타 동시 업데이트 시)
+- 인덱스: `monthlies(userId, startDate)`, `projects(userId, createdAt)` 등 기본 + 필요 복합
+- 무결성: "목표 수치는 먼슬리만 편집"을 UI/서버 규칙으로 고정
+- 동기화는 배치/트랜잭션으로 (먼슬리와 프로젝트 메타 동시 업데이트 시)

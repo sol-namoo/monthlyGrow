@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { auth } from "@/lib/firebase";
+import { auth } from "@/lib/firebase/index";
 import { resetTimeZoneCache } from "@/lib/utils";
 
 export function TimeZoneInitializer() {

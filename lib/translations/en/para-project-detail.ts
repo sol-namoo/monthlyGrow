@@ -18,8 +18,8 @@ export const paraProjectDetail = {
     items: "items",
   },
   progress: "Progress",
-  connectedChapters: "Connected Chapters",
-  noConnectedChapters: "No connected chapters",
+  connectedMonthlies: "Connected Monthlies",
+  noConnectedMonthlies: "No connected monthlies",
   tabs: {
     overview: "Overview",
     tasks: "Tasks",
@@ -136,6 +136,5 @@ export const paraProjectDetail = {
     description: "This is a long-term project",
   },
   edit: "Edit",
-  delete: "Delete",
   back: "Back",
 } as const;

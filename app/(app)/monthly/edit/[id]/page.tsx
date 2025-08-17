@@ -1,0 +1,704 @@
+"use client";
+
+import type React from "react";
+import { useState, use, Suspense, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  ChevronLeft,
+  Calendar,
+  Info,
+  X,
+  Plus,
+  Target,
+  Save,
+  Clock,
+  Trophy,
+  MessageSquare,
+  FolderOpen,
+  ExternalLink,
+  ChevronDown,
+  ChevronRight,
+  Edit,
+  Trash2,
+} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Checkbox } from "@/components/ui/checkbox";
+import { formatDate, getMonthlyStatus } from "@/lib/utils";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "@/lib/firebase/index";
+import { useLanguage } from "@/hooks/useLanguage";
+import {
+  fetchMonthlyById,
+  fetchAllProjectsByUserId,
+  updateMonthly,
+} from "@/lib/firebase/index";
+import { useToast } from "@/hooks/use-toast";
+import { Monthly, KeyResult } from "@/lib/types";
+
+import { RetrospectiveForm } from "@/components/RetrospectiveForm";
+import { MonthlyNoteForm } from "@/components/MonthlyNoteForm";
+
+// 로딩 스켈레톤 컴포넌트
+function EditMonthlySkeleton() {
+  return (
+    <div className="container max-w-md px-4 py-6">
+      <div className="mb-6 flex items-center">
+        <Skeleton className="h-8 w-8 mr-2" />
+        <Skeleton className="h-6 w-32" />
+      </div>
+
+      <Skeleton className="h-8 w-48 mb-4" />
+      <Skeleton className="h-4 w-full mb-2" />
+      <Skeleton className="h-4 w-3/4 mb-6" />
+
+      <Skeleton className="h-32 w-full mb-4" />
+      <Skeleton className="h-32 w-full mb-4" />
+    </div>
+  );
+}
+
+export default function EditMonthlyPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [user, userLoading] = useAuthState(auth);
+  const { translate, currentLanguage } = useLanguage();
+
+  const { id } = use(params);
+
+  // 폼 상태
+  const [objective, setObjective] = useState("");
+  const [objectiveDescription, setObjectiveDescription] = useState("");
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [reward, setReward] = useState("");
+  const [keyResults, setKeyResults] = useState<KeyResult[]>([]);
+  const [quickAccessProjects, setQuickAccessProjects] = useState<string[]>([]);
+
+  const [showQuickAccessDialog, setShowQuickAccessDialog] = useState(false);
+
+  // 선택 가능한 월 옵션 생성 (현재 월부터 6개월)
+  const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth() + 1;
+
+  const monthOptions = Array.from({ length: 6 }, (_, i) => {
+    const targetMonth = currentMonth + i;
+    const targetYear = currentYear + Math.floor((targetMonth - 1) / 12);
+    const normalizedMonth = ((targetMonth - 1) % 12) + 1;
+    return {
+      year: targetYear,
+      month: normalizedMonth,
+      label: `${targetYear}년 ${normalizedMonth}월`,
+    };
+  });
+  const [activeTab, setActiveTab] = useState("key-results");
+  const [openProjects, setOpenProjects] = useState<string[]>([]);
+  const [showRetrospectiveModal, setShowRetrospectiveModal] = useState(false);
+  const [showNoteForm, setShowNoteForm] = useState(false);
+
+  // 연결된 프로젝트들의 상세 정보 가져오기
+  const { data: allProjects = [] } = useQuery({
+    queryKey: ["all-projects", user?.uid],
+    queryFn: () => fetchAllProjectsByUserId(user?.uid || ""),
+    enabled: !!user?.uid,
+  });
+
+  // 먼슬리 데이터 조회
+  const { data: monthly, isLoading: monthlyLoading } = useQuery({
+    queryKey: ["monthly", id],
+    queryFn: () => fetchMonthlyById(id),
+    enabled: !!id,
+  });
+
+  // 폼 데이터 초기화
+  useEffect(() => {
+    if (monthly) {
+      setObjective(monthly.objective || "");
+      setObjectiveDescription(monthly.objectiveDescription || "");
+      setReward(monthly.reward || "");
+      // 기존 먼슬리의 년/월 추출
+      const startDateObj =
+        monthly.startDate instanceof Date
+          ? monthly.startDate
+          : (monthly.startDate as any).toDate();
+      setSelectedYear(startDateObj.getFullYear());
+      setSelectedMonth(startDateObj.getMonth() + 1);
+      setKeyResults(monthly.keyResults || []);
+      setQuickAccessProjects(monthly.quickAccessProjects || []);
+    }
+  }, [monthly]);
+
+  // 헬퍼 함수들
+  const completedKeyResults = keyResults.filter((kr) => kr.isCompleted).length;
+  const totalKeyResults = keyResults.length;
+  const keyResultsProgress =
+    totalKeyResults > 0
+      ? Math.round((completedKeyResults / totalKeyResults) * 100)
+      : 0;
+
+  const toggleKeyResultCompletion = (keyResultId: string) => {
+    setKeyResults((prev) =>
+      prev.map((kr) =>
+        kr.id === keyResultId ? { ...kr, isCompleted: !kr.isCompleted } : kr
+      )
+    );
+  };
+
+  const toggleProject = (projectName: string) => {
+    setOpenProjects((prev) =>
+      prev.includes(projectName)
+        ? prev.filter((p) => p !== projectName)
+        : [...prev, projectName]
+    );
+  };
+
+  // 먼슬리 업데이트 뮤테이션
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      if (!monthly) throw new Error("먼슬리를 찾을 수 없습니다.");
+
+      const updatedMonthly = {
+        objective,
+        objectiveDescription,
+        reward,
+        keyResults,
+        quickAccessProjects,
+      };
+
+      await updateMonthly(monthly.id, updatedMonthly);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["monthly", id] });
+      queryClient.invalidateQueries({ queryKey: ["monthlies"] });
+      toast({
+        title: translate("monthly.edit.success.title"),
+        description: translate("monthly.edit.success.description"),
+      });
+      router.push(`/monthly/${id}`);
+    },
+    onError: (error) => {
+      console.error("먼슬리 업데이트 실패:", error);
+      toast({
+        title: translate("monthly.edit.error.title"),
+        description: translate("monthly.edit.error.description"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Key Result 추가
+  const addKeyResult = () => {
+    setKeyResults([
+      ...keyResults,
+      {
+        id: crypto.randomUUID(),
+        title: "",
+        description: "",
+        isCompleted: false,
+      },
+    ]);
+  };
+
+  // Key Result 제거
+  const removeKeyResult = (index: number) => {
+    if (keyResults.length > 1) {
+      setKeyResults(keyResults.filter((_, i) => i !== index));
+    }
+  };
+
+  // Key Result 업데이트
+  const updateKeyResult = (
+    index: number,
+    field: keyof KeyResult,
+    value: string | boolean
+  ) => {
+    const updatedKeyResults = [...keyResults];
+    updatedKeyResults[index] = {
+      ...updatedKeyResults[index],
+      [field]: value,
+    };
+    setKeyResults(updatedKeyResults);
+  };
+
+  // 폼 제출
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!objective.trim()) {
+      toast({
+        title: translate("monthly.edit.validation.title"),
+        description: translate("monthly.edit.validation.objectiveRequired"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (keyResults.length === 0) {
+      toast({
+        title: translate("monthly.edit.validation.title"),
+        description: translate("monthly.edit.validation.minKeyResults"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (keyResults.some((kr) => !kr.title.trim())) {
+      toast({
+        title: translate("monthly.edit.validation.title"),
+        description: translate("monthly.edit.validation.keyResultRequired"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    updateMutation.mutate();
+  };
+
+  // 로딩 상태
+  if (userLoading || monthlyLoading) {
+    return <EditMonthlySkeleton />;
+  }
+
+  if (!monthly) {
+    return (
+      <div className="container max-w-md px-4 py-6">
+        <div className="text-center py-12">
+          <Info className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">
+            {translate("monthly.edit.error.notFound")}
+          </h2>
+          <p className="text-muted-foreground mb-4">
+            {translate("monthly.edit.error.notFoundDescription")}
+          </p>
+          <Button asChild>
+            <Link href="/monthly">
+              {translate("monthly.edit.error.backToList")}
+            </Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const status = getMonthlyStatus(monthly);
+
+  return (
+    <div className="container max-w-md px-4 py-6 pb-20">
+      {/* Header */}
+      <div className="mb-6 flex items-center justify-between">
+        <Button variant="ghost" size="icon" onClick={() => router.back()}>
+          <ChevronLeft className="h-5 w-5" />
+        </Button>
+        <h1 className="text-xl font-bold">{translate("monthly.edit.title")}</h1>
+        <div className="w-10"></div>
+      </div>
+
+      {/* 상태 경고 */}
+      {status === "ended" && (
+        <Alert className="mb-6">
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            {translate("monthly.edit.error.completed")}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Monthly Info Card */}
+      <Card className="p-6 mb-6 border border-border">
+        <div className="space-y-6">
+          <div>
+            <div className="mb-4">
+              <Label className="text-sm font-medium text-muted-foreground">
+                {translate("monthly.edit.basicInfo.monthSelection")}
+              </Label>
+              <div className="flex items-center gap-3 mt-2">
+                <Select
+                  value={`${selectedYear}-${selectedMonth}`}
+                  onValueChange={(value) => {
+                    const [year, month] = value.split("-").map(Number);
+                    setSelectedYear(year);
+                    setSelectedMonth(month);
+                  }}
+                  disabled={status === "ended"}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue
+                      placeholder={translate(
+                        "monthly.edit.basicInfo.monthPlaceholder"
+                      )}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthOptions.map((option) => (
+                      <SelectItem
+                        key={`${option.year}-${option.month}`}
+                        value={`${option.year}-${option.month}`}
+                      >
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Badge
+                  variant="outline"
+                  className="text-sm font-medium w-12 flex-shrink-0"
+                >
+                  {selectedMonth}월
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+                <Clock className="h-4 w-4" />
+                <span>{formatDate(monthly?.startDate, "ko")}</span>
+                <span>-</span>
+                <span>{formatDate(monthly?.endDate, "ko")}</span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label
+                htmlFor="objective"
+                className="text-sm font-medium text-muted-foreground"
+              >
+                {translate("monthly.edit.form.objective")}
+              </Label>
+              <Input
+                value={objective}
+                onChange={(e) => setObjective(e.target.value)}
+                placeholder={translate(
+                  "monthly.edit.form.objectivePlaceholder"
+                )}
+                className="text-lg font-semibold border-none bg-transparent p-0 focus-visible:ring-0"
+                disabled={status === "ended"}
+              />
+              <Textarea
+                value={objectiveDescription}
+                onChange={(e) => setObjectiveDescription(e.target.value)}
+                placeholder={translate(
+                  "monthly.edit.form.keyResultDescriptionPlaceholder"
+                )}
+                className="text-sm text-muted-foreground border-none bg-transparent p-0 resize-none focus-visible:ring-0"
+                rows={2}
+                disabled={status === "ended"}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <Badge
+              className={
+                status === "planned"
+                  ? "bg-blue-100 text-blue-800 hover:bg-blue-100"
+                  : status === "ended"
+                  ? "bg-green-100 text-green-800 hover:bg-green-100"
+                  : "bg-primary hover:bg-primary/90 text-white"
+              }
+            >
+              {status === "planned"
+                ? "예정"
+                : status === "ended"
+                ? "완료"
+                : "진행중"}
+            </Badge>
+          </div>
+
+          {/* Key Results 진행률 */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Key Results 진행률</span>
+              <span className="text-sm font-bold">{keyResultsProgress}%</span>
+            </div>
+            <Progress value={keyResultsProgress} className="h-3" />
+            <p className="text-xs text-muted-foreground">
+              {completedKeyResults}/{totalKeyResults} 완료
+            </p>
+          </div>
+
+          {/* 보상 */}
+          <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+            <div className="flex items-center gap-2 mb-1">
+              <Trophy className="h-4 w-4 text-yellow-600" />
+              <span className="text-sm font-medium text-yellow-800">
+                목표 달성 보상
+              </span>
+            </div>
+            <Input
+              value={reward}
+              onChange={(e) => setReward(e.target.value)}
+              placeholder="목표 달성 시 받을 보상"
+              className="text-sm text-yellow-700 border-none bg-transparent p-0 focus-visible:ring-0"
+              disabled={status === "ended"}
+            />
+            <p className="text-xs text-yellow-600 mt-1">
+              예: 🎮 새로운 게임 구매하기, 🍕 맛있는 음식 먹기
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* 프로젝트 연결 (선택사항) */}
+      <Card className="p-4 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-bold text-sm flex items-center gap-2">
+              <FolderOpen className="h-4 w-4" />
+              프로젝트 연결
+              <Badge variant="secondary" className="text-xs">
+                선택사항
+              </Badge>
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              이 먼슬리와 연결된 프로젝트들
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs"
+            onClick={() => setShowQuickAccessDialog(true)}
+          >
+            <Edit className="mr-1 h-3 w-3" />
+            {translate("monthlyDetail.quickAccess.edit")}
+          </Button>
+        </div>
+      </Card>
+
+      {/* 프로젝트 바로가기 */}
+      <Card className="p-4 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-sm">
+            {translate("monthlyDetail.quickAccess.title")}
+          </h3>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs"
+            onClick={() => setShowQuickAccessDialog(true)}
+          >
+            <Edit className="mr-1 h-3 w-3" />
+            {translate("monthlyDetail.quickAccess.edit")}
+          </Button>
+        </div>
+
+        {quickAccessProjects && quickAccessProjects.length > 0 ? (
+          <div className="space-y-2">
+            {quickAccessProjects.map((projectId) => {
+              const projectInfo = allProjects.find((p) => p.id === projectId);
+              return (
+                <Link key={projectId} href={`/para/projects/${projectId}`}>
+                  <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">
+                        {projectInfo?.title || `프로젝트 ID: ${projectId}`}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {projectInfo?.area ||
+                          translate("monthlyDetail.uncategorized")}
+                      </p>
+                    </div>
+                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-4 bg-muted/20 rounded-lg text-center">
+            <p className="text-sm text-muted-foreground mb-3">
+              {translate("monthlyDetail.quickAccess.description")}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-transparent"
+              onClick={() => setShowQuickAccessDialog(true)}
+            >
+              <Plus className="mr-2 h-3 w-3" />
+              {translate("monthlyDetail.quickAccess.addProject")}
+            </Button>
+          </div>
+        )}
+      </Card>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-2 mb-6 text-xs">
+          <TabsTrigger value="key-results">
+            {translate("monthlyDetail.tabs.keyResults")}
+          </TabsTrigger>
+          <TabsTrigger value="completed-tasks">
+            {translate("monthlyDetail.tabs.completedTasks")}
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Key Results 탭 */}
+        <TabsContent value="key-results" className="mt-0">
+          <div className="space-y-4">
+            <div className="p-3 bg-muted/20 rounded-lg">
+              <p className="text-xs text-muted-foreground">
+                {translate("monthly.edit.form.keyResultsGuide")}
+              </p>
+            </div>
+
+            {keyResults.map((keyResult, index) => (
+              <Card key={index} className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {translate("monthlyDetail.keyResult")} {index + 1}
+                  </span>
+                  {keyResults.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeKeyResult(index)}
+                      disabled={status === "ended"}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Input
+                    value={keyResult.title}
+                    onChange={(e) =>
+                      updateKeyResult(index, "title", e.target.value)
+                    }
+                    placeholder={translate(
+                      "monthly.edit.form.keyResultTitlePlaceholder"
+                    )}
+                    disabled={status === "ended"}
+                  />
+                  <Textarea
+                    value={keyResult.description}
+                    onChange={(e) =>
+                      updateKeyResult(index, "description", e.target.value)
+                    }
+                    placeholder={translate(
+                      "monthly.edit.form.keyResultDescriptionPlaceholder"
+                    )}
+                    rows={2}
+                    disabled={status === "ended"}
+                  />
+                </div>
+              </Card>
+            ))}
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full bg-transparent"
+              onClick={addKeyResult}
+              disabled={status === "ended"}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Key Result 추가
+            </Button>
+          </div>
+        </TabsContent>
+
+        {/* 완료된 할 일 탭 */}
+        <TabsContent value="completed-tasks" className="mt-0">
+          <div className="space-y-4">
+            <Card className="p-8 text-center">
+              <div className="mb-4">
+                <div className="w-12 h-12 mx-auto rounded-full border-2 border-muted-foreground/30"></div>
+              </div>
+              <h3 className="text-lg font-medium mb-2">
+                완료된 할 일이 없어요
+              </h3>
+              <p className="text-sm text-muted-foreground mb-6">
+                {status === "planned"
+                  ? "아직 시작하지 않은 먼슬리입니다."
+                  : "이번 달에 완료한 태스크가 아직 없습니다."}
+                <br />
+                프로젝트에서 할 일을 확인해보세요!
+              </p>
+
+              <Button asChild className="w-full">
+                <Link href="/para/projects">
+                  <FolderOpen className="mr-2 h-4 w-4" />
+                  프로젝트 보러 가기
+                </Link>
+              </Button>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* 프로젝트 바로가기 다이얼로그 */}
+
+      {/* 회고 작성 모달 */}
+      {showRetrospectiveModal && (
+        <RetrospectiveForm
+          monthlyTitle={monthly?.objective || ""}
+          keyResults={monthly?.keyResults || []}
+          onClose={() => setShowRetrospectiveModal(false)}
+          onSave={(data) => {
+            console.log("회고 저장:", data);
+            toast({
+              title: "회고 저장 완료",
+              description: "회고가 성공적으로 저장되었습니다.",
+            });
+            setShowRetrospectiveModal(false);
+          }}
+        />
+      )}
+
+      {/* 노트 편집 모달 */}
+      {showNoteForm && monthly && (
+        <MonthlyNoteForm
+          monthly={monthly}
+          onClose={() => setShowNoteForm(false)}
+          onSave={() => {
+            // 노트 저장 후 데이터 새로고침
+            queryClient.invalidateQueries({
+              queryKey: ["monthly", monthly.id],
+            });
+          }}
+        />
+      )}
+
+      {/* 완료 버튼 */}
+      <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 z-50">
+        <div className="container max-w-md mx-auto">
+          <Button
+            onClick={handleSubmit}
+            disabled={updateMutation.isPending || status === "ended"}
+            className="w-full"
+          >
+            {updateMutation.isPending ? "저장 중..." : "완료"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

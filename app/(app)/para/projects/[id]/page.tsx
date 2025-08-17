@@ -48,7 +48,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { auth } from "@/lib/firebase";
+import { auth } from "@/lib/firebase/index";
 import {
   fetchProjectById,
   deleteProjectById,
@@ -58,16 +58,18 @@ import {
   addTaskToProject,
   updateTaskInProject,
   deleteTaskFromProject,
+  toggleTaskCompletion,
+  toggleTaskCompletionInSubcollection,
   fetchAreaById,
-  fetchChaptersByIds,
+  fetchMonthliesByIds,
   createRetrospective,
   updateRetrospective,
   createNote,
   updateNote,
   updateProject,
-} from "@/lib/firebase";
+} from "@/lib/firebase/index";
 import { useLanguage } from "@/hooks/useLanguage";
-import { formatDate, formatDateForInput, getChapterStatus } from "@/lib/utils";
+import { formatDate, formatDateForInput, getMonthlyStatus } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -233,12 +235,16 @@ export default function ProjectDetailPage({
         duration: taskData.duration,
         done: false,
       };
-      return addTaskToProject(projectId, newTask);
+      return addTaskToProject(projectId, {
+        ...newTask,
+        userId: user?.uid || "",
+        projectId,
+      });
     },
     onSuccess: () => {
       setHasChanges(true); // 변경 사항 플래그 설정만
-      // 태스크 변경 시 챕터 태스크 카운트 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: ["chapterTaskCounts"] });
+      // 태스크 변경 시 먼슬리 태스크 카운트 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ["monthlyTaskCounts"] });
       queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
       toast({
         title: translate("paraProjectDetail.task.add.success.title"),
@@ -267,7 +273,7 @@ export default function ProjectDetailPage({
       taskId: string;
       taskData: Partial<any>;
     }) => {
-      return updateTaskInProject(taskId, taskData);
+      return updateTaskInProject(projectId, taskId, taskData);
     },
     onSuccess: () => {
       setHasChanges(true); // 변경 사항 플래그 설정
@@ -293,7 +299,7 @@ export default function ProjectDetailPage({
       queryClient.invalidateQueries({
         queryKey: ["taskCounts", projectId],
       });
-      queryClient.invalidateQueries({ queryKey: ["chapterTaskCounts"] });
+      queryClient.invalidateQueries({ queryKey: ["monthlyTaskCounts"] });
       queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
     },
   });
@@ -340,8 +346,8 @@ export default function ProjectDetailPage({
     },
     onSuccess: () => {
       setHasChanges(true); // 변경 사항 플래그 설정
-      // 태스크 변경 시 챕터 태스크 카운트 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: ["chapterTaskCounts"] });
+      // 태스크 변경 시 먼슬리 태스크 카운트 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ["monthlyTaskCounts"] });
       queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
       toast({
         title: "태스크 삭제 완료",
@@ -356,8 +362,8 @@ export default function ProjectDetailPage({
       queryClient.invalidateQueries({
         queryKey: ["taskCounts", projectId],
       });
-      // 태스크 변경 시 챕터 태스크 카운트 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: ["chapterTaskCounts"] });
+      // 태스크 변경 시 먼슬리 태스크 카운트 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ["monthlyTaskCounts"] });
       queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
     },
   });
@@ -381,7 +387,7 @@ export default function ProjectDetailPage({
         bestMoment: retrospectiveData.bestMoment,
         routineAdherence: retrospectiveData.routineAdherence,
         unexpectedObstacles: retrospectiveData.unexpectedObstacles,
-        nextChapterApplication: retrospectiveData.nextChapterApplication,
+        nextMonthlyApplication: retrospectiveData.nextMonthlyApplication,
         userRating: retrospectiveData.userRating,
         bookmarked: retrospectiveData.bookmarked,
         title: retrospectiveData.title,
@@ -398,7 +404,7 @@ export default function ProjectDetailPage({
           userId: user?.uid || "",
           projectId: project?.id || "",
           ...filteredData,
-          // chapterId는 프로젝트 회고에서는 사용하지 않으므로 제외
+          // monthlyId는 프로젝트 회고에서는 사용하지 않으므로 제외
         });
 
         // 프로젝트에 회고 연결 (필요한 필드만 포함)
@@ -489,11 +495,11 @@ export default function ProjectDetailPage({
   const [bookmarked, setBookmarked] = useState(false);
   const [hoverRating, setHoverRating] = useState<number | undefined>(undefined);
 
-  // 챕터 상세 페이지와 동일한 회고 변수들 추가
+  // 먼슬리 상세 페이지와 동일한 회고 변수들 추가
   const [bestMoment, setBestMoment] = useState("");
   const [routineAdherence, setRoutineAdherence] = useState("");
   const [unexpectedObstacles, setUnexpectedObstacles] = useState("");
-  const [nextChapterApplication, setNextChapterApplication] = useState("");
+  const [nextMonthlyApplication, setNextMonthlyApplication] = useState("");
 
   // 스마트 회고 상태
   const [planningNeedsImprovement, setPlanningNeedsImprovement] =
@@ -523,28 +529,28 @@ export default function ProjectDetailPage({
     enabled: !!project?.areaId,
   });
 
-  // 연결된 챕터 정보 가져오기
-  const { data: connectedChapters = [] } = useQuery({
-    queryKey: ["connectedChapters", project?.id],
+  // 연결된 먼슬리 정보 가져오기
+  const { data: connectedMonthlies = [] } = useQuery({
+    queryKey: ["connectedMonthlies", project?.id],
     queryFn: async () => {
-      if (!project || !project.connectedChapters) return [];
+      if (!project || !project.connectedMonthlies) return [];
 
-      // connectedChapters가 객체 배열인지 문자열 배열인지 확인
-      const chapterIds = Array.isArray(project.connectedChapters)
-        ? project.connectedChapters.map((chapter: any) =>
-            typeof chapter === "string" ? chapter : chapter.id
+      // connectedMonthlies가 객체 배열인지 문자열 배열인지 확인
+      const monthlyIds = Array.isArray(project.connectedMonthlies)
+        ? project.connectedMonthlies.map((monthly: any) =>
+            typeof monthly === "string" ? monthly : monthly.id
           )
         : [];
 
-      console.log("프로젝트 connectedChapters:", project.connectedChapters);
-      console.log("추출된 chapterIds:", chapterIds);
+      console.log("프로젝트 connectedMonthlies:", project.connectedMonthlies);
+      console.log("추출된 monthlyIds:", monthlyIds);
 
-      const chapters = await fetchChaptersByIds(chapterIds);
-      console.log("가져온 챕터들:", chapters);
+      const monthlies = await fetchMonthliesByIds(monthlyIds);
+      console.log("가져온 먼슬리들:", monthlies);
 
-      return chapters;
+      return monthlies;
     },
-    enabled: !!project && !!project.connectedChapters,
+    enabled: !!project && !!project.connectedMonthlies,
   });
 
   // 태스크 개수만 가져오기 (성능 최적화용) - 우선 로드
@@ -579,8 +585,8 @@ export default function ProjectDetailPage({
       setBestMoment(project.retrospective.bestMoment || "");
       setRoutineAdherence(project.retrospective.routineAdherence || "");
       setUnexpectedObstacles(project.retrospective.unexpectedObstacles || "");
-      setNextChapterApplication(
-        project.retrospective.nextChapterApplication || ""
+      setNextMonthlyApplication(
+        project.retrospective.nextMonthlyApplication || ""
       );
       setUserRating(project.retrospective.userRating);
       setBookmarked(project.retrospective.bookmarked || false);
@@ -604,7 +610,7 @@ export default function ProjectDetailPage({
       setBestMoment("");
       setRoutineAdherence("");
       setUnexpectedObstacles("");
-      setNextChapterApplication("");
+      setNextMonthlyApplication("");
       setUserRating(undefined);
       setBookmarked(false);
       setHoverRating(undefined);
@@ -730,9 +736,9 @@ export default function ProjectDetailPage({
 
   // 최적화된 태스크 개수 사용 (taskCounts 우선, 폴백으로 tasks 사용)
   const completedTasks =
-    (taskCounts?.completedTasks ?? 0) ||
+    (taskCounts?.completed ?? 0) ||
     (tasks?.filter((task: any) => task.done).length ?? 0);
-  const totalTasks = (taskCounts?.totalTasks ?? 0) || (tasks?.length ?? 0);
+  const totalTasks = (taskCounts?.total ?? 0) || (tasks?.length ?? 0);
 
   // 반복형 프로젝트의 경우 targetCount 사용, 작업형의 경우 tasks 개수 사용
   const targetCount =
@@ -822,8 +828,8 @@ export default function ProjectDetailPage({
       {
         onSuccess: () => {
           setHasChanges(true); // 변경 사항 플래그 설정만
-          // 태스크 변경 시 챕터 태스크 카운트 캐시 무효화
-          queryClient.invalidateQueries({ queryKey: ["chapterTaskCounts"] });
+          // 태스크 변경 시 먼슬리 태스크 카운트 캐시 무효화
+          queryClient.invalidateQueries({ queryKey: ["monthlyTaskCounts"] });
           queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
         },
         onError: (error, variables, context) => {
@@ -834,8 +840,8 @@ export default function ProjectDetailPage({
           queryClient.invalidateQueries({
             queryKey: ["taskCounts", projectId],
           });
-          // 태스크 변경 시 챕터 태스크 카운트 캐시 무효화
-          queryClient.invalidateQueries({ queryKey: ["chapterTaskCounts"] });
+          // 태스크 변경 시 먼슬리 태스크 카운트 캐시 무효화
+          queryClient.invalidateQueries({ queryKey: ["monthlyTaskCounts"] });
           queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
           toast({
             title: "태스크 상태 변경 실패",
@@ -906,8 +912,8 @@ export default function ProjectDetailPage({
       bestMoment,
       routineAdherence,
       unexpectedObstacles,
-      nextChapterApplication,
-      content: `가장 좋았던 순간: ${bestMoment}\n\n일정 준수: ${routineAdherence}\n\n예상치 못한 장애물: ${unexpectedObstacles}\n\n다음 챕터 적용점: ${nextChapterApplication}`,
+      nextMonthlyApplication,
+      content: `가장 좋았던 순간: ${bestMoment}\n\n일정 준수: ${routineAdherence}\n\n예상치 못한 장애물: ${unexpectedObstacles}\n\n다음 먼슬리 적용점: ${nextMonthlyApplication}`,
       userRating,
       bookmarked,
       // 스마트 회고 데이터 (완료율 90% 미만 시에만 포함)
@@ -967,13 +973,13 @@ export default function ProjectDetailPage({
     );
   };
 
-  const getChapterTitle = (chapterId: string) => {
-    // TODO: 실제 챕터 데이터를 가져와서 사용
-    return chapterId;
+  const getMonthlyTitle = (monthlyId: string) => {
+    // TODO: 실제 먼슬리 데이터를 가져와서 사용
+    return monthlyId;
   };
 
-  const getChapterPeriod = (chapterId: string) => {
-    // TODO: 실제 챕터 데이터를 가져와서 사용
+  const getMonthlyPeriod = (monthlyId: string) => {
+    // TODO: 실제 먼슬리 데이터를 가져와서 사용
     return "";
   };
 
@@ -1120,49 +1126,49 @@ export default function ProjectDetailPage({
             ></div>
           </div>
 
-          {/* 연결된 챕터 */}
+          {/* 연결된 먼슬리 */}
           <div>
             <span className="text-sm font-medium">
-              {translate("paraProjectDetail.connectedChapters")}
+              {translate("paraProjectDetail.connectedMonthlies")}
             </span>
             <div className="mt-2 space-y-2">
-              {connectedChapters && connectedChapters.length > 0 ? (
-                connectedChapters.map((chapter) => (
+              {connectedMonthlies && connectedMonthlies.length > 0 ? (
+                connectedMonthlies.map((monthly) => (
                   <div
-                    key={chapter.id}
+                    key={monthly.id}
                     className="flex items-center gap-3 p-2 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors"
                   >
                     <BookOpen className="h-4 w-4 text-blue-600 flex-shrink-0" />
                     <div className="flex flex-col flex-1 min-w-0">
                       <Link
-                        href={`/chapter/${chapter.id}`}
+                        href={`/monthly/${monthly.id}`}
                         className="flex items-center gap-2 group"
                       >
                         <span className="text-sm text-blue-600 font-medium group-hover:text-blue-700 transition-colors">
-                          {chapter.title}
+                          {monthly.objective}
                         </span>
                         <ExternalLink className="h-3 w-3 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </Link>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs text-muted-foreground">
-                          {formatDate(chapter.startDate, currentLanguage)} ~{" "}
-                          {formatDate(chapter.endDate, currentLanguage)}
+                          {formatDate(monthly.startDate, currentLanguage)} ~{" "}
+                          {formatDate(monthly.endDate, currentLanguage)}
                         </span>
                         <Badge
                           variant={
-                            getChapterStatus(chapter) === "in_progress"
+                            getMonthlyStatus(monthly) === "in_progress"
                               ? "default"
-                              : getChapterStatus(chapter) === "ended"
+                              : getMonthlyStatus(monthly) === "ended"
                               ? "secondary"
                               : "outline"
                           }
                           className="text-xs"
                         >
-                          {getChapterStatus(chapter) === "in_progress"
+                          {getMonthlyStatus(monthly) === "in_progress"
                             ? translate(
                                 "paraProjectDetail.statusLabels.inProgress"
                               )
-                            : getChapterStatus(chapter) === "ended"
+                            : getMonthlyStatus(monthly) === "ended"
                             ? translate(
                                 "paraProjectDetail.statusLabels.completed"
                               )
@@ -1177,15 +1183,15 @@ export default function ProjectDetailPage({
               ) : (
                 <Card className="p-4 text-center">
                   <p className="text-muted-foreground">
-                    {translate("paraProjectDetail.noConnectedChapters")}
+                    {translate("paraProjectDetail.noConnectedMonthlies")}
                   </p>
                 </Card>
               )}
             </div>
           </div>
-          {connectedChapters && connectedChapters.length > 0 && (
+          {connectedMonthlies && connectedMonthlies.length > 0 && (
             <div className="space-y-3">
-              {connectedChapters.length >= 3 &&
+              {connectedMonthlies.length >= 3 &&
                 getProjectStatus(project) === "in_progress" && (
                   <CustomAlert variant="warning" className="mb-4">
                     <AlertCircle className="h-4 w-4" />
@@ -1195,7 +1201,10 @@ export default function ProjectDetailPage({
                     <AlertDescription>
                       {translate(
                         "paraProjectDetail.longTermProject.description"
-                      ).replace("{count}", connectedChapters.length.toString())}
+                      ).replace(
+                        "{count}",
+                        connectedMonthlies.length.toString()
+                      )}
                     </AlertDescription>
                   </CustomAlert>
                 )}
@@ -1266,7 +1275,7 @@ export default function ProjectDetailPage({
                     {translate("paraProjectDetail.completedTime")}
                   </span>
                   <span className="font-medium">
-                    {timeStats?.completedTime || 0}
+                    {timeStats?.totalFocusTime || 0}
                     {translate("paraProjectDetail.hours")}
                   </span>
                 </div>
@@ -1275,7 +1284,7 @@ export default function ProjectDetailPage({
                     {translate("paraProjectDetail.remainingTime")}
                   </span>
                   <span className="font-medium">
-                    {timeStats?.remainingTime || 0}
+                    {timeStats?.averageFocusTime || 0}
                     {translate("paraProjectDetail.hours")}
                   </span>
                 </div>
@@ -1388,12 +1397,12 @@ export default function ProjectDetailPage({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">
-                    {translate("paraProjectDetail.connectedChapters")}
+                    {translate("paraProjectDetail.connectedMonthlies")}
                   </span>
                   <span>
-                    {connectedChapters && connectedChapters.length > 0
-                      ? `${connectedChapters.length}개`
-                      : translate("paraProjectDetail.noConnectedChapters")}
+                    {connectedMonthlies && connectedMonthlies.length > 0
+                      ? `${connectedMonthlies.length}개`
+                      : translate("paraProjectDetail.noConnectedMonthlies")}
                   </span>
                 </div>
               </div>
@@ -1753,21 +1762,21 @@ export default function ProjectDetailPage({
               </div>
               <div>
                 <label
-                  htmlFor="nextChapterApplication"
+                  htmlFor="nextMonthlyApplication"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
                   {translate(
-                    "paraProjectDetail.retrospective.nextChapterApplication.label"
+                    "paraProjectDetail.retrospective.nextMonthlyApplication.label"
                   )}
                 </label>
                 <Textarea
-                  id="nextChapterApplication"
+                  id="nextMonthlyApplication"
                   className="mt-1"
                   rows={2}
-                  value={nextChapterApplication}
-                  onChange={(e) => setNextChapterApplication(e.target.value)}
+                  value={nextMonthlyApplication}
+                  onChange={(e) => setNextMonthlyApplication(e.target.value)}
                   placeholder={translate(
-                    "paraProjectDetail.retrospective.nextChapterApplication.placeholder"
+                    "paraProjectDetail.retrospective.nextMonthlyApplication.placeholder"
                   )}
                 />
               </div>

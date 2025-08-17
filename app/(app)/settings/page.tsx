@@ -15,16 +15,18 @@ import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/hooks/useSettings";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { auth } from "@/lib/firebase";
+import { auth } from "@/lib/firebase/index";
 import { signOut } from "firebase/auth";
 import {
-  updateUserDisplayName,
+  updateUserSettings,
+  updateUserPreferences,
+  updateUserProfile,
   uploadProfilePicture,
   updateUserProfilePicture,
-} from "@/lib/firebase";
+} from "@/lib/firebase/index";
 import { resetTimeZoneCache } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-import { Edit2, Check, X, Save, Loader2 } from "lucide-react";
+import { Edit2, Check, X, Save, Loader2, BookOpen } from "lucide-react";
 import Image from "next/image";
 
 // 설정 폼 스키마 정의 (Firebase Auth 정보 제외)
@@ -36,7 +38,6 @@ const settingsFormSchema = z.object({
   notifications: z.boolean(),
   theme: z.enum(["light", "dark", "system"]),
   language: z.enum(["ko", "en"]),
-  chapterProjectCardDisplay: z.enum(["chapter_only", "both"]),
 });
 
 type SettingsFormData = z.infer<typeof settingsFormSchema>;
@@ -77,8 +78,8 @@ export default function SettingsPage() {
     email: translate("settings.email"),
     noEmail: translate("settings.noEmail"),
 
-    // 챕터 설정 섹션
-    chapterSettings: translate("settings.chapterSettings"),
+    // 먼슬리 설정 섹션
+    monthlySettings: translate("settings.monthlySettings"),
     defaultReward: translate("settings.defaultReward"),
     defaultRewardPlaceholder: translate("settings.defaultRewardPlaceholder"),
     defaultRewardEnabled: translate("settings.defaultRewardEnabled"),
@@ -105,20 +106,6 @@ export default function SettingsPage() {
     // 언어 옵션
     languageKorean: translate("language.korean"),
     languageEnglish: translate("language.english"),
-
-    // 프로젝트 카드 표시 옵션
-    chapterProjectCardDisplay: translate(
-      "settings.chapterProjectCardDisplay.title"
-    ),
-    chapterProjectCardDisplayDescription: translate(
-      "settings.chapterProjectCardDisplay.description"
-    ),
-    chapterProjectCardDisplayChapterOnly: translate(
-      "settings.chapterProjectCardDisplay.chapterOnly"
-    ),
-    chapterProjectCardDisplayBoth: translate(
-      "settings.chapterProjectCardDisplay.both"
-    ),
 
     // 토스트 메시지
     save: translate("settings.save"),
@@ -255,7 +242,9 @@ export default function SettingsPage() {
     }
 
     try {
-      await updateUserDisplayName(newDisplayName.trim());
+      await updateUserProfile(user?.uid || "", {
+        displayName: newDisplayName.trim(),
+      });
       setIsEditingName(false);
       setNewDisplayName("");
 
@@ -327,11 +316,8 @@ export default function SettingsPage() {
 
     setIsUploadingPhoto(true);
     try {
-      // 파일 업로드
       const downloadURL = await uploadProfilePicture(file, user.uid);
-
-      // 사용자 프로필 업데이트
-      await updateUserProfilePicture(downloadURL);
+      await updateUserProfilePicture(user.uid, downloadURL);
 
       // 성공 메시지 표시
       toast({
@@ -366,6 +352,10 @@ export default function SettingsPage() {
     );
   }
 
+  const handleOnboardingRestart = () => {
+    router.push("/onboarding");
+  };
+
   return (
     <div className="container max-w-md px-4 py-6">
       <h1 className="mb-6 text-2xl font-bold">{texts.title}</h1>
@@ -373,7 +363,7 @@ export default function SettingsPage() {
       <div className="space-y-8">
         <section>
           <h2 className="mb-4 text-xl font-bold">{texts.profile}</h2>
-          <Card className="p-4">
+          <Card className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
             <div className="mb-6 flex flex-col items-center">
               <div className="relative mb-4">
                 <div className="w-32 h-32 relative overflow-hidden rounded-full border-4 border-primary/20 bg-secondary">
@@ -507,8 +497,8 @@ export default function SettingsPage() {
         </section>
 
         <section>
-          <h2 className="mb-4 text-xl font-bold">{texts.chapterSettings}</h2>
-          <Card className="p-4">
+          <h2 className="mb-4 text-xl font-bold">{texts.monthlySettings}</h2>
+          <Card className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2">
                 <Label htmlFor="defaultRewardEnabled">
@@ -614,41 +604,12 @@ export default function SettingsPage() {
                 disabled={savingStates["carryOver"]}
               />
             </div>
-
-            <div>
-              <Label htmlFor="chapterProjectCardDisplay">
-                {texts.chapterProjectCardDisplay}
-              </Label>
-              <p className="text-xs text-muted-foreground mb-2">
-                {texts.chapterProjectCardDisplayDescription}
-              </p>
-              <select
-                id="chapterProjectCardDisplay"
-                value={form.watch("chapterProjectCardDisplay")}
-                onChange={(e) =>
-                  saveSetting(
-                    "chapterProjectCardDisplay",
-                    e.target.value as "chapter_only" | "both",
-                    texts.chapterProjectCardDisplay + " " + texts.saveSuccess
-                  )
-                }
-                disabled={savingStates["chapterProjectCardDisplay"]}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-              >
-                <option value="chapter_only">
-                  {texts.chapterProjectCardDisplayChapterOnly}
-                </option>
-                <option value="both">
-                  {texts.chapterProjectCardDisplayBoth}
-                </option>
-              </select>
-            </div>
           </Card>
         </section>
 
         <section>
           <h2 className="mb-4 text-xl font-bold">{texts.themeSettings}</h2>
-          <Card className="p-4">
+          <Card className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
             <div className="space-y-4">
               <div>
                 <Label htmlFor="theme">{texts.theme}</Label>
@@ -693,6 +654,30 @@ export default function SettingsPage() {
             </p>
           </Card>
         </section>
+
+        <section>
+          <h2 className="mb-4 text-xl font-bold">도움말 및 가이드</h2>
+          <Card className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
+            <div className="flex items-center justify-between space-y-4">
+              <div>
+                <Label className="text-sm font-medium">
+                  앱 사용법 다시 보기
+                </Label>
+                <p className="text-xs text-gray-500">
+                  앱 사용법을 다시 확인하세요
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOnboardingRestart}
+              >
+                <BookOpen className="h-4 w-4 mr-1" />
+                시작
+              </Button>
+            </div>
+          </Card>
+        </section>
       </div>
 
       {/* 로그아웃 섹션 */}
@@ -700,7 +685,7 @@ export default function SettingsPage() {
         <h2 className="mb-4 text-xl font-bold text-foreground">
           {texts.account}
         </h2>
-        <Card className="p-4 border-border">
+        <Card className="p-4 border-border bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-medium text-foreground">{texts.logout}</h3>

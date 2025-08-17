@@ -5,9 +5,8 @@ import { CharacterAvatar } from "@/components/character-avatar";
 import { ProgressCard } from "@/components/widgets/progress-card";
 import { StatsCard } from "@/components/widgets/stats-card";
 import { AreaActivityChart } from "@/components/widgets/area-activity-chart";
-import { ChapterComparisonChart } from "@/components/widgets/chapter-comparison-chart";
 import { UncategorizedStatsCard } from "@/components/widgets/uncategorized-stats-card";
-import { ChapterCard } from "@/components/widgets/chapter-card";
+import { MonthlyComparisonChart } from "@/components/widgets/chapter-comparison-chart";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,42 +25,80 @@ import {
   Lightbulb,
   Rocket,
   CheckCircle,
+  CheckCircle2,
+  Circle,
   AlertCircle,
   ArrowRight,
   Play,
   Settings,
   BarChart3,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Task } from "@/lib/types";
+
+// 모든 함수들을 새로운 구조에서 import
 import {
-  fetchAllAreasByUserId,
   fetchAllProjectsByUserId,
-  fetchAllChaptersByUserId,
-  fetchAllResourcesByUserId,
+  fetchUncategorizedResourcesByUserId,
   getOrCreateUncategorizedArea,
-  getTodayDeadlineProjects,
   getTaskCountsByProjectId,
   getTaskCountsForMultipleProjects,
-  fetchYearlyActivityStats,
-  fetchProjectsByChapterId,
-  fetchCurrentChapterProjects,
+  fetchProjectsByMonthlyId,
+  fetchCurrentMonthlyProjects,
   getTodayTasks,
-} from "@/lib/firebase";
-import { getChapterStatus, formatDate } from "@/lib/utils";
+  toggleTaskCompletion,
+  toggleTaskCompletionInSubcollection,
+  fetchAllMonthliesByUserId,
+  fetchYearlyActivityStats,
+} from "@/lib/firebase/index";
+
+import { getMonthlyStatus, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/hooks/useLanguage";
+import Image from "next/image";
 
 export default function HomePage() {
   const [user, loading] = useAuthState(auth);
-  const [showAllProjects, setShowAllProjects] = useState(false);
+  const [activeTab, setActiveTab] = useState("today");
   const { toast } = useToast();
   const router = useRouter();
   const { translate, currentLanguage } = useLanguage();
+  const queryClient = useQueryClient();
+
+  // 태스크 완료/미완료 토글 함수
+  const handleTaskToggle = async (task: Task) => {
+    try {
+      // 태스크가 서브컬렉션에 있는지 확인 (projectId가 있으면 서브컬렉션)
+      if (task.projectId) {
+        await toggleTaskCompletionInSubcollection(task.projectId, task.id);
+      } else {
+        await toggleTaskCompletion(task.id);
+      }
+
+      // 쿼리 무효화하여 데이터 새로고침
+      queryClient.invalidateQueries({ queryKey: ["todayTasks", user?.uid] });
+
+      toast({
+        title: task.done ? "태스크 미완료 처리" : "태스크 완료 처리",
+        description: task.done
+          ? "태스크를 미완료로 변경했습니다."
+          : "태스크를 완료로 변경했습니다.",
+      });
+    } catch (error) {
+      console.error("태스크 토글 실패:", error);
+      toast({
+        title: "오류 발생",
+        description: "태스크 상태 변경에 실패했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // 번역 텍스트 메모이제이션
   const texts = useMemo(
@@ -78,27 +115,21 @@ export default function HomePage() {
       todayTab: translate("home.tabs.today"),
       dashboardTab: translate("home.tabs.dashboard"),
 
-      // 현재 챕터
-      currentChapter: translate("home.currentChapter"),
-      noChapter: translate("home.noChapter"),
-      noChapterDescription: translate("home.noChapterDescription"),
-      createChapter: translate("home.createChapter"),
+      // 현재 먼슬리
+      currentMonthly: translate("home.currentMonthly"),
+      noMonthly: translate("home.noMonthly"),
+      noMonthlyDescription: translate("home.noMonthlyDescription"),
+      createMonthly: translate("home.createMonthly"),
       reward: translate("home.reward"),
       noReward: translate("home.noReward"),
       progress: translate("home.progress"),
       progressSuffix: translate("home.progressSuffix"),
       daysLeft: translate("home.daysLeft"),
 
-      // 오늘 마감
-      todayDeadline: translate("home.todayDeadline"),
-      todayDeadlineDescription: translate("home.todayDeadlineDescription"),
       completed: translate("home.completed"),
       inProgress: translate("home.inProgress"),
 
       // 프로젝트
-      currentChapterProjects: translate("home.currentChapterProjects"),
-      noProjects: translate("home.noProjects"),
-      noProjectsDescription: translate("home.noProjectsDescription"),
       addProject: translate("home.addProject"),
       area: translate("home.area"),
       addedMidway: translate("home.addedMidway"),
@@ -109,37 +140,41 @@ export default function HomePage() {
       aiPlanGenerator: translate("home.aiPlanGenerator"),
       aiPlanGeneratorDescription: translate("home.aiPlanGeneratorDescription"),
       generateWithAI: translate("home.generateWithAI"),
+      aiPlanGeneratorFeatures: {
+        goalAnalysis: translate("home.aiPlanGeneratorFeatures.goalAnalysis"),
+        timeConstraints: translate(
+          "home.aiPlanGeneratorFeatures.timeConstraints"
+        ),
+        autoGeneration: translate(
+          "home.aiPlanGeneratorFeatures.autoGeneration"
+        ),
+      },
 
       // 오늘의 할 일
       todayTasks: translate("home.todayTasks"),
       todayTasksEmpty: translate("home.todayTasksEmpty"),
       todayTasksEmptyDescription: translate("home.todayTasksEmptyDescription"),
-      todayDeadlineProjects: translate("home.todayDeadlineProjects"),
-      todayDeadlineProjectsEmpty: translate("home.todayDeadlineProjectsEmpty"),
-      todayDeadlineProjectsEmptyDescription: translate(
-        "home.todayDeadlineProjectsEmptyDescription"
-      ),
-      inProgressProjects: translate("home.inProgressProjects"),
+
+      // 빠른 액션
       quickActions: translate("home.quickActions"),
       newProject: translate("home.newProject"),
       addResource: translate("home.addResource"),
-      newChapter: translate("home.newChapter"),
-      viewAllProjects: translate("home.viewAllProjects"),
+      newMonthly: translate("home.newMonthly"),
 
       // 대시보드
       yearlyStats: translate("home.yearlyStats"),
       yearlyStatsDescription: translate("home.yearlyStatsDescription"),
       focusTime: translate("home.focusTime"),
-      hours: translate("home.hours"),
       completionRate: translate("home.completionRate"),
-      completedChapters: translate("home.completedChapters"),
-      completedChaptersDescription: translate(
-        "home.completedChaptersDescription"
+      completedMonthlies: translate("home.completedMonthlies"),
+      completedMonthliesDescription: translate(
+        "home.completedMonthliesDescription"
       ),
       totalRewards: translate("home.totalRewards"),
       totalRewardsDescription: translate("home.totalRewardsDescription"),
+      hours: translate("home.hours"),
       areaActivity: translate("home.areaActivity"),
-      chapterComparison: translate("home.chapterComparison"),
+      monthlyComparison: translate("home.monthlyComparison"),
       dashboardUpdate: translate("home.dashboardUpdate"),
 
       // 로그인
@@ -149,7 +184,7 @@ export default function HomePage() {
     [translate]
   );
 
-  // 로그인 상태 확인 및 리다이렉션
+  // 로그인 상태 확인
   useEffect(() => {
     if (!loading && !user) {
       toast({
@@ -174,155 +209,162 @@ export default function HomePage() {
     }
   }, [user]);
 
-  // Firestore에서 직접 데이터 가져오기
-  const { data: areas = [] } = useQuery({
-    queryKey: ["areas", user?.uid],
-    queryFn: async () => {
-      if (!user) return [];
-      const userAreas = await fetchAllAreasByUserId(user.uid);
-
-      // "미분류" 영역이 없으면 생성
-      const hasUncategorized = userAreas.some((area) => area.name === "미분류");
-      if (!hasUncategorized) {
-        try {
-          await getOrCreateUncategorizedArea(user.uid);
-          // 영역 목록을 다시 가져옴
-          return await fetchAllAreasByUserId(user.uid);
-        } catch (error) {
-          console.error("미분류 영역 생성 실패:", error);
-        }
-      }
-
-      return userAreas;
-    },
+  // 모든 프로젝트를 가져오기 (Today's Tasks에서 프로젝트 정보 표시용)
+  const { data: allProjects = [], isLoading: allProjectsLoading } = useQuery({
+    queryKey: ["allProjects", user?.uid],
+    queryFn: () => (user ? fetchAllProjectsByUserId(user.uid) : []),
     enabled: !!user,
   });
-
-  // 현재 챕터를 먼저 가져와서 해당 챕터의 프로젝트만 가져오기
-  const { data: chapters = [], isLoading: chaptersLoading } = useQuery({
-    queryKey: ["chapters", user?.uid],
-    queryFn: () => (user ? fetchAllChaptersByUserId(user.uid) : []),
-    enabled: !!user,
-  });
-
-  // 현재 진행 중인 챕터를 날짜 기반으로 선택
-  const currentChapter =
-    chapters.find((chapter) => {
-      const status = getChapterStatus(chapter);
-      return status === "in_progress";
-    }) || null;
-
-  const { data: projects = [], isLoading: projectsLoading } = useQuery({
-    queryKey: ["currentChapterProjects", user?.uid, currentChapter?.id],
-    queryFn: () =>
-      user && currentChapter
-        ? fetchCurrentChapterProjects(user.uid, currentChapter.id)
-        : [],
-    enabled: !!user && !!currentChapter,
-  });
-
-  // 현재 챕터에 연결된 프로젝트들 (이미 필터링된 상태)
-  const currentChapterProjects = projects;
 
   // 오늘의 task들
   const { data: todayTasks = [], isLoading: todayTasksLoading } = useQuery({
-    queryKey: ["todayTasks", user?.uid, currentChapter?.id],
-    queryFn: () =>
-      user && currentChapter ? getTodayTasks(user.uid, currentChapter.id) : [],
-    enabled: !!user && !!currentChapter,
-  });
-
-  // 오늘 마감인 프로젝트들
-  const { data: todayDeadlineProjects = [] } = useQuery({
-    queryKey: ["todayDeadlineProjects", user?.uid],
-    queryFn: () => (user ? getTodayDeadlineProjects(user.uid) : []),
+    queryKey: ["todayTasks", user?.uid],
+    queryFn: () => (user ? getTodayTasks(user.uid) : []),
     enabled: !!user,
   });
 
-  // 오늘 마감 프로젝트들의 태스크 통계
-  const { data: todayProjectTaskCounts = {} } = useQuery({
-    queryKey: [
-      "todayProjectTaskCounts",
-      todayDeadlineProjects.map((p) => p.id).sort(), // 정렬해서 키 안정성 보장
-    ],
-    queryFn: () =>
-      getTaskCountsForMultipleProjects(todayDeadlineProjects.map((p) => p.id)),
-    enabled: todayDeadlineProjects.length > 0,
+  // 먼슬리 데이터 (현재 먼슬리 정보와 대시보드용)
+  const { data: monthlies = [], isLoading: monthliesLoading } = useQuery({
+    queryKey: ["monthlies", user?.uid],
+    queryFn: () => (user ? fetchAllMonthliesByUserId(user.uid) : []),
+    enabled: !!user,
   });
 
-  // 연간 통계
+  // Lazy Loading: Dashboard 탭이 활성화될 때만 실행
   const { data: yearlyStats } = useQuery({
     queryKey: ["yearlyStats", user?.uid],
     queryFn: () =>
       user
         ? fetchYearlyActivityStats(user.uid, new Date().getFullYear())
         : null,
+    enabled: !!user && activeTab === "dashboard",
+  });
+
+  // 미분류 리소스만 가져오기 (최적화)
+  const { data: uncategorizedResources = [] } = useQuery({
+    queryKey: ["uncategorizedResources", user?.uid],
+    queryFn: () => (user ? fetchUncategorizedResourcesByUserId(user.uid) : []),
     enabled: !!user,
   });
 
-  // 리소스 데이터
-  const { data: resources = [] } = useQuery({
-    queryKey: ["resources", user?.uid],
-    queryFn: () => (user ? fetchAllResourcesByUserId(user.uid) : []),
-    enabled: !!user,
+  // 현재 진행 중인 먼슬리를 날짜 기반으로 선택
+  const currentMonthly =
+    monthlies.find((monthly) => {
+      const status = getMonthlyStatus(monthly);
+      return status === "in_progress";
+    }) || null;
+
+  // 월간 비교 데이터 준비
+  const pastMonthlies = monthlies.filter(
+    (monthly) => getMonthlyStatus(monthly) === "ended"
+  );
+
+  // 월간 비교 차트 데이터 - Key Results 기반으로 계산
+  const monthlyComparisonData = pastMonthlies.slice(-3).map((monthly) => {
+    const startDate =
+      monthly.startDate instanceof Date
+        ? monthly.startDate
+        : (monthly.startDate as any).toDate();
+
+    // Key Results 기반으로 완료율 계산
+    const totalKeyResults = monthly.keyResults?.length || 0;
+    const completedKeyResults =
+      monthly.keyResults?.filter((kr) => kr.isCompleted).length || 0;
+    const completionRate =
+      totalKeyResults > 0
+        ? Math.round((completedKeyResults / totalKeyResults) * 100)
+        : 0;
+
+    // 완료된 Key Results 수를 집중 시간으로 사용 (임시)
+    const focusHours = completedKeyResults;
+
+    const data = {
+      name: `${startDate.getMonth() + 1}월`,
+      completion: completionRate,
+      focusHours: focusHours,
+    };
+
+    return data;
   });
 
-  // 현재 챕터 정보 계산
-  const startDate = currentChapter
-    ? formatDate(new Date(currentChapter.startDate), currentLanguage)
+  // 현재 먼슬리 정보 계산
+  const startDate = currentMonthly
+    ? formatDate(new Date(currentMonthly.startDate), currentLanguage)
     : "";
-  const endDate = currentChapter
-    ? formatDate(new Date(currentChapter.endDate), currentLanguage)
+  const endDate = currentMonthly
+    ? formatDate(new Date(currentMonthly.endDate), currentLanguage)
     : "";
 
-  // 챕터 진행률 계산 - connectedProjects를 사용하여 정확한 계산
+  // 월 뱃지용 월 추출
+  const getMonthBadge = (date: Date) => {
+    const month = new Date(date).getMonth() + 1;
+    if (currentLanguage === "ko") {
+      return `${month}월`;
+    } else {
+      const monthNames = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+      return monthNames[month - 1];
+    }
+  };
+
+  // 먼슬리 진행률 계산 - connectedProjects를 사용하여 정확한 계산
   let total = 0;
   let actualDoneCount = 0;
   let progress = 0;
 
-  if (currentChapter && currentChapter.connectedProjects) {
-    total = currentChapter.connectedProjects.reduce(
-      (sum, project) => sum + (project.chapterTargetCount || 0),
-      0
-    );
-    actualDoneCount = currentChapter.connectedProjects.reduce(
-      (sum, project) => sum + (project.chapterDoneCount || 0),
-      0
-    );
+  if (currentMonthly && currentMonthly.keyResults) {
+    total = currentMonthly.keyResults.length;
+    actualDoneCount = currentMonthly.keyResults.filter(
+      (kr) => kr.isCompleted
+    ).length;
     progress = total > 0 ? Math.round((actualDoneCount / total) * 100) : 0;
   }
 
   // 남은 일수 계산
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const daysLeft = currentChapter
+  const daysLeft = currentMonthly
     ? Math.max(
         0,
         Math.ceil(
-          (new Date(currentChapter.endDate).getTime() - today.getTime()) /
+          (new Date(currentMonthly.endDate).getTime() - today.getTime()) /
             (1000 * 60 * 60 * 24)
         )
       )
     : 0;
+
+  // 디버깅: D-day 계산 정보 (개발 환경에서만)
+  if (process.env.NODE_ENV === "development" && currentMonthly) {
+    console.log("D-day 계산 정보:", {
+      today: today.toISOString(),
+      endDate: currentMonthly.endDate,
+      endDateParsed: new Date(currentMonthly.endDate).toISOString(),
+      daysLeft,
+      currentMonthly: {
+        id: currentMonthly.id,
+        objective: currentMonthly.objective,
+        startDate: currentMonthly.startDate,
+        endDate: currentMonthly.endDate,
+      },
+    });
+  }
   const changeRate = 0; // 추후 통계 fetch로 대체
 
-  // 프로젝트 표시 개수 제한 (정책: 3개 이하면 모두 표시, 4개 이상이면 3개만 표시 + 더보기 버튼)
-  const displayedProjects = showAllProjects
-    ? currentChapterProjects
-    : currentChapterProjects.slice(0, 3);
-  const hasMoreProjects = currentChapterProjects.length > 3;
-
-  // areaId → area명 매핑 함수
-  const getAreaName = (areaId?: string) =>
-    areaId ? areas.find((a) => a.id === areaId)?.name || "-" : "-";
-
   // 미분류 항목 통계 계산
-  const uncategorizedArea = areas.find((area) => area.name === "미분류");
-  const uncategorizedProjects = projects.filter(
-    (project) => project.areaId === uncategorizedArea?.id
-  ).length;
-  const uncategorizedResources = resources.filter(
-    (resource) => resource.areaId === uncategorizedArea?.id
+  const uncategorizedProjects = allProjects.filter(
+    (project) => !project.areaId
   ).length;
 
   return (
@@ -330,7 +372,21 @@ export default function HomePage() {
       {/* 헤더 섹션 */}
       <div className="mb-8">
         <div className="flex items-center gap-4 mb-6">
-          <CharacterAvatar level={5} />
+          <div className="relative">
+            <div className="w-20 h-20 relative overflow-hidden rounded-full border-4 border-primary/20 bg-secondary">
+              {user?.photoURL ? (
+                <Image
+                  src={user.photoURL}
+                  alt="Profile Picture"
+                  width={80}
+                  height={80}
+                  className="object-cover w-full h-full"
+                />
+              ) : (
+                <CharacterAvatar level={5} />
+              )}
+            </div>
+          </div>
           <div className="flex-1">
             <h1 className="text-2xl font-bold">
               {texts.greeting}{" "}
@@ -350,40 +406,40 @@ export default function HomePage() {
       </div>
 
       {/* AI 계획 생성기 독립 블록 */}
-      <Card className="mb-6 bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200">
+      <Card className="mb-6 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border-purple-200 dark:border-purple-700/50">
         <div className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Sparkles className="h-6 w-6 text-purple-600" />
+            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+              <Sparkles className="h-6 w-6 text-purple-600 dark:text-purple-400" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-purple-900">
+              <h3 className="text-lg font-bold text-purple-900 dark:text-purple-100">
                 {texts.aiPlanGenerator}
               </h3>
-              <p className="text-sm text-purple-700">
+              <p className="text-sm text-purple-700 dark:text-purple-300">
                 {texts.aiPlanGeneratorDescription}
               </p>
             </div>
           </div>
 
           <div className="space-y-3 mb-4">
-            <div className="flex items-center gap-2 text-sm text-purple-700">
+            <div className="flex items-center gap-2 text-sm text-purple-700 dark:text-purple-300">
               <CheckCircle className="h-4 w-4" />
-              <span>목표 분석 및 단계별 계획 수립</span>
+              <span>{texts.aiPlanGeneratorFeatures.goalAnalysis}</span>
             </div>
-            <div className="flex items-center gap-2 text-sm text-purple-700">
+            <div className="flex items-center gap-2 text-sm text-purple-700 dark:text-purple-300">
               <CheckCircle className="h-4 w-4" />
-              <span>시간 제약 및 난이도 고려</span>
+              <span>{texts.aiPlanGeneratorFeatures.timeConstraints}</span>
             </div>
-            <div className="flex items-center gap-2 text-sm text-purple-700">
+            <div className="flex items-center gap-2 text-sm text-purple-700 dark:text-purple-300">
               <CheckCircle className="h-4 w-4" />
-              <span>프로젝트와 작업 자동 생성</span>
+              <span>{texts.aiPlanGeneratorFeatures.autoGeneration}</span>
             </div>
           </div>
 
           <Button
             onClick={() => router.push("/ai-plan-generator")}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+            className="w-full bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600 text-white"
           >
             <Rocket className="h-4 w-4 mr-2" />
             {texts.generateWithAI}
@@ -394,153 +450,221 @@ export default function HomePage() {
       {/* 미분류 항목 통계 */}
       <UncategorizedStatsCard
         uncategorizedProjects={uncategorizedProjects}
-        uncategorizedResources={uncategorizedResources}
-        totalAreas={areas.length}
+        uncategorizedResources={uncategorizedResources.length}
+        totalAreas={0}
       />
 
       {/* 탭 네비게이션 */}
-      <Tabs defaultValue="today" className="mb-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="today">{texts.todayTab}</TabsTrigger>
           <TabsTrigger value="dashboard">{texts.dashboardTab}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="today" className="mt-4 space-y-6">
-          {/* 현재 챕터 정보 */}
-          {currentChapter ? (
-            <ChapterCard
-              chapter={currentChapter}
-              daysLeft={daysLeft}
-              progress={progress}
-              completedTasks={actualDoneCount}
-              totalTasks={total}
-              currentLanguage={currentLanguage}
-              texts={{
-                daysLeft: texts.daysLeft,
-                reward: texts.reward,
-                noReward: texts.noReward,
-                progress: texts.progress,
-                progressSuffix: texts.progressSuffix,
-              }}
-              href={`/chapter/${currentChapter.id}`}
-            />
-          ) : (
-            <Card className="border-2 border-dashed border-primary/30 p-8 text-center">
-              <div className="mb-4 flex justify-center">
-                <div className="rounded-full bg-primary/10 p-4">
-                  <BookOpen className="h-8 w-8 text-primary" />
+          {/* 현재 먼슬리 정보 */}
+          {currentMonthly ? (
+            <Card className="p-4 border border-border hover:shadow-sm transition-shadow bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge
+                      variant="secondary"
+                      className="text-xs bg-primary/10 text-primary border-primary/20"
+                    >
+                      {getMonthBadge(currentMonthly.startDate)}
+                    </Badge>
+                    <h3 className="text-lg font-semibold">
+                      {currentMonthly.objective}
+                    </h3>
+                  </div>
+                  {currentMonthly.objective && (
+                    <p className="text-sm text-muted-foreground mb-2">
+                      {currentMonthly.objective}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Calendar className="h-3 w-3" />
+                    <span>
+                      {formatDate(currentMonthly.startDate, currentLanguage)} -{" "}
+                      {formatDate(currentMonthly.endDate, currentLanguage)}
+                    </span>
+                  </div>
                 </div>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href={`/monthly/${currentMonthly.id}`}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Link>
+                </Button>
               </div>
-              <h3 className="mb-2 text-lg font-bold">{texts.noChapter}</h3>
-              <p className="mb-6 text-xs text-muted-foreground max-w-sm mx-auto">
-                {texts.noChapterDescription}
+
+              {/* Key Results Progress */}
+              {currentMonthly.keyResults &&
+                currentMonthly.keyResults.length > 0 && (
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Key Results</span>
+                      <Badge
+                        variant="outline"
+                        className="text-xs flex-shrink-0"
+                      >
+                        {
+                          currentMonthly.keyResults.filter(
+                            (kr) => kr.isCompleted
+                          ).length
+                        }
+                        /{currentMonthly.keyResults.length}
+                      </Badge>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-primary h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${progress}%`,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+
+              {/* 보상 정보 */}
+              {currentMonthly.reward && (
+                <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+                  <Award className="h-4 w-4" />
+                  <span>{currentMonthly.reward}</span>
+                </div>
+              )}
+
+              {/* D-day 정보 */}
+              <div className="mt-3 flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {texts.daysLeft}: {daysLeft}일
+                </span>
+                <ProgressCard
+                  title={texts.progress}
+                  progress={progress}
+                  total={100}
+                />
+              </div>
+            </Card>
+          ) : (
+            <Card className="p-6 text-center border-dashed border-border bg-card/80 dark:bg-card/60">
+              <div className="mb-3 text-2xl">📅</div>
+              <h3 className="mb-2 font-medium">{texts.noMonthly}</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                {texts.noMonthlyDescription}
               </p>
-              <Button onClick={() => router.push("/chapter/new")}>
-                <Plus className="mr-2 h-4 w-4" />
-                {texts.createChapter}
+              <Button onClick={() => router.push("/monthly/new")}>
+                <Plus className="h-4 w-4 mr-2" />
+                {texts.createMonthly}
               </Button>
             </Card>
           )}
 
-          {/* 오늘의 task들 */}
+          {/* 오늘의 할 일 */}
           <section>
             <div className="flex items-center gap-2 mb-4">
-              <CheckCircle className="h-5 w-5 text-primary" />
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
               <h3 className="text-lg font-bold">
                 {texts.todayTasks} ({todayTasks.length}개)
               </h3>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {todayTasks.length > 0 ? (
-                todayTasks.map((task) => (
-                  <Card
-                    key={task.id}
-                    className="p-4 border border-border hover:shadow-sm transition-shadow"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <h4 className="font-medium mb-1">{task.title}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {task.duration}일 소요
-                        </p>
+                todayTasks.map((task, index) => {
+                  const project = allProjects.find(
+                    (p) => p.id === task.projectId
+                  );
+                  return (
+                    <Card
+                      key={task.id}
+                      className={`p-3 transition-all duration-200 hover:shadow-md ${
+                        task.done ? "bg-green-50/50 dark:bg-green-900/20" : ""
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* 인덱스 번호 */}
+                        <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            {index + 1}
+                          </span>
+                        </div>
+                        {/* 완료 상태 토글 버튼 */}
+                        <button
+                          onClick={() => handleTaskToggle(task)}
+                          className="flex-shrink-0 hover:scale-110 transition-transform cursor-pointer"
+                        >
+                          {task.done ? (
+                            <CheckCircle2 className="h-3 w-3 text-green-600 fill-green-600" />
+                          ) : (
+                            <Circle className="h-3 w-3 text-muted-foreground hover:text-green-600 hover:fill-green-100" />
+                          )}
+                        </button>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p
+                              className={`text-sm font-medium transition-all duration-200 ${
+                                task.done
+                                  ? "line-through text-muted-foreground"
+                                  : ""
+                              }`}
+                            >
+                              {task.title}
+                            </p>
+                          </div>
+                          {/* 프로젝트명을 별도 행으로 표시 */}
+                          {project && (
+                            <div className="mb-1">
+                              <span className="text-xs text-muted-foreground">
+                                {project.title}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              <span>
+                                {formatDate(task.date, currentLanguage)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              <span>
+                                {typeof task.duration === "string"
+                                  ? parseFloat(task.duration)
+                                  : task.duration}
+                                시간
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        {/* 프로젝트로 연결되는 OUTlink 버튼 */}
+                        {project && (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              asChild
+                              className="flex-shrink-0 h-8 w-8 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                            >
+                              <Link href={`/para/projects/${project.id}`}>
+                                <ExternalLink className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                      <Badge
-                        variant={task.done ? "default" : "secondary"}
-                        className="text-xs"
-                      >
-                        {task.done ? "완료" : "진행중"}
-                      </Badge>
-                    </div>
-
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        예상 소요시간: {task.duration}일
-                      </span>
-                      <span className="text-muted-foreground">
-                        {task.done ? "✅ 완료됨" : "⏳ 진행중"}
-                      </span>
-                    </div>
-                  </Card>
-                ))
+                    </Card>
+                  );
+                })
               ) : (
-                <Card className="p-6 text-center border-dashed border-border">
+                <Card className="p-6 text-center border-dashed border-border bg-card/80 dark:bg-card/60">
                   <div className="mb-3 text-2xl">📝</div>
                   <h3 className="mb-2 font-medium">{texts.todayTasksEmpty}</h3>
                   <p className="text-sm text-muted-foreground">
                     {texts.todayTasksEmptyDescription}
-                  </p>
-                </Card>
-              )}
-            </div>
-          </section>
-
-          {/* 오늘 마감 프로젝트들 */}
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <AlertCircle className="h-5 w-5 text-orange-600" />
-              <h3 className="text-lg font-bold">
-                {texts.todayDeadlineProjects} ({todayDeadlineProjects.length}개)
-              </h3>
-            </div>
-
-            <div className="space-y-3">
-              {todayDeadlineProjects.length > 0 ? (
-                todayDeadlineProjects.map((project) => (
-                  <Card
-                    key={project.id}
-                    className="p-4 border border-border hover:shadow-sm transition-shadow"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <h4 className="font-medium mb-1">{project.title}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {getAreaName(project.areaId)} 영역
-                        </p>
-                      </div>
-                      <Badge variant="destructive" className="text-xs">
-                        마감
-                      </Badge>
-                    </div>
-
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        목표: {project.targetCount}개
-                      </span>
-                      <span className="text-muted-foreground">
-                        완료: {project.completedTasks}개
-                      </span>
-                    </div>
-                  </Card>
-                ))
-              ) : (
-                <Card className="p-6 text-center border-dashed border-border">
-                  <div className="mb-3 text-2xl">🎯</div>
-                  <h3 className="mb-2 font-medium">
-                    {texts.todayDeadlineProjectsEmpty}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {texts.todayDeadlineProjectsEmptyDescription}
                   </p>
                 </Card>
               )}
@@ -572,11 +696,11 @@ export default function HomePage() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => router.push("/chapter/new")}
+                onClick={() => router.push("/monthly/new")}
                 className="h-16 flex flex-col gap-1 hover:bg-primary/5 hover:border-primary/30 transition-colors"
               >
                 <Target className="h-5 w-5" />
-                <span className="text-sm">{texts.newChapter}</span>
+                <span className="text-sm">{texts.newMonthly}</span>
               </Button>
               <Button
                 variant="outline"
@@ -591,7 +715,7 @@ export default function HomePage() {
         </TabsContent>
 
         <TabsContent value="dashboard" className="mt-4 space-y-6">
-          <div className="rounded-lg border bg-muted/20 p-4 mb-4">
+          <div className="rounded-lg border bg-muted/20 dark:bg-muted/10 p-4 mb-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
             <h2 className="text-lg font-bold mb-2 flex items-center gap-2">
               <BarChart3 className="h-5 w-5" />
               {texts.yearlyStats}
@@ -648,9 +772,9 @@ export default function HomePage() {
 
           <div className="grid grid-cols-2 gap-4">
             <StatsCard
-              title={texts.completedChapters}
-              value={yearlyStats?.completedChapters || 0}
-              description={texts.completedChaptersDescription}
+              title={texts.completedMonthlies}
+              value={yearlyStats?.completedMonthlies || 0}
+              description={texts.completedMonthliesDescription}
               icon={<BookOpen className="h-4 w-4 text-muted-foreground" />}
             />
             <StatsCard
@@ -661,7 +785,7 @@ export default function HomePage() {
             />
           </div>
 
-          <Card className="p-4">
+          <Card className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
             <h3 className="mb-4 font-bold">{texts.areaActivity}</h3>
             <div className="h-64">
               <AreaActivityChart
@@ -681,22 +805,16 @@ export default function HomePage() {
             </div>
           </Card>
 
-          <Card className="p-4">
-            <h3 className="mb-4 font-bold">{texts.chapterComparison}</h3>
+          <Card className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
+            <h3 className="mb-4 font-bold">{texts.monthlyComparison}</h3>
             <div className="h-64">
-              <ChapterComparisonChart
-                data={
-                  yearlyStats?.monthlyProgress
-                    ? Object.entries(yearlyStats.monthlyProgress).map(
-                        ([month, stats]: [string, any]) => ({
-                          name: `${parseInt(month)}월`,
-                          completion: stats.completionRate,
-                          focusHours: Math.round(stats.focusTime / 60),
-                        })
-                      )
-                    : []
-                }
-              />
+              {monthlyComparisonData.length > 0 ? (
+                <MonthlyComparisonChart data={monthlyComparisonData} />
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  <p>완료된 월간 데이터가 없습니다</p>
+                </div>
+              )}
             </div>
           </Card>
 

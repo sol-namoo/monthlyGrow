@@ -25,10 +25,9 @@ import {
 import { Search, Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  fetchAllProjectsByUserId,
-  fetchAllAreasByUserId,
   fetchProjectsByUserIdWithPaging,
-} from "@/lib/firebase";
+  fetchAllAreasByUserId,
+} from "@/lib/firebase/index";
 import { getAuth } from "firebase/auth";
 import { Project, Area } from "@/lib/types";
 import { getProjectStatus, formatDate } from "@/lib/utils";
@@ -46,7 +45,7 @@ interface ProjectSelectionModalProps {
   areas?: any[]; // 외부에서 전달받은 영역 목록
   projectsLoading?: boolean;
   areasLoading?: boolean;
-  currentChapterId?: string; // 현재 챕터 ID (수정 시에만 사용)
+  currentMonthlyId?: string; // 현재 먼슬리 ID (수정 시에만 사용)
 }
 
 export function ProjectSelectionModal({
@@ -61,7 +60,7 @@ export function ProjectSelectionModal({
   areas: externalAreas,
   projectsLoading: externalProjectsLoading,
   areasLoading: externalAreasLoading,
-  currentChapterId,
+  currentMonthlyId,
 }: ProjectSelectionModalProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -90,8 +89,7 @@ export function ProjectSelectionModal({
       const result = await fetchProjectsByUserIdWithPaging(
         user?.uid || "",
         itemsPerPage,
-        lastDoc,
-        "latest"
+        lastDoc
       );
 
       if (lastDoc === null) {
@@ -154,8 +152,8 @@ export function ProjectSelectionModal({
 
     // 연결되지 않은 프로젝트만 필터 (체크박스가 체크되어 있을 때만)
     if (showOnlyUnconnected) {
-      const connectedChapters = (project as any).connectedChapters || [];
-      const isConnected = connectedChapters.length > 0 || project.chapterId;
+      const connectedMonthlies = (project as any).connectedMonthlies || [];
+      const isConnected = connectedMonthlies.length > 0 || project.monthlyId;
       if (isConnected) {
         return false;
       }
@@ -192,8 +190,7 @@ export function ProjectSelectionModal({
     const result = await fetchProjectsByUserIdWithPaging(
       user?.uid || "",
       itemsPerPage,
-      lastDoc,
-      "latest"
+      lastDoc
     );
 
     setAllProjects((prev) => [...prev, ...result.projects]);
@@ -225,7 +222,7 @@ export function ProjectSelectionModal({
         <DialogHeader>
           <DialogTitle>프로젝트 선택</DialogTitle>
           <DialogDescription>
-            이 챕터에 연결할 프로젝트를 선택하세요.
+            이 먼슬리에 연결할 프로젝트를 선택하세요.
             {maxProjects && ` 최대 ${maxProjects}개까지 선택할 수 있습니다.`}
           </DialogDescription>
         </DialogHeader>
@@ -366,26 +363,29 @@ export function ProjectSelectionModal({
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1 ml-2">
-                          {currentChapterId &&
-                            project.chapterId === currentChapterId && (
-                              <Badge variant="secondary" className="text-xs">
-                                현재 챕터에 연결됨
+                          {currentMonthlyId &&
+                            project.monthlyId === currentMonthlyId && (
+                              <Badge
+                                variant="secondary"
+                                className="text-xs flex-shrink-0"
+                              >
+                                현재 먼슬리에 연결됨
                               </Badge>
                             )}
-                          {currentChapterId &&
-                            project.chapterId &&
-                            project.chapterId !== currentChapterId && (
+                          {currentMonthlyId &&
+                            project.monthlyId &&
+                            project.monthlyId !== currentMonthlyId && (
                               <Badge
                                 variant="outline"
-                                className="text-xs text-muted-foreground"
+                                className="text-xs flex-shrink-0 text-muted-foreground"
                               >
-                                다른 챕터에 연결됨
+                                다른 먼슬리에 연결됨
                               </Badge>
                             )}
                           {newlyCreatedProjectId === project.id && (
                             <Badge
                               variant="default"
-                              className="text-xs bg-green-500"
+                              className="text-xs flex-shrink-0 bg-green-500"
                             >
                               새로 생성됨
                             </Badge>
@@ -408,7 +408,7 @@ export function ProjectSelectionModal({
                   </p>
                   <Button asChild variant="outline">
                     <a
-                      href="/para/projects/new?returnUrl=/chapter/new"
+                      href="/para/projects/new?returnUrl=/monthly/new"
                       target="_blank"
                     >
                       <Plus className="mr-2 h-4 w-4" />새 프로젝트 만들기

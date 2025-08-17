@@ -11,7 +11,7 @@ export const common = {
   category: "카테고리",
   target: "목표",
   uncategorized: "미분류",
-  chapterGoal: "이번 챕터 목표",
+  monthlyGoal: "이번 먼슬리 목표",
   projectProgress: "전체 진행률",
   errors: {
     loginRequired: "로그인이 필요합니다.",
@@ -22,7 +22,7 @@ export const common = {
 
 export const bottomNav = {
   home: "홈",
-  chapter: "챕터",
+  monthly: "먼슬리",
   para: "PARA",
   settings: "설정",
 } as const;
@@ -56,9 +56,9 @@ export const charts = {
   areaActivity: "영역별 활동",
   completionRate: "완료율",
   focusTime: "집중 시간",
-  chapterComparison: "챕터 비교",
-  monthlyProgress: "월간 진행률",
+  monthlyComparison: "먼슬리 비교",
+  monthlyProgress: "먼슬리 진행률",
   yearlyStats: "연간 통계",
   projectStatus: "프로젝트 상태",
-  taskProgress: "태스크 진행률",
+  taskProgress: "할 일 진행률",
 } as const;

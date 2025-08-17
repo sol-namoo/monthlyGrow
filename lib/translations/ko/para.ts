@@ -13,25 +13,25 @@ export const para = {
       label: "목표 개수",
       placeholder: "목표 개수를 입력해주세요",
       repetitive: "목표 횟수",
-      taskBased: "목표 태스크 수",
+      taskBased: "목표 할 일 수",
       repetitivePlaceholder: "목표 횟수 (예: 30)",
-      taskBasedPlaceholder: "목표 태스크 수 (예: 10)",
+      taskBasedPlaceholder: "목표 할 일 수 (예: 10)",
       description: {
         repetitive:
-          "반복형 프로젝트는 목표 횟수에 따라 태스크가 자동으로 생성됩니다",
+          "반복형 프로젝트는 목표 횟수에 따라 할 일이 자동으로 생성됩니다",
         taskBased:
-          "작업형 프로젝트는 목표 태스크 수에 따라 빈 태스크가 생성됩니다",
+          "작업형 프로젝트는 목표 할 일 수에 따라 빈 할 일이 생성됩니다",
       },
       hint: {
-        repetitive: "목표 횟수를 입력하면 태스크가 자동으로 생성됩니다",
-        taskBased: "목표 태스크 수를 입력하면 빈 태스크가 생성됩니다",
+        repetitive: "목표 횟수를 입력하면 할 일이 자동으로 생성됩니다",
+        taskBased: "목표 할 일 수를 입력하면 빈 할 일이 생성됩니다",
         setup: "목표 횟수와 프로젝트 기간을 설정해주세요",
       },
-      chapter: {
-        label: "챕터 목표 개수",
+      monthly: {
+        label: "먼슬리 목표 개수",
         recommended: "권장: {count}개",
-        current: "{current}개 / 총 태스크 {total}개",
-        setToTotal: "전체 태스크로 설정",
+        current: "{current}개 / 총 할 일 {total}개",
+        setToTotal: "전체 할 일로 설정",
         setToRecommended: "권장값으로 설정",
       },
     },
@@ -42,6 +42,8 @@ export const para = {
       plannedWithCount: "예정 ({count}개)",
       inProgress: "진행 중",
       inProgressWithCount: "진행 중 ({count}개)",
+      overdue: "기한 지남",
+      overdueWithCount: "기한 지남 ({count}개)",
       completed: "완료",
       completedWithCount: "완료 ({count}개)",
     },
@@ -277,7 +279,7 @@ export const para = {
     count: "총 {count}개 아카이브",
     filter: {
       all: "전체",
-      chapter: "챕터",
+      monthly: "먼슬리",
       project: "프로젝트",
     },
     sort: {
@@ -292,8 +294,12 @@ export const para = {
     },
     noTitle: "제목 없음",
     noSummary: "요약 없음",
+    loading: "아카이브를 불러오는 중...",
+    loadMore: "더 보기",
+    monthlyRetrospective: "먼슬리 회고",
+    projectRetrospective: "프로젝트 회고",
     types: {
-      chapterRetrospective: "챕터 회고",
+      monthlyRetrospective: "먼슬리 회고",
       projectRetrospective: "프로젝트 회고",
     },
     // Archive 상세페이지
@@ -316,18 +322,18 @@ export const para = {
       note: "노트",
     },
     relatedItem: {
-      chapter: "연결된 챕터",
+      monthly: "연결된 먼슬리",
       project: "연결된 프로젝트",
-      chapterDescription: "이 회고가 작성된 챕터입니다",
+      monthlyDescription: "이 회고가 작성된 먼슬리입니다",
       projectDescription: "이 회고가 작성된 프로젝트입니다",
-      viewChapter: "챕터 보기",
+      viewMonthly: "먼슬리 보기",
       viewProject: "프로젝트 보기",
     },
     retrospective: {
       bestMoment: "가장 좋았던 순간",
       routineAdherence: "루틴 준수율",
       unexpectedObstacles: "예상치 못한 장애물",
-      nextChapterApplication: "다음 챕터 적용 방안",
+      nextMonthlyApplication: "다음 먼슬리 적용 방안",
       note: "노트",
     },
     notes: {

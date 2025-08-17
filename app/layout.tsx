@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "MonthlyGrow - 월간 자기계발 앱",
-  description: "월간 챕터 기반 자기계발 앱",
+      description: "월간 기반 자기계발 앱",
   generator: "v0.dev",
 };
 

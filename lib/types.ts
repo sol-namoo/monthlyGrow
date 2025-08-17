@@ -24,12 +24,6 @@ export interface Resource {
   updatedAt: Date;
 }
 
-// 스프린트별 프로젝트 연결 인터페이스 (정량적 목표 제거)
-export interface ConnectedProject {
-  projectId: string;
-  addedMidway?: boolean; // 스프린트 중간에 추가된 프로젝트 여부
-}
-
 export interface Project {
   id: string;
   userId: string;
@@ -38,26 +32,28 @@ export interface Project {
   category?: "repetitive" | "task_based"; // 프로젝트 유형
   areaId?: string;
   area?: string; // Area 이름 (denormalized - DB에 저장되지 않고 쿼리 시 함께 제공)
-  target: string; // 목표 설명 (작업형: "완성된 이력서 1부", 반복형: "주요 개념 정리")
-  targetCount?: number; // 반복형일 때만 사용 (목표 개수)
   completedTasks: number; // 전체 실제 완료된 태스크 수
   startDate: Date;
   endDate: Date;
   createdAt: Date;
   updatedAt: Date;
-  sprintId?: string; // 현재 연결된 스프린트 ID (legacy)
-  connectedSprints?: string[]; // 연결된 스프린트 ID 배열
-
-  addedMidway?: boolean; // 스프린트 중간에 추가된 프로젝트 여부
   retrospective?: Retrospective;
   notes: Note[];
-  // tasks는 서브컬렉션으로 관리: projects/{projectId}/tasks/{taskId}
 
-  // 미완료 프로젝트 이관 관련 필드
-  isCarriedOver?: boolean; // 이전 스프린트에서 이관된 프로젝트 여부
-  originalSprintId?: string; // 원래 스프린트 ID (이관된 경우)
-  carriedOverAt?: Date; // 이관된 날짜
-  migrationStatus?: "pending" | "migrated" | "ignored"; // 이관 상태
+  // Monthly 연결 관련
+  connectedMonthlies?: string[]; // 연결된 Monthly ID 배열
+
+  // 프로젝트 목표 관련
+  target?: string; // 목표 설명 (예: "운동", "독서")
+  targetCount?: number; // 목표 수치 (기본값: 1)
+
+  // 이관 관련
+  isCarriedOver?: boolean;
+  originalMonthlyId?: string;
+  carriedOverAt?: Date;
+  migrationStatus?: "pending" | "migrated";
+
+  // tasks는 서브컬렉션으로 관리: projects/{projectId}/tasks/{taskId}
 
   // 프로젝트 상태는 동적으로 계산됨 (DB에 저장되지 않음)
   // getProjectStatus() 함수를 사용하여 실시간 계산
@@ -71,55 +67,144 @@ export interface Task {
   date: Date;
   duration: number; // 소요일수
   done: boolean;
+  completedAt?: Date; // 완료된 날짜 (done이 true일 때만 설정)
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface Sprint {
+// 먼슬리별 완료된 태스크 추적
+export interface MonthlyCompletedTasks {
   id: string;
   userId: string;
-  title: string;
+  yearMonth: string; // "2024-08" 형태
+  completedTasks: {
+    taskId: string;
+    projectId: string;
+    completedAt: Date;
+  }[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Key Result 인터페이스
+export interface KeyResult {
+  id: string;
+  title: string; // "운동 총 8회"
+  description?: string; // 상세 설명 (선택사항)
+  isCompleted: boolean; // 사용자가 OX 체크
+  targetCount?: number; // 목표 수치
+  completedCount?: number; // 완료 수치
+}
+
+export interface Monthly {
+  id: string;
+  userId: string;
+  objective: string; // OKR Objective (간단한 한 줄)
+  objectiveDescription?: string; // Objective 상세 설명 (선택사항)
   startDate: Date;
   endDate: Date;
   focusAreas: string[]; // Area ID 배열
-  objective: string; // 스프린트 목표 (정성적)
+  keyResults: KeyResult[]; // Key Results
   reward?: string;
   createdAt: Date;
   updatedAt: Date;
-  connectedProjects?: ConnectedProject[]; // 연결된 프로젝트들
-  retrospective?: Retrospective; // 스프린트 회고
-  note?: Note; // 스프린트 노트 (선택)
+  retrospective?: Retrospective; // 먼슬리 회고
+  note?: string; // 먼슬리 노트 (선택)
+  quickAccessProjects?: string[]; // 프로젝트 바로가기 ID 배열
 
   // 로컬 계산 필드 (DB에 저장되지 않음)
   status?: "planned" | "in_progress" | "ended"; // startDate와 endDate를 기반으로 클라이언트에서 계산
 }
 
-export interface Snapshot {
+// Key Result 스냅샷 (월말 스냅샷용)
+export interface KeyResultSnapshot {
   id: string;
-  chapterId: string;
-  projectId: string;
-  year: number;
-  month: number;
-  snapshotDate: Date;
-  doneCount: number;
-  targetCount: number;
-  reward: string;
+  title: string;
+  description?: string; // 상세 설명 (선택사항)
+  isCompleted: boolean;
+  targetCount?: number;
+  completedCount?: number;
+  // 스냅샷 시점의 상태를 그대로 보존
 }
+
+// 월간 스냅샷 (월말 자동 생성)
+export interface MonthlySnapshot {
+  id: string;
+  userId: string;
+  yearMonth: string; // "2024-08"
+  snapshotDate: Date;
+
+  // 먼슬리 정보
+  monthly: {
+    id: string;
+    objective: string;
+    objectiveDescription?: string;
+    keyResults: KeyResultSnapshot[];
+  };
+
+  // 완료된 태스크들 (프로젝트별 그룹핑)
+  completedTasks: {
+    projectId: string;
+    projectTitle: string;
+    areaName: string;
+    tasks: {
+      taskId: string;
+      title: string;
+      completedAt: Date;
+    }[];
+  }[];
+
+  // 통계 정보
+  statistics: {
+    totalCompletedTasks: number;
+    totalProjects: number;
+    totalAreas: number;
+    keyResultsCompleted: number;
+    keyResultsTotal: number;
+  };
+}
+
+// 기존 Snapshot 인터페이스 제거 (legacy)
+// export interface Snapshot {
+//   id: string;
+//   monthlyId: string;
+//   projectId: string;
+//   year: number;
+//   month: number;
+//   snapshotDate: Date;
+//   doneCount: number;
+//   targetCount: number;
+//   reward: string;
+// }
 
 export interface Retrospective {
   id: string;
   userId: string;
-  sprintId?: string; // 스프린트 회고인 경우
+  monthlyId?: string; // 먼슬리 회고인 경우
   projectId?: string; // 프로젝트 회고인 경우
   createdAt: Date;
   updatedAt: Date;
   content?: string; // 자유 회고
 
-  // 스프린트용 필드
+  // 먼슬리용 필드
   bestMoment?: string;
   routineAdherence?: string;
   unexpectedObstacles?: string;
-  nextSprintApplication?: string;
+  nextMonthlyApplication?: string;
+
+  // Key Results 중심 필드 (Monthly 구조에 맞게 추가)
+  keyResultsReview?: {
+    completedKeyResults?: string[]; // 완료된 Key Results ID 목록
+    failedKeyResults?: {
+      keyResultId: string;
+      reason:
+        | "unrealisticGoal"
+        | "timeManagement"
+        | "priorityMismatch"
+        | "externalFactors"
+        | "other"; // 실패 이유
+    }[];
+  };
 
   // 프로젝트용 필드
   goalAchieved?: string;
@@ -169,11 +254,6 @@ export interface UserSettings {
   notifications: boolean;
   theme: "light" | "dark" | "system";
   language: "ko" | "en";
-  sprintProjectCardDisplay: "sprint_only" | "both"; // 스프린트 페이지에서 프로젝트 카드 표시 방식
-  // Firebase Auth에서 제공하는 정보는 제외:
-  // - email (user.email)
-  // - displayName (user.displayName)
-  // - photoURL (user.photoURL)
 }
 
 export interface UserPreferences {
@@ -224,10 +304,11 @@ export interface GeneratedPlan {
     description: string;
     category: "repetitive" | "task_based";
     areaName: string;
-    target: string; // 목표 설명 (작업형: "완성된 이력서 1부", 반복형: "주요 개념 정리")
-    targetCount?: number; // 반복형일 때만 사용 (목표 개수)
     durationWeeks: number;
     difficulty: string;
+    target?: string; // 목표 설명 (예: "운동", "독서")
+    targetCount?: number; // 목표 수치
+    estimatedDailyTime?: number; // 일일 예상 소요 시간 (분)
     tasks: Array<{
       title: string;
       description: string;
@@ -281,7 +362,9 @@ export interface GeneratePlanRequest {
   userInput: string;
   constraints?: PlanConstraints;
   existingAreas?: Area[];
+  inputType?: "manual" | "monthly"; // 입력 방식 (기본값: manual)
+  selectedMonthlyId?: string; // Monthly 기반일 때 선택된 Monthly ID
 }
 
-// Archive는 Chapter나 Project의 완료된 상태를 나타내는 뷰
+// Archive는 Monthly나 Project의 완료된 상태를 나타내는 뷰
 // 별도 컬렉션이 아닌 기존 데이터의 필터링된 뷰

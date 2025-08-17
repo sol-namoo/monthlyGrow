@@ -2,21 +2,21 @@
 
 import { useQuery } from "@tanstack/react-query";
 import {
-  getChapter,
-  getProjectsByChapterId,
-  getSnapshotsByChapterId,
+  getMonthly,
+  getProjectsByMonthlyId,
+  getSnapshotsByMonthlyId,
   getProject,
   getTasksByProjectId,
   getArea,
   getResource,
   getArchive,
   getProjectsByUserId,
-  getChaptersByUserId,
+  getMonthliesByUserId,
 } from "../api/data"; // api/data.ts를 import
 
 interface Options {
   userId?: string;
-  chapterId?: string;
+  monthlyId?: string;
   projectId?: string;
   areaId?: string;
   resourceId?: string;
@@ -27,9 +27,9 @@ interface Options {
 export const usePageData = (
   page:
     | "home"
-    | "chapterDetail"
+    | "monthlyDetail"
     | "projectDetail"
-    | "newChapter"
+    | "newMonthly"
     | "area"
     | "resource"
     | "archive",
@@ -46,53 +46,53 @@ export const usePageData = (
       queryFn: () => getProjectsByUserId(userId),
     });
     const {
-      data: chapters,
-      isLoading: chaptersLoading,
-      error: chaptersError,
+      data: monthlies,
+      isLoading: monthliesLoading,
+      error: monthliesError,
     } = useQuery({
-      queryKey: ["chapters"],
-      queryFn: () => getChaptersByUserId(userId),
+      queryKey: ["monthlies"],
+      queryFn: () => getMonthliesByUserId(userId),
     });
     return {
       projects,
-      chapters,
-      isLoading: chaptersLoading || projectsLoading,
-      error: chaptersError || projectsError,
+      monthlies,
+      isLoading: monthliesLoading || projectsLoading,
+      error: monthliesError || projectsError,
     };
   }
 
-  if (page === "chapterDetail") {
-    const { chapterId = "" } = options;
+  if (page === "monthlyDetail") {
+    const { monthlyId = "" } = options;
     const {
-      data: chapter,
-      isLoading: chapterLoading,
-      error: chapterError,
+      data: monthly,
+      isLoading: monthlyLoading,
+      error: monthlyError,
     } = useQuery({
-      queryKey: ["chapters", chapterId],
-      queryFn: () => getChapter(chapterId),
+      queryKey: ["monthlies", monthlyId],
+      queryFn: () => getMonthly(monthlyId),
     });
     const {
       data: projects,
       isLoading: projectsLoading,
       error: projectsError,
     } = useQuery({
-      queryKey: ["chapters", chapterId, "projects"],
-      queryFn: () => getProjectsByChapterId(chapterId),
+      queryKey: ["monthlies", monthlyId, "projects"],
+      queryFn: () => getProjectsByMonthlyId(monthlyId),
     });
     const {
       data: snapshots,
       isLoading: snapshotsLoading,
       error: snapshotsError,
     } = useQuery({
-      queryKey: ["chapters", chapterId, "snapshots"],
-      queryFn: () => getSnapshotsByChapterId(chapterId),
+      queryKey: ["monthlies", monthlyId, "snapshots"],
+      queryFn: () => getSnapshotsByMonthlyId(monthlyId),
     });
     return {
-      chapter,
+      monthly,
       projects,
       snapshots,
-      isLoading: chapterLoading || projectsLoading || snapshotsLoading,
-      error: chapterError || projectsError || snapshotsError,
+      isLoading: monthlyLoading || projectsLoading || snapshotsLoading,
+      error: monthlyError || projectsError || snapshotsError,
     };
   }
 
@@ -121,8 +121,8 @@ export const usePageData = (
       error: projectError || tasksError,
     };
   }
-  if (page === "newChapter") {
-    // TODO: implement newChapter data fetching
+  if (page === "newMonthly") {
+    // TODO: implement newMonthly data fetching
     const {
       data: projects,
       isLoading: projectsLoading,

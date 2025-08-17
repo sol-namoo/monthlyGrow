@@ -1,5 +1,5 @@
 // Firebase Functions 진입점
-export { checkCompletedChapters, testProjectMigration } from "./cronJobs";
+export { checkCompletedMonthlies, testProjectMigration } from "./cronJobs";
 
 // 모든 함수들을 functions.ts에서 import
 export {
@@ -7,9 +7,9 @@ export {
   checkMigrationStatus,
   migrateDatabase,
   migrateUser,
-  migrateLoopToChapter,
-  createChaptersFromLoopIds,
-  createChaptersFromChapterIds,
+  migrateLoopToMonthly,
+  createMonthliesFromLoopIds,
+  createMonthliesFromMonthlyIds,
 } from "./functions";
 
 // Claude API 함수들

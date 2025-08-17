@@ -21,28 +21,30 @@ export const createActivitySnapshotForUser = async (
   try {
     console.log(`📸 ${year}년 ${month}월 스냅샷 생성 시작 (사용자: ${userId})`);
 
-    // 해당 월의 모든 챕터 찾기
-    const chaptersSnapshot = await db
-      .collection("chapters")
+    // 해당 월의 모든 먼슬리 찾기
+    const monthliesSnapshot = await db
+      .collection("monthlies")
       .where("userId", "==", userId)
       .get();
 
-    const monthChapters = chaptersSnapshot.docs
+    const monthMonthlies = monthliesSnapshot.docs
       .map((doc) => ({ id: doc.id, ...doc.data() }))
-      .filter((chapter: any) => {
-        const chapterYear = new Date(chapter.endDate.toDate()).getFullYear();
-        const chapterMonth = new Date(chapter.endDate.toDate()).getMonth() + 1;
-        return chapterYear === year && chapterMonth === month;
+      .filter((monthly: any) => {
+        const monthlyYear = new Date(monthly.endDate.toDate()).getFullYear();
+        const monthlyMonth = new Date(monthly.endDate.toDate()).getMonth() + 1;
+        return monthlyYear === year && monthlyMonth === month;
       });
 
-    if (monthChapters.length === 0) {
-      console.log(`❌ ${year}년 ${month}월 챕터가 없습니다.`);
+    if (monthMonthlies.length === 0) {
+      console.log(`❌ ${year}년 ${month}월 먼슬리가 없습니다.`);
       return null;
     }
 
-    console.log(`📋 ${year}년 ${month}월 챕터 ${monthChapters.length}개 발견`);
+    console.log(
+      `📋 ${year}년 ${month}월 먼슬리 ${monthMonthlies.length}개 발견`
+    );
 
-    // 모든 챕터의 프로젝트와 태스크 데이터 수집
+    // 모든 먼슬리의 프로젝트와 태스크 데이터 수집
     const allProjects = [];
     const allAreas = await db
       .collection("areas")
@@ -50,10 +52,10 @@ export const createActivitySnapshotForUser = async (
       .get();
     const areas = allAreas.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
-    for (const chapter of monthChapters) {
+    for (const monthly of monthMonthlies) {
       const projectsSnapshot = await db
         .collection("projects")
-        .where("chapterId", "==", chapter.id)
+        .where("monthlyId", "==", monthly.id)
         .get();
       const projects = projectsSnapshot.docs.map((doc) => ({
         id: doc.id,
@@ -147,18 +149,18 @@ export const createActivitySnapshotForUser = async (
         ? Math.round((completedProjects / totalProjects) * 100)
         : 0;
 
-    // 보상 정보 (모든 챕터의 보상 합계)
-    const rewards = monthChapters
-      .filter((chapter: any) => chapter.reward)
-      .map((chapter: any) => chapter.reward);
+    // 보상 정보 (모든 먼슬리의 보상 합계)
+    const rewards = monthMonthlies
+      .filter((monthly: any) => monthly.reward)
+      .map((monthly: any) => monthly.reward);
 
     // 스냅샷 데이터 생성
     const snapshotData = {
       userId,
       year,
       month,
-      chapterIds: monthChapters.map((l: any) => l.id),
-      chapterTitles: monthChapters.map((l: any) => l.title),
+      monthlyIds: monthMonthlies.map((l: any) => l.id),
+      monthlyTitles: monthMonthlies.map((l: any) => l.title),
       completedProjects,
       totalProjects,
       completionRate: overallCompletionRate,
@@ -176,7 +178,7 @@ export const createActivitySnapshotForUser = async (
     await db.collection("activitySnapshots").doc(snapshotId).set(snapshotData);
 
     console.log(`✅ ${year}년 ${month}월 스냅샷 생성 완료:`);
-    console.log(`- 챕터: ${monthChapters.length}개`);
+    console.log(`- 먼슬리: ${monthMonthlies.length}개`);
     console.log(`- 프로젝트: ${completedProjects}/${totalProjects} 완료`);
     console.log(`- 태스크: ${completedTasks}/${totalTasks} 완료`);
     console.log(`- 완료율: ${overallCompletionRate}%`);

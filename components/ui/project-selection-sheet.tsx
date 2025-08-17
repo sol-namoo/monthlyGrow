@@ -25,10 +25,9 @@ import {
 import { Search, Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  fetchAllProjectsByUserId,
-  fetchAllAreasByUserId,
   fetchProjectsByUserIdWithPaging,
-} from "@/lib/firebase";
+  fetchAllAreasByUserId,
+} from "@/lib/firebase/index";
 import { getAuth } from "firebase/auth";
 import { Project, Area } from "@/lib/types";
 import { getProjectStatus, formatDate } from "@/lib/utils";
@@ -46,7 +45,7 @@ interface ProjectSelectionSheetProps {
   areas?: any[]; // 외부에서 전달받은 영역 목록
   projectsLoading?: boolean;
   areasLoading?: boolean;
-  currentChapterId?: string; // 현재 챕터 ID (수정 시에만 사용)
+  currentMonthlyId?: string; // 현재 먼슬리 ID (수정 시에만 사용)
 }
 
 export function ProjectSelectionSheet({
@@ -61,12 +60,12 @@ export function ProjectSelectionSheet({
   areas: externalAreas,
   projectsLoading: externalProjectsLoading,
   areasLoading: externalAreasLoading,
-  currentChapterId,
+  currentMonthlyId,
 }: ProjectSelectionSheetProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [areaFilter, setAreaFilter] = useState<string>("all");
-  // 챕터 수정 시에는 모든 프로젝트를 보여주기 위해 기본값을 false로 설정
+  // 먼슬리 수정 시에는 모든 프로젝트를 보여주기 위해 기본값을 false로 설정
   const [showOnlyUnconnected, setShowOnlyUnconnected] = useState(false);
   const [itemsPerPage] = useState(10);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -88,14 +87,12 @@ export function ProjectSelectionSheet({
     queryFn: async () => {
       if (externalProjects) return null;
 
-      // 디버깅: 모든 프로젝트 개수 확인
-      console.log("🔍 전체 프로젝트 개수 확인 중...");
-      console.log("🔍 현재 사용자 ID:", user?.uid);
-      const allProjects = await fetchAllProjectsByUserId(user?.uid || "");
+      // 디버깅: 페칭 시작
       console.log(
-        "🔍 fetchAllProjectsByUserId 결과:",
-        allProjects.length,
-        "개"
+        "🔍 페칭 시작 - userId:",
+        user?.uid,
+        "pageLimit:",
+        itemsPerPage
       );
 
       // 모든 경우에 10개씩 페이지네이션 사용
@@ -193,10 +190,10 @@ export function ProjectSelectionSheet({
     }
 
     // 연결되지 않은 프로젝트만 필터 (체크박스가 체크되어 있을 때만)
-    // 챕터 수정 시에는 모든 프로젝트를 보여줌
-    if (showOnlyUnconnected && !currentChapterId) {
-      const connectedChapters = (project as any).connectedChapters || [];
-      const isConnected = connectedChapters.length > 0 || project.chapterId;
+    // 먼슬리 수정 시에는 모든 프로젝트를 보여줌
+    if (showOnlyUnconnected && !currentMonthlyId) {
+      const connectedMonthlies = (project as any).connectedMonthlies || [];
+      const isConnected = connectedMonthlies.length > 0 || project.monthlyId;
       if (isConnected) {
         return false;
       }
@@ -280,7 +277,7 @@ export function ProjectSelectionSheet({
         <SheetHeader>
           <SheetTitle>프로젝트 선택</SheetTitle>
           <SheetDescription>
-            이 챕터에 연결할 프로젝트를 선택하세요.
+            이 먼슬리에 연결할 프로젝트를 선택하세요.
             {maxProjects && ` 최대 ${maxProjects}개까지 선택할 수 있습니다.`}
           </SheetDescription>
         </SheetHeader>
@@ -335,7 +332,7 @@ export function ProjectSelectionSheet({
                 }
               />
               <Label htmlFor="showOnlyUnconnected" className="text-sm">
-                {currentChapterId
+                {currentMonthlyId
                   ? "연결되지 않은 프로젝트만 보기 (체크 해제 시 모든 프로젝트 표시)"
                   : "연결되지 않은 프로젝트만 보기"}
               </Label>
@@ -433,7 +430,7 @@ export function ProjectSelectionSheet({
                                 ? "destructive"
                                 : "outline"
                             }
-                            className="text-xs"
+                            className="text-xs flex-shrink-0"
                           >
                             {project.status === "completed"
                               ? "완료됨"
@@ -444,15 +441,18 @@ export function ProjectSelectionSheet({
                               : "계획됨"}
                           </Badge>
                           {(() => {
-                            const connectedChapters =
-                              (project as any).connectedChapters || [];
-                            const isConnectedToCurrentChapter =
-                              currentChapterId &&
-                              (connectedChapters.includes(currentChapterId) ||
-                                project.chapterId === currentChapterId);
+                            const connectedMonthlies =
+                              (project as any).connectedMonthlies || [];
+                            const isConnectedToCurrentMonthly =
+                              currentMonthlyId &&
+                              (connectedMonthlies.includes(currentMonthlyId) ||
+                                project.monthlyId === currentMonthlyId);
 
-                            return isConnectedToCurrentChapter ? (
-                              <Badge variant="outline" className="text-xs">
+                            return isConnectedToCurrentMonthly ? (
+                              <Badge
+                                variant="outline"
+                                className="text-xs flex-shrink-0"
+                              >
                                 연결됨
                               </Badge>
                             ) : null;
@@ -475,7 +475,7 @@ export function ProjectSelectionSheet({
                   </p>
                   <Button asChild variant="outline">
                     <a
-                      href="/para/projects/new?returnUrl=/chapter/new"
+                      href="/para/projects/new?returnUrl=/monthly/new"
                       target="_blank"
                     >
                       <Plus className="mr-2 h-4 w-4" />새 프로젝트 만들기

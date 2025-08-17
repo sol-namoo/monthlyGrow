@@ -8,7 +8,7 @@ import {
   charts,
 } from "./common";
 import { home } from "./home";
-import { chapter, chapterDetail, chapterEdit, chapterNew } from "./chapter";
+import { monthly, monthlyDetail, monthlyEdit, monthlyNew } from "./monthly";
 import { para } from "./para";
 import { paraProjectDetail } from "./para-project-detail";
 import { settings } from "./settings";
@@ -21,10 +21,10 @@ export const ko = {
   theme,
   language,
   home,
-  chapter,
-  chapterDetail,
-  chapterEdit,
-  chapterNew,
+  monthly,
+  monthlyDetail,
+  monthlyEdit,
+  monthlyNew,
   para,
   paraProjectDetail,
   settings,

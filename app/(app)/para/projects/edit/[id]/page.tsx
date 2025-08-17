@@ -47,7 +47,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { auth } from "@/lib/firebase";
+import { auth } from "@/lib/firebase/index";
 import { useFieldArray, Controller } from "react-hook-form";
 import type { Project } from "@/lib/types";
 import {
@@ -56,12 +56,12 @@ import {
   fetchAllAreasByUserId,
   fetchAllProjectsByUserId,
   fetchAllTasksByProjectId,
-  fetchAllChaptersByUserId,
+  fetchAllMonthliesByUserId,
   deleteTaskFromProject,
   addTaskToProject,
   updateTaskInProject,
-  updateChapter,
-} from "@/lib/firebase";
+  updateMonthly,
+} from "@/lib/firebase/index";
 import {
   CustomAlert,
   AlertDescription,
@@ -163,11 +163,11 @@ export default function EditProjectPage({
   // 새로 추가된 태스크들을 추적하는 상태 (임시 ID -> 실제 Firestore ID 매핑)
   const [newTaskIds, setNewTaskIds] = useState<Set<string>>(new Set());
 
-  // 챕터 연결 관리 상태
-  const [showChapterConnectionDialog, setShowChapterConnectionDialog] =
+  // 월간 연결 관리 상태
+  const [showMonthlyConnectionDialog, setShowMonthlyConnectionDialog] =
     useState(false);
-  const [selectedChapterIds, setSelectedChapterIds] = useState<string[]>([]);
-  const [chapterTargetCounts, setChapterTargetCounts] = useState<
+  const [selectedMonthlyIds, setSelectedMonthlyIds] = useState<string[]>([]);
+  const [monthlyTargetCounts, setMonthlyTargetCounts] = useState<
     Record<string, number>
   >({});
 
@@ -213,14 +213,14 @@ export default function EditProjectPage({
     enabled: !!projectId,
   });
 
-  // 챕터 목록 가져오기
-  const { data: allChapters = [], isLoading: chaptersLoading } = useQuery({
-    queryKey: ["chapters", user?.uid],
-    queryFn: () => fetchAllChaptersByUserId(user?.uid || ""),
+  // 월간 목록 가져오기
+  const { data: allMonthlies = [], isLoading: monthliesLoading } = useQuery({
+    queryKey: ["monthlies", user?.uid],
+    queryFn: () => fetchAllMonthliesByUserId(user?.uid || ""),
     enabled: !!user?.uid,
   });
 
-  // 모든 프로젝트 가져오기 (챕터 연결 수 계산용)
+  // 모든 프로젝트 가져오기 (월간 연결 수 계산용)
   const { data: allProjects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["all-projects", user?.uid],
     queryFn: () => fetchAllProjectsByUserId(user?.uid || ""),
@@ -241,7 +241,7 @@ export default function EditProjectPage({
       ? Math.round((completedTasks / totalTasks) * 100)
       : 0;
 
-  // 연결 가능한 챕터 필터링 (프로젝트 기간과 겹치는 챕터들, 최대 6개월 후까지)
+  // 연결 가능한 월간 필터링 (프로젝트 기간과 겹치는 월간들, 최대 6개월 후까지)
   // react-hook-form 설정
   const form = useForm<EditProjectFormData>({
     resolver: zodResolver(editProjectFormSchema),
@@ -258,8 +258,8 @@ export default function EditProjectPage({
     },
   });
 
-  const getAvailableChaptersForConnection = () => {
-    if (!project || !allChapters.length || !form) return [];
+  const getAvailableMonthliesForConnection = () => {
+    if (!project || !allMonthlies.length || !form) return [];
 
     const projectStart = new Date(form.watch("startDate"));
     const projectEnd = new Date(form.watch("endDate"));
@@ -270,33 +270,33 @@ export default function EditProjectPage({
     const currentMonth = currentDate.getMonth();
     const sixMonthsLater = new Date(currentYear, currentMonth + 6, 0);
 
-    return allChapters.filter((chapter) => {
-      const chapterStart = new Date(chapter.startDate);
-      const chapterEnd = new Date(chapter.endDate);
+    return allMonthlies.filter((monthly) => {
+      const monthlyStart = new Date(monthly.startDate);
+      const monthlyEnd = new Date(monthly.endDate);
 
       // 6개월 이후 제한
-      if (chapterStart > sixMonthsLater) return false;
+      if (monthlyStart > sixMonthsLater) return false;
 
       // 프로젝트 기간과 겹치는지 확인
-      return projectStart <= chapterEnd && projectEnd >= chapterStart;
+      return projectStart <= monthlyEnd && projectEnd >= monthlyStart;
     });
   };
 
-  const availableChaptersForConnection = getAvailableChaptersForConnection();
+  const availableMonthliesForConnection = getAvailableMonthliesForConnection();
 
-  // 챕터별 기본 태스크 개수 계산 (프로젝트 기간과 챕터 기간을 고려)
-  const getDefaultTargetCount = (chapter: any) => {
+  // 월간별 기본 태스크 개수 계산 (프로젝트 기간과 월간 기간을 고려)
+  const getDefaultTargetCount = (monthly: any) => {
     const projectStartDate = new Date(form.watch("startDate"));
     const projectEndDate = new Date(form.watch("endDate"));
-    const chapterStartDate = new Date(chapter.startDate);
-    const chapterEndDate = new Date(chapter.endDate);
+    const monthlyStartDate = new Date(monthly.startDate);
+    const monthlyEndDate = new Date(monthly.endDate);
 
-    // 프로젝트와 챕터의 겹치는 기간 계산
+    // 프로젝트와 월간의 겹치는 기간 계산
     const overlapStart = new Date(
-      Math.max(projectStartDate.getTime(), chapterStartDate.getTime())
+      Math.max(projectStartDate.getTime(), monthlyStartDate.getTime())
     );
     const overlapEnd = new Date(
-      Math.min(projectEndDate.getTime(), chapterEndDate.getTime())
+      Math.min(projectEndDate.getTime(), monthlyEndDate.getTime())
     );
 
     if (overlapEnd <= overlapStart) return 1;
@@ -317,26 +317,26 @@ export default function EditProjectPage({
     );
   };
 
-  // 챕터별 태스크 개수 업데이트 핸들러
-  const updateChapterTargetCount = (chapterId: string, count: number) => {
-    setChapterTargetCounts((prev) => ({
+  // 월간별 태스크 개수 업데이트 핸들러
+  const updateMonthlyTargetCount = (monthlyId: string, count: number) => {
+    setMonthlyTargetCounts((prev) => ({
       ...prev,
-      [chapterId]: Math.max(1, count), // 최소 1개
+      [monthlyId]: Math.max(1, count), // 최소 1개
     }));
   };
 
-  // 챕터 선택/해제 핸들러
-  const toggleChapterSelection = (chapterId: string) => {
-    setSelectedChapterIds((prev) => {
-      const newSelection = prev.includes(chapterId)
-        ? prev.filter((id) => id !== chapterId)
-        : [...prev, chapterId];
+  // 월간 선택/해제 핸들러
+  const toggleMonthlySelection = (monthlyId: string) => {
+    setSelectedMonthlyIds((prev) => {
+      const newSelection = prev.includes(monthlyId)
+        ? prev.filter((id) => id !== monthlyId)
+        : [...prev, monthlyId];
 
-      // 챕터가 해제되면 해당 챕터의 태스크 개수도 제거
-      if (!newSelection.includes(chapterId)) {
-        setChapterTargetCounts((prev) => {
+      // 월간이 해제되면 해당 월간의 태스크 개수도 제거
+      if (!newSelection.includes(monthlyId)) {
+        setMonthlyTargetCounts((prev) => {
           const newCounts = { ...prev };
-          delete newCounts[chapterId];
+          delete newCounts[monthlyId];
           return newCounts;
         });
       }
@@ -371,28 +371,28 @@ export default function EditProjectPage({
     form.setValue("category", newCategory);
   };
 
-  // 챕터 상태 확인
-  const getChapterStatus = (chapter: any) => {
+  // 월간 상태 확인
+  const getMonthlyStatus = (monthly: any) => {
     const now = new Date();
-    const chapterStart = new Date(chapter.startDate);
-    const chapterEnd = new Date(chapter.endDate);
+    const monthlyStart = new Date(monthly.startDate);
+    const monthlyEnd = new Date(monthly.endDate);
 
-    if (now >= chapterStart && now <= chapterEnd) {
+    if (now >= monthlyStart && now <= monthlyEnd) {
       return "in_progress";
-    } else if (now < chapterStart) {
+    } else if (now < monthlyStart) {
       return "planned";
     } else {
       return "completed";
     }
   };
 
-  // 챕터에 연결된 프로젝트 수를 계산하는 함수
-  const getConnectedProjectCount = (chapterId: string) => {
+  // 월간에 연결된 프로젝트 수를 계산하는 함수
+  const getConnectedProjectCount = (monthlyId: string) => {
     if (!allProjects) return 0;
 
-    // 모든 프로젝트에서 해당 챕터에 연결된 프로젝트 수 계산
+    // 모든 프로젝트에서 해당 월간에 연결된 프로젝트 수 계산
     return allProjects.filter((project) =>
-      project.connectedChapters?.includes(chapterId)
+      project.connectedMonthlies?.includes(monthlyId)
     ).length;
   };
 
@@ -412,34 +412,22 @@ export default function EditProjectPage({
         tasks: [], // 초기값 설정
       });
 
-      // 현재 연결된 챕터들을 selectedChapterIds에 설정
-      if (project.connectedChapters) {
-        setSelectedChapterIds(project.connectedChapters);
+      // 현재 연결된 월간들을 selectedMonthlyIds에 설정
+      if (project.connectedMonthlies) {
+        setSelectedMonthlyIds(project.connectedMonthlies);
       }
 
-      // 기존 챕터별 태스크 개수 정보 로드
+      // 기존 월간별 태스크 개수 정보 로드
       if (
-        project.connectedChapters &&
-        project.connectedChapters.length > 0 &&
-        allChapters.length > 0
+        project.connectedMonthlies &&
+        project.connectedMonthlies.length > 0 &&
+        allMonthlies.length > 0
       ) {
-        const targetCounts: Record<string, number> = {};
-        project.connectedChapters.forEach((chapterId) => {
-          // 챕터에서 이 프로젝트의 목표 개수 찾기
-          const chapterData = allChapters.find((c) => c.id === chapterId);
-          if (chapterData && chapterData.connectedProjects) {
-            const projectGoal = chapterData.connectedProjects.find(
-              (goal) => goal.projectId === projectId
-            );
-            if (projectGoal) {
-              targetCounts[chapterId] = projectGoal.chapterTargetCount;
-            }
-          }
-        });
-        setChapterTargetCounts(targetCounts);
+        // connectedProjects가 제거되었으므로 이 로직은 더 이상 필요하지 않음
+        setMonthlyTargetCounts({});
       }
     }
-  }, [project, form, areas, allChapters, projectId]);
+  }, [project, form, areas, allMonthlies, projectId]);
 
   // useFieldArray for tasks (form 초기화 이후에 정의)
   const { fields, append, remove, replace } = useFieldArray({
@@ -577,7 +565,7 @@ export default function EditProjectPage({
 
     try {
       // 1. 프로젝트 정보 업데이트
-      const connectedChapters = selectedChapterIds;
+      const connectedMonthlies = selectedMonthlyIds;
 
       const updateData: Partial<Omit<Project, "id" | "userId" | "createdAt">> =
         {
@@ -588,7 +576,7 @@ export default function EditProjectPage({
           endDate: new Date(data.endDate),
           target: data.target,
           targetCount: data.targetCount,
-          connectedChapters,
+          connectedMonthlies,
           updatedAt: new Date(),
         };
 
@@ -596,7 +584,7 @@ export default function EditProjectPage({
         updateData.areaId = data.areaId;
       }
 
-      await updateProject(project.id, { ...project, ...updateData });
+      await updateProject(project.id, updateData);
 
       // 2. 삭제된 태스크들 처리
       if (deletedTaskIds.length > 0) {
@@ -627,10 +615,12 @@ export default function EditProjectPage({
               date: new Date(task.date),
               duration: task.duration,
               done: task.done,
+              userId: user?.uid || "",
+              projectId: project.id,
             });
           } else if (isExistingTask) {
             // 기존 태스크 수정
-            await updateTaskInProject(task.id, {
+            await updateTaskInProject(project.id, task.id, {
               title: task.title,
               date: new Date(task.date),
               duration: task.duration,
@@ -666,50 +656,7 @@ export default function EditProjectPage({
         queryClient.invalidateQueries({ queryKey: ["taskCounts", projectId] }),
       ]);
 
-      // 선택된 챕터들에 프로젝트 연결 및 태스크 개수 설정
-      if (selectedChapterIds.length > 0) {
-        try {
-          const chapterUpdatePromises = selectedChapterIds.map(
-            async (chapterId) => {
-              const chapter = allChapters.find((c) => c.id === chapterId);
-              if (!chapter) return;
-
-              // 기존 connectedProjects 배열 가져오기
-              const existingConnectedProjects = chapter.connectedProjects || [];
-
-              // 새로운 프로젝트 목표 추가
-              const newProjectGoal = {
-                projectId: projectId,
-                chapterTargetCount:
-                  chapterTargetCounts[chapterId] ||
-                  getDefaultTargetCount(chapter),
-                chapterDoneCount: 0,
-              };
-
-              // 기존에 같은 프로젝트가 있는지 확인하고 업데이트
-              const updatedConnectedProjects = existingConnectedProjects.filter(
-                (goal) => goal.projectId !== projectId
-              );
-              updatedConnectedProjects.push(newProjectGoal);
-
-              // 챕터 업데이트
-              await updateChapter(chapterId, {
-                connectedProjects: updatedConnectedProjects,
-              });
-            }
-          );
-
-          await Promise.all(chapterUpdatePromises);
-        } catch (chapterError) {
-          console.error("챕터 업데이트 실패:", chapterError);
-          // 챕터 업데이트 실패해도 프로젝트는 수정되었으므로 경고만 표시
-          toast({
-            title: "프로젝트 수정 완료 (챕터 연결 실패)",
-            description: "프로젝트는 수정되었지만 챕터 연결에 실패했습니다.",
-            variant: "destructive",
-          });
-        }
-      }
+      // connectedProjects가 제거되었으므로 월간 연결 기능은 더 이상 사용하지 않음
 
       router.replace(`/para/projects/${project.id}`);
     } catch (error) {
@@ -730,7 +677,7 @@ export default function EditProjectPage({
     projectLoading ||
     areasLoading ||
     tasksLoading ||
-    chaptersLoading
+    monthliesLoading
   ) {
     return <EditProjectSkeleton />;
   }
@@ -969,7 +916,7 @@ export default function EditProjectPage({
                   type="date"
                   {...form.register("endDate")}
                   max={(() => {
-                    // 이번달 이후 6개월까지만 가능 (챕터 생성 가능 월과 동일)
+                    // 이번달 이후 6개월까지만 가능 (월간 생성 가능 월과 동일)
                     const currentDate = new Date();
                     const currentYear = currentDate.getFullYear();
                     const currentMonth = currentDate.getMonth();
@@ -999,7 +946,7 @@ export default function EditProjectPage({
                     <br />
                   </>
                 )}
-                종료일은 이번달 이후 6개월까지만 설정 가능합니다 (챕터 생성 가능
+                종료일은 이번달 이후 6개월까지만 설정 가능합니다 (월간 생성 가능
                 월과 동일)
               </AlertDescription>
             </CustomAlert>
@@ -1311,34 +1258,36 @@ export default function EditProjectPage({
           </div>
         </Card>
 
-        {/* 챕터 연결 섹션 */}
+        {/* 월간 연결 섹션 */}
         <Card className="p-6">
-          <h2 className="mb-4 text-lg font-semibold">챕터 연결</h2>
+          <h2 className="mb-4 text-lg font-semibold">월간 연결</h2>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              이 프로젝트를 특정 챕터에 연결하여 월별 목표로 관리할 수 있습니다.
+              이 프로젝트를 특정 월간에 연결하여 월별 목표로 관리할 수 있습니다.
             </p>
 
-            {/* 현재 연결된 챕터들 표시 */}
-            {selectedChapterIds.length > 0 && allChapters.length > 0 && (
+            {/* 현재 연결된 먼슬리들 표시 */}
+            {selectedMonthlyIds.length > 0 && allMonthlies.length > 0 && (
               <div>
-                <Label>현재 연결된 챕터</Label>
+                <Label>현재 연결된 월간</Label>
                 <div className="mt-2 space-y-2">
-                  {allChapters
-                    .filter((chapter) =>
-                      selectedChapterIds.includes(chapter.id)
+                  {allMonthlies
+                    .filter((monthly) =>
+                      selectedMonthlyIds.includes(monthly.id)
                     )
-                    .map((chapter) => (
+                    .map((monthly) => (
                       <div
-                        key={chapter.id}
+                        key={monthly.id}
                         className="p-3 border rounded-lg bg-muted/30"
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div>
-                            <span className="font-medium">{chapter.title}</span>
+                            <span className="font-medium">
+                              {monthly.objective}
+                            </span>
                             <p className="text-xs text-muted-foreground">
-                              {formatDate(chapter.startDate)} ~{" "}
-                              {formatDate(chapter.endDate)}
+                              {formatDate(monthly.startDate)} ~{" "}
+                              {formatDate(monthly.endDate)}
                             </p>
                           </div>
                           <Button
@@ -1346,14 +1295,14 @@ export default function EditProjectPage({
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                              // 챕터 연결 해제
-                              setSelectedChapterIds((prev) =>
-                                prev.filter((id) => id !== chapter.id)
+                              // 월간 연결 해제
+                              setSelectedMonthlyIds((prev) =>
+                                prev.filter((id) => id !== monthly.id)
                               );
-                              // 챕터가 해제되면 해당 챕터의 태스크 개수도 제거
-                              setChapterTargetCounts((prev) => {
+                              // 월간이 해제되면 해당 월간의 태스크 개수도 제거
+                              setMonthlyTargetCounts((prev) => {
                                 const newCounts = { ...prev };
-                                delete newCounts[chapter.id];
+                                delete newCounts[monthly.id];
                                 return newCounts;
                               });
                             }}
@@ -1362,32 +1311,32 @@ export default function EditProjectPage({
                           </Button>
                         </div>
 
-                        {/* 기존 연결된 챕터의 태스크 개수 표시 */}
+                        {/* 기존 연결된 월간의 태스크 개수 표시 */}
                         <div className="mt-3 pt-3 border-t border-border">
                           <div className="flex items-center gap-2">
                             <Label
-                              htmlFor={`target-${chapter.id}`}
+                              htmlFor={`target-${monthly.id}`}
                               className="text-sm font-medium"
                             >
-                              이 챕터에서 완성할 태스크 개수
+                              이 월간에서 완성할 태스크 개수
                             </Label>
                             <Badge variant="secondary" className="text-xs">
-                              권장: {getDefaultTargetCount(chapter)}개
+                              권장: {getDefaultTargetCount(monthly)}개
                             </Badge>
                           </div>
                           <div className="flex items-center gap-2 mt-1">
                             <Input
-                              id={`target-${chapter.id}`}
+                              id={`target-${monthly.id}`}
                               type="number"
                               min="1"
                               max="100"
                               value={
-                                chapterTargetCounts[chapter.id] ||
-                                getDefaultTargetCount(chapter)
+                                monthlyTargetCounts[monthly.id] ||
+                                getDefaultTargetCount(monthly)
                               }
                               onChange={(e) => {
                                 const value = parseInt(e.target.value) || 1;
-                                updateChapterTargetCount(chapter.id, value);
+                                updateMonthlyTargetCount(monthly.id, value);
                               }}
                               className="w-20"
                             />
@@ -1399,9 +1348,9 @@ export default function EditProjectPage({
                               variant="ghost"
                               size="sm"
                               onClick={() => {
-                                updateChapterTargetCount(
-                                  chapter.id,
-                                  getDefaultTargetCount(chapter)
+                                updateMonthlyTargetCount(
+                                  monthly.id,
+                                  getDefaultTargetCount(monthly)
                                 );
                               }}
                               className="text-xs"
@@ -1410,7 +1359,8 @@ export default function EditProjectPage({
                             </Button>
                           </div>
                           <p className="text-xs text-muted-foreground mt-1">
-                            프로젝트 기간과 챕터 기간을 고려한 권장 개수입니다.
+                            프로젝트 기간과 먼슬리 기간을 고려한 권장
+                            개수입니다.
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
                             (프로젝트 정보: 미완료 태스크{" "}
@@ -1426,17 +1376,17 @@ export default function EditProjectPage({
 
             <div className="text-center p-4 border-2 border-dashed rounded-lg">
               <p className="text-sm text-muted-foreground mb-2">
-                새로운 챕터에 연결하거나 기존 연결을 관리하세요
+                새로운 월간에 연결하거나 기존 연결을 관리하세요
               </p>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  setShowChapterConnectionDialog(true);
+                  setShowMonthlyConnectionDialog(true);
                 }}
               >
                 <Plus className="h-4 w-4 mr-2" />
-                챕터 연결 관리
+                월간 연결 관리
               </Button>
             </div>
           </div>
@@ -1457,32 +1407,32 @@ export default function EditProjectPage({
         </div>
       </form>
 
-      {/* 챕터 연결 대화상자 */}
+      {/* 월간 연결 대화상자 */}
       <Dialog
-        open={showChapterConnectionDialog}
-        onOpenChange={setShowChapterConnectionDialog}
+        open={showMonthlyConnectionDialog}
+        onOpenChange={setShowMonthlyConnectionDialog}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>챕터에 연결</DialogTitle>
+            <DialogTitle>월간에 연결</DialogTitle>
             <DialogDescription>
-              이 프로젝트를 연결할 챕터를 선택하세요. (프로젝트 기간과 겹치는
-              챕터만 표시됩니다)
+              이 프로젝트를 연결할 월간을 선택하세요. (프로젝트 기간과 겹치는
+              월간만 표시됩니다)
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            {availableChaptersForConnection.length === 0 ? (
+            {availableMonthliesForConnection.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-muted-foreground">
-                  연결할 수 있는 챕터가 없습니다.
+                  연결할 수 있는 월간이 없습니다.
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  프로젝트 기간과 겹치는 챕터만 연결할 수 있습니다.
+                  프로젝트 기간과 겹치는 월간만 연결할 수 있습니다.
                 </p>
                 <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
                   <p className="text-xs text-blue-700 dark:text-blue-300">
-                    💡 <strong>팁:</strong> 챕터를 먼저 생성하거나 프로젝트
+                    💡 <strong>팁:</strong> 월간을 먼저 생성하거나 프로젝트
                     기간을 조정해보세요.
                   </p>
                 </div>
@@ -1490,23 +1440,23 @@ export default function EditProjectPage({
             ) : (
               <>
                 <div className="space-y-2">
-                  {availableChaptersForConnection.map((chapter) => (
+                  {availableMonthliesForConnection.map((monthly) => (
                     <div
-                      key={chapter.id}
+                      key={monthly.id}
                       className={`p-3 border rounded-lg ${
-                        selectedChapterIds.includes(chapter.id)
+                        selectedMonthlyIds.includes(monthly.id)
                           ? "border-primary bg-primary/5"
                           : "border-border"
                       }`}
                     >
                       <div
                         className="cursor-pointer"
-                        onClick={() => toggleChapterSelection(chapter.id)}
+                        onClick={() => toggleMonthlySelection(monthly.id)}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <h4 className="font-medium">{chapter.title}</h4>
-                            {selectedChapterIds.includes(chapter.id) && (
+                            <h4 className="font-medium">{monthly.objective}</h4>
+                            {selectedMonthlyIds.includes(monthly.id) && (
                               <Badge variant="outline" className="text-xs">
                                 선택됨
                               </Badge>
@@ -1514,27 +1464,27 @@ export default function EditProjectPage({
                           </div>
                           <span
                             className={`text-xs px-2 py-1 rounded-full ${
-                              getChapterStatus(chapter) === "in_progress"
+                              getMonthlyStatus(monthly) === "in_progress"
                                 ? "bg-green-100 text-green-700"
-                                : getChapterStatus(chapter) === "planned"
+                                : getMonthlyStatus(monthly) === "planned"
                                 ? "bg-blue-100 text-blue-700"
                                 : "bg-gray-100 text-gray-700"
                             }`}
                           >
-                            {getChapterStatus(chapter) === "in_progress"
+                            {getMonthlyStatus(monthly) === "in_progress"
                               ? "진행 중"
-                              : getChapterStatus(chapter) === "planned"
+                              : getMonthlyStatus(monthly) === "planned"
                               ? "예정"
                               : "완료"}
                           </span>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          {formatDate(chapter.startDate)} -{" "}
-                          {formatDate(chapter.endDate)}
+                          {formatDate(monthly.startDate)} -{" "}
+                          {formatDate(monthly.endDate)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           연결된 프로젝트:{" "}
-                          {getConnectedProjectCount(chapter.id)}개
+                          {getConnectedProjectCount(monthly.id)}개
                         </p>
                       </div>
                     </div>
@@ -1544,26 +1494,26 @@ export default function EditProjectPage({
                 <div className="flex gap-2">
                   <Button
                     onClick={() => {
-                      setShowChapterConnectionDialog(false);
+                      setShowMonthlyConnectionDialog(false);
                       toast({
-                        title: "챕터 연결 설정됨",
-                        description: `${selectedChapterIds.length}개 챕터가 선택되었습니다. 저장 시 적용됩니다.`,
+                        title: "월간 연결 설정됨",
+                        description: `${selectedMonthlyIds.length}개 월간이 선택되었습니다. 저장 시 적용됩니다.`,
                       });
                     }}
                     className="flex-1"
                   >
-                    확인 ({selectedChapterIds.length}개)
+                    확인 ({selectedMonthlyIds.length}개)
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => {
-                      // 변경사항 취소 - 원래 연결된 챕터들로 되돌리기
-                      if (project?.connectedChapters) {
-                        setSelectedChapterIds(project.connectedChapters);
+                      // 변경사항 취소 - 원래 연결된 월간들로 되돌리기
+                      if (project?.connectedMonthlies) {
+                        setSelectedMonthlyIds(project.connectedMonthlies);
                       } else {
-                        setSelectedChapterIds([]);
+                        setSelectedMonthlyIds([]);
                       }
-                      setShowChapterConnectionDialog(false);
+                      setShowMonthlyConnectionDialog(false);
                     }}
                     className="flex-1"
                   >

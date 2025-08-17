@@ -22,7 +22,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
-import { fetchAllAreasByUserId, auth } from "@/lib/firebase";
+import { fetchAllAreasByUserId, auth } from "@/lib/firebase/index";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useLanguage } from "@/hooks/useLanguage";

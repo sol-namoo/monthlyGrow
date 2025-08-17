@@ -27,8 +27,8 @@ export const para = {
         taskBased: "Enter target task count to generate empty tasks",
         setup: "Please set target count and project duration",
       },
-      chapter: {
-        label: "Chapter Target Count",
+      monthly: {
+        label: "Monthly Target Count",
         recommended: "Recommended: {count}",
         current: "{current} / Total Tasks {total}",
         setToTotal: "Set to Total",
@@ -42,6 +42,8 @@ export const para = {
       plannedWithCount: "Planned ({count})",
       inProgress: "In Progress",
       inProgressWithCount: "In Progress ({count})",
+      overdue: "Overdue",
+      overdueWithCount: "Overdue ({count})",
       completed: "Completed",
       completedWithCount: "Completed ({count})",
     },
@@ -280,7 +282,7 @@ export const para = {
     count: "Total {count} archives",
     filter: {
       all: "All",
-      chapter: "Chapter",
+      monthly: "Monthly",
       project: "Project",
     },
     sort: {
@@ -293,8 +295,14 @@ export const para = {
       title: "No archives",
       description: "Completed items will be displayed here",
     },
+    noTitle: "No title",
+    noSummary: "No summary",
+    loading: "Loading archives...",
+    loadMore: "Load more",
+    monthlyRetrospective: "Monthly Retrospective",
+    projectRetrospective: "Project Retrospective",
     types: {
-      chapterRetrospective: "Chapter Retrospective",
+      monthlyRetrospective: "Monthly Retrospective",
       projectRetrospective: "Project Retrospective",
     },
     // Archive detail page
@@ -318,20 +326,20 @@ export const para = {
       note: "Note",
     },
     relatedItem: {
-      chapter: "Connected Chapter",
+      monthly: "Connected Monthly",
       project: "Connected Project",
-      chapterDescription:
-        "This is the chapter where this retrospective was written",
+      monthlyDescription:
+        "This is the monthly where this retrospective was written",
       projectDescription:
         "This is the project where this retrospective was written",
-      viewChapter: "View Chapter",
+      viewMonthly: "View Monthly",
       viewProject: "View Project",
     },
     retrospective: {
       bestMoment: "Best Moment",
       routineAdherence: "Routine Adherence",
       unexpectedObstacles: "Unexpected Obstacles",
-      nextChapterApplication: "Next Chapter Application",
+      nextMonthlyApplication: "Next Monthly Application",
       note: "Note",
     },
     notes: {

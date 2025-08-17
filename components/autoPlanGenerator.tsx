@@ -18,6 +18,9 @@ import {
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../lib/firebase";
 import { useLanguage } from "../hooks/useLanguage";
+import { fetchAllMonthliesByUserId } from "../lib/firebase/index";
+import { useQuery } from "@tanstack/react-query";
+import { calculateMonthlyWeeks } from "../lib/utils";
 import { Button } from "./ui/button";
 import { generateConstraintsGuide } from "../functions/src/constraints-guide";
 import {
@@ -73,10 +76,13 @@ function isGeneratePlanResponse(data: unknown): data is GeneratePlanResponse {
 }
 
 // 제약사항에 최대값 설정하는 함수
-function processConstraints(constraints: PlanConstraints): PlanConstraints {
+function processConstraints(
+  constraints: PlanConstraints,
+  monthlyWeeks?: number
+): PlanConstraints {
   const processed = { ...constraints };
 
-  // 프로젝트 기간이 설정되지 않았으면 최대값 설정
+  // 프로젝트 기간이 설정되지 않았으면 기본 최대값 설정
   if (!processed.projectWeeks) {
     processed.maxProjectWeeks = 24; // 최대 6개월
   }
@@ -98,7 +104,9 @@ function processConstraints(constraints: PlanConstraints): PlanConstraints {
 
 export default function PlanGenerator() {
   const { translate } = useLanguage();
+  const [inputType, setInputType] = useState<"manual" | "monthly">("manual");
   const [userGoal, setUserGoal] = useState("");
+  const [selectedMonthlyId, setSelectedMonthlyId] = useState<string>("");
   const [constraints, setConstraints] = useState<PlanConstraints>({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPlan, setGeneratedPlan] = useState<GeneratedPlan | null>(
@@ -138,9 +146,45 @@ export default function PlanGenerator() {
     loadExistingAreas();
   }, [user]);
 
+  // Monthly 데이터 조회 (최근 3개월부터, 내림차순 정렬)
+  const { data: monthlies = [] } = useQuery({
+    queryKey: ["recentMonthlies", user?.uid],
+    queryFn: async () => {
+      const data = await fetchAllMonthliesByUserId(user?.uid || "");
+
+      // 시작일 기준으로 내림차순 정렬 (최신이 위로)
+      return data.sort((a: any, b: any) => {
+        const aStart =
+          a.startDate instanceof Date
+            ? a.startDate
+            : (a.startDate as any).toDate();
+        const bStart =
+          b.startDate instanceof Date
+            ? b.startDate
+            : (b.startDate as any).toDate();
+        return bStart.getTime() - aStart.getTime();
+      });
+    },
+    enabled: !!user?.uid,
+  });
+
+  // 선택된 Monthly의 기간 계산
+  const selectedMonthly = monthlies.find(
+    (m: any) => m.id === selectedMonthlyId
+  );
+  const monthlyWeeks = selectedMonthly
+    ? calculateMonthlyWeeks(selectedMonthly)
+    : 0;
+
   const handleGenerate = async () => {
-    if (!userGoal.trim()) {
+    // 입력 타입에 따른 유효성 검사
+    if (inputType === "manual" && !userGoal.trim()) {
       setError(translate("aiPlanGenerator.errors.goalRequired"));
+      return;
+    }
+
+    if (inputType === "monthly" && !selectedMonthlyId) {
+      setError(translate("aiPlanGenerator.errors.monthlyRequired"));
       return;
     }
 
@@ -153,8 +197,11 @@ export default function PlanGenerator() {
     setError("");
 
     try {
-      // 제약사항에 최대값 설정
-      const processedConstraints = processConstraints(constraints);
+      // 제약사항에 최대값 설정 (Monthly 기간 고려)
+      const processedConstraints = processConstraints(
+        constraints,
+        monthlyWeeks
+      );
 
       // 제약사항 가이드 생성
       const constraintsGuide = generateConstraintsGuide(processedConstraints);
@@ -162,9 +209,13 @@ export default function PlanGenerator() {
       // AI 계획 생성 요청
       const generatePlan = httpsCallable(functions, "generatePlan");
       const requestData = {
-        userInput: userGoal.trim(),
+        userInput:
+          inputType === "monthly" ? "Monthly 기반 계획 생성" : userGoal.trim(),
         constraints: processedConstraints,
         existingAreas: existingAreas,
+        inputType: inputType,
+        selectedMonthlyId:
+          inputType === "monthly" ? selectedMonthlyId : undefined,
       };
 
       const result = await generatePlan(requestData);
@@ -305,18 +356,21 @@ export default function PlanGenerator() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">
+      <h1 className="text-2xl font-bold mb-2">
         {translate("aiPlanGenerator.title")}
       </h1>
+      <p className="text-gray-600 mb-6">
+        {translate("aiPlanGenerator.subtitle")}
+      </p>
 
       {/* 기존 Areas 정보 */}
       {existingAreas.length > 0 && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h3 className="font-medium text-blue-900 mb-2">
+        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-lg">
+          <h3 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
             📋 {translate("aiPlanGenerator.existingAreas.title")} (
             {existingAreas.length}개)
           </h3>
-          <p className="text-sm text-blue-700 mb-3">
+          <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
             {translate("aiPlanGenerator.existingAreas.description")}
           </p>
           <div className="grid grid-cols-4 md:grid-cols-6 gap-1">
@@ -326,7 +380,7 @@ export default function PlanGenerator() {
               return (
                 <div
                   key={area.id}
-                  className="flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-gray-50 p-2 text-center"
+                  className="flex flex-col items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-2 text-center"
                 >
                   <div
                     className="mb-1 rounded-full p-1"
@@ -341,7 +395,9 @@ export default function PlanGenerator() {
                   </div>
                   <span className="text-xs">{area.name}</span>
                   {area.status === "archived" && (
-                    <span className="text-xs text-gray-400">(보관됨)</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                      (보관됨)
+                    </span>
                   )}
                 </div>
               );
@@ -350,22 +406,139 @@ export default function PlanGenerator() {
         </div>
       )}
 
-      {/* 목표 입력 */}
+      {/* 입력 타입 선택 */}
       <div className="mb-6">
         <label className="block text-sm font-medium mb-2">
-          {translate("aiPlanGenerator.form.goalLabel")}
+          {translate("aiPlanGenerator.form.inputTypeLabel")}
         </label>
-        <textarea
-          value={userGoal}
-          onChange={(e) => setUserGoal(e.target.value)}
-          placeholder={translate("aiPlanGenerator.form.goalPlaceholder")}
-          className="w-full p-3 border rounded-lg h-24 resize-none"
-          maxLength={200}
-        />
-        <div className="text-sm text-gray-500 mt-1">
-          {userGoal.length}/200자
+        <div className="flex gap-4">
+          <label className="flex items-center">
+            <input
+              type="radio"
+              value="manual"
+              checked={inputType === "manual"}
+              onChange={(e) =>
+                setInputType(e.target.value as "manual" | "monthly")
+              }
+              className="mr-2"
+            />
+            {translate("aiPlanGenerator.form.manualInput")}
+          </label>
+          <label className="flex items-center">
+            <input
+              type="radio"
+              value="monthly"
+              checked={inputType === "monthly"}
+              onChange={(e) =>
+                setInputType(e.target.value as "manual" | "monthly")
+              }
+              className="mr-2"
+            />
+            {translate("aiPlanGenerator.form.monthlyBased")}
+          </label>
         </div>
       </div>
+
+      {/* 목표 입력 (수동 입력일 때만 표시) */}
+      {inputType === "manual" && (
+        <div className="mb-6">
+          <label className="block text-sm font-medium mb-2">
+            {translate("aiPlanGenerator.form.goalLabel")}
+          </label>
+          <textarea
+            value={userGoal}
+            onChange={(e) => setUserGoal(e.target.value)}
+            placeholder={translate("aiPlanGenerator.form.goalPlaceholder")}
+            className="w-full p-3 border rounded-lg h-24 resize-none"
+            maxLength={200}
+          />
+          <div className="text-sm text-gray-500 mt-1">
+            {userGoal.length}/200자
+          </div>
+        </div>
+      )}
+
+      {/* Monthly 선택 (Monthly 기반일 때만 표시) */}
+      {inputType === "monthly" && (
+        <div className="mb-6">
+          <label className="block text-sm font-medium mb-2">Monthly 선택</label>
+          {monthlies.length === 0 ? (
+            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-lg">
+              <p className="text-yellow-800 dark:text-yellow-200">
+                생성된 Monthly가 없습니다. 먼저 Monthly를 생성해주세요.
+              </p>
+            </div>
+          ) : (
+            <select
+              value={selectedMonthlyId}
+              onChange={(e) => setSelectedMonthlyId(e.target.value)}
+              className="w-full p-3 border rounded-lg"
+            >
+              <option value="">Monthly를 선택하세요</option>
+              {monthlies.map((monthly: any) => (
+                <option key={monthly.id} value={monthly.id}>
+                  {monthly.objective} ({monthly.startDate.toLocaleDateString()}{" "}
+                  ~ {monthly.endDate.toLocaleDateString()})
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* 선택된 Monthly 정보 미리보기 */}
+          {selectedMonthlyId && (
+            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-lg">
+              <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+                선택된 Monthly 정보
+              </h4>
+              {(() => {
+                const selectedMonthly = monthlies.find(
+                  (m: any) => m.id === selectedMonthlyId
+                );
+                if (!selectedMonthly) return null;
+
+                return (
+                  <div className="text-sm text-blue-800 dark:text-blue-300">
+                    <p>
+                      <strong>목표:</strong> {selectedMonthly.objective}
+                    </p>
+                    {selectedMonthly.objectiveDescription && (
+                      <p>
+                        <strong>설명:</strong>{" "}
+                        {selectedMonthly.objectiveDescription}
+                      </p>
+                    )}
+                    {selectedMonthly.keyResults &&
+                      selectedMonthly.keyResults.length > 0 && (
+                        <div>
+                          <strong>Key Results:</strong>
+                          <ul className="ml-4 mt-1">
+                            {selectedMonthly.keyResults.map(
+                              (kr: any, index: any) => (
+                                <li key={kr.id || index}>• {kr.title}</li>
+                              )
+                            )}
+                          </ul>
+                        </div>
+                      )}
+                    {selectedMonthly.focusAreas &&
+                      selectedMonthly.focusAreas.length > 0 && (
+                        <p>
+                          <strong>중점 영역:</strong>{" "}
+                          {selectedMonthly.focusAreas.join(", ")}
+                        </p>
+                      )}
+                    {selectedMonthly.reward && (
+                      <p>
+                        <strong>보상:</strong> {selectedMonthly.reward}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 제약 조건 설정 */}
       <div className="grid md:grid-cols-2 gap-6 mb-6">
@@ -394,7 +567,9 @@ export default function PlanGenerator() {
               className="w-full p-2 border rounded"
             >
               <option value="">AI가 자동 설정</option>
+              <option value="1">1주</option>
               <option value="2">2주</option>
+              <option value="3">3주</option>
               <option value="4">1개월</option>
               <option value="8">2개월</option>
               <option value="12">3개월</option>
@@ -402,6 +577,11 @@ export default function PlanGenerator() {
               <option value="20">5개월</option>
               <option value="24">6개월</option>
             </select>
+            {inputType === "monthly" && monthlyWeeks > 0 && (
+              <p className="text-xs text-gray-500 mt-1">
+                참고: 선택된 Monthly 기간은 {monthlyWeeks}주입니다
+              </p>
+            )}
           </div>
 
           <div className="mb-3">
@@ -551,7 +731,11 @@ export default function PlanGenerator() {
       <div className="text-center mb-6">
         <button
           onClick={handleGenerate}
-          disabled={isGenerating || !userGoal.trim()}
+          disabled={
+            isGenerating ||
+            (inputType === "manual" && !userGoal.trim()) ||
+            (inputType === "monthly" && !selectedMonthlyId)
+          }
           className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
         >
           {isGenerating
@@ -562,7 +746,7 @@ export default function PlanGenerator() {
 
       {/* 오류 메시지 */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/50 text-red-700 dark:text-red-300 px-4 py-3 rounded mb-6">
           {error}
         </div>
       )}
@@ -736,7 +920,7 @@ function PlanPreview({
   };
 
   return (
-    <div className="border rounded-lg p-6 bg-gray-50">
+    <div className="border rounded-lg p-6 bg-gray-50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-700">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">
           {translate("aiPlanGenerator.result.title")}
@@ -760,7 +944,7 @@ function PlanPreview({
       </div>
 
       {/* 계획 요약 및 영역 선택 */}
-      <div className="mb-6 p-4 bg-white rounded-lg border">
+      <div className="mb-6 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
         <h3 className="font-medium text-lg mb-2">
           {translate("aiPlanGenerator.result.summary.title")}
         </h3>
@@ -777,11 +961,11 @@ function PlanPreview({
 
         {/* 영역 선택 UI */}
         {showAreaMatching && (
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <h4 className="font-medium text-blue-900 mb-2">
+          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-lg">
+            <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
               {translate("aiPlanGenerator.areaMatching.title")}
             </h4>
-            <p className="text-sm text-blue-700 mb-3">
+            <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
               {translate("aiPlanGenerator.areaMatching.description")}
             </p>
 
@@ -789,7 +973,7 @@ function PlanPreview({
               {/* 기존 영역 카드들 */}
               {existingAreas.length > 0 && (
                 <div>
-                  <p className="text-sm font-medium text-gray-700 mb-2">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     {translate("aiPlanGenerator.areaMatching.selectExisting")}
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -866,7 +1050,7 @@ function PlanPreview({
 
               {/* AI 제안 영역들을 새로 생성하는 카드들 */}
               <div>
-                <p className="text-sm font-medium text-gray-700 mb-2">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   {translate("aiPlanGenerator.areaMatching.createNew")}
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -939,7 +1123,7 @@ function PlanPreview({
           </div>
         )}
 
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           {translate("aiPlanGenerator.result.summary.description")}
         </p>
       </div>
@@ -947,7 +1131,10 @@ function PlanPreview({
       {/* 프로젝트 목록 */}
       <div className="space-y-4">
         {editedPlan.projects.map((project, index) => (
-          <div key={index} className="bg-white p-4 rounded-lg border">
+          <div
+            key={index}
+            className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700"
+          >
             {isEditing ? (
               <div className="space-y-3">
                 <div>
@@ -1123,7 +1310,7 @@ function PlanPreview({
       {/* 저장 버튼 */}
       <div className="mt-6 text-center">
         {saveError && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded mb-4">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/50 text-red-700 dark:text-red-300 px-4 py-2 rounded mb-4">
             {saveError}
           </div>
         )}
