@@ -9,6 +9,7 @@ import {
   updateDoc,
   deleteDoc,
   orderBy,
+  Timestamp,
 } from "firebase/firestore";
 import { db } from "./config";
 import {
@@ -384,55 +385,26 @@ export const getTodayTasks = async (
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // 현재 먼슬리의 프로젝트들을 먼저 가져오기
-    let projectIds: string[] = [];
-
-    if (currentMonthlyId) {
-      // 특정 먼슬리의 프로젝트들만
-      const projects = await fetchProjectsByMonthlyId(currentMonthlyId);
-      projectIds = projects.map((p) => p.id);
-    } else {
-      // 현재 진행 중인 먼슬리의 프로젝트들
-      const monthlies = await fetchAllMonthliesByUserId(userId);
-      const currentMonthly = monthlies.find((monthly) => {
-        const status = getMonthlyStatus(monthly);
-        return status === "in_progress";
-      });
-
-      if (currentMonthly) {
-        const projects = await fetchProjectsByMonthlyId(currentMonthly.id);
-        projectIds = projects.map((p) => p.id);
-      }
-    }
-
-    if (projectIds.length === 0) {
-      return [];
-    }
-
-    // Firestore에서 사용자의 모든 태스크를 조회 (단순화)
-    const q = query(collection(db, "tasks"), where("userId", "==", userId));
+    // Firestore에서 오늘 날짜의 태스크만 서버사이드에서 필터링
+    // 이 쿼리를 실행하면 Firestore가 필요한 인덱스를 자동으로 제안함
+    const q = query(
+      collection(db, "tasks"),
+      where("userId", "==", userId),
+      where("date", ">=", Timestamp.fromDate(today)),
+      where("date", "<", Timestamp.fromDate(tomorrow))
+    );
 
     const querySnapshot = await getDocs(q);
-    const allUserTasks = querySnapshot.docs.map((doc) => {
+    const todayTasks = querySnapshot.docs.map((doc) => {
       const data = doc.data();
       return {
         id: doc.id,
         ...data,
         date: data.date.toDate(),
+        completedAt: data.completedAt?.toDate(),
         createdAt: data.createdAt.toDate(),
         updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
       } as Task;
-    });
-
-    // 오늘 날짜이면서 현재 먼슬리의 프로젝트 태스크만 필터링
-    const todayTasks = allUserTasks.filter((task) => {
-      const taskDate = new Date(task.date);
-      taskDate.setHours(0, 0, 0, 0);
-      return (
-        taskDate >= today &&
-        taskDate < tomorrow &&
-        projectIds.includes(task.projectId)
-      );
     });
 
     return sortTasksByDateAndTitle(todayTasks);
@@ -487,7 +459,7 @@ export const getCompletedTasksByMonthlyPeriod = async (
     const endOfMonth = new Date(endDate);
     endOfMonth.setHours(23, 59, 59, 999);
 
-    // Firestore에서 완료된 태스크만 조회 (단순화)
+    // Firestore에서 완료된 태스크만 조회 (서버사이드 필터링)
     const q = query(
       collection(db, "tasks"),
       where("userId", "==", userId),
@@ -514,13 +486,6 @@ export const getCompletedTasksByMonthlyPeriod = async (
         completedAt instanceof Date ? completedAt : new Date(completedAt);
       return completedDate >= startOfMonth && completedDate <= endOfMonth;
     });
-
-    console.log(
-      `🔍 Monthly 기간 필터링 결과: ${monthlyCompletedTasks.length}개 task`
-    );
-    console.log(
-      `📅 Monthly 기간: ${startOfMonth.toLocaleDateString()} ~ ${endOfMonth.toLocaleDateString()}`
-    );
 
     // 프로젝트 정보를 배치로 가져와서 성능 최적화
     const projectIds = [

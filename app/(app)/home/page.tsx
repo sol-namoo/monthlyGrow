@@ -538,14 +538,7 @@ export default function HomePage() {
 
               {/* D-day 정보 */}
               <div className="mt-3 flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {texts.daysLeft}: {daysLeft}일
-                </span>
-                <ProgressCard
-                  title={texts.progress}
-                  progress={progress}
-                  total={100}
-                />
+                <span className="text-muted-foreground">D-{daysLeft}</span>
               </div>
             </Card>
           ) : (
