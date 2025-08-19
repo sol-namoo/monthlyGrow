@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase/index";
+import { createUser } from "@/lib/firebase/users";
 import {
   ChevronRight,
   ChevronLeft,
@@ -71,104 +74,127 @@ export default function OnboardingPage() {
 
   const totalSteps = 6;
 
+  // 사용자 문서 생성 확인 및 생성
+  useEffect(() => {
+    const checkAndCreateUserDoc = async () => {
+      if (user && !userLoading) {
+        try {
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (!userDoc.exists()) {
+            console.log("온보딩 페이지에서 사용자 문서를 생성합니다.");
+            await createUser({
+              uid: user.uid,
+              email: user.email || "",
+              displayName: user.displayName || "",
+              photoURL: user.photoURL || "",
+              emailVerified: user.emailVerified || false,
+            });
+            console.log("✅ 사용자 문서 생성 완료");
+          }
+        } catch (error) {
+          console.error("사용자 문서 생성 중 오류:", error);
+        }
+      }
+    };
+
+    checkAndCreateUserDoc();
+  }, [user, userLoading]);
+
   // 다국어 텍스트 메모이제이션
   const texts = useMemo(
     () => ({
-      welcome: "환영합니다! 🎉",
-      subtitle: "체계적인 목표 달성을 위한 앱 사용법을 안내해드립니다",
-      monthly: "먼슬리 (Monthly)",
-      monthlyDesc: "매달 달성하고 싶은 목표와 핵심 결과를 설정합니다",
-      para: "PARA 시스템",
-      paraDesc:
-        "목표를 실행하기 위한 프로젝트, 영역, 자원을 체계적으로 관리합니다",
-      game: "게임형 자기관리",
-      gameDesc: "월간 먼슬리와 보상 시스템으로 동기를 유지합니다",
-      createMonthly: "첫 번째 먼슬리 만들기",
-      createMonthlyDesc: "이번 달의 목표를 설정해보세요",
-      laterCreate: "지금 만들지 않고 나중에 만들 수도 있어요",
-      objective: "이번 달의 목표 (Objective)",
-      objectivePlaceholder: "예: 건강한 라이프스타일 만들기",
-      startDate: "시작일",
-      endDate: "종료일",
-      keyResults: "핵심 결과 (Key Results)",
-      keyResultPlaceholder: "예: 주 3회 이상 운동하기",
-      keyResultDescPlaceholder: "구체적인 실행 방법을 적어보세요",
-      reward: "목표 달성 보상 🎁",
-      rewardPlaceholder: "예: 좋아하는 레스토랑에서 식사하기",
-      rewardDesc: "목표를 달성했을 때 자신에게 줄 보상을 설정하세요",
-      paraOverview: "PARA 시스템 둘러보기",
-      paraOverviewDesc: "목표를 실행하기 위한 체계적인 구조입니다",
-      projects: "Projects",
-      projectsDesc: "구체적인 결과물이 있는 작업",
-      areas: "Areas",
-      areasDesc: "지속적으로 관리할 영역",
-      resources: "Resources",
-      resourcesDesc: "참고할 자료와 정보",
-      archives: "Archives",
-      archivesDesc: "완료된 프로젝트 보관",
-      aiGenerator: "AI 계획 생성기",
-      aiGeneratorDesc:
-        "설정한 목표를 AI가 분석하여 PARA 구조를 자동으로 생성해드립니다",
-      optional: "선택사항",
-      manualOption: "수동으로 직접 관리하거나 AI의 도움을 받을 수 있습니다",
-      aiExperience: "AI 계획 생성기 체험",
-      aiExperienceDesc: "설정한 목표를 바탕으로 AI가 계획을 생성합니다",
-      analyzing: "목표 분석 중...",
-      analysisComplete: "목표 분석 완료",
-      areasGenerated: "관련 영역(Areas) 3개 생성",
-      projectsGenerated: "실행 프로젝트(Projects) 5개 생성",
-      resourcesGenerated: "참고 자료(Resources) 8개 추천",
-      generatedAreas: "생성된 영역 (Areas)",
-      generatedProjects: "생성된 프로젝트 (Projects)",
-      healthManagement: "건강 관리",
-      exerciseRoutine: "운동 루틴",
-      nutritionManagement: "영양 관리",
-      homeTraining: "주 3회 홈트레이닝 루틴 만들기",
-      healthyDiet: "건강한 식단 계획 수립",
-      sleepPattern: "수면 패턴 개선하기",
-      manualEdit: "언제든지 수동으로 수정하거나 새로 추가할 수 있습니다",
-      connection: "연결과 실행",
-      connectionDesc: "먼슬리와 PARA를 연결하여 목표를 실행해보세요",
-      homeFeatures: "홈 화면 주요 기능",
-      currentProgress: "현재 먼슬리 진행률",
-      currentProgressDesc: "Key Results 달성 현황을 한눈에 확인",
-      todayTasks: "오늘의 할 일",
-      todayTasksDesc: "연결된 프로젝트의 오늘 할 일 표시",
-      achievement: "성취 현황",
-      achievementDesc: "완료한 작업과 보상 진행 상황",
-      executionTips: "실행 팁",
-      tip1: "매일 홈 화면에서 오늘의 할 일을 확인하세요",
-      tip2: "주간 회고를 통해 진행 상황을 점검하세요",
-      tip3: "목표 달성 시 설정한 보상을 꼭 실행하세요",
-      ready: "준비 완료! 🚀",
-      readyDesc: "이제 체계적인 목표 달성을 시작해보세요",
-      experiencedFeatures: "체험한 기능들",
-      createdSampleData: "생성된 샘플 데이터",
-      monthlyLater: "먼슬리: 나중에 직접 만들어보세요",
-      paraLearned: "PARA 시스템: 체계적인 관리 방법을 학습했습니다",
-      aiExperienced: "AI 계획 생성기: 자동 계획 생성 과정을 체험했습니다",
-      nextSteps: "다음 단계",
-      step1: "먼슬리 페이지에서 첫 번째 목표를 만들어보세요",
-      step2: "PARA 시스템에서 프로젝트와 영역을 관리하세요",
-      step3: "AI 계획 생성기로 자동 계획을 만들어보세요",
-      step4: "홈 화면에서 오늘의 할 일을 확인하세요",
-      step5: "PARA 시스템에서 프로젝트를 세부 조정하세요",
-      step6: "설정에서 언제든지 앱 사용법을 다시 볼 수 있습니다",
-      previous: "이전",
-      next: "다음",
-      createLater: "다음에 만들기",
-      start: "시작하기",
-      skipEntire: "앱 사용법 전체 건너뛰기",
-      monthlyLaterNote: "먼슬리는 나중에 언제든지 만들 수 있어요",
+      welcome: translate("onboarding.welcome"),
+      subtitle: translate("onboarding.subtitle"),
+      monthly: translate("onboarding.monthly"),
+      monthlyDesc: translate("onboarding.monthlyDesc"),
+      para: translate("onboarding.para"),
+      paraDesc: translate("onboarding.paraDesc"),
+      game: translate("onboarding.game"),
+      gameDesc: translate("onboarding.gameDesc"),
+      createMonthly: translate("onboarding.createMonthly"),
+      createMonthlyDesc: translate("onboarding.createMonthlyDesc"),
+      laterCreate: translate("onboarding.laterCreate"),
+      objective: translate("onboarding.objective"),
+      objectivePlaceholder: translate("onboarding.objectivePlaceholder"),
+      startDate: translate("onboarding.startDate"),
+      endDate: translate("onboarding.endDate"),
+      keyResults: translate("onboarding.keyResults"),
+      keyResultPlaceholder: translate("onboarding.keyResultPlaceholder"),
+      keyResultDescPlaceholder: translate(
+        "onboarding.keyResultDescPlaceholder"
+      ),
+      reward: translate("onboarding.reward"),
+      rewardPlaceholder: translate("onboarding.rewardPlaceholder"),
+      rewardDesc: translate("onboarding.rewardDesc"),
+      paraOverview: translate("onboarding.paraOverview"),
+      paraOverviewDesc: translate("onboarding.paraOverviewDesc"),
+      projects: translate("onboarding.projects"),
+      projectsDesc: translate("onboarding.projectsDesc"),
+      areas: translate("onboarding.areas"),
+      areasDesc: translate("onboarding.areasDesc"),
+      resources: translate("onboarding.resources"),
+      resourcesDesc: translate("onboarding.resourcesDesc"),
+      archives: translate("onboarding.archives"),
+      archivesDesc: translate("onboarding.archivesDesc"),
+      aiGenerator: translate("onboarding.aiGenerator"),
+      aiGeneratorDesc: translate("onboarding.aiGeneratorDesc"),
+      optional: translate("onboarding.optional"),
+      manualOption: translate("onboarding.manualOption"),
+      aiExperience: translate("onboarding.aiExperience"),
+      aiExperienceDesc: translate("onboarding.aiExperienceDesc"),
+      analyzing: translate("onboarding.analyzing"),
+      analysisComplete: translate("onboarding.analysisComplete"),
+      areasGenerated: translate("onboarding.areasGenerated"),
+      projectsGenerated: translate("onboarding.projectsGenerated"),
+      resourcesGenerated: translate("onboarding.resourcesGenerated"),
+      generatedAreas: translate("onboarding.generatedAreas"),
+      generatedProjects: translate("onboarding.generatedProjects"),
+      healthManagement: translate("onboarding.healthManagement"),
+      exerciseRoutine: translate("onboarding.exerciseRoutine"),
+      nutritionManagement: translate("onboarding.nutritionManagement"),
+      homeTraining: translate("onboarding.homeTraining"),
+      healthyDiet: translate("onboarding.healthyDiet"),
+      sleepPattern: translate("onboarding.sleepPattern"),
+      manualEdit: translate("onboarding.manualEdit"),
+      connection: translate("onboarding.connection"),
+      connectionDesc: translate("onboarding.connectionDesc"),
+      homeFeatures: translate("onboarding.homeFeatures"),
+      currentProgress: translate("onboarding.currentProgress"),
+      currentProgressDesc: translate("onboarding.progressDesc"),
+      todayTasks: translate("onboarding.todayTasks"),
+      todayTasksDesc: translate("onboarding.todayTasksDesc"),
+      achievement: translate("onboarding.achievement"),
+      achievementDesc: translate("onboarding.achievementDesc"),
+      executionTips: translate("onboarding.executionTips"),
+      tip1: translate("onboarding.tip1"),
+      tip2: translate("onboarding.tip2"),
+      tip3: translate("onboarding.tip3"),
+      ready: translate("onboarding.ready"),
+      readyDesc: translate("onboarding.readyDesc"),
+      experiencedFeatures: translate("onboarding.experiencedFeatures"),
+      createdSampleData: translate("onboarding.createdSampleData"),
+      monthlyLater: translate("onboarding.monthlyLater"),
+      paraLearned: translate("onboarding.paraOverview"),
+      aiExperienced: translate("onboarding.aiExperience"),
+      nextSteps: translate("onboarding.nextSteps"),
+      step1: translate("onboarding.step1"),
+      step2: translate("onboarding.step2"),
+      step3: translate("onboarding.step3"),
+      step4: translate("onboarding.step4"),
+      step5: translate("onboarding.step5"),
+      step6: translate("onboarding.step6"),
+      previous: translate("onboarding.previous"),
+      next: translate("onboarding.next"),
+      createLater: translate("onboarding.createLater"),
+      start: translate("onboarding.start"),
+      skipEntire: translate("onboarding.skipEntire"),
       // 예시 데이터
-      sampleObjective: "건강한 라이프스타일 만들기",
-      sampleKeyResult1: "주 3회 이상 운동하기",
-      sampleKeyResult1Desc:
-        "홈트레이닝, 조깅, 수영 등 다양한 운동을 통해 체력을 향상시킵니다.",
-      sampleKeyResult2: "건강한 식단 유지하기",
-      sampleKeyResult2Desc:
-        "하루 3끼 규칙적으로 먹고, 채소와 단백질을 충분히 섭취합니다.",
-      sampleReward: "좋아하는 레스토랑에서 특별한 식사하기",
+      sampleObjective: translate("onboarding.sampleObjective"),
+      sampleKeyResult1: translate("onboarding.sampleKeyResult1"),
+      sampleKeyResult1Desc: translate("onboarding.sampleKeyResult1Desc"),
+      sampleKeyResult2: translate("onboarding.sampleKeyResult2"),
+      sampleKeyResult2Desc: translate("onboarding.sampleKeyResult2Desc"),
+      sampleReward: translate("onboarding.sampleReward"),
     }),
     [translate]
   );
@@ -202,8 +228,8 @@ export default function OnboardingPage() {
     } catch (error) {
       console.error("앱 사용법 완료 처리 중 오류:", error);
       toast({
-        title: "오류 발생",
-        description: "앱 사용법 완료 처리 중 문제가 발생했습니다.",
+        title: translate("onboarding.errorTitle"),
+        description: translate("onboarding.errorDescription"),
         variant: "destructive",
       });
     }
@@ -237,38 +263,44 @@ export default function OnboardingPage() {
         return (
           <div className="text-center space-y-6">
             <div className="mb-8">
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 dark:from-blue-600 dark:to-indigo-700 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Target className="h-10 w-10 text-white" />
               </div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              <h1 className="text-3xl font-bold text-foreground mb-2">
                 {texts.welcome}
               </h1>
-              <p className="text-lg text-gray-600">{texts.subtitle}</p>
+              <p className="text-lg text-muted-foreground">{texts.subtitle}</p>
             </div>
 
             <div className="space-y-4">
-              <Card className="p-6 text-left">
+              <Card className="p-6 text-left border-border bg-card dark:bg-slate-800/50 dark:border-slate-700">
                 <div className="flex items-center mb-3">
                   <Calendar className="h-6 w-6 text-blue-500 mr-3" />
-                  <h3 className="text-lg font-bold">{texts.monthly}</h3>
+                  <h3 className="text-lg font-bold text-foreground">
+                    {texts.monthly}
+                  </h3>
                 </div>
-                <p className="text-gray-600">{texts.monthlyDesc}</p>
+                <p className="text-muted-foreground">{texts.monthlyDesc}</p>
               </Card>
 
-              <Card className="p-6 text-left">
+              <Card className="p-6 text-left border-border bg-card dark:bg-slate-800/50 dark:border-slate-700">
                 <div className="flex items-center mb-3">
                   <FolderOpen className="h-6 w-6 text-green-500 mr-3" />
-                  <h3 className="text-lg font-bold">{texts.para}</h3>
+                  <h3 className="text-lg font-bold text-foreground">
+                    {texts.para}
+                  </h3>
                 </div>
-                <p className="text-gray-600">{texts.paraDesc}</p>
+                <p className="text-muted-foreground">{texts.paraDesc}</p>
               </Card>
 
-              <Card className="p-6 text-left">
+              <Card className="p-6 text-left border-border bg-card dark:bg-slate-800/50 dark:border-slate-700">
                 <div className="flex items-center mb-3">
                   <Trophy className="h-6 w-6 text-yellow-500 mr-3" />
-                  <h3 className="text-lg font-bold">{texts.game}</h3>
+                  <h3 className="text-lg font-bold text-foreground">
+                    {texts.game}
+                  </h3>
                 </div>
-                <p className="text-gray-600">{texts.gameDesc}</p>
+                <p className="text-muted-foreground">{texts.gameDesc}</p>
               </Card>
             </div>
           </div>
@@ -278,17 +310,17 @@ export default function OnboardingPage() {
         return (
           <div className="space-y-6">
             <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl font-bold text-foreground mb-2">
                 {texts.createMonthly}
               </h2>
-              <p className="text-gray-600">{texts.createMonthlyDesc}</p>
-              <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm text-blue-700">
+              <p className="text-muted-foreground">{texts.createMonthlyDesc}</p>
+              <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/50 rounded-lg border border-blue-200 dark:border-blue-800">
+                <p className="text-sm text-blue-700 dark:text-blue-300">
                   <Clock className="h-4 w-4 inline mr-1" />
                   {texts.laterCreate}
                 </p>
                 {!user && (
-                  <p className="text-sm text-blue-700 mt-2">
+                  <p className="text-sm text-blue-700 dark:text-blue-300 mt-2">
                     <AlertCircle className="h-4 w-4 inline mr-1" />
                     로그인 후에 먼슬리를 생성할 수 있습니다.
                   </p>
@@ -296,7 +328,7 @@ export default function OnboardingPage() {
               </div>
             </div>
 
-            <Card className="p-6">
+            <Card className="p-6 border-border bg-card dark:bg-slate-800/30 dark:border-slate-700/50">
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="objective">{texts.objective}</Label>
@@ -333,19 +365,25 @@ export default function OnboardingPage() {
               </div>
             </Card>
 
-            <Card className="p-6">
-              <h3 className="text-lg font-bold mb-4">{texts.reward}</h3>
+            <Card className="p-6 border-border bg-card dark:bg-slate-800/30 dark:border-slate-700/50">
+              <h3 className="text-lg font-bold mb-4 text-foreground">
+                {texts.reward}
+              </h3>
               <Input value={texts.sampleReward} disabled={true} />
-              <p className="text-xs text-gray-500 mt-2">{texts.rewardDesc}</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                {texts.rewardDesc}
+              </p>
             </Card>
 
-            <Card className="p-6">
-              <h3 className="text-lg font-bold mb-4">{texts.keyResults}</h3>
+            <Card className="p-6 border-border bg-card dark:bg-slate-800/30 dark:border-slate-700/50">
+              <h3 className="text-lg font-bold mb-4 text-foreground">
+                {texts.keyResults}
+              </h3>
               <div className="space-y-4">
                 {onboardingData.keyResults.map((kr, index) => (
                   <div
                     key={kr.id}
-                    className="p-4 border border-border rounded-lg"
+                    className="p-4 border border-border dark:border-slate-700/50 rounded-lg bg-background dark:bg-slate-800/20"
                   >
                     <Label className="text-sm font-medium text-muted-foreground mb-2 block">
                       Key Result {index + 1}
@@ -379,58 +417,76 @@ export default function OnboardingPage() {
         return (
           <div className="space-y-6">
             <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl font-bold text-foreground mb-2">
                 {texts.paraOverview}
               </h2>
-              <p className="text-gray-600">{texts.paraOverviewDesc}</p>
+              <p className="text-muted-foreground">{texts.paraOverviewDesc}</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <Card className="p-4 text-center">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Target className="h-6 w-6 text-blue-600" />
+              <Card className="p-4 text-center border-border bg-card dark:bg-slate-800/50 dark:border-slate-700">
+                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Target className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
-                <h3 className="font-bold text-sm mb-2">{texts.projects}</h3>
-                <p className="text-xs text-gray-600">{texts.projectsDesc}</p>
+                <h3 className="font-bold text-sm mb-2 text-foreground">
+                  {texts.projects}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {texts.projectsDesc}
+                </p>
               </Card>
 
-              <Card className="p-4 text-center">
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <RotateCcw className="h-6 w-6 text-green-600" />
+              <Card className="p-4 text-center border-border bg-card dark:bg-slate-800/50 dark:border-slate-700">
+                <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <RotateCcw className="h-6 w-6 text-green-600 dark:text-green-400" />
                 </div>
-                <h3 className="font-bold text-sm mb-2">{texts.areas}</h3>
-                <p className="text-xs text-gray-600">{texts.areasDesc}</p>
+                <h3 className="font-bold text-sm mb-2 text-foreground">
+                  {texts.areas}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {texts.areasDesc}
+                </p>
               </Card>
 
-              <Card className="p-4 text-center">
-                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <BookOpen className="h-6 w-6 text-purple-600" />
+              <Card className="p-4 text-center border-border bg-card dark:bg-slate-800/50 dark:border-slate-700">
+                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <BookOpen className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                 </div>
-                <h3 className="font-bold text-sm mb-2">{texts.resources}</h3>
-                <p className="text-xs text-gray-600">{texts.resourcesDesc}</p>
+                <h3 className="font-bold text-sm mb-2 text-foreground">
+                  {texts.resources}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {texts.resourcesDesc}
+                </p>
               </Card>
 
-              <Card className="p-4 text-center">
-                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Archive className="h-6 w-6 text-gray-600" />
+              <Card className="p-4 text-center border-border bg-card dark:bg-slate-800/50 dark:border-slate-700">
+                <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Archive className="h-6 w-6 text-gray-600 dark:text-gray-400" />
                 </div>
-                <h3 className="font-bold text-sm mb-2">{texts.archives}</h3>
-                <p className="text-xs text-gray-600">{texts.archivesDesc}</p>
+                <h3 className="font-bold text-sm mb-2 text-foreground">
+                  {texts.archives}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {texts.archivesDesc}
+                </p>
               </Card>
             </div>
 
-            <Card className="p-6 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
+            <Card className="p-6 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/50 dark:to-pink-950/50 border-purple-200 dark:border-purple-800">
               <div className="flex items-center mb-3">
-                <Sparkles className="h-6 w-6 text-purple-600 mr-3" />
-                <h3 className="text-lg font-bold text-purple-900">
+                <Sparkles className="h-6 w-6 text-purple-600 dark:text-purple-400 mr-3" />
+                <h3 className="text-lg font-bold text-purple-900 dark:text-purple-100">
                   {texts.aiGenerator}
                 </h3>
-                <Badge className="ml-2 bg-purple-100 text-purple-800">
+                <Badge className="ml-2 bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200">
                   {texts.optional}
                 </Badge>
               </div>
-              <p className="text-purple-800 mb-4">{texts.aiGeneratorDesc}</p>
-              <div className="flex items-center text-sm text-purple-700">
+              <p className="text-purple-800 dark:text-purple-200 mb-4">
+                {texts.aiGeneratorDesc}
+              </p>
+              <div className="flex items-center text-sm text-purple-700 dark:text-purple-300">
                 <CheckCircle className="h-4 w-4 mr-2" />
                 <span>{texts.manualOption}</span>
               </div>
@@ -442,39 +498,39 @@ export default function OnboardingPage() {
         return (
           <div className="space-y-6">
             <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl font-bold text-foreground mb-2">
                 {texts.aiExperience}
               </h2>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 {onboardingData.skippedMonthlyCreation
                   ? "샘플 목표를 바탕으로 AI가 계획을 생성하는 과정을 보여드립니다"
                   : texts.aiExperienceDesc}
               </p>
             </div>
 
-            <Card className="p-6 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
+            <Card className="p-6 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/50 dark:to-pink-950/50 border-purple-200 dark:border-purple-800">
               <div className="flex items-center mb-4">
-                <Zap className="h-6 w-6 text-purple-600 mr-3" />
-                <h3 className="text-lg font-bold text-purple-900">
+                <Zap className="h-6 w-6 text-purple-600 dark:text-purple-400 mr-3" />
+                <h3 className="text-lg font-bold text-purple-900 dark:text-purple-100">
                   {texts.analyzing}
                 </h3>
               </div>
               <div className="space-y-3">
-                <div className="flex items-center text-sm text-purple-800">
+                <div className="flex items-center text-sm text-purple-800 dark:text-purple-200">
                   <div className="w-2 h-2 bg-purple-400 rounded-full mr-3 animate-pulse"></div>
                   <span>
                     "{texts.sampleObjective}" {texts.analysisComplete}
                   </span>
                 </div>
-                <div className="flex items-center text-sm text-purple-800">
+                <div className="flex items-center text-sm text-purple-800 dark:text-purple-200">
                   <div className="w-2 h-2 bg-purple-400 rounded-full mr-3 animate-pulse"></div>
                   <span>{texts.areasGenerated}</span>
                 </div>
-                <div className="flex items-center text-sm text-purple-800">
+                <div className="flex items-center text-sm text-purple-800 dark:text-purple-200">
                   <div className="w-2 h-2 bg-purple-400 rounded-full mr-3 animate-pulse"></div>
                   <span>{texts.projectsGenerated}</span>
                 </div>
-                <div className="flex items-center text-sm text-purple-800">
+                <div className="flex items-center text-sm text-purple-800 dark:text-purple-200">
                   <div className="w-2 h-2 bg-purple-400 rounded-full mr-3 animate-pulse"></div>
                   <span>{texts.resourcesGenerated}</span>
                 </div>
@@ -482,24 +538,28 @@ export default function OnboardingPage() {
             </Card>
 
             <div className="grid gap-4">
-              <Card className="p-4">
+              <Card className="p-4 border-border bg-card dark:bg-slate-800/50 dark:border-slate-700">
                 <div className="flex items-center mb-2">
                   <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-                  <h4 className="font-bold">{texts.generatedAreas}</h4>
+                  <h4 className="font-bold text-foreground">
+                    {texts.generatedAreas}
+                  </h4>
                 </div>
-                <div className="space-y-2 text-sm text-gray-600">
+                <div className="space-y-2 text-sm text-muted-foreground">
                   <div>• {texts.healthManagement}</div>
                   <div>• {texts.exerciseRoutine}</div>
                   <div>• {texts.nutritionManagement}</div>
                 </div>
               </Card>
 
-              <Card className="p-4">
+              <Card className="p-4 border-border bg-card dark:bg-slate-800/50 dark:border-slate-700">
                 <div className="flex items-center mb-2">
                   <div className="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
-                  <h4 className="font-bold">{texts.generatedProjects}</h4>
+                  <h4 className="font-bold text-foreground">
+                    {texts.generatedProjects}
+                  </h4>
                 </div>
-                <div className="space-y-2 text-sm text-gray-600">
+                <div className="space-y-2 text-sm text-muted-foreground">
                   <div>• {texts.homeTraining}</div>
                   <div>• {texts.healthyDiet}</div>
                   <div>• {texts.sleepPattern}</div>
@@ -507,8 +567,8 @@ export default function OnboardingPage() {
               </Card>
             </div>
 
-            <Card className="p-4 bg-yellow-50 border-yellow-200">
-              <div className="flex items-center text-sm text-yellow-800">
+            <Card className="p-4 bg-yellow-50 dark:bg-yellow-950/50 border-yellow-200 dark:border-yellow-800">
+              <div className="flex items-center text-sm text-yellow-800 dark:text-yellow-200">
                 <CheckCircle className="h-4 w-4 mr-2" />
                 <span>{texts.manualEdit}</span>
               </div>
@@ -526,42 +586,48 @@ export default function OnboardingPage() {
               <p className="text-muted-foreground">{texts.connectionDesc}</p>
             </div>
 
-            <Card className="p-6">
-              <h3 className="text-lg font-bold mb-4">{texts.homeFeatures}</h3>
+            <Card className="p-6 border-border bg-card dark:bg-slate-800/30 dark:border-slate-700/50">
+              <h3 className="text-lg font-bold mb-4 text-foreground">
+                {texts.homeFeatures}
+              </h3>
               <div className="space-y-4">
-                <div className="flex items-center p-3 bg-blue-50 rounded-lg">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-4">
-                    <Calendar className="h-5 w-5 text-blue-600" />
+                <div className="flex items-center p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800/50">
+                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center mr-4">
+                    <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm">
+                    <h4 className="font-bold text-sm text-foreground">
                       {texts.currentProgress}
                     </h4>
-                    <p className="text-xs text-gray-600">
+                    <p className="text-xs text-gray-600 dark:text-gray-300">
                       {texts.currentProgressDesc}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center p-3 bg-green-50 rounded-lg">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-4">
-                    <Target className="h-5 w-5 text-green-600" />
+                <div className="flex items-center p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800/50">
+                  <div className="w-10 h-10 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center mr-4">
+                    <Target className="h-5 w-5 text-green-600 dark:text-green-400" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm">{texts.todayTasks}</h4>
-                    <p className="text-xs text-gray-600">
+                    <h4 className="font-bold text-sm text-foreground">
+                      {texts.todayTasks}
+                    </h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-300">
                       {texts.todayTasksDesc}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center p-3 bg-purple-50 rounded-lg">
-                  <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mr-4">
-                    <Trophy className="h-5 w-5 text-purple-600" />
+                <div className="flex items-center p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800/50">
+                  <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/50 rounded-full flex items-center justify-center mr-4">
+                    <Trophy className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm">{texts.achievement}</h4>
-                    <p className="text-xs text-gray-600">
+                    <h4 className="font-bold text-sm text-foreground">
+                      {texts.achievement}
+                    </h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-300">
                       {texts.achievementDesc}
                     </p>
                   </div>
@@ -569,14 +635,14 @@ export default function OnboardingPage() {
               </div>
             </Card>
 
-            <Card className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+            <Card className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/50 dark:to-emerald-950/50 border-green-200 dark:border-green-800">
               <div className="flex items-center mb-3">
-                <Play className="h-6 w-6 text-green-600 mr-3" />
-                <h3 className="text-lg font-bold text-green-900">
+                <Play className="h-6 w-6 text-green-600 dark:text-green-400 mr-3" />
+                <h3 className="text-lg font-bold text-green-900 dark:text-green-100">
                   {texts.executionTips}
                 </h3>
               </div>
-              <div className="space-y-2 text-sm text-green-800">
+              <div className="space-y-2 text-sm text-green-800 dark:text-green-200">
                 <div className="flex items-center">
                   <CheckCircle className="h-4 w-4 mr-2" />
                   <span>{texts.tip1}</span>
@@ -598,17 +664,17 @@ export default function OnboardingPage() {
         return (
           <div className="text-center space-y-6">
             <div className="mb-8">
-              <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 dark:from-green-600 dark:to-emerald-700 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle className="h-10 w-10 text-white" />
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">
+              <h2 className="text-3xl font-bold text-foreground mb-2">
                 {texts.ready}
               </h2>
-              <p className="text-lg text-gray-600">{texts.readyDesc}</p>
+              <p className="text-lg text-muted-foreground">{texts.readyDesc}</p>
             </div>
 
-            <Card className="p-6 text-left">
-              <h3 className="text-lg font-bold mb-4">
+            <Card className="p-6 text-left border-border bg-card dark:bg-slate-800/50 dark:border-slate-700">
+              <h3 className="text-lg font-bold mb-4 text-foreground">
                 {onboardingData.skippedMonthlyCreation
                   ? texts.experiencedFeatures
                   : texts.createdSampleData}
@@ -618,17 +684,19 @@ export default function OnboardingPage() {
                   <>
                     <div className="flex items-center">
                       <Calendar className="h-4 w-4 text-blue-500 mr-2" />
-                      <span className="text-gray-600">
+                      <span className="text-muted-foreground">
                         {texts.monthlyLater}
                       </span>
                     </div>
                     <div className="flex items-center">
                       <FolderOpen className="h-4 w-4 text-green-500 mr-2" />
-                      <span className="text-gray-600">{texts.paraLearned}</span>
+                      <span className="text-muted-foreground">
+                        {texts.paraLearned}
+                      </span>
                     </div>
                     <div className="flex items-center">
                       <Sparkles className="h-4 w-4 text-purple-500 mr-2" />
-                      <span className="text-gray-600">
+                      <span className="text-muted-foreground">
                         {texts.aiExperienced}
                       </span>
                     </div>
@@ -637,13 +705,13 @@ export default function OnboardingPage() {
                   <>
                     <div className="flex items-center">
                       <Calendar className="h-4 w-4 text-blue-500 mr-2" />
-                      <span className="text-gray-600">
+                      <span className="text-muted-foreground">
                         먼슬리: "{texts.sampleObjective}"
                       </span>
                     </div>
                     <div className="flex items-center">
                       <Target className="h-4 w-4 text-blue-500 mr-2" />
-                      <span className="text-gray-600">
+                      <span className="text-muted-foreground">
                         Key Results:{" "}
                         {
                           onboardingData.keyResults.filter((kr) => kr.title)
@@ -654,13 +722,13 @@ export default function OnboardingPage() {
                     </div>
                     <div className="flex items-center">
                       <FolderOpen className="h-4 w-4 text-green-500 mr-2" />
-                      <span className="text-gray-600">
+                      <span className="text-muted-foreground">
                         PARA 구조: 자동 생성됨
                       </span>
                     </div>
                     <div className="flex items-center">
                       <Trophy className="h-4 w-4 text-yellow-500 mr-2" />
-                      <span className="text-gray-600">
+                      <span className="text-muted-foreground">
                         보상: "{texts.sampleReward}"
                       </span>
                     </div>
@@ -669,40 +737,54 @@ export default function OnboardingPage() {
               </div>
             </Card>
 
-            <Card className="p-6 bg-blue-50 border-blue-200">
+            <Card className="p-6 bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800">
               <div className="flex items-center mb-3">
-                <Home className="h-5 w-5 text-blue-600 mr-2" />
-                <h4 className="font-bold text-blue-900">{texts.nextSteps}</h4>
+                <Home className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2" />
+                <h4 className="font-bold text-blue-900 dark:text-blue-100">
+                  {texts.nextSteps}
+                </h4>
               </div>
-              <div className="text-sm text-blue-800 space-y-2">
+              <div className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
                 {onboardingData.skippedMonthlyCreation ? (
                   <>
                     <div className="flex items-center">
                       <Calendar className="h-4 w-4 text-blue-500 mr-2" />
-                      <span className="text-blue-700">{texts.step1}</span>
+                      <span className="text-blue-700 dark:text-blue-300">
+                        {texts.step1}
+                      </span>
                     </div>
                     <div className="flex items-center">
                       <FolderOpen className="h-4 w-4 text-green-500 mr-2" />
-                      <span className="text-green-700">{texts.step2}</span>
+                      <span className="text-green-700 dark:text-green-300">
+                        {texts.step2}
+                      </span>
                     </div>
                     <div className="flex items-center">
                       <Sparkles className="h-4 w-4 text-purple-500 mr-2" />
-                      <span className="text-purple-700">{texts.step3}</span>
+                      <span className="text-purple-700 dark:text-purple-300">
+                        {texts.step3}
+                      </span>
                     </div>
                   </>
                 ) : (
                   <>
                     <div className="flex items-center">
                       <Home className="h-4 w-4 text-blue-500 mr-2" />
-                      <span className="text-blue-700">{texts.step4}</span>
+                      <span className="text-blue-700 dark:text-blue-300">
+                        {texts.step4}
+                      </span>
                     </div>
                     <div className="flex items-center">
                       <Target className="h-4 w-4 text-green-500 mr-2" />
-                      <span className="text-green-700">{texts.step5}</span>
+                      <span className="text-green-700 dark:text-green-300">
+                        {texts.step5}
+                      </span>
                     </div>
                     <div className="flex items-center">
-                      <Settings className="h-4 w-4 text-gray-500 mr-2" />
-                      <span className="text-gray-700">{texts.step6}</span>
+                      <Settings className="h-4 w-4 text-gray-500 dark:text-gray-400 mr-2" />
+                      <span className="text-gray-700 dark:text-gray-300">
+                        {texts.step6}
+                      </span>
                     </div>
                   </>
                 )}
@@ -722,7 +804,9 @@ export default function OnboardingPage() {
       <div className="container max-w-md mx-auto px-4 py-8 min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">로딩 중...</p>
+          <p className="text-muted-foreground">
+            {translate("pageLoading.loading")}
+          </p>
         </div>
       </div>
     );
@@ -732,15 +816,15 @@ export default function OnboardingPage() {
     <div
       className="container max-w-md mx-auto px-4 py-8 min-h-screen"
       role="main"
-      aria-label="온보딩 가이드"
+      aria-label={translate("onboarding.ariaLabel")}
     >
       {/* Progress Bar */}
       <div className="mb-8">
         <div className="flex justify-between items-center mb-2">
-          <span className="text-sm font-medium text-gray-600">
+          <span className="text-sm font-medium text-muted-foreground">
             {currentStep} / {totalSteps}
           </span>
-          <span className="text-sm text-gray-600">
+          <span className="text-sm text-muted-foreground">
             {Math.round((currentStep / totalSteps) * 100)}%
           </span>
         </div>
@@ -756,7 +840,7 @@ export default function OnboardingPage() {
           variant="outline"
           onClick={prevStep}
           disabled={currentStep === 1}
-          className="flex items-center"
+          className="flex items-center border-border hover:bg-accent"
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
           {texts.previous}
@@ -765,33 +849,15 @@ export default function OnboardingPage() {
         {currentStep === totalSteps ? (
           <Button
             onClick={completeOnboarding}
-            className="flex items-center bg-green-600 hover:bg-green-700"
+            className="flex items-center bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600"
           >
             {texts.start}
             <Home className="h-4 w-4 ml-2" />
           </Button>
-        ) : currentStep === 2 ? (
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={skipMonthlyCreation}
-              className="flex items-center"
-            >
-              <Clock className="h-4 w-4 mr-1" />
-              {texts.createLater}
-            </Button>
-            <Button
-              onClick={nextStep}
-              className="flex items-center bg-blue-600 hover:bg-blue-700"
-            >
-              {texts.next}
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
         ) : (
           <Button
             onClick={nextStep}
-            className="flex items-center bg-blue-600 hover:bg-blue-700"
+            className="flex items-center bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
           >
             {texts.next}
             <ChevronRight className="h-4 w-4 ml-1" />
@@ -801,14 +867,11 @@ export default function OnboardingPage() {
 
       {/* Skip Options */}
       <div className="text-center mt-4 space-y-2">
-        {currentStep === 2 && (
-          <p className="text-xs text-gray-500">{texts.monthlyLaterNote}</p>
-        )}
         {currentStep < totalSteps && (
           <Button
             variant="ghost"
             onClick={skipEntireOnboarding}
-            className="text-gray-500 text-sm flex items-center mx-auto"
+            className="text-muted-foreground text-sm flex items-center mx-auto hover:text-foreground hover:bg-accent"
           >
             <X className="h-3 w-3 mr-1" />
             {texts.skipEntire}

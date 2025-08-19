@@ -27,9 +27,13 @@ export function useSettings() {
   useEffect(() => {
     const loadSettings = async () => {
       if (!user?.uid) {
-        // 로그인하지 않은 경우 브라우저 언어 감지
+        // 로그인하지 않은 경우 로그인 전 언어 설정 또는 브라우저 언어 감지
+        const preLoginLang = localStorage.getItem(
+          "preLoginLanguage"
+        ) as Language;
         const detectedLang = detectBrowserLanguage();
-        setSettings({ ...defaultSettings, language: detectedLang });
+        const finalLang = preLoginLang || detectedLang;
+        setSettings({ ...defaultSettings, language: finalLang });
         setIsLoading(false);
         return;
       }

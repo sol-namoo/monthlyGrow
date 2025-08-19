@@ -54,7 +54,33 @@ export const fetchUserById = async (userId: string): Promise<User> => {
       },
     } as User;
   } else {
-    throw new Error("User not found");
+    // 사용자 문서가 없을 때 기본 사용자 데이터 반환
+    console.log(
+      `사용자 문서가 없습니다. 기본 데이터를 반환합니다. - UID: ${userId}`
+    );
+    return {
+      id: userId,
+      profile: {
+        displayName: "",
+        email: "",
+        emailVerified: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      settings: {
+        defaultRewardEnabled: false,
+        carryOver: true,
+        aiRecommendations: true,
+        notifications: true,
+        theme: "system" as const,
+        language: "ko" as const,
+      },
+      preferences: {
+        timezone: "Asia/Seoul",
+        dateFormat: "YYYY-MM-DD",
+        weeklyStartDay: "monday" as const,
+      },
+    } as User;
   }
 };
 
@@ -150,7 +176,10 @@ export const updateUserProfile = async (
       updatedAt: updateTimestamp(),
     });
 
-    await updateDoc(doc(db, "userProfiles", userId), filteredData);
+    // users 컬렉션의 profile 필드를 업데이트
+    await updateDoc(doc(db, "users", userId), {
+      profile: filteredData,
+    });
     console.log(`✅ 사용자 프로필 업데이트 완료 - ID: ${userId}`);
   } catch (error) {
     console.error(`❌ 사용자 프로필 업데이트 실패 - ID: ${userId}`, error);
@@ -168,7 +197,10 @@ export const updateUserSettings = async (
       updatedAt: updateTimestamp(),
     });
 
-    await updateDoc(doc(db, "userSettings", userId), filteredData);
+    // users 컬렉션의 settings 필드를 업데이트
+    await updateDoc(doc(db, "users", userId), {
+      settings: filteredData,
+    });
     console.log(`✅ 사용자 설정 업데이트 완료 - ID: ${userId}`);
   } catch (error) {
     console.error(`❌ 사용자 설정 업데이트 실패 - ID: ${userId}`, error);
@@ -186,7 +218,10 @@ export const updateUserPreferences = async (
       updatedAt: updateTimestamp(),
     });
 
-    await updateDoc(doc(db, "userPreferences", userId), filteredData);
+    // users 컬렉션의 preferences 필드를 업데이트
+    await updateDoc(doc(db, "users", userId), {
+      preferences: filteredData,
+    });
     console.log(`✅ 사용자 선호도 업데이트 완료 - ID: ${userId}`);
   } catch (error) {
     console.error(`❌ 사용자 선호도 업데이트 실패 - ID: ${userId}`, error);

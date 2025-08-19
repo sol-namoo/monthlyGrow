@@ -74,15 +74,35 @@ export default function HomePage() {
   // 태스크 완료/미완료 토글 함수
   const handleTaskToggle = async (task: Task) => {
     try {
-      // 태스크가 서브컬렉션에 있는지 확인 (projectId가 있으면 서브컬렉션)
-      if (task.projectId) {
-        await toggleTaskCompletionInSubcollection(task.projectId, task.id);
-      } else {
-        await toggleTaskCompletion(task.id);
+      console.log("태스크 토글 시작:", {
+        taskId: task.id,
+        projectId: task.projectId,
+        currentDone: task.done,
+        title: task.title,
+      });
+
+      // 모든 태스크는 서브컬렉션에 있으므로 projectId가 필수
+      if (!task.projectId) {
+        throw new Error("프로젝트 ID가 없는 태스크입니다.");
       }
+
+      console.log("서브컬렉션 태스크 처리:", task.projectId, task.id);
+      await toggleTaskCompletionInSubcollection(task.projectId, task.id);
 
       // 쿼리 무효화하여 데이터 새로고침
       queryClient.invalidateQueries({ queryKey: ["todayTasks", user?.uid] });
+
+      // monthly의 completed tasks 쿼리도 무효화
+      if (currentMonthly) {
+        queryClient.invalidateQueries({
+          queryKey: [
+            "completedTasks",
+            currentMonthly.id,
+            currentMonthly.startDate,
+            currentMonthly.endDate,
+          ],
+        });
+      }
 
       toast({
         title: task.done ? "태스크 미완료 처리" : "태스크 완료 처리",
@@ -578,12 +598,6 @@ export default function HomePage() {
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        {/* 인덱스 번호 */}
-                        <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
-                          <span className="text-xs font-medium text-muted-foreground">
-                            {index + 1}
-                          </span>
-                        </div>
                         {/* 완료 상태 토글 버튼 */}
                         <button
                           onClick={() => handleTaskToggle(task)}

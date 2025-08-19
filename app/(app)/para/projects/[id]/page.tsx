@@ -58,8 +58,6 @@ import {
   addTaskToProject,
   updateTaskInProject,
   deleteTaskFromProject,
-  toggleTaskCompletion,
-  toggleTaskCompletionInSubcollection,
   fetchAreaById,
   fetchMonthliesByIds,
   createRetrospective,
@@ -301,13 +299,16 @@ export default function ProjectDetailPage({
       });
       queryClient.invalidateQueries({ queryKey: ["monthlyTaskCounts"] });
       queryClient.invalidateQueries({ queryKey: ["projectTaskCounts"] });
+
+      // monthly의 completed tasks 쿼리도 무효화
+      queryClient.invalidateQueries({ queryKey: ["completedTasks"] });
     },
   });
 
   // 태스크 삭제 mutation
   const deleteTaskMutation = useMutation({
     mutationFn: (taskId: string) => {
-      return deleteTaskFromProject(taskId);
+      return deleteTaskFromProject(projectId, taskId);
     },
     onMutate: async (taskId) => {
       // 진행 중인 쿼리 취소
@@ -1275,7 +1276,7 @@ export default function ProjectDetailPage({
                     {translate("paraProjectDetail.completedTime")}
                   </span>
                   <span className="font-medium">
-                    {timeStats?.totalFocusTime || 0}
+                    {timeStats?.completedTime || 0}
                     {translate("paraProjectDetail.hours")}
                   </span>
                 </div>
@@ -1284,7 +1285,7 @@ export default function ProjectDetailPage({
                     {translate("paraProjectDetail.remainingTime")}
                   </span>
                   <span className="font-medium">
-                    {timeStats?.averageFocusTime || 0}
+                    {timeStats?.remainingTime || 0}
                     {translate("paraProjectDetail.hours")}
                   </span>
                 </div>

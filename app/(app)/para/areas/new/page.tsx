@@ -47,15 +47,18 @@ import { createArea } from "@/lib/firebase/index";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase/index";
 
-// 폼 스키마 정의
-const areaFormSchema = z.object({
-  title: z.string().min(1, "영역 이름을 입력해주세요"),
-  description: z.string().min(1, "영역 설명을 입력해주세요"),
-  color: z.string().min(1, "색상을 선택해주세요"),
-  icon: z.string().min(1, "아이콘을 선택해주세요"),
-});
+// 폼 스키마 정의 (다국어화 적용)
+const createAreaFormSchema = (translate: any) =>
+  z.object({
+    title: z.string().min(1, translate("areas.validation.titleRequired")),
+    description: z
+      .string()
+      .min(1, translate("areas.validation.descriptionRequired")),
+    color: z.string().min(1, translate("areas.validation.colorRequired")),
+    icon: z.string().min(1, translate("areas.validation.iconRequired")),
+  });
 
-type AreaFormData = z.infer<typeof areaFormSchema>;
+type AreaFormData = z.infer<ReturnType<typeof createAreaFormSchema>>;
 
 function NewAreaPageContent() {
   const router = useRouter();
@@ -66,6 +69,7 @@ function NewAreaPageContent() {
   const [user] = useAuthState(auth);
 
   // react-hook-form 설정
+  const areaFormSchema = createAreaFormSchema(translate);
   const form = useForm<AreaFormData>({
     resolver: zodResolver(areaFormSchema),
     defaultValues: {
@@ -76,41 +80,41 @@ function NewAreaPageContent() {
     },
   });
 
-  // 추천 Area 템플릿
+  // 추천 Area 템플릿 (다국어화)
   const areaTemplates = [
     {
-      title: "건강",
-      description: "신체적, 정신적 건강 관리",
+      title: translate("areas.templates.health.title"),
+      description: translate("areas.templates.health.description"),
       color: "#10b981",
       icon: "heart",
     },
     {
-      title: "커리어",
-      description: "직업적 성장과 발전",
+      title: translate("areas.templates.career.title"),
+      description: translate("areas.templates.career.description"),
       color: "#3b82f6",
       icon: "briefcase",
     },
     {
-      title: "자기계발",
-      description: "개인적 성장과 학습",
+      title: translate("areas.templates.personal.title"),
+      description: translate("areas.templates.personal.description"),
       color: "#8b5cf6",
       icon: "brain",
     },
     {
-      title: "인간관계",
-      description: "가족, 친구, 동료와의 관계",
+      title: translate("areas.templates.relationships.title"),
+      description: translate("areas.templates.relationships.description"),
       color: "#f59e0b",
       icon: "users",
     },
     {
-      title: "재정",
-      description: "재정 관리와 투자",
+      title: translate("areas.templates.finance.title"),
+      description: translate("areas.templates.finance.description"),
       color: "#059669",
       icon: "dollarSign",
     },
     {
-      title: "취미/여가",
-      description: "개인적 즐거움과 휴식",
+      title: translate("areas.templates.hobby.title"),
+      description: translate("areas.templates.hobby.description"),
       color: "#ec4899",
       icon: "gamepad2",
     },
@@ -204,7 +208,7 @@ function NewAreaPageContent() {
         >
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <h1 className="text-2xl font-bold">영역 만들기</h1>
+        <h1 className="text-2xl font-bold">{translate("areas.new.title")}</h1>
       </div>
 
       <div className="mb-6 text-center">
@@ -213,24 +217,27 @@ function NewAreaPageContent() {
             <Brain className="h-8 w-8 text-primary" />
           </div>
         </div>
-        <h2 className="text-lg font-bold mb-2">새로운 영역을 만들어보세요</h2>
+        <h2 className="text-lg font-bold mb-2">
+          {translate("areas.new.title")}
+        </h2>
         <p className="text-sm text-muted-foreground">
-          영역은 프로젝트와 자료를 체계적으로 분류하고 관리하는 기준입니다.
-          자신만의 영역을 만들어보세요.
+          {translate("areas.new.description")}
         </p>
       </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <Card className="p-6">
-          <h2 className="mb-4 text-lg font-semibold">기본 정보</h2>
+          <h2 className="mb-4 text-lg font-semibold">
+            {translate("areas.form.title")}
+          </h2>
 
           <div className="space-y-4">
             <div>
-              <Label htmlFor="title">영역 이름</Label>
+              <Label htmlFor="title">{translate("areas.form.title")}</Label>
               <Input
                 id="title"
                 {...form.register("title")}
-                placeholder="예: 건강, 커리어, 자기계발"
+                placeholder={translate("areas.form.titlePlaceholder")}
               />
               {form.formState.errors.title && (
                 <p className="mt-1 text-sm text-red-500">
@@ -240,11 +247,13 @@ function NewAreaPageContent() {
             </div>
 
             <div>
-              <Label htmlFor="description">영역 설명</Label>
+              <Label htmlFor="description">
+                {translate("areas.form.description")}
+              </Label>
               <Textarea
                 id="description"
                 {...form.register("description")}
-                placeholder="이 영역에서 관리하고 싶은 내용을 설명해주세요"
+                placeholder={translate("areas.form.descriptionPlaceholder")}
                 rows={3}
               />
               {form.formState.errors.description && (
@@ -257,7 +266,9 @@ function NewAreaPageContent() {
         </Card>
 
         <Card className="p-6">
-          <h2 className="mb-4 text-lg font-semibold">시각적 설정</h2>
+          <h2 className="mb-4 text-lg font-semibold">
+            {translate("areas.form.color")}
+          </h2>
 
           <div className="space-y-4">
             <div>

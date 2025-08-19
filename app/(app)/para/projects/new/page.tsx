@@ -589,8 +589,8 @@ function NewProjectPageContent() {
 
     // 사용자에게 즉시 피드백 제공
     toast({
-      title: "프로젝트 생성 중...",
-      description: "프로젝트를 생성하고 있습니다. 잠시만 기다려주세요.",
+      title: translate("pageLoading.creating"),
+      description: translate("pageLoading.creating"),
     });
 
     try {

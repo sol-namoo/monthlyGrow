@@ -524,7 +524,14 @@ export default function PlanGenerator() {
                       selectedMonthly.focusAreas.length > 0 && (
                         <p>
                           <strong>중점 영역:</strong>{" "}
-                          {selectedMonthly.focusAreas.join(", ")}
+                          {selectedMonthly.focusAreas
+                            .map((areaId: string) => {
+                              const area = existingAreas.find(
+                                (a) => a.id === areaId
+                              );
+                              return area ? area.name : areaId;
+                            })
+                            .join(", ")}
                         </p>
                       )}
                     {selectedMonthly.reward && (

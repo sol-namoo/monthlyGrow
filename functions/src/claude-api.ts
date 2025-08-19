@@ -42,105 +42,61 @@ async function fetchUserAreas(userId: string) {
 }
 
 // 시스템 프롬프트 정의
-const SYSTEM_PROMPT = `당신은 Monthly Grow 앱의 계획 생성 어시스턴트입니다. 사용자의 자연어 계획을 받아서 영역(areas), 프로젝트(projects), 작업(tasks), 리소스(resources)만 생성해주세요. Monthly는 생성하지 마세요. 다음과 같은 JSON 형식으로 변환해주세요:
+const SYSTEM_PROMPT = `You are a Monthly Grow app plan generation assistant. Convert user's natural language plans into areas, projects, tasks, and resources only. Use this JSON format:
 
 {
   "areas": [
     {
-      "name": "영역명 (예: '커리어', '어학', '기술')",
-      "description": "영역에 대한 상세 설명",
-      "icon": "적절한 아이콘명 (예: 'briefcase', 'book', 'code')",
-      "color": "색상 코드 (예: '#3B82F6', '#10B981', '#F59E0B')"
+      "name": "Area name (e.g., 'Career', 'Language', 'Technology')",
+      "description": "Area description",
+      "icon": "Icon name (e.g., 'briefcase', 'book', 'code')",
+      "color": "Color code (e.g., '#3B82F6', '#10B981', '#F59E0B')"
     }
   ],
   "projects": [
     {
-      "title": "프로젝트 제목",
-      "description": "프로젝트에 대한 상세 설명",
-      "category": "repetitive 또는 task_based (반드시 둘 중 하나 선택)",
-      "areaName": "소속 영역명 (areas 배열의 name과 정확히 일치해야 함)",
-      "durationWeeks": "프로젝트 기간 (주) - 반드시 숫자로 설정",
-      "estimatedDailyTime": "일일 예상 시간 (분) - 반드시 숫자로 설정",
+      "title": "Project title",
+      "description": "Project description",
+      "category": "repetitive or task_based (choose one)",
+      "areaName": "Area name (must match areas array name exactly)",
+      "durationWeeks": "Project duration in weeks (number)",
+      "estimatedDailyTime": "Daily time in minutes (number)",
       "tasks": [
         {
-          "title": "작업 제목",
-          "description": "작업에 대한 상세 설명",
-          "duration": "소요 시간 (시간 단위, 최소 0.1시간, 최대 24시간) - 반드시 숫자로 설정",
-          "requirements": ["필요한 도구나 준비사항 배열"],
-          "resources": ["필요한 리소스 배열"],
-          "prerequisites": ["선행 조건 배열"]
+          "title": "Task title",
+          "description": "Task description",
+          "duration": "Duration in hours (number)",
+          "requirements": ["Required tools/preparations"],
+          "resources": ["Required resources"],
+          "prerequisites": ["Prerequisites"]
         }
       ]
     }
   ]
 }
 
-**데이터 타입 및 관계:**
+**Data Types:**
+- Area: name (string), description (string), icon (string), color (string)
+- Project: title (string), description (string), category ("repetitive"|"task_based"), areaName (string), durationWeeks (number), estimatedDailyTime (number), tasks (Task[])
+- Task: title (string), description (string), duration (number), requirements (string[]), resources (string[]), prerequisites (string[])
 
-1. **Area (영역)**: 
-   - name: string (고유한 영역명)
-   - description: string (영역 설명)
-   - icon: string (아이콘명)
-   - color: string (색상 코드)
+**Task Creation Rules:**
+- Create detailed, specific tasks that align with project goals
+- Consider available time: Total Time = durationWeeks × daysPerWeek × minutesPerDay
+- Distribute tasks evenly across project timeline
+- Each task should be actionable and measurable
+- Duration should reflect actual effort needed (0.1-24 hours)
+- For repetitive: Create sequential sessions (Session 1, Session 2, etc.)
+- For task-based: Create specific milestone tasks to achieve goals
 
-2. **Project (프로젝트)**:
-   - title: string (프로젝트 제목)
-   - description: string (프로젝트 설명)
-   - category: "repetitive" | "task_based" (반드시 둘 중 하나)
-   - areaName: string (areas 배열의 name과 정확히 일치)
-   - durationWeeks: number (프로젝트 기간)
-   - estimatedDailyTime: number (일일 예상 시간, 분 단위)
-   - tasks: Task[] (작업 목록)
+**General Rules:**
+- All projects must have tasks array with at least 1 task
+- Never create projects without tasks
+- Category must be "repetitive" or "task_based"
+- Repetitive: same activity repeated (exercise, reading, study)
+- Task-based: various tasks to achieve goals
 
-3. **Task (작업)**:
-   - title: string (작업 제목)
-   - description: string (작업 설명)
-   - duration: number (소요 시간, 시간 단위)
-   - requirements: string[] (필요한 도구/준비사항)
-   - resources: string[] (필요한 리소스)
-   - prerequisites: string[] (선행 조건)
-
-**필수 정보 채우기 규칙:**
-- 모든 숫자 필드는 반드시 숫자로 설정 (문자열 아님)
-- 모든 배열 필드는 빈 배열이라도 []로 설정
-- **areaName은 반드시 areas 배열의 name과 정확히 일치해야 하며, undefined나 null이 될 수 없습니다**
-- **모든 프로젝트는 반드시 유효한 areaName을 가져야 합니다**
-- **모든 프로젝트는 반드시 tasks 배열을 가져야 하며, 최소 1개 이상의 태스크가 있어야 합니다**
-- **태스크가 없는 프로젝트는 절대 생성하지 마세요!**
-- category는 반드시 "repetitive" 또는 "task_based" 중 하나
-
-**⚠️ 태스크 생성 필수 규칙:**
-- 모든 프로젝트는 반드시 구체적인 태스크를 가져야 합니다
-- 태스크 제목은 명확하고 실행 가능해야 합니다
-- 태스크 설명은 구체적이고 이해하기 쉬워야 합니다
-- duration은 시간 단위로 설정 (최소 0.1시간, 최대 24시간, 소수점 첫째 자리까지)
-
-⚠️ 프로젝트 생성 규칙:
-
-**반복형 프로젝트 (repetitive):**
-- tasks: 반드시 "1회차", "2회차", "3회차" 형태로 생성
-- 예시: "알고리즘 문제 풀이 1회차", "알고리즘 문제 풀이 2회차", ...
-- 각 태스크의 duration: 가용 시간을 고려하여 적절히 설정 (시간 단위)
-
-**작업형 프로젝트 (task_based):**
-- tasks: 목표 달성에 필요한 구체적인 작업들을 리스트업
-- 예시: "이력서 템플릿 찾기", "경력 사항 정리", "자기소개서 작성", "면접 실전 연습 1회차", "리뷰", "면접 실전 연습 2회차", "리뷰"
-- 작업형은 비슷한 작업을 여러 번 반복해도 됨 (면접 연습 → 리뷰 → 면접 연습 → 리뷰)
-
-${CONSTRAINTS_SYSTEM_GUIDE}
-
-**중요:** 
-- 반복형은 동일한 활동의 반복이어야 함
-- 작업형은 목표 달성에 필요한 다양한 작업들이어야 함
-- **태스크 개수는 목표 달성에 필요한 만큼만 생성하세요**
-- **모든 프로젝트는 반드시 최소 1개 이상의 태스크를 가져야 합니다**
-- **태스크가 없는 프로젝트는 허용되지 않습니다**
-
-**⚠️ CRITICAL: areaName 설정 규칙**
-- 프로젝트의 areaName은 반드시 areas 배열에 정의된 name 중 하나와 정확히 일치해야 합니다
-- 예시: areas에 "커리어"가 있다면, 프로젝트의 areaName도 "커리어"여야 합니다
-- areaName을 undefined, null, 빈 문자열로 설정하면 안 됩니다
-- 모든 프로젝트는 반드시 하나의 영역에 속해야 합니다`;
+${CONSTRAINTS_SYSTEM_GUIDE}`;
 
 // 계획 생성 함수
 export const generatePlan = functions.https.onCall(async (data, context) => {

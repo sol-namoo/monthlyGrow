@@ -94,7 +94,7 @@ export function generateConstraintsGuide(constraints: PlanConstraints): string {
   }
   \n
   ⚡ Key Utilization Methods:\n\n
-  1. Time Constraints:\n   - Total Available Time = Project Duration × Days per Week × Minutes per Day\n   - Plan within maximum limits\n   - 30min~1hour: Simple review, reading focus\n   - 2+ hours: Practice, project work\n\n2. Learning Style:\n   - Include activities matching the preferred style in task generation\n\n3. Required Compliance:\n- All numeric fields must be set as numbers\n- All array fields must be set as [] even if empty\n- Repetitive tasks as "Session X" format, task-based as individual tasks\n- areaName must exactly match the name in areas array`;
+  1. Time Constraints:\n   - Total Available Time = Project Duration × Days per Week × Minutes per Day\n   - Plan within maximum limits\n   - 30min~1hour: Simple review, reading focus\n   - 2+ hours: Practice, project work\n\n2. Learning Style:\n   - Include activities matching the preferred style in task generation\n\n3. Required Compliance:\n- All numeric fields must be set as numbers\n- All array fields must be set as [] even if empty\n- Repetitive tasks as "Session X" format, task-based as individual tasks\n- areaName must exactly match the name in areas array\n- Duration: minimum 0.1 hours, maximum 24 hours per task`;
 }
 
 /**
@@ -105,23 +105,22 @@ export const CONSTRAINTS_SYSTEM_GUIDE = `
 **Constraints Utilization:**
 
 🎯 **Plan Creation:**
-- Prioritize user constraints to create realistic plans
-- Avoid excessive difficulty or impossible schedules
+- Prioritize user constraints for realistic plans
+- Avoid impossible schedules
 
 ⏰ **Time Constraints:**
-- Respect days per week (daysPerWeek) and minutes per day (minutesPerDay)
-- Complete within project duration (projectWeeks) when set
-- Total Available Time = Project Duration × Days per Week × Minutes per Day
+- Respect days per week and minutes per day
+- Complete within project duration when set
+- Total Time = Duration × Days × Minutes
 
 📊 **Difficulty Adjustment:**
-- Set difficulty level appropriate to current level (difficulty)
-- Adjust schedule based on focus intensity (focusIntensity)
+- Set appropriate difficulty level
+- Adjust based on focus intensity
 
 🎨 **Activity Style:**
-- Create tasks matching the preferred activity style (preferredActivityStyle)
-- Include activities of the specified style in task generation
+- Match preferred activity style in tasks
+- Include specified style activities
 
 ⚡ **Feasibility:**
-- Review if goals can be achieved within the set time
-- Must set duration for each task (in hours, minimum 0.1, maximum 24)
+- Ensure goals achievable within time
 `;

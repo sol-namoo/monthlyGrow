@@ -72,7 +72,7 @@ function AddExistingProjectPageContent() {
     onError: (error) => {
       toast({
         title: "오류",
-        description: "처리 중 오류가 발생했습니다.",
+        description: translate("pageLoading.processing"),
         variant: "destructive",
       });
     },

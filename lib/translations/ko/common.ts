@@ -41,6 +41,14 @@ export const language = {
 
 export const pageLoading = {
   navigating: "페이지 이동 중...",
+  loading: "잠시만 기다려 주세요...",
+  processing: "처리 중...",
+  saving: "저장 중...",
+  updating: "업데이트 중...",
+  deleting: "삭제 중...",
+  creating: "생성 중...",
+  analyzing: "분석 중...",
+  connecting: "연결 중...",
 } as const;
 
 export const noteForm = {

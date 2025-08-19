@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +52,7 @@ import { ProjectConnectionDialog } from "@/components/monthly/ProjectConnectionD
 
 interface MonthlyDetailContentProps {
   monthly: Monthly & { connectedProjects?: Project[] };
+  allAreas?: any[];
   showHeader?: boolean;
   showActions?: boolean;
   onDelete?: () => void;
@@ -59,6 +60,7 @@ interface MonthlyDetailContentProps {
 
 export function MonthlyDetailContent({
   monthly,
+  allAreas = [],
   showHeader = true,
   showActions = true,
   onDelete,
@@ -76,7 +78,7 @@ export function MonthlyDetailContent({
   const [showProjectConnectionDialog, setShowProjectConnectionDialog] =
     useState(false);
 
-  // Collapse 상태 관리
+  // Collapse 상태 관리 - 기본적으로 모든 프로젝트를 접힌 상태로 설정
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(
     new Set()
   );
@@ -100,6 +102,16 @@ export function MonthlyDetailContent({
       ),
     enabled: !!user?.uid && !!monthly.id,
   });
+
+  // completed tasks가 로드되면 모든 프로젝트를 기본적으로 접힌 상태로 설정
+  useEffect(() => {
+    if (completedTasks && completedTasks.length > 0) {
+      const projectIds = [
+        ...new Set(completedTasks.map((task) => task.projectId)),
+      ];
+      setCollapsedProjects(new Set(projectIds));
+    }
+  }, [completedTasks]);
 
   // 통계 계산
   const status = getMonthlyStatus(monthly);
@@ -170,8 +182,8 @@ export function MonthlyDetailContent({
     mutationFn: () => deleteMonthlyById(monthly.id),
     onSuccess: () => {
       toast({
-        title: translate("monthlyDetail.delete.success.title"),
-        description: translate("monthlyDetail.delete.success.description"),
+        title: translate("monthly.detail.delete.success.title"),
+        description: translate("monthly.detail.delete.success.description"),
       });
       if (onDelete) {
         onDelete();
@@ -180,8 +192,8 @@ export function MonthlyDetailContent({
     onError: (error) => {
       console.error("먼슬리 삭제 실패:", error);
       toast({
-        title: translate("monthlyDetail.delete.error.title"),
-        description: translate("monthlyDetail.delete.error.description"),
+        title: translate("monthly.detail.delete.error.title"),
+        description: translate("monthly.detail.delete.error.description"),
         variant: "destructive",
       });
     },
@@ -361,113 +373,92 @@ export function MonthlyDetailContent({
         </div>
       </Card>
 
-      {/* 연결된 프로젝트들 */}
+      {/* 중점 영역 및 연결된 프로젝트 */}
       <Card className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-bold text-sm">
-            {translate("monthlyDetail.connectedProjects")}
-          </h3>
-          {!isPastMonthly && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowProjectConnectionDialog(true)}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              프로젝트 연결
-            </Button>
-          )}
-        </div>
-        <div className="space-y-2">
-          {monthly.connectedProjects && monthly.connectedProjects.length > 0 ? (
-            monthly.connectedProjects.map((project) => (
-              <Link key={project.id} href={`/para/projects/${project.id}`}>
-                <div className="flex items-center gap-3 p-3 bg-muted/40 dark:bg-muted/30 rounded-lg hover:bg-muted/60 dark:hover:bg-muted/50 transition-colors">
-                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">{project.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {project.area || translate("monthlyDetail.uncategorized")}
-                    </p>
-                  </div>
-                  <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                </div>
-              </Link>
-            ))
-          ) : (
-            <div className="text-center py-6">
-              <p className="text-sm text-muted-foreground mb-2">
-                연결된 프로젝트가 없습니다
-              </p>
-              {!isPastMonthly && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowProjectConnectionDialog(true)}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  프로젝트 연결하기
-                </Button>
-              )}
+        <div className="space-y-4">
+          {/* 중점 영역 */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <span className="text-sm font-medium">중점 영역</span>
             </div>
-          )}
+            {(() => {
+              const validAreas = monthly.focusAreas
+                ? monthly.focusAreas
+                    .map((areaId) => allAreas.find((a) => a.id === areaId))
+                    .filter(Boolean)
+                : [];
+
+              return validAreas.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {validAreas.map((area) => (
+                    <Badge
+                      key={area.id}
+                      variant="outline"
+                      className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700"
+                    >
+                      {area.name}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-2">
+                  <p className="text-xs text-muted-foreground">
+                    중점 영역이 없습니다
+                  </p>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* 연결된 프로젝트 */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <FolderOpen className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <span className="text-sm font-medium">
+                {translate("monthly.detail.connectedProjects")}
+              </span>
+            </div>
+
+            {monthly.connectedProjects &&
+            monthly.connectedProjects.length > 0 ? (
+              <div className="space-y-1">
+                {monthly.connectedProjects.map((project) => (
+                  <Link key={project.id} href={`/para/projects/${project.id}`}>
+                    <div className="flex items-center gap-2 p-2 bg-muted/30 dark:bg-muted/20 rounded-md hover:bg-muted/50 dark:hover:bg-muted/40 transition-colors">
+                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      <span className="text-sm flex-1">{project.title}</span>
+                      <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-2">
+                <p className="text-xs text-muted-foreground">
+                  연결된 프로젝트가 없습니다
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </Card>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4 mb-6 text-xs bg-muted/50 dark:bg-muted/30">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <TabsTrigger value="key-results">
-                  {translate("monthlyDetail.tabs.keyResults")}
-                </TabsTrigger>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{translate("monthlyDetail.tabs.keyResultsFull")}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <TabsTrigger value="completed-tasks">
-                  {translate("monthlyDetail.tabs.completedTasks")}
-                </TabsTrigger>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{translate("monthlyDetail.tabs.completedTasksFull")}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <TabsTrigger value="retrospective">
-                  {translate("monthlyDetail.tabs.retrospective")}
-                </TabsTrigger>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{translate("monthlyDetail.tabs.retrospectiveFull")}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <TabsTrigger value="notes">
-                  {translate("monthlyDetail.tabs.note")}
-                </TabsTrigger>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{translate("monthlyDetail.tabs.noteFull")}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+        <TabsList className="grid w-full grid-cols-4 mb-6">
+          <TabsTrigger value="key-results" className="min-w-0 flex-1">
+            {translate("monthly.detail.tabs.keyResults")}
+          </TabsTrigger>
+          <TabsTrigger value="completed-tasks" className="min-w-0 flex-1">
+            {translate("monthly.detail.tabs.completedTasks")}
+          </TabsTrigger>
+          <TabsTrigger value="retrospective" className="min-w-0 flex-1">
+            {translate("monthly.detail.tabs.retrospective")}
+          </TabsTrigger>
+          <TabsTrigger value="notes" className="min-w-0 flex-1">
+            {translate("monthly.detail.tabs.note")}
+          </TabsTrigger>
         </TabsList>
 
         {/* Key Results 탭 */}
@@ -525,12 +516,14 @@ export function MonthlyDetailContent({
                       >
                         {keyResult.isCompleted
                           ? translate(
-                              "monthlyDetail.keyResults.status.completed"
+                              "monthly.detail.keyResults.status.completed"
                             )
                           : status === "planned"
-                          ? translate("monthlyDetail.keyResults.status.planned")
+                          ? translate(
+                              "monthly.detail.keyResults.status.planned"
+                            )
                           : translate(
-                              "monthlyDetail.keyResults.status.inProgress"
+                              "monthly.detail.keyResults.status.inProgress"
                             )}
                       </Badge>
                       {!isPastMonthly && (
@@ -552,17 +545,17 @@ export function MonthlyDetailContent({
                   <div className="w-12 h-12 mx-auto rounded-full border-2 border-muted-foreground/30"></div>
                 </div>
                 <h3 className="text-lg font-medium mb-2">
-                  {translate("monthlyDetail.keyResults.noKeyResults")}
+                  {translate("monthly.detail.keyResults.noKeyResults")}
                 </h3>
                 <p className="text-sm text-muted-foreground mb-6">
                   {translate(
-                    "monthlyDetail.keyResults.noKeyResultsDescription"
+                    "monthly.detail.keyResults.noKeyResultsDescription"
                   )}
                 </p>
                 {!isPastMonthly && (
                   <Button variant="outline" className="w-full bg-transparent">
                     <Plus className="mr-2 h-4 w-4" />
-                    {translate("monthlyDetail.keyResults.addKeyResult")}
+                    {translate("monthly.detail.keyResults.addKeyResult")}
                   </Button>
                 )}
               </Card>
@@ -573,7 +566,7 @@ export function MonthlyDetailContent({
               !isPastMonthly && (
                 <Button variant="outline" className="w-full bg-transparent">
                   <Plus className="mr-2 h-4 w-4" />
-                  {translate("monthlyDetail.keyResults.addKeyResult")}
+                  {translate("monthly.detail.keyResults.addKeyResult")}
                 </Button>
               )}
           </div>
@@ -702,20 +695,20 @@ export function MonthlyDetailContent({
                   <div className="w-12 h-12 mx-auto rounded-full border-2 border-muted-foreground/30"></div>
                 </div>
                 <h3 className="text-lg font-medium mb-2">
-                  {translate("monthlyDetail.completedTasks.noTasks.title")}
+                  {translate("monthly.detail.completedTasks.noTasks.title")}
                 </h3>
                 <p className="text-sm text-muted-foreground mb-6">
                   {translate(
-                    "monthlyDetail.completedTasks.noTasks.description"
+                    "monthly.detail.completedTasks.noTasks.description"
                   )}
                   <br />
-                  {translate("monthlyDetail.completedTasks.noTasks.hint")}
+                  {translate("monthly.detail.completedTasks.noTasks.hint")}
                 </p>
 
                 <Button asChild className="w-full">
                   <Link href="/para/projects">
                     <FolderOpen className="mr-2 h-4 w-4" />
-                    {translate("monthlyDetail.viewProjects")}
+                    {translate("monthly.detail.viewProjects")}
                   </Link>
                 </Button>
               </Card>
@@ -732,11 +725,11 @@ export function MonthlyDetailContent({
                   <Target className="h-12 w-12 mx-auto text-muted-foreground/50" />
                 </div>
                 <h3 className="text-lg font-medium mb-2">
-                  {translate("monthlyDetail.retrospective.notStarted.title")}
+                  {translate("monthly.detail.retrospective.notStarted.title")}
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   {translate(
-                    "monthlyDetail.retrospective.notStarted.description"
+                    "monthly.detail.retrospective.notStarted.description"
                   )}
                 </p>
               </Card>
@@ -814,15 +807,15 @@ export function MonthlyDetailContent({
         <ConfirmDialog
           open={showDeleteDialog}
           onOpenChange={setShowDeleteDialog}
-          title={translate("monthlyDetail.delete.title")}
-          description={translate("monthlyDetail.delete.description")}
+          title={translate("monthly.detail.delete.title")}
+          description={translate("monthly.detail.delete.description")}
           onConfirm={() => {
             deleteMutation.mutate();
             setShowDeleteDialog(false);
           }}
           onCancel={() => setShowDeleteDialog(false)}
-          confirmText={translate("monthlyDetail.delete.confirm")}
-          cancelText={translate("monthlyDetail.delete.cancel")}
+          confirmText={translate("monthly.detail.delete.confirm")}
+          cancelText={translate("monthly.detail.delete.cancel")}
         />
       )}
 

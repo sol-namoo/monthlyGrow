@@ -28,30 +28,56 @@ import { getMonthlyStatus } from "../utils";
 export const fetchAllTasksByUserId = async (
   userId: string
 ): Promise<Task[]> => {
-  const q = query(
-    collection(db, "tasks"),
-    where("userId", "==", userId),
-    orderBy("date", "desc")
+  // 사용자의 모든 프로젝트 조회
+  const projectsQuery = query(
+    collection(db, "projects"),
+    where("userId", "==", userId)
   );
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      date: data.date.toDate(),
-      createdAt: data.createdAt.toDate(),
-      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-    } as Task;
-  });
+  const projectsSnapshot = await getDocs(projectsQuery);
+
+  const allTasks: Task[] = [];
+
+  // 각 프로젝트의 서브컬렉션에서 태스크 조회
+  for (const projectDoc of projectsSnapshot.docs) {
+    const projectId = projectDoc.id;
+
+    try {
+      const tasksQuery = query(
+        collection(db, "projects", projectId, "tasks"),
+        orderBy("date", "desc")
+      );
+      const tasksSnapshot = await getDocs(tasksQuery);
+
+      const projectTasks = tasksSnapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          projectId: projectId,
+          ...data,
+          date: data.date.toDate(),
+          createdAt: data.createdAt.toDate(),
+          updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+        } as Task;
+      });
+
+      allTasks.push(...projectTasks);
+    } catch (error) {
+      console.error(`프로젝트 ${projectId}의 태스크 조회 실패:`, error);
+      continue;
+    }
+  }
+
+  // 날짜순으로 정렬
+  return allTasks.sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
 };
 
 export const fetchAllTasksByProjectId = async (
   projectId: string
 ): Promise<Task[]> => {
   const q = query(
-    collection(db, "tasks"),
-    where("projectId", "==", projectId),
+    collection(db, "projects", projectId, "tasks"),
     orderBy("date", "desc")
   );
   const querySnapshot = await getDocs(q);
@@ -59,6 +85,7 @@ export const fetchAllTasksByProjectId = async (
     const data = doc.data();
     return {
       id: doc.id,
+      projectId: projectId,
       ...data,
       date: data.date.toDate(),
       createdAt: data.createdAt.toDate(),
@@ -70,7 +97,7 @@ export const fetchAllTasksByProjectId = async (
 export const getTaskCountsByProjectId = async (
   projectId: string
 ): Promise<{ total: number; completed: number; pending: number }> => {
-  const q = query(collection(db, "tasks"), where("projectId", "==", projectId));
+  const q = query(collection(db, "projects", projectId, "tasks"));
   const querySnapshot = await getDocs(q);
 
   const tasks = querySnapshot.docs.map((doc) => doc.data());
@@ -95,34 +122,22 @@ export const getTaskCountsForMultipleProjects = async (
     { total: number; completed: number; pending: number }
   > = {};
 
-  // Firestore의 'in' 쿼리는 최대 10개만 지원하므로 배치로 처리
-  const batchSize = 10;
-  for (let i = 0; i < projectIds.length; i += batchSize) {
-    const batch = projectIds.slice(i, i + batchSize);
+  // 각 프로젝트의 서브컬렉션에서 태스크 조회
+  for (const projectId of projectIds) {
+    try {
+      const q = query(collection(db, "projects", projectId, "tasks"));
+      const querySnapshot = await getDocs(q);
 
-    const q = query(collection(db, "tasks"), where("projectId", "in", batch));
-    const querySnapshot = await getDocs(q);
-
-    // 각 프로젝트별로 카운트 계산
-    const tasksByProject: Record<string, any[]> = {};
-    querySnapshot.docs.forEach((doc) => {
-      const taskData = doc.data();
-      const projectId = taskData.projectId;
-      if (!tasksByProject[projectId]) {
-        tasksByProject[projectId] = [];
-      }
-      tasksByProject[projectId].push(taskData);
-    });
-
-    // 각 프로젝트의 통계 계산
-    batch.forEach((projectId) => {
-      const tasks = tasksByProject[projectId] || [];
+      const tasks = querySnapshot.docs.map((doc) => doc.data());
       const total = tasks.length;
       const completed = tasks.filter((task) => task.done).length;
       const pending = total - completed;
 
       results[projectId] = { total, completed, pending };
-    });
+    } catch (error) {
+      console.error(`프로젝트 ${projectId}의 태스크 카운트 조회 실패:`, error);
+      results[projectId] = { total: 0, completed: 0, pending: 0 };
+    }
   }
 
   return results;
@@ -131,34 +146,31 @@ export const getTaskCountsForMultipleProjects = async (
 export const getTaskTimeStatsByProjectId = async (
   projectId: string
 ): Promise<{
-  totalFocusTime: number;
-  averageFocusTime: number;
+  completedTime: number;
+  remainingTime: number;
   totalTasks: number;
   completedTasks: number;
 }> => {
-  const q = query(collection(db, "tasks"), where("projectId", "==", projectId));
+  const q = query(collection(db, "projects", projectId, "tasks"));
   const querySnapshot = await getDocs(q);
 
   const tasks = querySnapshot.docs.map((doc) => doc.data());
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter((task) => task.done).length;
 
-  // focusTime이 있는 태스크들만 필터링
-  const tasksWithFocusTime = tasks.filter(
-    (task) => task.focusTime && task.focusTime > 0
-  );
-  const totalFocusTime = tasksWithFocusTime.reduce(
-    (sum, task) => sum + (task.focusTime || 0),
-    0
-  );
-  const averageFocusTime =
-    tasksWithFocusTime.length > 0
-      ? totalFocusTime / tasksWithFocusTime.length
-      : 0;
+  // 완료된 태스크들의 duration 합계 계산 (완료된 시간)
+  const completedTime = tasks
+    .filter((task) => task.done && task.duration)
+    .reduce((sum, task) => sum + (task.duration || 0), 0);
+
+  // 남은 태스크들의 duration 합계 계산 (남은 시간)
+  const remainingTime = tasks
+    .filter((task) => !task.done && task.duration)
+    .reduce((sum, task) => sum + (task.duration || 0), 0);
 
   return {
-    totalFocusTime,
-    averageFocusTime,
+    completedTime,
+    remainingTime,
     totalTasks,
     completedTasks,
   };
@@ -191,6 +203,9 @@ export const createTask = async (
     if (!taskData.title?.trim()) {
       throw new Error("태스크 제목을 입력해주세요.");
     }
+    if (!taskData.projectId) {
+      throw new Error("프로젝트 ID가 필요합니다.");
+    }
 
     const baseData = createBaseData(taskData.userId);
     const newTask = {
@@ -198,8 +213,17 @@ export const createTask = async (
       ...baseData,
     };
 
-    const docRef = await addDoc(collection(db, "tasks"), newTask);
-    console.log(`✅ 태스크 생성 완료 - ID: ${docRef.id}`);
+    // 서브컬렉션에 저장
+    const subcollectionRef = collection(
+      db,
+      "projects",
+      taskData.projectId,
+      "tasks"
+    );
+    const docRef = await addDoc(subcollectionRef, newTask);
+    console.log(
+      `✅ 프로젝트 서브컬렉션에 태스크 생성 완료 - Project: ${taskData.projectId}, Task: ${docRef.id}`
+    );
 
     return {
       id: docRef.id,
@@ -223,6 +247,7 @@ export const createTask = async (
 
 export const updateTask = async (
   taskId: string,
+  projectId: string,
   updateData: Partial<Omit<Task, "id" | "userId" | "createdAt">>
 ): Promise<void> => {
   try {
@@ -231,10 +256,18 @@ export const updateTask = async (
       updatedAt: updateTimestamp(),
     });
 
-    await updateDoc(doc(db, "tasks", taskId), filteredData);
-    console.log(`✅ 태스크 업데이트 완료 - ID: ${taskId}`);
+    await updateDoc(
+      doc(db, "projects", projectId, "tasks", taskId),
+      filteredData
+    );
+    console.log(
+      `✅ 프로젝트 서브컬렉션 태스크 업데이트 완료 - Project: ${projectId}, Task: ${taskId}`
+    );
   } catch (error) {
-    console.error(`❌ 태스크 업데이트 실패 - ID: ${taskId}`, error);
+    console.error(
+      `❌ 프로젝트 서브컬렉션 태스크 업데이트 실패 - Project: ${projectId}, Task: ${taskId}`,
+      error
+    );
     throw new Error("태스크 업데이트에 실패했습니다.");
   }
 };
@@ -258,9 +291,12 @@ export const addTaskToProject = async (
       ...baseData,
     };
 
-    const docRef = await addDoc(collection(db, "tasks"), newTask);
+    // 서브컬렉션에 저장
+    const subcollectionRef = collection(db, "projects", projectId, "tasks");
+    const docRef = await addDoc(subcollectionRef, newTask);
+
     console.log(
-      `✅ 프로젝트에 태스크 추가 완료 - Project: ${projectId}, Task: ${docRef.id}`
+      `✅ 프로젝트 서브컬렉션에 태스크 추가 완료 - Project: ${projectId}, Task: ${docRef.id}`
     );
 
     return {
@@ -294,54 +330,77 @@ export const updateTaskInProject = async (
       updatedAt: updateTimestamp(),
     });
 
-    await updateDoc(doc(db, "tasks", taskId), filteredData);
+    // 서브컬렉션에서 업데이트
+    await updateDoc(
+      doc(db, "projects", projectId, "tasks", taskId),
+      filteredData
+    );
     console.log(
-      `✅ 프로젝트 태스크 업데이트 완료 - Project: ${projectId}, Task: ${taskId}`
+      `✅ 프로젝트 서브컬렉션 태스크 업데이트 완료 - Project: ${projectId}, Task: ${taskId}`
     );
   } catch (error) {
     console.error(
-      `❌ 프로젝트 태스크 업데이트 실패 - Project: ${projectId}, Task: ${taskId}`,
+      `❌ 프로젝트 서브컬렉션 태스크 업데이트 실패 - Project: ${projectId}, Task: ${taskId}`,
       error
     );
     throw new Error("태스크 업데이트에 실패했습니다.");
   }
 };
 
-export const deleteTaskFromProject = async (taskId: string): Promise<void> => {
+export const deleteTaskFromProject = async (
+  projectId: string,
+  taskId: string
+): Promise<void> => {
   try {
-    await deleteDoc(doc(db, "tasks", taskId));
-    console.log(`✅ 태스크 삭제 완료 - ID: ${taskId}`);
+    // 서브컬렉션에서 삭제
+    await deleteDoc(doc(db, "projects", projectId, "tasks", taskId));
+    console.log(
+      `✅ 서브컬렉션 태스크 삭제 완료 - Project: ${projectId}, Task: ${taskId}`
+    );
   } catch (error) {
-    console.error(`❌ 태스크 삭제 실패 - ID: ${taskId}`, error);
+    console.error(
+      `❌ 서브컬렉션 태스크 삭제 실패 - Project: ${projectId}, Task: ${taskId}`,
+      error
+    );
     throw new Error("태스크 삭제에 실패했습니다.");
   }
 };
 
-export const toggleTaskCompletion = async (taskId: string): Promise<void> => {
-  try {
-    const taskRef = doc(db, "tasks", taskId);
-    const taskSnap = await getDoc(taskRef);
+// 이 함수는 더 이상 사용되지 않습니다. 서브컬렉션 구조로 변경되었으므로 toggleTaskCompletionInSubcollection을 사용하세요.
+// export const toggleTaskCompletion = async (taskId: string): Promise<void> => {
+//   try {
+//     const taskRef = doc(db, "tasks", taskId);
+//     const taskSnap = await getDoc(taskRef);
 
-    if (!taskSnap.exists()) {
-      throw new Error("Task not found");
-    }
+//     if (!taskSnap.exists()) {
+//       throw new Error("Task not found");
+//     }
 
-    const taskData = taskSnap.data();
-    const newDone = !taskData.done;
+//     const taskData = taskSnap.data();
+//     const newDone = !taskData.done;
 
-    await updateDoc(taskRef, {
-      done: newDone,
-      updatedAt: updateTimestamp(),
-    });
+//     const updateData: any = {
+//       done: newDone,
+//       updatedAt: updateTimestamp(),
+//     };
 
-    console.log(
-      `✅ Task completion toggled - ID: ${taskId}, completed: ${newDone}`
-    );
-  } catch (error) {
-    console.error(`❌ Task completion toggle failed - ID: ${taskId}`, error);
-    throw new Error("Task completion toggle failed");
-  }
-};
+//     // 완료 상태가 true로 변경되면 completedAt 설정, false로 변경되면 제거
+//     if (newDone) {
+//       updateData.completedAt = updateTimestamp();
+//     } else {
+//       updateData.completedAt = null;
+//     }
+
+//     await updateDoc(taskRef, updateData);
+
+//     console.log(
+//       `✅ Task completion toggled - ID: ${taskId}, completed: ${newDone}`
+//     );
+//   } catch (error) {
+//     console.error(`❌ Task completion toggle failed - ID: ${taskId}`, error);
+//     throw new Error("Task completion toggle failed");
+//   }
+// };
 
 export const toggleTaskCompletionInSubcollection = async (
   projectId: string,
@@ -358,10 +417,19 @@ export const toggleTaskCompletionInSubcollection = async (
     const taskData = taskSnap.data();
     const newDone = !taskData.done;
 
-    await updateDoc(taskRef, {
+    const updateData: any = {
       done: newDone,
       updatedAt: updateTimestamp(),
-    });
+    };
+
+    // 완료 상태가 true로 변경되면 completedAt 설정, false로 변경되면 제거
+    if (newDone) {
+      updateData.completedAt = updateTimestamp();
+    } else {
+      updateData.completedAt = null;
+    }
+
+    await updateDoc(taskRef, updateData);
 
     console.log(
       `✅ Task completion toggled in subcollection - Project: ${projectId}, Task: ${taskId}, completed: ${newDone}`
@@ -385,27 +453,47 @@ export const getTodayTasks = async (
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Firestore에서 오늘 날짜의 태스크만 서버사이드에서 필터링
-    // 이 쿼리를 실행하면 Firestore가 필요한 인덱스를 자동으로 제안함
-    const q = query(
-      collection(db, "tasks"),
-      where("userId", "==", userId),
-      where("date", ">=", Timestamp.fromDate(today)),
-      where("date", "<", Timestamp.fromDate(tomorrow))
+    // 프로젝트 서브컬렉션에서 오늘 날짜의 태스크 조회
+    const projectsQuery = query(
+      collection(db, "projects"),
+      where("userId", "==", userId)
     );
 
-    const querySnapshot = await getDocs(q);
-    const todayTasks = querySnapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        date: data.date.toDate(),
-        completedAt: data.completedAt?.toDate(),
-        createdAt: data.createdAt.toDate(),
-        updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-      } as Task;
-    });
+    const projectsSnapshot = await getDocs(projectsQuery);
+    const todayTasks: Task[] = [];
+
+    // 각 프로젝트의 서브컬렉션에서 태스크 조회
+    for (const projectDoc of projectsSnapshot.docs) {
+      const projectId = projectDoc.id;
+
+      try {
+        const subTasksQuery = query(
+          collection(db, "projects", projectId, "tasks"),
+          where("date", ">=", Timestamp.fromDate(today)),
+          where("date", "<", Timestamp.fromDate(tomorrow))
+        );
+
+        const subTasksSnapshot = await getDocs(subTasksQuery);
+        const projectTasks = subTasksSnapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            projectId: projectId, // 프로젝트 ID 추가
+            ...data,
+            date: data.date.toDate(),
+            completedAt: data.completedAt?.toDate(),
+            createdAt: data.createdAt.toDate(),
+            updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+          } as Task;
+        });
+
+        todayTasks.push(...projectTasks);
+      } catch (error) {
+        console.error(`프로젝트 ${projectId}의 태스크 조회 실패:`, error);
+        // 개별 프로젝트 조회 실패는 전체 조회를 중단하지 않음
+        continue;
+      }
+    }
 
     return sortTasksByDateAndTitle(todayTasks);
   } catch (error) {
@@ -428,7 +516,7 @@ const sortTasksByDateAndTitle = (tasks: Task[]): Task[] => {
   });
 };
 
-// 먼슬리 기간 동안 완료된 모든 태스크를 조회하는 함수 (느슨한 관계 지원)
+// 먼슬리 기간 동안 완료된 모든 태스크를 조회하는 함수 (서브컬렉션 전용)
 export const getCompletedTasksByMonthlyPeriod = async (
   userId: string,
   startDate: Date,
@@ -459,27 +547,51 @@ export const getCompletedTasksByMonthlyPeriod = async (
     const endOfMonth = new Date(endDate);
     endOfMonth.setHours(23, 59, 59, 999);
 
-    // Firestore에서 완료된 태스크만 조회 (서버사이드 필터링)
-    const q = query(
-      collection(db, "tasks"),
-      where("userId", "==", userId),
-      where("done", "==", true)
+    // 1. 사용자의 모든 프로젝트 조회
+    const projectsQuery = query(
+      collection(db, "projects"),
+      where("userId", "==", userId)
     );
+    const projectsSnapshot = await getDocs(projectsQuery);
 
-    const querySnapshot = await getDocs(q);
-    const allCompletedTasks = querySnapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        date: data.date.toDate(),
-        completedAt: data.completedAt?.toDate(),
-        createdAt: data.createdAt.toDate(),
-        updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-      } as Task;
-    });
+    const allCompletedTasks: Task[] = [];
 
-    // 먼슬리 기간 내의 태스크만 필터링 (completedAt 기준)
+    // 2. 각 프로젝트의 서브컬렉션에서 완료된 태스크 조회
+    for (const projectDoc of projectsSnapshot.docs) {
+      const projectId = projectDoc.id;
+
+      try {
+        const subTasksQuery = query(
+          collection(db, "projects", projectId, "tasks"),
+          where("done", "==", true)
+        );
+
+        const subTasksSnapshot = await getDocs(subTasksQuery);
+        const projectTasks = subTasksSnapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            projectId: projectId,
+            ...data,
+            date: data.date.toDate(),
+            completedAt: data.completedAt?.toDate(),
+            createdAt: data.createdAt.toDate(),
+            updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+          } as Task;
+        });
+
+        allCompletedTasks.push(...projectTasks);
+      } catch (error) {
+        console.error(
+          `프로젝트 ${projectId}의 완료된 태스크 조회 실패:`,
+          error
+        );
+        // 개별 프로젝트 조회 실패는 전체 조회를 중단하지 않음
+        continue;
+      }
+    }
+
+    // 3. 먼슬리 기간 내의 태스크만 필터링 (completedAt 기준)
     const monthlyCompletedTasks = allCompletedTasks.filter((task) => {
       const completedAt = task.completedAt || task.date; // completedAt이 없으면 date 사용
       const completedDate =
@@ -487,7 +599,7 @@ export const getCompletedTasksByMonthlyPeriod = async (
       return completedDate >= startOfMonth && completedDate <= endOfMonth;
     });
 
-    // 프로젝트 정보를 배치로 가져와서 성능 최적화
+    // 4. 프로젝트 정보를 배치로 가져와서 성능 최적화
     const projectIds = [
       ...new Set(monthlyCompletedTasks.map((task) => task.projectId)),
     ];
@@ -502,7 +614,7 @@ export const getCompletedTasksByMonthlyPeriod = async (
       }
     });
 
-    // Area 정보를 배치로 가져와서 성능 최적화
+    // 5. Area 정보를 배치로 가져와서 성능 최적화
     const areaIds = [
       ...new Set(
         Array.from(projectDataMap.values())
@@ -521,7 +633,7 @@ export const getCompletedTasksByMonthlyPeriod = async (
       }
     });
 
-    // 결과 구성
+    // 6. 결과 구성
     const result = monthlyCompletedTasks
       .map((task) => {
         const projectData = projectDataMap.get(task.projectId);

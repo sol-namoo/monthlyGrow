@@ -210,7 +210,7 @@
     },
     {
       "collectionGroup": "tasks",
-      "queryScope": "COLLECTION",
+      "queryScope": "COLLECTION_GROUP",
       "fields": [
         {
           "fieldPath": "userId",
@@ -224,7 +224,7 @@
     },
     {
       "collectionGroup": "tasks",
-      "queryScope": "COLLECTION",
+      "queryScope": "COLLECTION_GROUP",
       "fields": [
         {
           "fieldPath": "projectId",
@@ -238,7 +238,7 @@
     },
     {
       "collectionGroup": "tasks",
-      "queryScope": "COLLECTION",
+      "queryScope": "COLLECTION_GROUP",
       "fields": [
         {
           "fieldPath": "userId",

@@ -33,6 +33,7 @@ import {
   fetchProjectsByMonthlyId,
   updateMonthly,
   deleteMonthlyById,
+  fetchAllAreasByUserId,
 } from "@/lib/firebase/index";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase/index";
@@ -91,6 +92,13 @@ function MonthlyDetailPage({ params }: { params: Promise<{ id: string }> }) {
     enabled: !!id,
   });
 
+  // Area 정보 조회
+  const { data: allAreas = [] } = useQuery({
+    queryKey: ["areas", user?.uid],
+    queryFn: () => fetchAllAreasByUserId(user?.uid || ""),
+    enabled: !!user?.uid,
+  });
+
   // 로딩 상태
   if (userLoading || monthlyLoading || projectsLoading) {
     return <MonthlyDetailSkeleton />;
@@ -130,6 +138,7 @@ function MonthlyDetailPage({ params }: { params: Promise<{ id: string }> }) {
           ...monthly,
           connectedProjects: connectedProjects || [],
         }}
+        allAreas={allAreas}
         showHeader={false}
         showActions={true}
         onDelete={() => {

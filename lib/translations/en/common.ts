@@ -42,6 +42,14 @@ export const language = {
 
 export const pageLoading = {
   navigating: "Navigating...",
+  loading: "Please wait...",
+  processing: "Processing...",
+  saving: "Saving...",
+  updating: "Updating...",
+  deleting: "Deleting...",
+  creating: "Creating...",
+  analyzing: "Analyzing...",
+  connecting: "Connecting...",
 } as const;
 
 export const noteForm = {

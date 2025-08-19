@@ -32,6 +32,22 @@ import {
   ChevronRight,
   Edit,
   Trash2,
+  Compass,
+  Heart,
+  Brain,
+  Briefcase,
+  DollarSign,
+  Users,
+  Gamepad2,
+  Dumbbell,
+  BookOpen,
+  Home,
+  Car,
+  Plane,
+  Camera,
+  Music,
+  Palette,
+  Utensils,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -54,12 +70,36 @@ import {
   fetchMonthlyById,
   fetchAllProjectsByUserId,
   updateMonthly,
+  fetchAllAreasByUserId,
 } from "@/lib/firebase/index";
 import { useToast } from "@/hooks/use-toast";
 import { Monthly, KeyResult } from "@/lib/types";
 
 import { RetrospectiveForm } from "@/components/RetrospectiveForm";
 import { MonthlyNoteForm } from "@/components/MonthlyNoteForm";
+
+// 아이콘 컴포넌트 가져오기 함수
+const getIconComponent = (iconId: string) => {
+  const iconMap: Record<string, any> = {
+    compass: Compass,
+    heart: Heart,
+    brain: Brain,
+    briefcase: Briefcase,
+    dollarSign: DollarSign,
+    users: Users,
+    gamepad2: Gamepad2,
+    dumbbell: Dumbbell,
+    bookOpen: BookOpen,
+    home: Home,
+    car: Car,
+    plane: Plane,
+    camera: Camera,
+    music: Music,
+    palette: Palette,
+    utensils: Utensils,
+  };
+  return iconMap[iconId] || Compass;
+};
 
 // 로딩 스켈레톤 컴포넌트
 function EditMonthlySkeleton() {
@@ -101,6 +141,7 @@ export default function EditMonthlyPage({
   const [reward, setReward] = useState("");
   const [keyResults, setKeyResults] = useState<KeyResult[]>([]);
   const [quickAccessProjects, setQuickAccessProjects] = useState<string[]>([]);
+  const [selectedFocusAreas, setSelectedFocusAreas] = useState<string[]>([]);
 
   const [showQuickAccessDialog, setShowQuickAccessDialog] = useState(false);
 
@@ -131,6 +172,13 @@ export default function EditMonthlyPage({
     enabled: !!user?.uid,
   });
 
+  // Area 정보 가져오기
+  const { data: allAreas = [] } = useQuery({
+    queryKey: ["areas", user?.uid],
+    queryFn: () => fetchAllAreasByUserId(user?.uid || ""),
+    enabled: !!user?.uid,
+  });
+
   // 먼슬리 데이터 조회
   const { data: monthly, isLoading: monthlyLoading } = useQuery({
     queryKey: ["monthly", id],
@@ -153,6 +201,7 @@ export default function EditMonthlyPage({
       setSelectedMonth(startDateObj.getMonth() + 1);
       setKeyResults(monthly.keyResults || []);
       setQuickAccessProjects(monthly.quickAccessProjects || []);
+      setSelectedFocusAreas(monthly.focusAreas || []);
     }
   }, [monthly]);
 
@@ -191,6 +240,7 @@ export default function EditMonthlyPage({
         reward,
         keyResults,
         quickAccessProjects,
+        focusAreas: selectedFocusAreas,
       };
 
       await updateMonthly(monthly.id, updatedMonthly);
@@ -461,6 +511,76 @@ export default function EditMonthlyPage({
             </p>
           </div>
         </div>
+      </Card>
+
+      {/* 중점 영역 선택 (선택사항) */}
+      <Card className="p-4 mb-6">
+        <div className="mb-4">
+          <h3 className="font-bold text-sm flex items-center gap-2">
+            <Target className="h-4 w-4" />
+            중점 영역 선택
+            <Badge variant="secondary" className="text-xs">
+              선택사항
+            </Badge>
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            이번 달에 집중할 영역을 선택하세요
+          </p>
+        </div>
+
+        {/* Area 선택 그리드 */}
+        <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+          {allAreas.map((area) => {
+            const IconComponent = getIconComponent(area.icon || "compass");
+            const isSelected = selectedFocusAreas.includes(area.id);
+
+            return (
+              <div
+                key={area.id}
+                className={`flex flex-col items-center justify-center rounded-lg border p-3 cursor-pointer transition-colors ${
+                  isSelected
+                    ? "border-primary bg-primary/5"
+                    : "border-gray-200 hover:bg-gray-50"
+                }`}
+                onClick={() => {
+                  if (isSelected) {
+                    setSelectedFocusAreas((prev) =>
+                      prev.filter((id) => id !== area.id)
+                    );
+                  } else {
+                    setSelectedFocusAreas((prev) => [...prev, area.id]);
+                  }
+                }}
+              >
+                <div
+                  className="mb-2 rounded-full p-2"
+                  style={{
+                    backgroundColor: `${area.color}20`,
+                  }}
+                >
+                  <IconComponent
+                    className="h-4 w-4"
+                    style={{ color: area.color }}
+                  />
+                </div>
+                <span className="text-xs text-center font-medium">
+                  {area.name}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {selectedFocusAreas.length > 0 && (
+          <div className="mt-3 p-2 bg-muted/30 rounded-lg">
+            <p className="text-xs text-muted-foreground">
+              선택된 영역:{" "}
+              {selectedFocusAreas
+                .map((id) => allAreas.find((a) => a.id === id)?.name)
+                .join(", ")}
+            </p>
+          </div>
+        )}
       </Card>
 
       {/* 프로젝트 연결 (선택사항) */}

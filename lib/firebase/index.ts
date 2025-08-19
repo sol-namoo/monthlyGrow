@@ -60,7 +60,6 @@ export {
   addTaskToProject,
   updateTaskInProject,
   deleteTaskFromProject,
-  toggleTaskCompletion,
   toggleTaskCompletionInSubcollection,
   getTodayTasks,
   getCompletedTasksByMonthlyPeriod,
@@ -124,3 +123,9 @@ export {
 
 // Note 관련 함수들
 export { createNote, updateNote } from "./notes";
+
+// 마이그레이션 유틸리티
+export {
+  migrateTasksToSubcollections,
+  checkMigrationStatus,
+} from "./migration-utils";
