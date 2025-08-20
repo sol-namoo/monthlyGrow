@@ -37,8 +37,22 @@ export interface Project {
   endDate: Date;
   createdAt: Date;
   updatedAt: Date;
-  retrospective?: Retrospective;
-  notes: Note[];
+  retrospective?: {
+    id: string;
+    userId: string;
+    projectId: string;
+    createdAt: Date;
+    updatedAt: Date;
+    [key: string]: any;
+  };
+  notes?: {
+    id: string;
+    userId: string;
+    title: string;
+    content: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }[];
 
   // Monthly 연결 관련
   connectedMonthlies?: string[]; // 연결된 Monthly ID 배열
@@ -108,7 +122,14 @@ export interface Monthly {
   reward?: string;
   createdAt: Date;
   updatedAt: Date;
-  retrospective?: Retrospective; // 먼슬리 회고
+  retrospective?: {
+    id: string;
+    userId: string;
+    monthlyId: string;
+    createdAt: Date;
+    updatedAt: Date;
+    [key: string]: any;
+  }; // 먼슬리 회고
   note?: string; // 먼슬리 노트 (선택)
   quickAccessProjects?: string[]; // 프로젝트 바로가기 ID 배열
 
@@ -162,6 +183,25 @@ export interface MonthlySnapshot {
     keyResultsCompleted: number;
     keyResultsTotal: number;
   };
+
+  // 실패 분석 데이터 (새로 추가)
+  failureAnalysis?: {
+    totalKeyResults: number;
+    failedKeyResults: number;
+    failureRate: number;
+    failureReasons: {
+      reason: string;
+      label: string;
+      count: number;
+      percentage: number;
+    }[];
+    failedKeyResultsDetail: {
+      keyResultId: string;
+      keyResultTitle: string;
+      reason: string;
+      customReason?: string;
+    }[];
+  };
 }
 
 // 기존 Snapshot 인터페이스 제거 (legacy)
@@ -177,65 +217,49 @@ export interface MonthlySnapshot {
 //   reward: string;
 // }
 
-export interface Retrospective {
+// 통합 아카이브 컬렉션
+export interface UnifiedArchive {
   id: string;
   userId: string;
-  monthlyId?: string; // 먼슬리 회고인 경우
-  projectId?: string; // 프로젝트 회고인 경우
+  type:
+    | "monthly_retrospective"
+    | "monthly_note"
+    | "project_retrospective"
+    | "project_note";
+  parentId: string; // monthlyId 또는 projectId
+  title: string;
+  content: string;
   createdAt: Date;
   updatedAt: Date;
-  content?: string; // 자유 회고
-
-  // 먼슬리용 필드
+  // 각 타입별 고유 필드들
+  userRating?: number;
+  bookmarked?: boolean;
+  // 먼슬리 회고 필드들
   bestMoment?: string;
-  routineAdherence?: string;
+  routineAdherence?: number;
   unexpectedObstacles?: string;
   nextMonthlyApplication?: string;
-
-  // Key Results 중심 필드 (Monthly 구조에 맞게 추가)
-  keyResultsReview?: {
-    completedKeyResults?: string[]; // 완료된 Key Results ID 목록
-    failedKeyResults?: {
-      keyResultId: string;
-      reason:
-        | "unrealisticGoal"
-        | "timeManagement"
-        | "priorityMismatch"
-        | "externalFactors"
-        | "other"; // 실패 이유
-    }[];
-  };
-
-  // 프로젝트용 필드
-  goalAchieved?: string;
+  // Key Results 관련 데이터
+  keyResultsReview?: string; // Key Results 리뷰 텍스트
+  completedKeyResults?: string[]; // 완료된 Key Results ID 목록
+  failedKeyResults?: {
+    keyResultId: string;
+    keyResultTitle: string; // Key Result 제목 (조회 시 편의용)
+    reason:
+      | "unrealisticGoal"
+      | "timeManagement"
+      | "priorityMismatch"
+      | "externalFactors"
+      | "motivation"
+      | "other";
+    customReason?: string; // "other" 선택 시 사용자 입력 이유
+  }[];
+  // 프로젝트 회고 필드들
+  goalAchieved?: boolean;
   memorableTask?: string;
   stuckPoints?: string;
   newLearnings?: string;
   nextProjectImprovements?: string;
-
-  // 스마트 회고 필드 (완료율 90% 미만 시)
-  incompleteAnalysis?: {
-    planningNeedsImprovement?: boolean;
-    executionNeedsImprovement?: boolean;
-    otherReason?: string;
-  };
-
-  // 공통
-  userRating?: number; // 별점 (1~5)
-  bookmarked?: boolean;
-  title?: string;
-  summary?: string;
-}
-
-// 자유 메모용 Note 컬렉션
-export interface Note {
-  id: string;
-  userId: string;
-  monthlyId?: string; // 먼슬리 노트인 경우
-  projectId?: string; // 프로젝트 노트인 경우
-  content: string;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 // 사용자 관련 타입 정의

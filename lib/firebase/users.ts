@@ -129,7 +129,6 @@ export const createUser = async (userData: {
 
     // setDoc을 사용하여 특정 ID로 문서 생성
     await setDoc(doc(db, "users", userData.uid), newUser);
-    console.log(`✅ 사용자 생성 완료 - UID: ${userData.uid}`);
 
     return {
       id: userData.uid,
@@ -158,7 +157,6 @@ export const createUser = async (userData: {
       },
     } as User;
   } catch (error) {
-    console.error("❌ 사용자 생성 실패:", error);
     if (error instanceof Error) {
       throw new Error(`사용자 생성에 실패했습니다: ${error.message}`);
     }
@@ -180,9 +178,7 @@ export const updateUserProfile = async (
     await updateDoc(doc(db, "users", userId), {
       profile: filteredData,
     });
-    console.log(`✅ 사용자 프로필 업데이트 완료 - ID: ${userId}`);
   } catch (error) {
-    console.error(`❌ 사용자 프로필 업데이트 실패 - ID: ${userId}`, error);
     throw new Error("사용자 프로필 업데이트에 실패했습니다.");
   }
 };
@@ -201,9 +197,7 @@ export const updateUserSettings = async (
     await updateDoc(doc(db, "users", userId), {
       settings: filteredData,
     });
-    console.log(`✅ 사용자 설정 업데이트 완료 - ID: ${userId}`);
   } catch (error) {
-    console.error(`❌ 사용자 설정 업데이트 실패 - ID: ${userId}`, error);
     throw new Error("사용자 설정 업데이트에 실패했습니다.");
   }
 };
@@ -222,9 +216,7 @@ export const updateUserPreferences = async (
     await updateDoc(doc(db, "users", userId), {
       preferences: filteredData,
     });
-    console.log(`✅ 사용자 선호도 업데이트 완료 - ID: ${userId}`);
   } catch (error) {
-    console.error(`❌ 사용자 선호도 업데이트 실패 - ID: ${userId}`, error);
     throw new Error("사용자 선호도 업데이트에 실패했습니다.");
   }
 };
@@ -239,9 +231,7 @@ export const updateUserDisplayName = async (
     }
 
     await updateProfile(user, { displayName });
-    console.log(`✅ 사용자 표시명 업데이트 완료: ${displayName}`);
   } catch (error) {
-    console.error("❌ 사용자 표시명 업데이트 실패:", error);
     throw new Error("사용자 표시명 업데이트에 실패했습니다.");
   }
 };
@@ -255,10 +245,8 @@ export const uploadProfilePicture = async (
     const snapshot = await uploadBytes(storageRef, file);
     const downloadURL = await getDownloadURL(snapshot.ref);
 
-    console.log(`✅ 프로필 사진 업로드 완료 - URL: ${downloadURL}`);
     return downloadURL;
   } catch (error) {
-    console.error("❌ 프로필 사진 업로드 실패:", error);
     throw new Error("프로필 사진 업로드에 실패했습니다.");
   }
 };
@@ -270,10 +258,7 @@ export const deleteProfilePicture = async (
   try {
     const storageRef = ref(storage, `profile-pictures/${userId}/${fileName}`);
     await deleteObject(storageRef);
-
-    console.log(`✅ 프로필 사진 삭제 완료 - 파일: ${fileName}`);
   } catch (error) {
-    console.error("❌ 프로필 사진 삭제 실패:", error);
     throw new Error("프로필 사진 삭제에 실패했습니다.");
   }
 };
@@ -289,9 +274,7 @@ export const updateUserProfilePicture = async (
     }
 
     await updateProfile(user, { photoURL });
-    console.log(`✅ 프로필 사진 업데이트 완료 - URL: ${photoURL}`);
   } catch (error) {
-    console.error("❌ 프로필 사진 업데이트 실패:", error);
     throw new Error("프로필 사진 업데이트에 실패했습니다.");
   }
 };

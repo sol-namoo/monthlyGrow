@@ -78,76 +78,102 @@ export const createActivitySnapshotForUser = async (
         .doc(projectId)
         .collection("tasks")
         .get();
-
-      const tasks = tasksSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      const totalTasks = tasks.length;
-      const completedTasks = tasks.filter(
-        (task: any) => task.status === "completed"
-      ).length;
-
-      taskCounts[projectId] = { totalTasks, completedTasks };
+      const tasks = tasksSnapshot.docs.map((doc) => doc.data());
+      taskCounts[projectId] = {
+        totalTasks: tasks.length,
+        completedTasks: tasks.filter((task: any) => task.done).length,
+      };
     }
 
-    // Area별 통계 계산
-    const areaStats: any = {};
-    let totalFocusTime = 0;
-    let totalProjects = allProjects.length;
-    let completedProjects = 0;
-    let totalTasks = 0;
-    let completedTasks = 0;
+    // 완료된 프로젝트 계산
+    const completedProjects = allProjects.filter((project: any) => {
+      const counts = taskCounts[project.id];
+      return counts && counts.completedTasks >= counts.totalTasks;
+    });
 
-    for (const area of areas) {
-      const areaProjects = allProjects.filter((p: any) => p.areaId === area.id);
-      if (areaProjects.length > 0) {
-        const areaFocusTime = areaProjects.reduce(
-          (sum, p: any) => sum + (p.duration || 0),
-          0
-        );
-        const areaCompletedProjects = areaProjects.filter(
-          (p: any) => p.status === "completed"
-        ).length;
-
-        // 해당 Area의 태스크 개수 계산
-        const areaProjectIds = areaProjects.map((p: any) => p.id);
-        const areaTaskCounts = areaProjectIds.reduce(
-          (sum, projectId) => {
-            const counts = taskCounts[projectId];
-            return {
-              total: sum.total + (counts?.totalTasks || 0),
-              completed: sum.completed + (counts?.completedTasks || 0),
-            };
-          },
-          { total: 0, completed: 0 }
-        );
-
-        const areaCompletionRate = Math.round(
-          (areaCompletedProjects / areaProjects.length) * 100
-        );
-
-        areaStats[area.id] = {
-          name: (area as unknown as Area).name,
-          focusTime: areaFocusTime,
-          completionRate: areaCompletionRate,
-          projectCount: areaProjects.length,
-          taskCount: areaTaskCounts.total,
-          completedTasks: areaTaskCounts.completed,
-        };
-
-        totalFocusTime += areaFocusTime;
-        completedProjects += areaCompletedProjects;
-        totalTasks += areaTaskCounts.total;
-        completedTasks += areaTaskCounts.completed;
-      }
-    }
-
-    // 전체 완료율 계산
+    const totalProjects = allProjects.length;
     const overallCompletionRate =
       totalProjects > 0
-        ? Math.round((completedProjects / totalProjects) * 100)
+        ? Math.round((completedProjects.length / totalProjects) * 100)
         : 0;
+
+    // 총 태스크 및 완료된 태스크 계산
+    const totalTasks = Object.values(taskCounts).reduce(
+      (sum, counts) => sum + counts.totalTasks,
+      0
+    );
+    const completedTasks = Object.values(taskCounts).reduce(
+      (sum, counts) => sum + counts.completedTasks,
+      0
+    );
+
+    // 집중 시간 계산 (완료된 태스크의 duration 합계)
+    let totalFocusTime = 0;
+    for (const projectId of projectIds) {
+      const tasksSnapshot = await db
+        .collection("projects")
+        .doc(projectId)
+        .collection("tasks")
+        .where("done", "==", true)
+        .get();
+      const completedTasks = tasksSnapshot.docs.map((doc) => doc.data());
+      totalFocusTime += completedTasks.reduce(
+        (sum, task: any) => sum + (task.duration || 0),
+        0
+      );
+    }
+
+    // 영역별 통계 계산
+    const areaStats: { [areaId: string]: any } = {};
+    for (const project of allProjects) {
+      const areaId = project.areaId;
+      if (!areaId) continue;
+
+      if (!areaStats[areaId]) {
+        const area = areas.find((a) => a.id === areaId);
+        areaStats[areaId] = {
+          name: area?.name || "Unknown",
+          projectCount: 0,
+          completedProjectCount: 0,
+          focusTime: 0,
+          completionRate: 0,
+        };
+      }
+
+      areaStats[areaId].projectCount++;
+      const counts = taskCounts[project.id];
+      if (counts && counts.completedTasks >= counts.totalTasks) {
+        areaStats[areaId].completedProjectCount++;
+      }
+
+      // 영역별 집중 시간 계산
+      const tasksSnapshot = await db
+        .collection("projects")
+        .doc(project.id)
+        .collection("tasks")
+        .where("done", "==", true)
+        .get();
+      const completedTasks = tasksSnapshot.docs.map((doc) => doc.data());
+      areaStats[areaId].focusTime += completedTasks.reduce(
+        (sum: number, task: any) => sum + (task.duration || 0),
+        0
+      );
+    }
+
+    // 영역별 완료율 계산
+    for (const areaId in areaStats) {
+      const stats = areaStats[areaId];
+      stats.completionRate =
+        stats.projectCount > 0
+          ? Math.round((stats.completedProjectCount / stats.projectCount) * 100)
+          : 0;
+    }
+
+    // 실패 분석 데이터 수집 (새로 추가)
+    const failureAnalysis = await collectFailureAnalysisData(
+      userId,
+      monthMonthlies
+    );
 
     // 보상 정보 (모든 먼슬리의 보상 합계)
     const rewards = monthMonthlies
@@ -169,6 +195,7 @@ export const createActivitySnapshotForUser = async (
       completedTasks,
       rewards,
       areaStats,
+      failureAnalysis, // 실패 분석 데이터 추가
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -184,10 +211,110 @@ export const createActivitySnapshotForUser = async (
     console.log(`- 완료율: ${overallCompletionRate}%`);
     console.log(`- 집중 시간: ${Math.round(totalFocusTime / 60)}시간`);
     console.log(`- 보상: ${rewards.length}개`);
+    if (failureAnalysis) {
+      console.log(`- 실패율: ${failureAnalysis.failureRate}%`);
+      console.log(`- 실패 이유: ${failureAnalysis.failureReasons.length}개`);
+    }
 
     return snapshotData;
   } catch (error) {
     console.error(`❌ ${year}년 ${month}월 스냅샷 생성 실패:`, error);
+    return null;
+  }
+};
+
+// 실패 분석 데이터 수집 함수 (새로 추가)
+const collectFailureAnalysisData = async (
+  userId: string,
+  monthlies: any[]
+): Promise<any> => {
+  try {
+    // 통합 아카이브에서 실패 이유 데이터 가져오기
+    const archivesSnapshot = await db
+      .collection("unified_archives")
+      .where("userId", "==", userId)
+      .where("type", "in", ["monthly_retrospective", "project_retrospective"])
+      .get();
+
+    const archives = archivesSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    // 실패한 Key Results 데이터 수집
+    const failedKeyResults: Array<{
+      keyResultId: string;
+      keyResultTitle: string;
+      reason: string;
+      customReason?: string;
+      monthlyId: string;
+    }> = [];
+
+    archives.forEach((archive) => {
+      if (archive.keyResultsReview?.failedKeyResults) {
+        archive.keyResultsReview.failedKeyResults.forEach((failedKr: any) => {
+          // 해당 월의 먼슬리인지 확인
+          const isMonthlyInTargetPeriod = monthlies.some(
+            (monthly) => monthly.id === archive.parentId
+          );
+
+          if (isMonthlyInTargetPeriod) {
+            failedKeyResults.push({
+              keyResultId: failedKr.keyResultId,
+              keyResultTitle: failedKr.keyResultTitle,
+              reason: failedKr.reason,
+              customReason: failedKr.customReason,
+              monthlyId: archive.parentId,
+            });
+          }
+        });
+      }
+    });
+
+    // 전체 Key Results 개수 계산
+    const totalKeyResults = monthlies.reduce((total, monthly) => {
+      return total + (monthly.keyResults?.length || 0);
+    }, 0);
+
+    const failedKeyResultsCount = failedKeyResults.length;
+    const failureRate =
+      totalKeyResults > 0
+        ? Math.round((failedKeyResultsCount / totalKeyResults) * 100)
+        : 0;
+
+    // 실패 이유별 분포 계산
+    const reasonCounts: Record<string, number> = {};
+    failedKeyResults.forEach((failedKr) => {
+      reasonCounts[failedKr.reason] = (reasonCounts[failedKr.reason] || 0) + 1;
+    });
+
+    const reasonLabels: Record<string, string> = {
+      unrealisticGoal: "목표 과다",
+      timeManagement: "시간 관리",
+      priorityMismatch: "우선순위",
+      externalFactors: "외부 요인",
+      motivation: "동기 부족",
+      other: "기타",
+    };
+
+    const failureReasons = Object.entries(reasonCounts)
+      .map(([reason, count]) => ({
+        reason,
+        label: reasonLabels[reason] || reason,
+        count,
+        percentage: Math.round((count / failedKeyResultsCount) * 100),
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    return {
+      totalKeyResults,
+      failedKeyResults: failedKeyResultsCount,
+      failureRate,
+      failureReasons,
+      failedKeyResultsDetail: failedKeyResults,
+    };
+  } catch (error) {
+    console.error("실패 분석 데이터 수집 실패:", error);
     return null;
   }
 };

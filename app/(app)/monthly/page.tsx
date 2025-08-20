@@ -55,7 +55,7 @@ import {
 } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase/index";
-import { Monthly, Retrospective } from "@/lib/types";
+import { Monthly } from "@/lib/types";
 import {
   fetchAllMonthliesByUserId,
   fetchCurrentMonthlyProjects,
@@ -105,24 +105,64 @@ function MonthlyPageContent() {
     setCurrentTab(searchParams.get("tab") || "current");
   }, [searchParams]);
 
-  // Firestore에서 데이터 가져오기
-  const { data: monthlies = [], isLoading: monthliesLoading } = useQuery({
-    queryKey: ["monthlies", user?.uid],
-    queryFn: () => fetchAllMonthliesByUserId(user?.uid || ""),
-    enabled: !!user?.uid,
-  });
+  // 현재 먼슬리만 가져오기 (최적화)
+  const { data: currentMonthly = null, isLoading: currentMonthlyLoading } =
+    useQuery({
+      queryKey: ["current-monthly", user?.uid],
+      queryFn: async () => {
+        const allMonthlies = await fetchAllMonthliesByUserId(user?.uid || "");
+        return (
+          allMonthlies.find(
+            (monthly) => getMonthlyStatus(monthly) === "in_progress"
+          ) || null
+        );
+      },
+      enabled: !!user?.uid && currentTab === "current",
+      staleTime: 2 * 60 * 1000, // 2분간 캐시 유지
+      gcTime: 5 * 60 * 1000, // 5분간 가비지 컬렉션 방지
+    });
+
+  // 미래 먼슬리들 (탭이 활성화될 때만 가져오기)
+  const { data: futureMonthlies = [], isLoading: futureMonthliesLoading } =
+    useQuery({
+      queryKey: ["future-monthlies", user?.uid],
+      queryFn: async () => {
+        const allMonthlies = await fetchAllMonthliesByUserId(user?.uid || "");
+        return allMonthlies.filter(
+          (monthly) => getMonthlyStatus(monthly) === "planned"
+        );
+      },
+      enabled: !!user?.uid && currentTab === "future",
+      staleTime: 2 * 60 * 1000, // 2분간 캐시 유지
+      gcTime: 5 * 60 * 1000, // 5분간 가비지 컬렉션 방지
+    });
+
+  // 과거 먼슬리들 (탭이 활성화될 때만 가져오기)
+  const { data: pastMonthlies = [], isLoading: pastMonthliesLoading } =
+    useQuery({
+      queryKey: ["past-monthlies", user?.uid],
+      queryFn: async () => {
+        const allMonthlies = await fetchAllMonthliesByUserId(user?.uid || "");
+        return allMonthlies.filter(
+          (monthly) => getMonthlyStatus(monthly) === "ended"
+        );
+      },
+      enabled: !!user?.uid && currentTab === "past",
+      staleTime: 2 * 60 * 1000, // 2분간 캐시 유지
+      gcTime: 5 * 60 * 1000, // 5분간 가비지 컬렉션 방지
+    });
 
   // 프로젝트 개수 데이터 (임시로 빈 객체 사용)
   const projectCounts: Record<string, number> = {};
   const projectCountsLoading = false;
 
-  // 현재 먼슬리
-  const currentMonthly =
-    monthlies.find((monthly) => getMonthlyStatus(monthly) === "in_progress") ||
-    null;
-
   // 초기 로딩 상태
-  if (userLoading || monthliesLoading) {
+  if (
+    userLoading ||
+    (currentTab === "current" && currentMonthlyLoading) ||
+    (currentTab === "future" && futureMonthliesLoading) ||
+    (currentTab === "past" && pastMonthliesLoading)
+  ) {
     return (
       <div className="container max-w-md px-4 py-6 pb-20">
         <div className="mb-6">
@@ -139,19 +179,11 @@ function MonthlyPageContent() {
     );
   }
 
-  // 먼슬리 상태별 분류
-  const futureMonthlies = monthlies.filter(
-    (monthly) => getMonthlyStatus(monthly) === "planned"
-  );
-  const pastMonthlies = monthlies.filter(
-    (monthly) => getMonthlyStatus(monthly) === "ended"
-  );
-
   // 정렬
-  futureMonthlies.sort(
+  const sortedFutureMonthlies = [...futureMonthlies].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
-  pastMonthlies.sort(
+  const sortedPastMonthlies = [...pastMonthlies].sort(
     (a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
   );
 
@@ -179,25 +211,17 @@ function MonthlyPageContent() {
           </TabsTrigger>
           <TabsTrigger value="future" className="relative">
             {translate("monthly.tabs.future")}
-            {futureMonthlies.length > 0 && (
+            {sortedFutureMonthlies.length > 0 && (
               <Badge
                 variant="secondary"
                 className="ml-1 h-4 w-4 p-0 text-xs flex-shrink-0"
               >
-                {futureMonthlies.length}
+                {sortedFutureMonthlies.length}
               </Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="past" className="relative">
             {translate("monthly.tabs.past")}
-            {pastMonthlies.length > 0 && (
-              <Badge
-                variant="secondary"
-                className="ml-1 h-4 w-4 p-0 text-xs flex-shrink-0"
-              >
-                {pastMonthlies.length}
-              </Badge>
-            )}
           </TabsTrigger>
         </TabsList>
 
@@ -209,6 +233,9 @@ function MonthlyPageContent() {
               showActions={true}
               onDelete={() => {
                 // 삭제 후 현재 먼슬리가 없어지면 빈 상태로 변경
+                queryClient.invalidateQueries({
+                  queryKey: ["current-monthly", user?.uid],
+                });
               }}
             />
           ) : (
@@ -242,7 +269,7 @@ function MonthlyPageContent() {
             }
           >
             <FutureMonthliesTab
-              monthlies={futureMonthlies}
+              monthlies={sortedFutureMonthlies}
               projectCounts={projectCounts}
               projectCountsLoading={projectCountsLoading}
               onCreateMonthly={handleCreateMonthly}
@@ -260,9 +287,9 @@ function MonthlyPageContent() {
             }
           >
             <PastMonthliesTab
-              monthlies={pastMonthlies}
               projectCounts={projectCounts}
               projectCountsLoading={projectCountsLoading}
+              sortBy={sortBy}
             />
           </Suspense>
         </TabsContent>

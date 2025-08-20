@@ -59,12 +59,15 @@ export const noteForm = {
   contentRequired: "Please enter note content",
   save: "Save",
   cancel: "Cancel",
+  loading: "Loading...",
+  loadMore: "Load More",
 } as const;
 
 export const charts = {
   areaActivity: "Area Activity",
   completionRate: "Completion Rate",
   focusTime: "Focus Time",
+  focusTimeUnit: " hours",
   monthlyComparison: "Monthly Comparison",
   monthlyProgress: "Monthly Progress",
   yearlyStats: "Yearly Statistics",

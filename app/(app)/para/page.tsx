@@ -80,35 +80,38 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { ProjectCard } from "@/components/widgets/project-card";
 import dynamic from "next/dynamic";
 
-// 아카이브 탭을 lazy loading으로 import
-const ArchivesTab = dynamic(() => import("@/components/para/ArchivesTab"), {
-  loading: () => (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-4 w-32" />
-        <div className="flex gap-2">
-          <Skeleton className="h-8 w-24" />
-          <Skeleton className="h-8 w-24" />
+// 통합 아카이브 탭을 lazy loading으로 import
+const UnifiedArchivesTab = dynamic(
+  () => import("@/components/para/UnifiedArchivesTab"),
+  {
+    loading: () => (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-4 w-32" />
+          <div className="flex gap-2">
+            <Skeleton className="h-8 w-24" />
+            <Skeleton className="h-8 w-24" />
+          </div>
+        </div>
+        <div className="space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Card key={i} className="p-4">
+              <div className="space-y-3">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-6 w-16" />
+                  <Skeleton className="h-6 w-20" />
+                </div>
+              </div>
+            </Card>
+          ))}
         </div>
       </div>
-      <div className="space-y-4">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Card key={i} className="p-4">
-            <div className="space-y-3">
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-3 w-1/2" />
-              <div className="flex gap-2">
-                <Skeleton className="h-6 w-16" />
-                <Skeleton className="h-6 w-20" />
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
-  ),
-  ssr: false,
-});
+    ),
+    ssr: false,
+  }
+);
 
 function ParaPageContent() {
   const router = useRouter();
@@ -817,7 +820,7 @@ function ParaPageContent() {
         </TabsContent>
 
         <TabsContent value="archives" className="mt-4">
-          <ArchivesTab userId={user?.uid || ""} />
+          <UnifiedArchivesTab />
         </TabsContent>
       </Tabs>
     </div>

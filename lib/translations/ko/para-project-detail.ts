@@ -73,8 +73,29 @@ export const paraProjectDetail = {
   },
   retrospective: {
     title: "프로젝트 회고",
-    bestMoment: "가장 좋았던 순간",
-    bestMomentPlaceholder: "이 프로젝트에서 가장 좋았던 순간을 기록하세요",
+    bestMoment: {
+      label: "가장 좋았던 순간",
+      placeholder: "이 프로젝트에서 가장 좋았던 순간을 기록하세요",
+    },
+    routineAdherence: {
+      label: "루틴 준수율",
+      placeholder: "계획한 루틴을 얼마나 지켰나요?",
+    },
+    unexpectedObstacles: {
+      label: "예기치 못한 방해 요소",
+      placeholder: "예기치 못한 방해 요소는 있었나요?",
+    },
+    nextMonthlyApplication: {
+      label: "다음 먼슬리 적용 방안",
+      placeholder: "다음 먼슬리에 적용할 점은?",
+    },
+    helpful: {
+      label: "이 회고는 스스로에게 도움이 되었나요?",
+    },
+    bookmark: {
+      label: "다시 읽고 싶은 회고로 표시",
+      description: "중요한 회고는 북마크하여 나중에 쉽게 찾을 수 있습니다",
+    },
     challenges: "어려웠던 점",
     challengesPlaceholder: "이 프로젝트에서 어려웠던 점을 기록하세요",
     learnings: "배운 점",
@@ -93,6 +114,18 @@ export const paraProjectDetail = {
     inProgressDescription:
       "프로젝트가 진행 중입니다. 완료 후 회고를 작성할 수 있습니다",
     writeTitle: "회고 작성",
+    smartRetrospective: {
+      title: "스마트 회고",
+      description: "프로젝트 완료율이 90% 미만일 때 나타나는 추가 분석",
+      planningNeedsImprovement: "계획 수립 개선 필요",
+      planningDescription:
+        "프로젝트 계획 단계에서 개선이 필요한 부분이 있었습니다",
+      executionNeedsImprovement: "실행 과정 개선 필요",
+      executionDescription:
+        "프로젝트 실행 과정에서 개선이 필요한 부분이 있었습니다",
+      otherReason: "기타 이유",
+      otherReasonPlaceholder: "다른 개선이 필요한 부분이 있다면 기록하세요",
+    },
   },
   delete: {
     title: "프로젝트 삭제",

@@ -121,8 +121,10 @@ interface Project {
   endDate: Date; // 마감일
   createdAt: Date; // 생성일시
   updatedAt: Date; // 수정일시
-  retrospective?: Retrospective; // 프로젝트 회고
-  notes: Note[]; // 프로젝트 노트들
+  // Unified Archives를 통해 회고와 노트 관리
+  // retrospective는 unified_archives 컬렉션에서 조회
+  // Unified Archives를 통해 노트 관리
+  // notes는 unified_archives 컬렉션에서 조회
 
   // 프로젝트 상태는 동적으로 계산됨 (DB에 저장되지 않음)
   // getProjectStatus() 함수를 사용하여 실시간 계산
@@ -173,8 +175,8 @@ interface Monthly {
   reward?: string; // 목표 달성 시 보상
   createdAt: Date;
   updatedAt: Date;
-  retrospective?: Retrospective; // 먼슬리 회고 (완료 후)
-  note?: string; // 먼슬리 노트 (선택)
+  // Unified Archives를 통해 회고와 노트 관리
+  // retrospective와 note는 unified_archives 컬렉션에서 조회
 
   // 연결된 프로젝트들
   connectedProjects?: Array<{
@@ -232,94 +234,6 @@ interface Task {
 - `userId` (단일)
 - `userId` + `projectId` (복합)
 - `userId` + `date` (복합)
-
----
-
-### 🔹 Retrospectives 컬렉션
-
-먼슬리와 프로젝트의 회고를 저장합니다.
-
-```typescript
-interface Retrospective {
-  id: string; // 문서 ID (자동 생성)
-  userId: string; // 사용자 ID
-  monthlyId?: string; // 먼슬리 회고인 경우
-  projectId?: string; // 프로젝트 회고인 경우
-  createdAt: Date; // 생성일시
-  updatedAt: Date; // 수정일시
-  content?: string; // 자유 회고 내용
-
-  // 먼슬리용 필드
-  bestMoment?: string; // 가장 좋았던 순간
-  routineAdherence?: string; // 루틴 준수도
-  unexpectedObstacles?: string; // 예상치 못한 장애물
-  nextMonthlyApplication?: string; // 다음 월간 적용사항
-
-  // Key Results 중심 필드 (Monthly 구조에 맞게 추가)
-  keyResultsReview?: {
-    completedKeyResults?: string[]; // 완료된 Key Results ID 목록
-    failedKeyResults?: {
-      keyResultId: string;
-      reason:
-        | "unrealisticGoal"
-        | "timeManagement"
-        | "priorityMismatch"
-        | "externalFactors"
-        | "other"; // 실패 이유
-    }[];
-  };
-
-  // 프로젝트용 필드
-  goalAchieved?: string; // 목표 달성도
-  memorableTask?: string; // 기억에 남는 작업
-  stuckPoints?: string; // 막힌 지점들
-  newLearnings?: string; // 새로운 학습
-  nextProjectImprovements?: string; // 다음 프로젝트 개선사항
-
-  // 스마트 회고 필드 (완료율 90% 미만 시)
-  incompleteAnalysis?: {
-    planningNeedsImprovement?: boolean;
-    executionNeedsImprovement?: boolean;
-    otherReason?: string;
-  };
-
-  // 공통 필드
-  userRating?: number; // 별점 (1~5)
-  bookmarked?: boolean; // 북마크 여부
-  title?: string; // 회고 제목
-  summary?: string; // 요약
-}
-```
-
-**인덱스:**
-
-- `userId` (단일)
-- `userId` + `createdAt` (복합)
-- `userId` + `userRating` (복합)
-- `userId` + `bookmarked` (복합)
-
----
-
-### 🔹 Notes 컬렉션
-
-자유 메모를 저장합니다.
-
-```typescript
-interface Note {
-  id: string; // 문서 ID (자동 생성)
-  userId: string; // 사용자 ID
-  content: string; // 노트 내용
-  createdAt: Date; // 생성일시
-  updatedAt: Date; // 수정일시
-}
-```
-
-**인덱스:**
-
-- `userId` (단일)
-- `userId` + `createdAt` (복합)
-
----
 
 ### 🔹 MonthlyCompletedTasks 컬렉션
 
@@ -396,6 +310,25 @@ interface MonthlySnapshot {
     keyResultsCompleted: number;
     keyResultsTotal: number;
   };
+
+  // 실패 분석 데이터 (새로 추가)
+  failureAnalysis?: {
+    totalKeyResults: number;
+    failedKeyResults: number;
+    failureRate: number;
+    failureReasons: {
+      reason: string;
+      label: string;
+      count: number;
+      percentage: number;
+    }[];
+    failedKeyResultsDetail: {
+      keyResultId: string;
+      keyResultTitle: string;
+      reason: string;
+      customReason?: string;
+    }[];
+  };
 }
 ```
 
@@ -404,6 +337,72 @@ interface MonthlySnapshot {
 - `userId` (단일)
 - `userId` + `yearMonth` (복합)
 - `snapshotDate` (단일)
+
+---
+
+### 🔹 Unified Archives 컬렉션
+
+모든 회고와 노트를 통합 관리하는 아카이브 시스템입니다.
+
+```typescript
+interface UnifiedArchive {
+  id: string; // 문서 ID (자동 생성)
+  userId: string; // 사용자 ID (Firebase Auth UID)
+  type:
+    | "monthly_retrospective"
+    | "project_retrospective"
+    | "monthly_note"
+    | "project_note"; // 아카이브 타입
+  parentId: string; // 부모 문서 ID (Monthly ID 또는 Project ID)
+  parentType: "monthly" | "project"; // 부모 타입
+
+  // 공통 필드
+  title: string; // 제목 (자동 생성 또는 사용자 입력)
+  content: string; // 내용
+  userRating?: number; // 별점 (1-5)
+  bookmarked: boolean; // 북마크 여부
+
+  // 회고 전용 필드 (type이 "retrospective"인 경우)
+  bestMoment?: string; // 가장 좋았던 순간
+  routineAdherence?: string; // 루틴 준수율
+  unexpectedObstacles?: string; // 예상치 못한 장애물
+  nextMonthlyApplication?: string; // 다음 달 적용 사항
+  stuckPoints?: string; // 막힌 지점
+  newLearnings?: string; // 새로운 학습
+  nextProjectImprovements?: string; // 다음 프로젝트 개선사항
+  memorableTask?: string; // 가장 기억에 남는 작업
+
+  // Key Results 실패 이유 데이터 (새로 추가)
+  keyResultsReview?: {
+    completedKeyResults?: string[]; // 완료된 Key Results ID 목록
+    failedKeyResults?: {
+      keyResultId: string;
+      keyResultTitle: string; // Key Result 제목 (조회 시 편의용)
+      reason:
+        | "unrealisticGoal"
+        | "timeManagement"
+        | "priorityMismatch"
+        | "externalFactors"
+        | "motivation"
+        | "other";
+      customReason?: string; // "other" 선택 시 사용자 입력 이유
+    }[];
+  };
+
+  createdAt: Date; // 생성일시
+  updatedAt: Date; // 수정일시
+}
+```
+
+**인덱스:**
+
+- `userId` (단일)
+- `userId` + `type` (복합)
+- `userId` + `parentType` (복합)
+- `userId` + `createdAt` (복합, 내림차순)
+- `userId` + `bookmarked` (복합)
+- `userId` + `type` + `createdAt` (복합, 내림차순)
+- `userId` + `parentType` + `createdAt` (복합, 내림차순)
 
 ---
 
@@ -449,15 +448,22 @@ interface MonthlySnapshot {
 - 해당 월의 모든 정보를 완전히 보존
 - 과거 데이터 조회 시 사용
 
-### 6. Monthly → Retrospective (1:1)
+### 6. Unified Archives 시스템 (1:N)
 
-- 먼슬리 하나당 회고 하나
-- Monthly 문서 내에 `retrospective` 필드로 저장
+- 모든 회고와 노트를 `unified_archives` 컬렉션에서 통합 관리
+- `type` 필드로 구분: `"monthly_retrospective"`, `"project_retrospective"`, `"monthly_note"`, `"project_note"`
+- `parentId`로 Monthly 또는 Project와 연결
+- 별점(`userRating`)과 북마크(`bookmarked`) 기능 통합 제공
 
-### 7. Project → Retrospective (1:1)
+### 7. Monthly → Unified Archive (1:N)
 
-- 프로젝트 하나당 회고 하나
-- Project 문서 내에 `retrospective` 필드로 저장
+- 먼슬리 하나당 여러 아카이브 항목 가능 (회고, 노트)
+- `unified_archives` 컬렉션에서 `parentId`로 연결
+
+### 8. Project → Unified Archive (1:N)
+
+- 프로젝트 하나당 여러 아카이브 항목 가능 (회고, 노트)
+- `unified_archives` 컬렉션에서 `parentId`로 연결
 
 ---
 

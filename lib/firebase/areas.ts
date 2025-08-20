@@ -96,7 +96,7 @@ export const createArea = async (
     };
 
     const docRef = await addDoc(collection(db, "areas"), newArea);
-    console.log(`✅ 영역 생성 완료 - ID: ${docRef.id}`);
+
 
     return {
       id: docRef.id,
@@ -109,7 +109,7 @@ export const createArea = async (
       updatedAt: new Date(),
     } as Area;
   } catch (error) {
-    console.error("❌ 영역 생성 실패:", error);
+
     if (error instanceof Error) {
       throw new Error(`영역 생성에 실패했습니다: ${error.message}`);
     }
@@ -149,10 +149,10 @@ export const getOrCreateUncategorizedArea = async (
       status: "active",
     });
 
-    console.log("✅ 미분류 영역 생성 완료");
+
     return uncategorizedArea;
   } catch (error) {
-    console.error("❌ 미분류 영역 생성 실패:", error);
+
     throw error;
   }
 };
@@ -168,9 +168,9 @@ export const updateArea = async (
     });
 
     await updateDoc(doc(db, "areas", areaId), filteredData);
-    console.log(`✅ 영역 업데이트 완료 - ID: ${areaId}`);
+
   } catch (error) {
-    console.error(`❌ 영역 업데이트 실패 - ID: ${areaId}`, error);
+
     throw new Error("영역 업데이트에 실패했습니다.");
   }
 };
@@ -234,9 +234,9 @@ export const deleteAreaById = async (areaId: string): Promise<void> => {
       transaction.delete(areaRef);
     });
 
-    console.log(`✅ 영역 삭제 완료 - ID: ${areaId}`);
+
   } catch (error) {
-    console.error(`❌ 영역 삭제 실패 - ID: ${areaId}`, error);
+
     if (error instanceof Error) {
       throw new Error(`영역 삭제에 실패했습니다: ${error.message}`);
     }

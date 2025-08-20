@@ -214,6 +214,53 @@ export const monthlyDetail = {
         "Important retrospectives can be bookmarked for easy access later",
     },
     save: "Save Retrospective",
+    noRetrospective: "No retrospective written yet",
+    noRetrospectiveDescription: "Write a retrospective for this monthly",
+    writeRetrospective: "Write Retrospective",
+    failureReason: "Failure Reason",
+  },
+  retrospectiveForm: {
+    title: "Write Retrospective",
+    bestMoment: "Best moment of this monthly",
+    bestMomentPlaceholder: "e.g., The moment I felt good after exercising",
+    unexpectedObstacles: "Unexpected obstacles",
+    unexpectedObstaclesPlaceholder: "e.g., Sleeping in on weekends",
+    keyResultsReview: "Key Results Review",
+    completedKeyResults: "Completed Key Results",
+    failedKeyResults: "Failed Key Results",
+    status: {
+      completed: "Completed",
+      failed: "Failed",
+    },
+    failedReason: "Failure Reason",
+    failedReasonPlaceholder: "Select failure reason",
+    failedReasonOptions: {
+      unrealisticGoal: "Unrealistic goal",
+      timeManagement: "Poor time management",
+      priorityMismatch: "Priority mismatch",
+      externalFactors: "External factors",
+      motivation: "Lack of motivation",
+      other: "Other",
+      customReason: "Specific reason",
+      customReasonPlaceholder: "Please enter the specific failure reason",
+    },
+    nextMonthlyApplication: "What to apply to next monthly",
+    nextMonthlyApplicationPlaceholder:
+      "e.g., Include weekend routines in the next monthly plan",
+    freeformContent: "Free-form content",
+    freeformContentPlaceholder:
+      "Write any additional thoughts or reflections freely",
+    rating: "Rating",
+    bookmarked: "Bookmarked",
+    save: "Save",
+    cancel: "Cancel",
+    validation: {
+      bestMomentRequired: "Please enter the best moment",
+      unexpectedObstaclesRequired: "Please enter unexpected obstacles",
+      keyResultsReviewRequired: "Please enter key results review",
+      nextMonthlyApplicationRequired:
+        "Please enter what to apply to next monthly",
+    },
   },
   projectMigration: {
     title: "Incomplete Projects Found",
@@ -470,152 +517,4 @@ export const monthlyNew = {
     description: "An error occurred while creating the monthly",
   },
   createMonthly: "Create Monthly",
-  // Monthly creation page
-  new: {
-    title: "Create New Monthly",
-    description: "Create a new monthly to set and achieve your goals",
-    basicInfo: {
-      title: "Basic Information",
-      monthSelection: "Month Selection",
-      monthPlaceholder: "Select a month",
-    },
-    form: {
-      title: "Title",
-      titlePlaceholder: "e.g., August 2024",
-      objective: "Objective",
-      objectivePlaceholder: "e.g., Significantly improve customer satisfaction",
-      startDate: "Start Date",
-      endDate: "End Date",
-      reward: "Reward (Optional)",
-      rewardPlaceholder: "Reward for achieving the goal",
-      keyResults: "Key Results",
-      keyResultsDescription:
-        "Set specific and achievable metrics to measure goal achievement",
-      keyResultTitle: "Key Result Title",
-      keyResultTitlePlaceholder:
-        "e.g., Exercise 30 minutes daily, Read 3 times a week, Blog posting twice a week",
-      keyResultDescription: "Description (Optional)",
-      keyResultDescriptionPlaceholder:
-        "Enter detailed description of the objective",
-      addKeyResult: "Add Key Result",
-      removeKeyResult: "Remove Key Result",
-      keyResultsGuide:
-        "💡 It's recommended to set 3-5 key results per month. Too many can reduce focus.",
-      keyResultsGuideEdit:
-        "💡 It's recommended to set 3-5 key results per month. Too many can reduce focus.",
-    },
-    validation: {
-      titleRequired: "Please enter a title",
-      objectiveRequired: "Please enter an objective",
-      startDateRequired: "Please select a start date",
-      endDateRequired: "Please select an end date",
-      keyResultRequired: "Please enter a key metric title",
-      minKeyResults: "Please add at least 1 key metric",
-    },
-    existingMonthly: {
-      title: "Existing Monthly Found",
-      description:
-        "A monthly already exists for the selected month. Would you like to replace it?",
-      replace: "Replace Existing Monthly",
-      cancel: "Cancel",
-    },
-    success: {
-      title: "Monthly Created Successfully",
-      description: "New monthly has been created successfully",
-    },
-    error: {
-      title: "Monthly Creation Failed",
-      description: "An error occurred while creating the monthly",
-    },
-  },
-  // Monthly edit page
-  edit: {
-    title: "Edit Monthly",
-    description: "Edit monthly information",
-    basicInfo: {
-      title: "Basic Information",
-      monthSelection: "Month Selection",
-      monthPlaceholder: "Select a month",
-    },
-    form: {
-      title: "Title",
-      titlePlaceholder: "e.g., August 2024",
-      objective: "Objective",
-      objectivePlaceholder: "e.g., Significantly improve customer satisfaction",
-      startDate: "Start Date",
-      endDate: "End Date",
-      reward: "Reward (Optional)",
-      rewardPlaceholder: "Reward for achieving the goal",
-      keyResults: "Key Results",
-      keyResultsDescription:
-        "Set specific and achievable metrics to measure goal achievement",
-      keyResultTitle: "Key Result Title",
-      keyResultTitlePlaceholder:
-        "e.g., Exercise 30 minutes daily, Read 3 times a week, Blog posting twice a week",
-      keyResultDescription: "Description (Optional)",
-      keyResultDescriptionPlaceholder:
-        "Enter detailed description of the objective",
-      addKeyResult: "Add Key Result",
-      removeKeyResult: "Remove Key Result",
-    },
-    validation: {
-      titleRequired: "Please enter a title",
-      objectiveRequired: "Please enter an objective",
-      startDateRequired: "Please select a start date",
-      endDateRequired: "Please select an end date",
-      keyResultRequired: "Please enter a key metric title",
-    },
-    success: {
-      title: "Monthly Updated Successfully",
-      description: "Monthly has been updated successfully",
-    },
-    error: {
-      title: "Monthly Update Failed",
-      description: "An error occurred while updating the monthly",
-    },
-  },
-  // Monthly detail page
-  detail: {
-    notFound: {
-      title: "Monthly Not Found",
-      description: "The requested monthly does not exist or has been deleted",
-      backToList: "Back to Monthly List",
-    },
-    loading: {
-      title: "Loading Monthly",
-      description: "Loading monthly information",
-    },
-    actions: {
-      edit: "Edit",
-      delete: "Delete",
-      back: "Back",
-      editTooltip: "Edit Monthly",
-      deleteTooltip: "Delete Monthly",
-    },
-    delete: {
-      title: "Delete Monthly",
-      description:
-        "Are you sure you want to delete this monthly? This action cannot be undone",
-      confirm: "Delete",
-      cancel: "Cancel",
-      success: {
-        title: "Monthly Deleted Successfully",
-        description: "Monthly has been deleted successfully",
-      },
-      error: {
-        title: "Monthly Deletion Failed",
-        description: "An error occurred while deleting the monthly",
-      },
-    },
-    keyResultUpdate: {
-      success: {
-        title: "Key Metric Updated Successfully",
-        description: "Key metric has been updated successfully",
-      },
-      error: {
-        title: "Key Metric Update Failed",
-        description: "An error occurred while updating the key metric",
-      },
-    },
-  },
 } as const;

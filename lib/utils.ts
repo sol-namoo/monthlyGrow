@@ -640,3 +640,58 @@ export function formatMonthlyDataForPrompt(monthly: Monthly): string {
 
   return prompt;
 }
+
+/**
+ * 노트의 자동 제목을 생성합니다.
+ * @param archiveType 아카이브 타입 (monthly_note, project_note)
+ * @param parentData 부모 데이터 (Monthly 또는 Project)
+ * @param language 언어 ('ko' 또는 'en')
+ * @returns 생성된 제목
+ */
+export function generateNoteTitle(
+  archiveType: string,
+  parentData: any,
+  language: string = "ko"
+): string {
+  if (archiveType === "monthly_note" && parentData) {
+    const year =
+      parentData.startDate?.toDate?.()?.getFullYear() ||
+      new Date(parentData.startDate).getFullYear();
+    const month =
+      parentData.startDate?.toDate?.()?.getMonth() ||
+      new Date(parentData.startDate).getMonth();
+
+    if (language === "ko") {
+      return `${year}년 ${month + 1}월 먼슬리 노트`;
+    } else {
+      const monthNames = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+      ];
+      return `${monthNames[month]} ${year} Monthly Note`;
+    }
+  } else if (archiveType === "project_note" && parentData) {
+    if (language === "ko") {
+      return `${parentData.title || "프로젝트"} 노트`;
+    } else {
+      return `${parentData.title || "Project"} Note`;
+    }
+  }
+
+  // 기본값
+  if (language === "ko") {
+    return archiveType.includes("monthly") ? "먼슬리 노트" : "프로젝트 노트";
+  } else {
+    return archiveType.includes("monthly") ? "Monthly Note" : "Project Note";
+  }
+}

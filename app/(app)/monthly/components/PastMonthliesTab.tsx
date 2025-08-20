@@ -1,10 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronRight, Archive } from "lucide-react";
+import { ChevronRight, Archive, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Monthly } from "@/lib/types";
 import {
@@ -13,20 +14,49 @@ import {
   calculateMonthlyProgressInfo,
 } from "@/lib/utils";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "@/lib/firebase/index";
+import { fetchPastMonthliesByUserIdWithPaging } from "@/lib/firebase/index";
 
 interface PastMonthliesTabProps {
-  monthlies: Monthly[];
   projectCounts: Record<string, number>;
   projectCountsLoading: boolean;
+  sortBy: "latest" | "oldest" | "completionRate";
 }
 
 export default function PastMonthliesTab({
-  monthlies,
   projectCounts,
   projectCountsLoading,
+  sortBy,
 }: PastMonthliesTabProps) {
+  const [user] = useAuthState(auth);
   const { translate, currentLanguage } = useLanguage();
 
+  // 무한 쿼리로 과거 먼슬리 가져오기
+  const {
+    data: monthliesData,
+    fetchNextPage: fetchNextMonthlies,
+    hasNextPage: hasNextMonthlies,
+    isFetchingNextPage: isFetchingNextMonthlies,
+    isLoading: monthliesLoading,
+  } = useInfiniteQuery({
+    queryKey: ["past-monthlies", user?.uid, sortBy],
+    queryFn: ({ pageParam }) =>
+      fetchPastMonthliesByUserIdWithPaging(
+        user?.uid || "",
+        10,
+        pageParam?.lastDoc,
+        sortBy
+      ),
+    enabled: !!user?.uid,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasMore ? { lastDoc: lastPage.lastDoc } : undefined,
+    initialPageParam: { lastDoc: undefined },
+  });
+
+  // 모든 페이지의 먼슬리를 하나의 배열로 합치기
+  const allMonthlies = monthliesData?.pages.flatMap((page) => page.monthlies) || [];
   const getProjectCount = (monthly: Monthly) => {
     return projectCounts[monthly.id] || 0;
   };
@@ -43,13 +73,6 @@ export default function PastMonthliesTab({
       total: progressInfo.targetCounts,
     };
   };
-
-  // 월별 내림차순 정렬 (최근 완료된 먼슬리가 위에 오도록)
-  const sortedMonthlies = [...monthlies].sort((a, b) => {
-    const dateA = a.endDate instanceof Date ? a.endDate : new Date(a.endDate);
-    const dateB = b.endDate instanceof Date ? b.endDate : new Date(b.endDate);
-    return dateB.getTime() - dateA.getTime();
-  });
 
   // 월 표시를 위한 함수
   const getMonthDisplay = (monthly: Monthly) => {
@@ -81,6 +104,23 @@ export default function PastMonthliesTab({
     }
   };
 
+  // 로딩 상태
+  if (monthliesLoading) {
+    return (
+      <div className="space-y-4">
+        {[...Array(3)].map((_, i) => (
+          <Card key={i} className="p-4">
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+            </div>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* 지난 먼슬리 헤더 */}
@@ -88,15 +128,15 @@ export default function PastMonthliesTab({
         <div className="text-sm text-muted-foreground">
           {translate("monthly.pastMonthlies.totalCount").replace(
             "{count}",
-            sortedMonthlies.length.toString()
+            allMonthlies.length.toString()
           )}
         </div>
       </div>
 
       {/* 지난 먼슬리 리스트 */}
-      {sortedMonthlies.length > 0 ? (
+      {allMonthlies.length > 0 ? (
         <div className="space-y-4">
-          {sortedMonthlies.map((monthly) => (
+          {allMonthlies.map((monthly) => (
             <Card key={monthly.id} className="p-4">
               <Link href={`/monthly/${monthly.id}`} className="block">
                 <div className="flex items-start justify-between">
@@ -142,6 +182,26 @@ export default function PastMonthliesTab({
               </Link>
             </Card>
           ))}
+
+          {/* 더보기 버튼 */}
+          {hasNextMonthlies && (
+            <div className="flex justify-center pt-4">
+              <Button
+                variant="outline"
+                onClick={() => fetchNextMonthlies()}
+                disabled={isFetchingNextMonthlies}
+              >
+                {isFetchingNextMonthlies ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {translate("common.loading")}
+                  </>
+                ) : (
+                  translate("common.loadMore")
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       ) : (
         <Card className="border-2 border-dashed border-muted/30 p-8 text-center">

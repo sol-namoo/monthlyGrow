@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, Suspense, lazy } from "react";
 import { CharacterAvatar } from "@/components/character-avatar";
 import { ProgressCard } from "@/components/widgets/progress-card";
 import { StatsCard } from "@/components/widgets/stats-card";
 import { AreaActivityChart } from "@/components/widgets/area-activity-chart";
 import { UncategorizedStatsCard } from "@/components/widgets/uncategorized-stats-card";
 import { MonthlyComparisonChart } from "@/components/widgets/chapter-comparison-chart";
+import { FailurePatternWidget } from "@/components/widgets/failure-pattern-widget";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -45,16 +46,9 @@ import { Task } from "@/lib/types";
 import {
   fetchAllProjectsByUserId,
   fetchUncategorizedResourcesByUserId,
-  getOrCreateUncategorizedArea,
-  getTaskCountsByProjectId,
-  getTaskCountsForMultipleProjects,
-  fetchProjectsByMonthlyId,
-  fetchCurrentMonthlyProjects,
   getTodayTasks,
-  toggleTaskCompletion,
   toggleTaskCompletionInSubcollection,
   fetchAllMonthliesByUserId,
-  fetchYearlyActivityStats,
 } from "@/lib/firebase/index";
 
 import { getMonthlyStatus, formatDate } from "@/lib/utils";
@@ -62,6 +56,9 @@ import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/hooks/useLanguage";
 import Image from "next/image";
+
+// Lazy loaded dashboard components
+const DashboardContent = lazy(() => import("./components/DashboardContent"));
 
 export default function HomePage() {
   const [user, loading] = useAuthState(auth);
@@ -229,82 +226,70 @@ export default function HomePage() {
     }
   }, [user]);
 
-  // 모든 프로젝트를 가져오기 (Today's Tasks에서 프로젝트 정보 표시용)
-  const { data: allProjects = [], isLoading: allProjectsLoading } = useQuery({
-    queryKey: ["allProjects", user?.uid],
-    queryFn: () => (user ? fetchAllProjectsByUserId(user.uid) : []),
-    enabled: !!user,
-  });
-
-  // 오늘의 task들
+  // 오늘의 task들 (Today 탭에서만 필요)
   const { data: todayTasks = [], isLoading: todayTasksLoading } = useQuery({
     queryKey: ["todayTasks", user?.uid],
     queryFn: () => (user ? getTodayTasks(user.uid) : []),
-    enabled: !!user,
+    enabled: !!user && activeTab === "today",
+    staleTime: 2 * 60 * 1000, // 2분간 캐시 유지
+    gcTime: 5 * 60 * 1000, // 5분간 가비지 컬렉션 방지
   });
 
-  // 먼슬리 데이터 (현재 먼슬리 정보와 대시보드용)
-  const { data: monthlies = [], isLoading: monthliesLoading } = useQuery({
-    queryKey: ["monthlies", user?.uid],
-    queryFn: () => (user ? fetchAllMonthliesByUserId(user.uid) : []),
-    enabled: !!user,
-  });
+  // 현재 먼슬리만 가져오기 (Today 탭에서만 필요)
+  const { data: currentMonthly = null, isLoading: currentMonthlyLoading } =
+    useQuery({
+      queryKey: ["current-monthly", user?.uid],
+      queryFn: async () => {
+        if (!user) return null;
+        const allMonthlies = await fetchAllMonthliesByUserId(user.uid);
+        return (
+          allMonthlies.find(
+            (monthly) => getMonthlyStatus(monthly) === "in_progress"
+          ) || null
+        );
+      },
+      enabled: !!user && activeTab === "today",
+      staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
+      gcTime: 10 * 60 * 1000, // 10분간 가비지 컬렉션 방지
+    });
 
-  // Lazy Loading: Dashboard 탭이 활성화될 때만 실행
-  const { data: yearlyStats } = useQuery({
-    queryKey: ["yearlyStats", user?.uid],
-    queryFn: () =>
-      user
-        ? fetchYearlyActivityStats(user.uid, new Date().getFullYear())
-        : null,
-    enabled: !!user && activeTab === "dashboard",
-  });
+  // 오늘의 태스크에 필요한 프로젝트 정보만 가져오기 (최적화)
+  const { data: todayProjects = [], isLoading: todayProjectsLoading } =
+    useQuery({
+      queryKey: ["todayProjects", user?.uid],
+      queryFn: async () => {
+        if (!user || todayTasks.length === 0) return [];
+        const allProjects = await fetchAllProjectsByUserId(user.uid);
+        const projectIds = [
+          ...new Set(todayTasks.map((task) => task.projectId)),
+        ];
+        return allProjects.filter((project) => projectIds.includes(project.id));
+      },
+      enabled: !!user && activeTab === "today" && todayTasks.length > 0,
+      staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
+      gcTime: 10 * 60 * 1000, // 10분간 가비지 컬렉션 방지
+    });
 
   // 미분류 리소스만 가져오기 (최적화)
   const { data: uncategorizedResources = [] } = useQuery({
     queryKey: ["uncategorizedResources", user?.uid],
     queryFn: () => (user ? fetchUncategorizedResourcesByUserId(user.uid) : []),
     enabled: !!user,
+    staleTime: 10 * 60 * 1000, // 10분간 캐시 유지
+    gcTime: 20 * 60 * 1000, // 20분간 가비지 컬렉션 방지
   });
 
-  // 현재 진행 중인 먼슬리를 날짜 기반으로 선택
-  const currentMonthly =
-    monthlies.find((monthly) => {
-      const status = getMonthlyStatus(monthly);
-      return status === "in_progress";
-    }) || null;
-
-  // 월간 비교 데이터 준비
-  const pastMonthlies = monthlies.filter(
-    (monthly) => getMonthlyStatus(monthly) === "ended"
-  );
-
-  // 월간 비교 차트 데이터 - Key Results 기반으로 계산
-  const monthlyComparisonData = pastMonthlies.slice(-3).map((monthly) => {
-    const startDate =
-      monthly.startDate instanceof Date
-        ? monthly.startDate
-        : (monthly.startDate as any).toDate();
-
-    // Key Results 기반으로 완료율 계산
-    const totalKeyResults = monthly.keyResults?.length || 0;
-    const completedKeyResults =
-      monthly.keyResults?.filter((kr) => kr.isCompleted).length || 0;
-    const completionRate =
-      totalKeyResults > 0
-        ? Math.round((completedKeyResults / totalKeyResults) * 100)
-        : 0;
-
-    // 완료된 Key Results 수를 집중 시간으로 사용 (임시)
-    const focusHours = completedKeyResults;
-
-    const data = {
-      name: `${startDate.getMonth() + 1}월`,
-      completion: completionRate,
-      focusHours: focusHours,
-    };
-
-    return data;
+  // 미분류 프로젝트 수 계산 (간단한 쿼리로 대체)
+  const { data: uncategorizedProjectsCount = 0 } = useQuery({
+    queryKey: ["uncategorizedProjectsCount", user?.uid],
+    queryFn: async () => {
+      if (!user) return 0;
+      const allProjects = await fetchAllProjectsByUserId(user.uid);
+      return allProjects.filter((project) => !project.areaId).length;
+    },
+    enabled: !!user,
+    staleTime: 10 * 60 * 1000, // 10분간 캐시 유지
+    gcTime: 20 * 60 * 1000, // 20분간 가비지 컬렉션 방지
   });
 
   // 현재 먼슬리 정보 계산
@@ -381,11 +366,6 @@ export default function HomePage() {
     });
   }
   const changeRate = 0; // 추후 통계 fetch로 대체
-
-  // 미분류 항목 통계 계산
-  const uncategorizedProjects = allProjects.filter(
-    (project) => !project.areaId
-  ).length;
 
   return (
     <div className="container max-w-md px-4 py-6">
@@ -469,7 +449,7 @@ export default function HomePage() {
 
       {/* 미분류 항목 통계 */}
       <UncategorizedStatsCard
-        uncategorizedProjects={uncategorizedProjects}
+        uncategorizedProjects={uncategorizedProjectsCount}
         uncategorizedResources={uncategorizedResources.length}
         totalAreas={0}
       />
@@ -503,12 +483,20 @@ export default function HomePage() {
                       {currentMonthly.objective}
                     </p>
                   )}
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Calendar className="h-3 w-3" />
-                    <span>
-                      {formatDate(currentMonthly.startDate, currentLanguage)} -{" "}
-                      {formatDate(currentMonthly.endDate, currentLanguage)}
-                    </span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Calendar className="h-3 w-3" />
+                      <span>
+                        {formatDate(currentMonthly.startDate, currentLanguage)}{" "}
+                        - {formatDate(currentMonthly.endDate, currentLanguage)}
+                      </span>
+                    </div>
+                    <Badge
+                      variant={daysLeft <= 7 ? "destructive" : "secondary"}
+                      className="text-xs flex-shrink-0"
+                    >
+                      D-{daysLeft}
+                    </Badge>
                   </div>
                 </div>
                 <Button variant="ghost" size="sm" asChild>
@@ -555,11 +543,6 @@ export default function HomePage() {
                   <span>{currentMonthly.reward}</span>
                 </div>
               )}
-
-              {/* D-day 정보 */}
-              <div className="mt-3 flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">D-{daysLeft}</span>
-              </div>
             </Card>
           ) : (
             <Card className="p-6 text-center border-dashed border-border bg-card/80 dark:bg-card/60">
@@ -587,7 +570,7 @@ export default function HomePage() {
             <div className="space-y-2">
               {todayTasks.length > 0 ? (
                 todayTasks.map((task, index) => {
-                  const project = allProjects.find(
+                  const project = todayProjects.find(
                     (p) => p.id === task.projectId
                   );
                   return (
@@ -721,113 +704,28 @@ export default function HomePage() {
           </section>
         </TabsContent>
 
-        <TabsContent value="dashboard" className="mt-4 space-y-6">
-          <div className="rounded-lg border bg-muted/20 dark:bg-muted/10 p-4 mb-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
-            <h2 className="text-lg font-bold mb-2 flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              {texts.yearlyStats}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {texts.yearlyStatsDescription}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <StatsCard
-              title={texts.focusTime}
-              value={
-                yearlyStats
-                  ? `${Math.round(yearlyStats.totalFocusTime / 60)}${
-                      texts.hours
-                    }`
-                  : `0${texts.hours}`
-              }
-              description={
-                <div className="flex items-center gap-1 text-green-600">
-                  <TrendingUp className="h-3 w-3" />
-                  <span>
-                    {yearlyStats
-                      ? Math.round(yearlyStats.averageCompletionRate)
-                      : 0}
-                    % ↑
-                  </span>
+        <TabsContent value="dashboard" className="mt-4">
+          <Suspense
+            fallback={
+              <div className="space-y-6">
+                <div className="animate-pulse">
+                  <div className="h-8 bg-muted rounded w-1/3 mb-4"></div>
+                  <div className="h-4 bg-muted rounded w-1/2"></div>
                 </div>
-              }
-              icon={<Clock className="h-4 w-4 text-muted-foreground" />}
-            />
-            <StatsCard
-              title={texts.completionRate}
-              value={
-                yearlyStats
-                  ? `${Math.round(yearlyStats.averageCompletionRate)}%`
-                  : "0%"
-              }
-              description={
-                <div className="flex items-center gap-1 text-green-600">
-                  <TrendingUp className="h-3 w-3" />
-                  <span>
-                    {yearlyStats
-                      ? Math.round(yearlyStats.averageCompletionRate)
-                      : 0}
-                    % ↑
-                  </span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="h-24 bg-muted rounded"></div>
+                  <div className="h-24 bg-muted rounded"></div>
                 </div>
-              }
-              icon={<BookOpen className="h-4 w-4 text-muted-foreground" />}
+                <div className="h-64 bg-muted rounded"></div>
+              </div>
+            }
+          >
+            <DashboardContent
+              userId={user?.uid || ""}
+              texts={texts}
+              currentLanguage={currentLanguage}
             />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <StatsCard
-              title={texts.completedMonthlies}
-              value={yearlyStats?.completedMonthlies || 0}
-              description={texts.completedMonthliesDescription}
-              icon={<BookOpen className="h-4 w-4 text-muted-foreground" />}
-            />
-            <StatsCard
-              title={texts.totalRewards}
-              value={yearlyStats?.totalRewards || 0}
-              description={texts.totalRewardsDescription}
-              icon={<Award className="h-4 w-4 text-muted-foreground" />}
-            />
-          </div>
-
-          <Card className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
-            <h3 className="mb-4 font-bold">{texts.areaActivity}</h3>
-            <div className="h-64">
-              <AreaActivityChart
-                data={
-                  yearlyStats?.areaStats
-                    ? Object.entries(yearlyStats.areaStats).map(
-                        ([areaId, stats]: [string, any]) => ({
-                          name: stats.name,
-                          value: stats.focusTime,
-                          completionRate: stats.completionRate,
-                          projectCount: stats.projectCount,
-                        })
-                      )
-                    : []
-                }
-              />
-            </div>
-          </Card>
-
-          <Card className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
-            <h3 className="mb-4 font-bold">{texts.monthlyComparison}</h3>
-            <div className="h-64">
-              {monthlyComparisonData.length > 0 ? (
-                <MonthlyComparisonChart data={monthlyComparisonData} />
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  <p>완료된 월간 데이터가 없습니다</p>
-                </div>
-              )}
-            </div>
-          </Card>
-
-          <div className="text-center text-xs text-muted-foreground mt-4">
-            <p>{texts.dashboardUpdate}</p>
-          </div>
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>

@@ -116,7 +116,7 @@ function MonthlyDetailPage({ params }: { params: Promise<{ id: string }> }) {
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            {translate("monthly.detail.notFound")}
+            {translate("monthlyDetail.notFound")}
           </AlertDescription>
         </Alert>
       </div>
@@ -143,8 +143,8 @@ function MonthlyDetailPage({ params }: { params: Promise<{ id: string }> }) {
         showActions={true}
         onDelete={() => {
           toast({
-            title: translate("monthly.detail.delete.success"),
-            description: translate("monthly.detail.delete.successDescription"),
+            title: translate("monthlyDetail.delete.success"),
+            description: translate("monthlyDetail.delete.successDescription"),
           });
           router.push("/monthly");
         }}

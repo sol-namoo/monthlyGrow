@@ -12,7 +12,7 @@ import { monthly, monthlyDetail, monthlyEdit, monthlyNew } from "./monthly";
 import { para } from "./para";
 import { paraProjectDetail } from "./para-project-detail";
 import { settings } from "./settings";
-import { retrospective } from "./retrospective";
+
 import { aiPlanGenerator } from "./ai-plan-generator";
 import { login } from "./login";
 import { onboarding } from "./onboarding";
@@ -31,7 +31,7 @@ export const en = {
   para,
   paraProjectDetail,
   settings,
-  retrospective,
+
   aiPlanGenerator,
   login,
   onboarding,

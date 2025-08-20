@@ -58,12 +58,15 @@ export const noteForm = {
   contentRequired: "노트 내용을 입력해주세요",
   save: "저장",
   cancel: "취소",
+  loading: "로딩 중...",
+  loadMore: "더보기",
 } as const;
 
 export const charts = {
   areaActivity: "영역별 활동",
   completionRate: "완료율",
   focusTime: "집중 시간",
+  focusTimeUnit: "시간",
   monthlyComparison: "먼슬리 비교",
   monthlyProgress: "먼슬리 진행률",
   yearlyStats: "연간 통계",

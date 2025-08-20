@@ -127,19 +127,19 @@ function NewMonthlyPageContent() {
   const keyResultSchema = z.object({
     title: z
       .string()
-      .min(1, translate("monthly.new.validation.keyResultRequired")),
+      .min(1, translate("monthlyNew.validation.keyResultRequired")),
     description: z.string().optional(),
   });
 
   const monthlyFormSchema = z.object({
     objective: z
       .string()
-      .min(1, translate("monthly.new.validation.objectiveRequired")),
+      .min(1, translate("monthlyNew.validation.objectiveRequired")),
     objectiveDescription: z.string().optional(),
     reward: z.string().optional(),
     keyResults: z
       .array(keyResultSchema)
-      .min(1, translate("monthly.new.validation.minKeyResults")),
+      .min(1, translate("monthlyNew.validation.minKeyResults")),
   });
 
   // 현재 날짜 기준으로 년/월 설정
@@ -269,16 +269,16 @@ function NewMonthlyPageContent() {
       await createMonthly(monthlyData);
 
       toast({
-        title: translate("monthly.new.success.title"),
-        description: translate("monthly.new.success.description"),
+        title: translate("monthlyNew.success.title"),
+        description: translate("monthlyNew.success.description"),
       });
 
       router.push("/monthly");
     } catch (error) {
       console.error("먼슬리 생성 실패:", error);
       toast({
-        title: translate("monthly.new.error.title"),
-        description: translate("monthly.new.error.description"),
+        title: translate("monthlyNew.error.title"),
+        description: translate("monthlyNew.error.description"),
         variant: "destructive",
       });
     }
@@ -302,7 +302,7 @@ function NewMonthlyPageContent() {
             <ChevronLeft className="h-4 w-4" />
           </Link>
         </Button>
-        <h1 className="text-xl font-bold">{translate("monthly.new.title")}</h1>
+        <h1 className="text-xl font-bold">{translate("monthlyNew.title")}</h1>
       </div>
 
       {/* 기존 먼슬리 경고 */}
@@ -312,10 +312,10 @@ function NewMonthlyPageContent() {
             <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
             <div>
               <h3 className="font-medium text-amber-800 mb-1">
-                {translate("monthly.new.existingMonthly.title")}
+                {translate("monthlyNew.existingMonthly.title")}
               </h3>
               <p className="text-sm text-amber-700 mb-3">
-                {translate("monthly.new.existingMonthly.description")}
+                {translate("monthlyNew.existingMonthly.description")}
               </p>
               <div className="flex gap-2">
                 <Button
@@ -323,7 +323,7 @@ function NewMonthlyPageContent() {
                   size="sm"
                   onClick={() => router.push(`/monthly/${existingMonthly.id}`)}
                 >
-                  {translate("monthly.detail.actions.edit")}
+                  {translate("monthlyDetail.actions.edit")}
                 </Button>
                 <Button
                   variant="destructive"
@@ -347,7 +347,7 @@ function NewMonthlyPageContent() {
                     }
                   }}
                 >
-                  {translate("monthly.detail.delete.confirm")}
+                  {translate("monthlyDetail.delete.confirm")}
                 </Button>
               </div>
             </div>
@@ -361,13 +361,13 @@ function NewMonthlyPageContent() {
         <Card className="p-6 border border-border">
           <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
             <Target className="h-5 w-5 text-primary" />
-            {translate("monthly.new.basicInfo.title")}
+            {translate("monthlyNew.basicInfo.title")}
           </h2>
 
           <div className="space-y-6">
             <div>
               <Label className="text-sm font-medium">
-                {translate("monthly.new.basicInfo.monthSelection")}
+                {translate("monthlyNew.basicInfo.monthSelection")}
               </Label>
               <div className="flex items-center gap-3 mt-2">
                 <Select
@@ -381,7 +381,7 @@ function NewMonthlyPageContent() {
                   <SelectTrigger className="flex-1">
                     <SelectValue
                       placeholder={translate(
-                        "monthly.new.basicInfo.monthPlaceholder"
+                        "monthlyNew.basicInfo.monthPlaceholder"
                       )}
                     />
                   </SelectTrigger>
@@ -413,12 +413,12 @@ function NewMonthlyPageContent() {
 
             <div>
               <Label htmlFor="objective" className="text-sm font-medium">
-                {translate("monthly.new.form.objective")}
+                {translate("monthlyNew.form.objective")}
               </Label>
               <Input
                 id="objective"
                 {...register("objective")}
-                placeholder={translate("monthly.new.form.objectivePlaceholder")}
+                placeholder={translate("monthlyNew.form.objectivePlaceholder")}
                 className="w-full mt-2"
               />
               {errors.objective && (
@@ -433,13 +433,13 @@ function NewMonthlyPageContent() {
                 htmlFor="objectiveDescription"
                 className="text-sm font-medium"
               >
-                {translate("monthly.new.form.keyResultDescription")}
+                {translate("monthlyNew.form.keyResultDescription")}
               </Label>
               <Textarea
                 id="objectiveDescription"
                 {...register("objectiveDescription")}
                 placeholder={translate(
-                  "monthly.new.form.keyResultDescriptionPlaceholder"
+                  "monthlyNew.form.keyResultDescriptionPlaceholder"
                 )}
                 rows={3}
                 className="mt-2"
@@ -448,12 +448,12 @@ function NewMonthlyPageContent() {
 
             <div>
               <Label htmlFor="reward" className="text-sm font-medium">
-                {translate("monthly.new.form.reward")}
+                {translate("monthlyNew.form.reward")}
               </Label>
               <Input
                 id="reward"
                 {...register("reward")}
-                placeholder={translate("monthly.new.form.rewardPlaceholder")}
+                placeholder={translate("monthlyNew.form.rewardPlaceholder")}
                 className="mt-2"
               />
               <p className="text-xs text-muted-foreground mt-2">
@@ -616,13 +616,13 @@ function NewMonthlyPageContent() {
             <div>
               <h2 className="text-lg font-semibold flex items-center gap-2">
                 <Target className="h-5 w-5" />
-                {translate("monthly.new.form.keyResults")}
+                {translate("monthlyNew.form.keyResults")}
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
-                {translate("monthly.new.form.keyResultsDescription")}
+                {translate("monthlyNew.form.keyResultsDescription")}
               </p>
               <p className="text-xs text-muted-foreground mt-2">
-                {translate("monthly.new.form.keyResultsGuide")}
+                {translate("monthlyNew.form.keyResultsGuide")}
               </p>
             </div>
             <Button
@@ -632,7 +632,7 @@ function NewMonthlyPageContent() {
               onClick={addKeyResult}
             >
               <Plus className="h-4 w-4 mr-1" />
-              {translate("monthly.new.form.addKeyResult")}
+              {translate("monthlyNew.form.addKeyResult")}
             </Button>
           </div>
 
@@ -659,13 +659,13 @@ function NewMonthlyPageContent() {
                   <Input
                     {...register(`keyResults.${index}.title`)}
                     placeholder={translate(
-                      "monthly.new.form.keyResultTitlePlaceholder"
+                      "monthlyNew.form.keyResultTitlePlaceholder"
                     )}
                   />
                   <Textarea
                     {...register(`keyResults.${index}.description`)}
                     placeholder={translate(
-                      "monthly.new.form.keyResultDescriptionPlaceholder"
+                      "monthlyNew.form.keyResultDescriptionPlaceholder"
                     )}
                     rows={2}
                   />

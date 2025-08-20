@@ -305,7 +305,7 @@ export const createProject = async (
     };
 
     const docRef = await addDoc(collection(db, "projects"), newProject);
-    console.log(`✅ 프로젝트 생성 완료 - ID: ${docRef.id}`);
+
 
     return {
       id: docRef.id,
@@ -330,7 +330,7 @@ export const createProject = async (
       notes: projectData.notes || [],
     } as Project;
   } catch (error) {
-    console.error("❌ 프로젝트 생성 실패:", error);
+
     if (error instanceof Error) {
       throw new Error(`프로젝트 생성에 실패했습니다: ${error.message}`);
     }
@@ -349,9 +349,9 @@ export const updateProject = async (
     });
 
     await updateDoc(doc(db, "projects", projectId), filteredData);
-    console.log(`✅ 프로젝트 업데이트 완료 - ID: ${projectId}`);
+
   } catch (error) {
-    console.error(`❌ 프로젝트 업데이트 실패 - ID: ${projectId}`, error);
+
     throw new Error("프로젝트 업데이트에 실패했습니다.");
   }
 };
@@ -359,9 +359,9 @@ export const updateProject = async (
 export const deleteProjectById = async (projectId: string): Promise<void> => {
   try {
     await deleteDoc(doc(db, "projects", projectId));
-    console.log(`✅ 프로젝트 삭제 완료 - ID: ${projectId}`);
+
   } catch (error) {
-    console.error(`❌ 프로젝트 삭제 실패 - ID: ${projectId}`, error);
+
     throw new Error("프로젝트 삭제에 실패했습니다.");
   }
 };
@@ -403,14 +403,9 @@ export const updateProjectConnectedMonthlies = async (
       updatedAt: updateTimestamp(),
     });
 
-    console.log(
-      `✅ 프로젝트 연결 업데이트 완료 - 프로젝트: ${projectId}, 먼슬리: ${monthlyId}, 추가: ${add}`
-    );
+
   } catch (error) {
-    console.error(
-      `❌ 프로젝트 연결 업데이트 실패 - 프로젝트: ${projectId}, 먼슬리: ${monthlyId}`,
-      error
-    );
+
     throw new Error("프로젝트 연결 업데이트에 실패했습니다.");
   }
 };

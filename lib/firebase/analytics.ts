@@ -121,14 +121,17 @@ export const fetchYearlyActivityStats = async (
       (monthly) => getMonthlyStatus(monthly) === "ended"
     ).length;
 
-    // 총 집중 시간 계산 (임시로 완료된 Key Results 수 사용)
+    // 총 집중 시간 계산 (실제 시간 단위로 계산)
     let totalFocusTime = 0;
     monthlies.forEach((monthly) => {
       if (monthly.keyResults) {
         const completedKeyResults = monthly.keyResults.filter(
           (kr: any) => kr.isCompleted
-        ).length;
-        totalFocusTime += completedKeyResults;
+        );
+        // 각 완료된 Key Result의 예상 시간을 합산 (기본값: 2시간 = 120분)
+        completedKeyResults.forEach((kr: any) => {
+          totalFocusTime += kr.estimatedHours ? kr.estimatedHours * 60 : 120; // 기본 2시간
+        });
       }
     });
 
@@ -158,45 +161,157 @@ export const fetchYearlyActivityStats = async (
       }
     });
 
-    // 영역별 통계 계산
+    // 영역별 통계 계산 (실제 영역 데이터 사용)
     const areaStats: Record<string, any> = {};
-    const projectsQuery = query(
+
+    // 모든 영역 가져오기
+    const areasQuery = query(
+      collection(db, "areas"),
+      where("userId", "==", userId)
+    );
+    const areasSnapshot = await getDocs(areasQuery);
+    const areas = areasSnapshot.docs.map(
+      (doc) =>
+        ({
+          id: doc.id,
+          ...doc.data(),
+        } as any)
+    );
+
+    // 각 영역별로 프로젝트 수 계산
+    for (const area of areas) {
+      const areaProjectsQuery = query(
+        collection(db, "projects"),
+        where("userId", "==", userId),
+        where("areaId", "==", area.id)
+      );
+      const areaProjectsSnapshot = await getDocs(areaProjectsQuery);
+
+      const projectCount = areaProjectsSnapshot.docs.length;
+      let completedCount = 0;
+
+      // 완료된 프로젝트 수 계산
+      areaProjectsSnapshot.docs.forEach((doc) => {
+        const projectData = doc.data();
+        if (projectData.isCompleted) {
+          completedCount++;
+        }
+      });
+
+      areaStats[area.id] = {
+        name: area.name || "미분류",
+        focusTime: completedCount, // 완료된 프로젝트 수
+        completionRate:
+          projectCount > 0 ? (completedCount / projectCount) * 100 : 0,
+        projectCount: projectCount,
+      };
+    }
+
+    // 미분류 영역도 추가
+    const uncategorizedProjectsQuery = query(
       collection(db, "projects"),
       where("userId", "==", userId),
-      where("createdAt", ">=", startOfYear),
-      where("createdAt", "<=", endOfYear)
+      where("areaId", "==", null)
     );
-    const projectsSnapshot = await getDocs(projectsQuery);
+    const uncategorizedProjectsSnapshot = await getDocs(
+      uncategorizedProjectsQuery
+    );
 
-    projectsSnapshot.docs.forEach((doc) => {
-      const projectData = doc.data();
-      const areaId = projectData.areaId || "uncategorized";
+    if (uncategorizedProjectsSnapshot.docs.length > 0) {
+      let uncategorizedCompletedCount = 0;
+      uncategorizedProjectsSnapshot.docs.forEach((doc) => {
+        const projectData = doc.data();
+        if (projectData.isCompleted) {
+          uncategorizedCompletedCount++;
+        }
+      });
 
-      if (!areaStats[areaId]) {
-        areaStats[areaId] = {
-          name: projectData.area || "미분류",
-          focusTime: 0,
-          completionRate: 0,
-          projectCount: 0,
-        };
-      }
+      areaStats["uncategorized"] = {
+        name: "미분류",
+        focusTime: uncategorizedCompletedCount,
+        completionRate:
+          uncategorizedProjectsSnapshot.docs.length > 0
+            ? (uncategorizedCompletedCount /
+                uncategorizedProjectsSnapshot.docs.length) *
+              100
+            : 0,
+        projectCount: uncategorizedProjectsSnapshot.docs.length,
+      };
+    }
 
-      areaStats[areaId].projectCount++;
+    // 이전 연도와 비교하여 증가율 계산
+    let focusTimeIncrease = 0;
+    let completionRateIncrease = 0;
 
-      // 프로젝트 완료 여부에 따른 통계 업데이트
-      if (projectData.isCompleted) {
-        areaStats[areaId].focusTime += 1; // 임시로 완료된 프로젝트 수 사용
-      }
-    });
+    try {
+      const previousYear = year - 1;
+      const previousYearStart = new Date(previousYear, 0, 1);
+      const previousYearEnd = new Date(previousYear, 11, 31, 23, 59, 59, 999);
 
-    // 각 영역의 완료율 계산
-    Object.keys(areaStats).forEach((areaId) => {
-      const stats = areaStats[areaId];
-      stats.completionRate =
-        stats.projectCount > 0
-          ? (stats.focusTime / stats.projectCount) * 100
+      // 이전 연도 데이터만 조회 (재귀 호출 방지)
+      const previousMonthliesQuery = query(
+        collection(db, "monthlies"),
+        where("userId", "==", userId),
+        where("startDate", ">=", previousYearStart),
+        where("startDate", "<=", previousYearEnd)
+      );
+      const previousMonthliesSnapshot = await getDocs(previousMonthliesQuery);
+
+      let previousTotalFocusTime = 0;
+      let previousTotalCompletionRate = 0;
+      let previousValidMonthlies = 0;
+
+      previousMonthliesSnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        const monthly = {
+          ...data,
+          startDate: data.startDate.toDate(),
+          endDate: data.endDate.toDate(),
+        } as any;
+
+        if (monthly.keyResults) {
+          const completedKeyResults = monthly.keyResults.filter(
+            (kr: any) => kr.isCompleted
+          );
+          completedKeyResults.forEach((kr: any) => {
+            previousTotalFocusTime += kr.estimatedHours
+              ? kr.estimatedHours * 60
+              : 120;
+          });
+
+          if (monthly.keyResults.length > 0) {
+            const completionRate =
+              (completedKeyResults.length / monthly.keyResults.length) * 100;
+            previousTotalCompletionRate += completionRate;
+            previousValidMonthlies++;
+          }
+        }
+      });
+
+      const previousAverageCompletionRate =
+        previousValidMonthlies > 0
+          ? previousTotalCompletionRate / previousValidMonthlies
           : 0;
-    });
+
+      // 증가율 계산
+      focusTimeIncrease =
+        previousTotalFocusTime > 0
+          ? ((totalFocusTime - previousTotalFocusTime) /
+              previousTotalFocusTime) *
+            100
+          : 100;
+
+      completionRateIncrease =
+        previousAverageCompletionRate > 0
+          ? ((averageCompletionRate - previousAverageCompletionRate) /
+              previousAverageCompletionRate) *
+            100
+          : 100;
+    } catch (error) {
+      console.error("이전 연도 통계 조회 실패:", error);
+      focusTimeIncrease = 0;
+      completionRateIncrease = 0;
+    }
 
     return {
       totalFocusTime,
@@ -204,6 +319,8 @@ export const fetchYearlyActivityStats = async (
       completedMonthlies,
       totalRewards,
       areaStats,
+      focusTimeIncrease: Math.round(focusTimeIncrease),
+      completionRateIncrease: Math.round(completionRateIncrease),
     };
   } catch (error) {
     console.error("연간 활동 통계 조회 실패:", error);
@@ -503,17 +620,17 @@ export const fetchArchivesByUserIdWithPaging = async (
         } as any;
       });
 
-    // retrospectives 컬렉션에서 회고 데이터 가져오기
-    let retrospectivesQuery = query(
-      collection(db, "retrospectives"),
+    // unified_archives 컬렉션에서 회고와 노트 데이터 가져오기
+    let archivesQuery = query(
+      collection(db, "unified_archives"),
       where("userId", "==", userId),
       orderBy("createdAt", "desc"),
       limit(pageSize)
     );
 
     if (lastDoc) {
-      retrospectivesQuery = query(
-        collection(db, "retrospectives"),
+      archivesQuery = query(
+        collection(db, "unified_archives"),
         where("userId", "==", userId),
         orderBy("createdAt", "desc"),
         startAfter(lastDoc),
@@ -521,110 +638,81 @@ export const fetchArchivesByUserIdWithPaging = async (
       );
     }
 
-    const retrospectivesSnapshot = await getDocs(retrospectivesQuery);
+    const archivesSnapshot = await getDocs(archivesQuery);
 
-    // 각 회고에 대해 해당하는 먼슬리 정보도 가져오기
-    const monthlyArchives = await Promise.all(
-      retrospectivesSnapshot.docs.map(async (retroDoc) => {
-        const retroData = retroDoc.data();
+    // 각 아카이브에 대해 해당하는 먼슬리/프로젝트 정보도 가져오기
+    const archives = await Promise.all(
+      archivesSnapshot.docs.map(async (archiveDoc) => {
+        const archiveData = archiveDoc.data();
 
-        // 해당 먼슬리 정보 가져오기
-        const monthlyRef = docRef(db, "monthlies", retroData.monthlyId);
-        const monthlySnap = await getDoc(monthlyRef);
+        // 먼슬리 관련 아카이브인 경우
+        if (
+          archiveData.type === "monthly_retrospective" ||
+          archiveData.type === "monthly_note"
+        ) {
+          const monthlyRef = docRef(db, "monthlies", archiveData.parentId);
+          const monthlySnap = await getDoc(monthlyRef);
 
-        if (!monthlySnap.exists()) {
-          return null;
+          if (!monthlySnap.exists()) {
+            return null;
+          }
+
+          const monthlyData = monthlySnap.data();
+
+          return {
+            id: archiveDoc.id,
+            type:
+              archiveData.type === "monthly_retrospective" ? "monthly" : "note",
+            title: monthlyData.objective || monthlyData.objectiveDescription,
+            summary: archiveData.content || "",
+            userRating: archiveData.userRating || 0,
+            bookmarked: archiveData.bookmarked || false,
+            monthlyId: archiveData.parentId,
+            startDate: monthlyData.startDate.toDate(),
+            endDate: monthlyData.endDate.toDate(),
+            createdAt: archiveData.createdAt.toDate(),
+            updatedAt: archiveData.updatedAt.toDate(),
+          } as any;
+        }
+        // 프로젝트 관련 아카이브인 경우
+        else if (
+          archiveData.type === "project_retrospective" ||
+          archiveData.type === "project_note"
+        ) {
+          const projectRef = docRef(db, "projects", archiveData.parentId);
+          const projectSnap = await getDoc(projectRef);
+
+          if (!projectSnap.exists()) {
+            return null;
+          }
+
+          const projectData = projectSnap.data();
+
+          return {
+            id: archiveDoc.id,
+            type:
+              archiveData.type === "project_retrospective" ? "project" : "note",
+            title: projectData.title || "",
+            summary: archiveData.content || "",
+            userRating: archiveData.userRating || 0,
+            bookmarked: archiveData.bookmarked || false,
+            projectId: archiveData.parentId,
+            startDate: projectData.startDate.toDate(),
+            endDate: projectData.endDate.toDate(),
+            createdAt: archiveData.createdAt.toDate(),
+            updatedAt: archiveData.updatedAt.toDate(),
+          } as any;
         }
 
-        const monthlyData = monthlySnap.data();
-
-        return {
-          id: retroDoc.id,
-          type: "monthly",
-          title: monthlyData.objective || monthlyData.objectiveDescription,
-          summary: retroData.bestMoment || "",
-          userRating: retroData.userRating || 0,
-          bookmarked: retroData.bookmarked || false,
-          monthlyId: retroData.monthlyId,
-          startDate: monthlyData.startDate.toDate(),
-          endDate: monthlyData.endDate.toDate(),
-          createdAt:
-            retroData.createdAt?.toDate() || monthlyData.createdAt.toDate(),
-          updatedAt:
-            retroData.updatedAt?.toDate() || monthlyData.updatedAt?.toDate(),
-        } as any;
+        return null;
       })
     );
 
     // null 값 제거
-    const validMonthlyArchives = monthlyArchives.filter(
-      (archive) => archive !== null
-    );
+    const validArchives = archives.filter((archive) => archive !== null);
 
-    // notes 컬렉션에서 노트 데이터 가져오기
-    let notesQuery = query(
-      collection(db, "notes"),
-      where("userId", "==", userId),
-      orderBy("createdAt", "desc"),
-      limit(pageSize)
-    );
-
-    if (lastDoc) {
-      notesQuery = query(
-        collection(db, "notes"),
-        where("userId", "==", userId),
-        orderBy("createdAt", "desc"),
-        startAfter(lastDoc),
-        limit(pageSize)
-      );
-    }
-
-    const notesSnapshot = await getDocs(notesQuery);
-
-    // 각 노트에 대해 해당하는 먼슬리 정보도 가져오기
-    const noteArchives = await Promise.all(
-      notesSnapshot.docs.map(async (noteDoc) => {
-        const noteData = noteDoc.data();
-
-        // 해당 먼슬리 정보 가져오기
-        const monthlyRef = docRef(db, "monthlies", noteData.monthlyId);
-        const monthlySnap = await getDoc(monthlyRef);
-
-        if (!monthlySnap.exists()) {
-          return null;
-        }
-
-        const monthlyData = monthlySnap.data();
-
-        return {
-          id: noteDoc.id,
-          type: "note",
-          title: monthlyData.objective || monthlyData.objectiveDescription,
-          summary: noteData.content || "",
-          userRating: 0, // 노트는 별점 없음
-          bookmarked: false, // 노트는 북마크 없음
-          monthlyId: noteData.monthlyId,
-          startDate: monthlyData.startDate.toDate(),
-          endDate: monthlyData.endDate.toDate(),
-          createdAt:
-            noteData.createdAt?.toDate() || monthlyData.createdAt.toDate(),
-          updatedAt:
-            noteData.updatedAt?.toDate() || monthlyData.updatedAt?.toDate(),
-        } as any;
-      })
-    );
-
-    // null 값 제거
-    const validNoteArchives = noteArchives.filter(
-      (archive) => archive !== null
-    );
-
-    // 프로젝트, 먼슬리 회고, 노트 아카이브 합치기 (총 30개)
-    const allArchives = [
-      ...projectArchives,
-      ...validMonthlyArchives,
-      ...validNoteArchives,
-    ];
+    // 프로젝트와 통합 아카이브 합치기
+    const allArchives = [...projectArchives, ...validArchives];
 
     // 정렬 기준에 따라 정렬
     if (sortBy === "rating") {
@@ -635,9 +723,7 @@ export const fetchArchivesByUserIdWithPaging = async (
 
     const lastVisible = projectsSnapshot.docs[projectsSnapshot.docs.length - 1];
     const hasMore =
-      projectArchives.length === pageSize ||
-      validMonthlyArchives.length === pageSize ||
-      validNoteArchives.length === pageSize;
+      projectArchives.length === pageSize || validArchives.length === pageSize;
 
     return {
       archives: allArchives,
@@ -695,25 +781,49 @@ export const fetchArchiveCountByUserId = async (
       return data.endDate && data.endDate.toDate() <= new Date();
     }).length;
 
-    // retrospectives 컬렉션에서 회고 수 계산
-    const retrospectivesQuery = query(
-      collection(db, "retrospectives"),
+    // unified_archives 컬렉션에서 아카이브 수 계산
+    const archivesQuery = query(
+      collection(db, "unified_archives"),
       where("userId", "==", userId)
     );
-    const retrospectivesSnapshot = await getDocs(retrospectivesQuery);
-    const monthlyCount = retrospectivesSnapshot.size;
+    const archivesSnapshot = await getDocs(archivesQuery);
+    const archiveCount = archivesSnapshot.size;
 
-    // notes 컬렉션에서 노트 수 계산
-    const notesQuery = query(
-      collection(db, "notes"),
-      where("userId", "==", userId)
-    );
-    const notesSnapshot = await getDocs(notesQuery);
-    const noteCount = notesSnapshot.size;
-
-    return projectCount + monthlyCount + noteCount;
+    return projectCount + archiveCount;
   } catch (error) {
     console.error("아카이브 수 조회 실패:", error);
     return 0;
+  }
+};
+
+// 활동 스냅샷 조회 함수 (새로 추가)
+export const fetchActivitySnapshotsByUserId = async (
+  userId: string
+): Promise<any[]> => {
+  try {
+    const snapshotsQuery = query(
+      collection(db, "activitySnapshots"),
+      where("userId", "==", userId),
+      orderBy("year", "desc"),
+      orderBy("month", "desc")
+    );
+
+    const snapshot = await getDocs(snapshotsQuery);
+
+    return snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        userId: data.userId,
+        year: data.year,
+        month: data.month,
+        failureAnalysis: data.failureAnalysis,
+        createdAt: data.createdAt?.toDate(),
+        updatedAt: data.updatedAt?.toDate(),
+      };
+    });
+  } catch (error) {
+    console.error("활동 스냅샷 조회 실패:", error);
+    return [];
   }
 };

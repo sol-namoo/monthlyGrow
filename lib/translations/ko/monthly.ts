@@ -79,344 +79,395 @@ export const monthly = {
       description: "완료된 먼슬리가 여기에 표시됩니다",
     },
   },
-  // 먼슬리 상세 페이지
-  detail: {
-    title: "먼슬리 상세",
-    uncategorized: "미분류",
-    viewProjects: "프로젝트 보러 가기",
-    keyResult: "핵심 지표",
-    completedTasksCount: "{count}개 완료",
-    completedTasks: {
-      noTasks: {
-        title: "완료된 할 일이 없어요",
-        description: "이번 달에 완료한 태스크가 아직 없습니다.",
-        plannedDescription: "아직 시작하지 않은 먼슬리입니다.",
-        hint: "프로젝트에서 할 일을 확인해보세요!",
-      },
+} as const;
+
+export const monthlyDetail = {
+  title: "먼슬리 상세",
+  uncategorized: "미분류",
+  viewProjects: "프로젝트 보러 가기",
+  keyResult: "핵심 지표",
+  completedTasksCount: "{count}개 완료",
+  completedTasks: {
+    noTasks: {
+      title: "완료된 할 일이 없어요",
+      description: "이번 달에 완료한 태스크가 아직 없습니다.",
+      plannedDescription: "아직 시작하지 않은 먼슬리입니다.",
+      hint: "프로젝트에서 할 일을 확인해보세요!",
     },
-    reward: "보상",
-    noReward: "보상 없음",
-    completionRate: "달성률",
-    noProjectsForCompletionRate:
-      "연결된 프로젝트가 없으면 달성률을 측정할 수 없어요",
-    focusAreas: "중점 영역",
-    connectedArea: "연결된 영역",
-    createdAt: "생성일",
-    updatedAt: "수정일",
-    taskList: "할 일 목록",
-    add: "추가",
-    project: {
-      status: {
-        undefined: "미정",
-        planned: "예정",
-        inProgress: "진행 중",
-        completed: "완료",
-        overdue: "기한 지남",
-      },
-      duration: {
-        undefined: "기간 미정",
-      },
-    },
-    error: {
-      loading: "먼슬리를 불러오는 중 오류가 발생했습니다. 다시 시도해주세요.",
-      notFound: "먼슬리를 찾을 수 없습니다.",
-    },
-    noConnectedProjects: "먼슬리에 연결된 프로젝트가 없어요",
-    keyResults: {
-      noKeyResults: "Key Results가 없어요",
-      noKeyResultsDescription: "이번 먼슬리의 핵심 목표를 설정해보세요",
-      addKeyResult: "Key Result 추가",
-      status: {
-        completed: "완료",
-        planned: "예정",
-        inProgress: "진행중",
-      },
-    },
-    noProjectsForCompletionRateDescription:
-      "연결된 프로젝트가 없으면 달성률을 측정할 수 없어요",
-    connectProjectsHint:
-      '프로젝트를 연결하려면 상단의 "먼슬리 수정" 버튼을 사용하세요',
-    noFocusAreas: "중점 영역이 설정되지 않았습니다.",
-    connectedProjects: "연결된 프로젝트",
-    quickAccess: {
-      title: "프로젝트 연결",
-      description: "이 먼슬리와 연결된 프로젝트들",
-      addProject: "프로젝트 추가",
-      edit: "수정",
-    },
-    tabs: {
-      keyResults: "핵심 지표",
-      completedTasks: "완료된 할 일",
-      retrospective: "회고",
-      note: "노트",
-      keyResultsFull: "핵심 지표",
-      completedTasksFull: "완료된 할 일",
-      retrospectiveFull: "회고",
-      noteFull: "노트",
-    },
-    note: {
-      title: "먼슬리 노트",
-      edit: "노트 수정",
-      add: "노트 작성",
-      noNote: "작성된 노트가 없어요",
-      description: "이번 먼슬리에서 느낀 점을 기록해 보세요",
-      addButton: "노트 작성하기",
-      placeholder: "오늘의 노트를 작성해보세요...",
-      save: "저장하기",
-      editTitle: "먼슬리 노트 수정",
-      addTitle: "먼슬리 노트 작성",
-      descriptionText:
-        "먼슬리 진행 중 느낀 점이나 배운 점을 자유롭게 기록하세요.",
-      saveSuccess: "노트 저장 완료",
-      saveSuccessDescription: "노트가 성공적으로 저장되었습니다.",
-      saveError: "노트 저장 실패",
-      saveErrorDescription: "노트 저장 중 오류가 발생했습니다.",
-      contentRequired: "노트 저장 실패",
-      contentRequiredDescription: "노트 내용을 입력해주세요.",
-    },
-    addProject: {
-      title: "먼슬리에 프로젝트 추가",
-      description:
-        "먼슬리 중간에 추가된 프로젝트는 별도로 표시되며, 월말 리포트에서 '후속 투입 항목'으로 집계됩니다.",
-      newProject: "새 프로젝트 생성",
-      existingProject: "기존 프로젝트 연결",
-      cancel: "취소",
-    },
-    retrospective: {
-      title: "먼슬리 회고 작성",
-      description: "이번 먼슬리를 돌아보고 다음 먼슬리를 계획하세요.",
-      noContent: "작성된 회고가 없어요",
-      inProgressDescription: "먼슬리가 진행 중일 때는 회고를 작성할 수 없어요",
-      writeTitle: "회고 작성하기",
-      notStarted: {
-        title: "아직 시작하지 않은 먼슬리예요",
-        description: "먼슬리가 진행되면 회고를 작성할 수 있어요.",
-      },
-      bestMoment: {
-        label: "이번 먼슬리에서 가장 좋았던 순간은?",
-        placeholder: "예: 운동 후 기분이 좋아지는 것을 느낀 순간",
-      },
-      routineAdherence: {
-        label: "계획한 루틴을 얼마나 지켰나요?",
-        placeholder: "예: 평일 80%, 주말 60% 정도로 유지",
-      },
-      unexpectedObstacles: {
-        label: "예기치 못한 방해 요소는 있었나요?",
-        placeholder: "예: 주말에 늦잠을 자는 습관",
-      },
-      nextMonthlyApplication: {
-        label: "다음 먼슬리에 적용할 점은?",
-        placeholder: "예: 다음 먼슬리에서는 주말 루틴도 포함해서 계획",
-      },
-      helpful: {
-        label: "이 회고는 스스로에게 도움이 되었나요?",
-      },
-      bookmark: {
-        label: "다시 읽고 싶은 회고로 표시",
-        description: "중요한 회고는 북마크하여 나중에 쉽게 찾을 수 있습니다",
-      },
-      save: "회고 저장",
-    },
-    delete: {
-      title: "먼슬리 삭제",
-      description:
-        "이 먼슬리를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
-      completedDescription:
-        "이 먼슬리를 삭제하시겠습니까? 삭제해도 해당 월의 정보는 연간 통계에 여전히 반영됩니다.",
-      activeDescription:
-        "이 먼슬리를 삭제하시겠습니까? 연결된 프로젝트와 할 일도 함께 삭제됩니다.",
-      confirm: "삭제",
-      cancel: "취소",
-      success: {
-        title: "먼슬리 삭제 완료",
-        description: "먼슬리가 성공적으로 삭제되었습니다.",
-      },
-      error: {
-        title: "먼슬리 삭제 실패",
-        description: "먼슬리 삭제 중 오류가 발생했습니다.",
-      },
-    },
-    projectMigration: {
-      title: "미완료 프로젝트 발견",
-      description:
-        "이 먼슬리에 완료되지 않은 프로젝트가 있습니다. 다른 먼슬리로 이동하시겠습니까?",
-      incompleteProjects: "미완료 프로젝트 ({count}개)",
-      selectTarget: "이동할 먼슬리 선택",
-      selectPlaceholder: "먼슬리를 선택하세요",
-      inProgress: "진행 중",
+  },
+  reward: "보상",
+  noReward: "보상 없음",
+  completionRate: "달성률",
+  noProjectsForCompletionRate:
+    "연결된 프로젝트가 없으면 달성률을 측정할 수 없어요",
+  focusAreas: "중점 영역",
+  connectedArea: "연결된 영역",
+  createdAt: "생성일",
+  updatedAt: "수정일",
+  taskList: "할 일 목록",
+  add: "추가",
+  project: {
+    status: {
+      undefined: "미정",
       planned: "예정",
-      noAvailableMonthlies:
-        "💡 현재 이동 가능한 먼슬리가 없습니다. 새로운 먼슬리를 먼저 생성해주세요.",
-      later: "나중에 처리",
-      migrate: "프로젝트 이동",
-      success: {
-        title: "프로젝트 이동 완료",
-        description: "{count}개의 프로젝트가 성공적으로 이동되었습니다.",
-      },
-      error: {
-        title: "프로젝트 이동 실패",
-        description: "프로젝트 이동 중 오류가 발생했습니다.",
-      },
+      inProgress: "진행 중",
+      completed: "완료",
+      overdue: "기한 지남",
     },
-    notFound: {
-      title: "먼슬리를 찾을 수 없습니다",
-      description: "요청하신 먼슬리가 존재하지 않거나 삭제되었습니다",
-      backToList: "먼슬리 목록으로 돌아가기",
-    },
-    loading: {
-      title: "먼슬리 로딩 중",
-      description: "먼슬리 정보를 불러오는 중입니다",
-    },
-    actions: {
-      edit: "수정",
-      delete: "삭제",
-      back: "뒤로",
-      editTooltip: "먼슬리 수정",
-      deleteTooltip: "먼슬리 삭제",
-    },
-    keyResultUpdate: {
-      success: {
-        title: "핵심 지표 업데이트 완료",
-        description: "핵심 지표가 성공적으로 업데이트되었습니다",
-      },
-      error: {
-        title: "핵심 지표 업데이트 실패",
-        description: "핵심 지표 업데이트 중 오류가 발생했습니다",
-      },
+    duration: {
+      undefined: "기간 미정",
     },
   },
-  // 먼슬리 생성 페이지
-  new: {
-    title: "새 먼슬리 만들기",
-    description: "새로운 먼슬리를 생성하여 목표를 설정하고 달성해보세요",
-    basicInfo: {
-      title: "기본 정보",
-      monthSelection: "월 선택",
-      monthPlaceholder: "월을 선택하세요",
-    },
-    form: {
-      title: "제목",
-      titlePlaceholder: "예: 2024년 8월",
-      objective: "목표",
-      objectivePlaceholder: "예: 고객 만족도를 크게 향상시킨다",
-      startDate: "시작일",
-      endDate: "종료일",
-      reward: "보상 (선택사항)",
-      rewardPlaceholder: "목표 달성 시 받을 보상",
-      keyResults: "핵심 지표",
-      keyResultsDescription:
-        "목표 달성을 측정할 수 있는 구체적이고 실현 가능한 지표를 설정하세요",
-      keyResultTitle: "핵심 지표 제목",
-      keyResultTitlePlaceholder:
-        "예: 매일 30분 운동하기, 주 3회 독서하기, 주 2회 블로그 포스팅",
-      keyResultDescription: "상세 설명 (선택사항)",
-      keyResultDescriptionPlaceholder: "목표에 대한 상세한 설명을 입력하세요",
-      addKeyResult: "핵심 지표 추가",
-      removeKeyResult: "핵심 지표 제거",
-      keyResultsGuide:
-        "💡 한 달에 3-5개의 핵심 지표를 설정하는 것이 적절합니다. 너무 많으면 집중도가 떨어질 수 있어요.",
-      keyResult: "핵심 지표",
-      rewardExample: "예: 🎮 새로운 게임 구매하기, 🍕 맛있는 음식 먹기",
-    },
-    focusAreas: {
-      title: "중점 영역 선택",
-      description: "이번 달에 집중할 영역을 선택하세요",
-      selected: "선택된 영역",
-    },
-    quickAccess: {
-      title: "프로젝트 바로가기",
-      description: "이번 달에 집중할 프로젝트들을 선택해보세요",
-      addProject: "프로젝트 추가",
-      noProjects: "추가된 프로젝트가 없습니다",
-    },
-    delete: {
-      confirm: "기존 먼슬리를 삭제하시겠습니까?",
-      success: "삭제 완료",
-      successDescription: "기존 먼슬리가 삭제되었습니다.",
-      error: "삭제 실패",
-      errorDescription: "먼슬리 삭제에 실패했습니다.",
-    },
-    validation: {
-      titleRequired: "제목을 입력해주세요",
-      objectiveRequired: "목표를 입력해주세요",
-      startDateRequired: "시작일을 선택해주세요",
-      endDateRequired: "종료일을 선택해주세요",
-      keyResultRequired: "핵심 지표 제목을 입력해주세요",
-      duplicateTitle: "중복 먼슬리",
-      duplicateDescription:
-        "해당 월에 이미 먼슬리가 존재합니다. 다른 월을 선택하거나 기존 먼슬리를 수정해주세요.",
-      minKeyResults: "최소 1개의 핵심 지표를 추가해주세요",
-    },
-    existingMonthly: {
-      title: "기존 먼슬리가 있습니다",
-      description:
-        "선택한 월에 이미 먼슬리가 존재합니다. 기존 먼슬리를 대체하시겠습니까?",
-      replace: "기존 먼슬리 대체",
-      cancel: "취소",
-    },
-    success: {
-      title: "먼슬리 생성 완료",
-      description: "새로운 먼슬리가 성공적으로 생성되었습니다",
-    },
-    error: {
-      title: "먼슬리 생성 실패",
-      description: "먼슬리 생성 중 오류가 발생했습니다",
+  error: {
+    loading: "먼슬리를 불러오는 중 오류가 발생했습니다. 다시 시도해주세요.",
+    notFound: "먼슬리를 찾을 수 없습니다.",
+  },
+  noConnectedProjects: "먼슬리에 연결된 프로젝트가 없어요",
+  keyResults: {
+    noKeyResults: "Key Results가 없어요",
+    noKeyResultsDescription: "이번 먼슬리의 핵심 목표를 설정해보세요",
+    addKeyResult: "Key Result 추가",
+    status: {
+      completed: "완료",
+      planned: "예정",
+      inProgress: "진행중",
     },
   },
-  // 먼슬리 수정 페이지
-  edit: {
-    title: "먼슬리 수정",
-    description: "먼슬리 정보를 수정하세요",
-    basicInfo: {
-      title: "기본 정보",
-      monthSelection: "월 선택",
-      monthPlaceholder: "월을 선택하세요",
+  noProjectsForCompletionRateDescription:
+    "연결된 프로젝트가 없으면 달성률을 측정할 수 없어요",
+  connectProjectsHint:
+    '프로젝트를 연결하려면 상단의 "먼슬리 수정" 버튼을 사용하세요',
+  noFocusAreas: "중점 영역이 설정되지 않았습니다.",
+  connectedProjects: "연결된 프로젝트",
+  quickAccess: {
+    title: "프로젝트 연결",
+    description: "이 먼슬리와 연결된 프로젝트들",
+    addProject: "프로젝트 추가",
+    edit: "수정",
+  },
+  tabs: {
+    keyResults: "핵심 지표",
+    completedTasks: "완료된 할 일",
+    retrospective: "회고",
+    note: "노트",
+    keyResultsFull: "핵심 지표",
+    completedTasksFull: "완료된 할 일",
+    retrospectiveFull: "회고",
+    noteFull: "노트",
+  },
+  note: {
+    title: "먼슬리 노트",
+    edit: "노트 수정",
+    add: "노트 작성",
+    noNote: "아직 작성된 노트가 없어요",
+    description: "이번 먼슬리에서 느낀 점을 기록해 보세요",
+    addButton: "노트 작성하기",
+    placeholder: "오늘의 노트를 작성해보세요...",
+    save: "저장하기",
+    editTitle: "먼슬리 노트 수정",
+    addTitle: "먼슬리 노트 작성",
+    descriptionText:
+      "먼슬리 진행 중 느낀 점이나 배운 점을 자유롭게 기록하세요.",
+    saveSuccess: "노트 저장 완료",
+    saveSuccessDescription: "노트가 성공적으로 저장되었습니다.",
+    saveError: "노트 저장 실패",
+    saveErrorDescription: "노트 저장 중 오류가 발생했습니다.",
+    contentRequired: "노트 저장 실패",
+    contentRequiredDescription: "노트 내용을 입력해주세요.",
+    noNoteDescription: "이번 먼슬리에 대한 메모를 작성해보세요",
+    writeNote: "노트 작성하기",
+    editNote: "노트 편집하기",
+  },
+
+  addProject: {
+    title: "먼슬리에 프로젝트 추가",
+    description:
+      "먼슬리 중간에 추가된 프로젝트는 별도로 표시되며, 월말 리포트에서 '후속 투입 항목'으로 집계됩니다.",
+    newProject: "새 프로젝트 생성",
+    existingProject: "기존 프로젝트 연결",
+    cancel: "취소",
+  },
+  retrospective: {
+    title: "먼슬리 회고 작성",
+    description: "이번 먼슬리를 돌아보고 다음 먼슬리를 계획하세요.",
+    noContent: "작성된 회고가 없어요",
+    inProgressDescription: "먼슬리가 진행 중일 때는 회고를 작성할 수 없어요",
+    writeTitle: "회고 작성하기",
+    notStarted: {
+      title: "아직 시작하지 않은 먼슬리예요",
+      description: "먼슬리가 진행되면 회고를 작성할 수 있어요.",
     },
-    form: {
-      title: "제목",
-      titlePlaceholder: "예: 2024년 8월",
-      objective: "목표",
-      objectivePlaceholder: "예: 고객 만족도를 크게 향상시킨다",
-      startDate: "시작일",
-      endDate: "종료일",
-      reward: "보상 (선택사항)",
-      rewardPlaceholder: "목표 달성 시 받을 보상",
-      keyResults: "핵심 지표",
-      keyResultsDescription:
-        "목표 달성을 측정할 수 있는 구체적이고 실현 가능한 지표를 설정하세요",
-      keyResultTitle: "핵심 지표 제목",
-      keyResultTitlePlaceholder:
-        "예: 매일 30분 운동하기, 주 3회 독서하기, 주 2회 블로그 포스팅",
-      keyResultDescription: "상세 설명 (선택사항)",
-      keyResultDescriptionPlaceholder: "목표에 대한 상세한 설명을 입력하세요",
-      addKeyResult: "핵심 지표 추가",
-      removeKeyResult: "핵심 지표 제거",
-      keyResultsGuide:
-        "💡 한 달에 3-5개의 핵심 지표를 설정하는 것이 적절합니다. 너무 많으면 집중도가 떨어질 수 있어요.",
+    bestMoment: {
+      label: "이번 먼슬리에서 가장 좋았던 순간은?",
+      placeholder: "예: 운동 후 기분이 좋아지는 것을 느낀 순간",
     },
-    focusAreas: {
-      title: "중점 영역 선택",
-      description: "이번 달에 집중할 영역을 선택하세요",
-      selected: "선택된 영역",
+    routineAdherence: {
+      label: "계획한 루틴을 얼마나 지켰나요?",
+      placeholder: "예: 평일 80%, 주말 60% 정도로 유지",
     },
-    quickAccess: {
-      title: "프로젝트 연결",
-      description: "이 먼슬리와 연결된 프로젝트들",
+    unexpectedObstacles: {
+      label: "예기치 못한 방해 요소는 있었나요?",
+      placeholder: "예: 주말에 늦잠을 자는 습관",
     },
+    nextMonthlyApplication: {
+      label: "다음 먼슬리에 적용할 점은?",
+      placeholder: "예: 다음 먼슬리에서는 주말 루틴도 포함해서 계획",
+    },
+    helpful: {
+      label: "이 회고는 스스로에게 도움이 되었나요?",
+    },
+    bookmark: {
+      label: "다시 읽고 싶은 회고로 표시",
+      description: "중요한 회고는 북마크하여 나중에 쉽게 찾을 수 있습니다",
+    },
+    save: "회고 저장",
+    saveSuccess: "회고 저장 완료",
+    saveSuccessDescription: "회고가 성공적으로 저장되었습니다.",
+    noRetrospective: "아직 작성된 회고가 없어요",
+    noRetrospectiveDescription: "이번 먼슬리에 대한 회고를 작성해보세요",
+    writeRetrospective: "회고 작성하기",
+    failureReason: "실패 이유",
+  },
+  retrospectiveForm: {
+    title: "회고 작성",
+    bestMoment: "이번 먼슬리에서 가장 좋았던 순간",
+    bestMomentPlaceholder: "예: 운동 후 기분이 좋아지는 것을 느낀 순간",
+    unexpectedObstacles: "예기치 못한 방해 요소",
+    unexpectedObstaclesPlaceholder: "예: 주말에 늦잠을 자는 습관",
+    keyResultsReview: "핵심 지표 리뷰",
+    completedKeyResults: "완료된 핵심 지표",
+    failedKeyResults: "미완료 핵심 지표",
+    status: {
+      completed: "완료",
+      failed: "미완료",
+    },
+    failedReason: "실패 이유",
+    failedReasonPlaceholder: "실패 이유를 선택하세요",
+    failedReasonOptions: {
+      unrealisticGoal: "목표가 비현실적이었음",
+      timeManagement: "시간 관리 부족",
+      priorityMismatch: "우선순위 불일치",
+      externalFactors: "외부 요인",
+      motivation: "동기 부족",
+      other: "기타",
+      customReason: "구체적인 이유",
+      customReasonPlaceholder: "실패 이유를 구체적으로 입력해주세요",
+    },
+    nextMonthlyApplication: "다음 먼슬리에 적용할 점",
+    nextMonthlyApplicationPlaceholder:
+      "예: 다음 먼슬리에서는 주말 루틴도 포함해서 계획",
+    freeformContent: "자유 형식 내용",
+    freeformContentPlaceholder:
+      "추가로 기록하고 싶은 내용이 있다면 자유롭게 작성하세요",
+    rating: "평점",
+    bookmarked: "북마크",
+    save: "저장",
+    cancel: "취소",
     validation: {
-      titleRequired: "제목을 입력해주세요",
-      objectiveRequired: "목표를 입력해주세요",
-      startDateRequired: "시작일을 선택해주세요",
-      endDateRequired: "종료일을 선택해주세요",
-      keyResultRequired: "핵심 지표 제목을 입력해주세요",
+      bestMomentRequired: "가장 좋았던 순간을 입력해주세요",
+      unexpectedObstaclesRequired: "예기치 못한 방해 요소를 입력해주세요",
+      keyResultsReviewRequired: "핵심 지표 리뷰를 입력해주세요",
+      nextMonthlyApplicationRequired: "다음 먼슬리 적용점을 입력해주세요",
     },
+  },
+  delete: {
+    title: "먼슬리 삭제",
+    description: "이 먼슬리를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+    completedDescription:
+      "이 먼슬리를 삭제하시겠습니까? 삭제해도 해당 월의 정보는 연간 통계에 여전히 반영됩니다.",
+    activeDescription:
+      "이 먼슬리를 삭제하시겠습니까? 연결된 프로젝트와 할 일도 함께 삭제됩니다.",
+    confirm: "삭제",
+    cancel: "취소",
     success: {
-      title: "먼슬리 수정 완료",
-      description: "먼슬리가 성공적으로 수정되었습니다",
+      title: "먼슬리 삭제 완료",
+      description: "먼슬리가 성공적으로 삭제되었습니다.",
     },
     error: {
-      title: "먼슬리 수정 실패",
-      description: "먼슬리 수정 중 오류가 발생했습니다",
+      title: "먼슬리 삭제 실패",
+      description: "먼슬리 삭제 중 오류가 발생했습니다.",
     },
+  },
+  projectMigration: {
+    title: "미완료 프로젝트 발견",
+    description:
+      "이 먼슬리에 완료되지 않은 프로젝트가 있습니다. 다른 먼슬리로 이동하시겠습니까?",
+    incompleteProjects: "미완료 프로젝트 ({count}개)",
+    selectTarget: "이동할 먼슬리 선택",
+    selectPlaceholder: "먼슬리를 선택하세요",
+    inProgress: "진행 중",
+    planned: "예정",
+    noAvailableMonthlies:
+      "💡 현재 이동 가능한 먼슬리가 없습니다. 새로운 먼슬리를 먼저 생성해주세요.",
+    later: "나중에 처리",
+    migrate: "프로젝트 이동",
+    success: {
+      title: "프로젝트 이동 완료",
+      description: "{count}개의 프로젝트가 성공적으로 이동되었습니다.",
+    },
+    error: {
+      title: "프로젝트 이동 실패",
+      description: "프로젝트 이동 중 오류가 발생했습니다.",
+    },
+  },
+  notFound: {
+    title: "먼슬리를 찾을 수 없습니다",
+    description: "요청하신 먼슬리가 존재하지 않거나 삭제되었습니다",
+    backToList: "먼슬리 목록으로 돌아가기",
+  },
+  loading: {
+    title: "먼슬리 로딩 중",
+    description: "먼슬리 정보를 불러오는 중입니다",
+  },
+  actions: {
+    edit: "수정",
+    delete: "삭제",
+    back: "뒤로",
+    editTooltip: "먼슬리 수정",
+    deleteTooltip: "먼슬리 삭제",
+  },
+  keyResultUpdate: {
+    success: {
+      title: "핵심 지표 업데이트 완료",
+      description: "핵심 지표가 성공적으로 업데이트되었습니다",
+    },
+    error: {
+      title: "핵심 지표 업데이트 실패",
+      description: "핵심 지표 업데이트 중 오류가 발생했습니다",
+    },
+  },
+} as const;
+
+export const monthlyNew = {
+  title: "새 먼슬리 만들기",
+  description: "새로운 먼슬리를 생성하여 목표를 설정하고 달성해보세요",
+  basicInfo: {
+    title: "기본 정보",
+    monthSelection: "월 선택",
+    monthPlaceholder: "월을 선택하세요",
+  },
+  form: {
+    title: "제목",
+    titlePlaceholder: "예: 2024년 8월",
+    objective: "목표",
+    objectivePlaceholder: "예: 고객 만족도를 크게 향상시킨다",
+    startDate: "시작일",
+    endDate: "종료일",
+    reward: "보상 (선택사항)",
+    rewardPlaceholder: "목표 달성 시 받을 보상",
+    keyResults: "핵심 지표",
+    keyResultsDescription:
+      "목표 달성을 측정할 수 있는 구체적이고 실현 가능한 지표를 설정하세요",
+    keyResultTitle: "핵심 지표 제목",
+    keyResultTitlePlaceholder:
+      "예: 매일 30분 운동하기, 주 3회 독서하기, 주 2회 블로그 포스팅",
+    keyResultDescription: "상세 설명 (선택사항)",
+    keyResultDescriptionPlaceholder: "목표에 대한 상세한 설명을 입력하세요",
+    addKeyResult: "핵심 지표 추가",
+    removeKeyResult: "핵심 지표 제거",
+    keyResultsGuide:
+      "💡 한 달에 3-5개의 핵심 지표를 설정하는 것이 적절합니다. 너무 많으면 집중도가 떨어질 수 있어요.",
+    keyResult: "핵심 지표",
+    rewardExample: "예: 🎮 새로운 게임 구매하기, 🍕 맛있는 음식 먹기",
+  },
+  focusAreas: {
+    title: "중점 영역 선택",
+    description: "이번 달에 집중할 영역을 선택하세요",
+    selected: "선택된 영역",
+  },
+  quickAccess: {
+    title: "프로젝트 바로가기",
+    description: "이번 달에 집중할 프로젝트들을 선택해보세요",
+    addProject: "프로젝트 추가",
+    noProjects: "추가된 프로젝트가 없습니다",
+  },
+  delete: {
+    confirm: "기존 먼슬리를 삭제하시겠습니까?",
+    success: "삭제 완료",
+    successDescription: "기존 먼슬리가 삭제되었습니다.",
+    error: "삭제 실패",
+    errorDescription: "먼슬리 삭제에 실패했습니다.",
+  },
+  validation: {
+    titleRequired: "제목을 입력해주세요",
+    objectiveRequired: "목표를 입력해주세요",
+    startDateRequired: "시작일을 선택해주세요",
+    endDateRequired: "종료일을 선택해주세요",
+    keyResultRequired: "핵심 지표 제목을 입력해주세요",
+    duplicateTitle: "중복 먼슬리",
+    duplicateDescription:
+      "해당 월에 이미 먼슬리가 존재합니다. 다른 월을 선택하거나 기존 먼슬리를 수정해주세요.",
+    minKeyResults: "최소 1개의 핵심 지표를 추가해주세요",
+  },
+  existingMonthly: {
+    title: "기존 먼슬리가 있습니다",
+    description:
+      "선택한 월에 이미 먼슬리가 존재합니다. 기존 먼슬리를 대체하시겠습니까?",
+    replace: "기존 먼슬리 대체",
+    cancel: "취소",
+  },
+  success: {
+    title: "먼슬리 생성 완료",
+    description: "새로운 먼슬리가 성공적으로 생성되었습니다",
+  },
+  error: {
+    title: "먼슬리 생성 실패",
+    description: "먼슬리 생성 중 오류가 발생했습니다",
+  },
+} as const;
+
+export const monthlyEdit = {
+  title: "먼슬리 수정",
+  description: "먼슬리 정보를 수정하세요",
+  basicInfo: {
+    title: "기본 정보",
+    monthSelection: "월 선택",
+    monthPlaceholder: "월을 선택하세요",
+  },
+  form: {
+    title: "제목",
+    titlePlaceholder: "예: 2024년 8월",
+    objective: "목표",
+    objectivePlaceholder: "예: 고객 만족도를 크게 향상시킨다",
+    startDate: "시작일",
+    endDate: "종료일",
+    reward: "보상 (선택사항)",
+    rewardPlaceholder: "목표 달성 시 받을 보상",
+    keyResults: "핵심 지표",
+    keyResultsDescription:
+      "목표 달성을 측정할 수 있는 구체적이고 실현 가능한 지표를 설정하세요",
+    keyResultTitle: "핵심 지표 제목",
+    keyResultTitlePlaceholder:
+      "예: 매일 30분 운동하기, 주 3회 독서하기, 주 2회 블로그 포스팅",
+    keyResultDescription: "상세 설명 (선택사항)",
+    keyResultDescriptionPlaceholder: "목표에 대한 상세한 설명을 입력하세요",
+    addKeyResult: "핵심 지표 추가",
+    removeKeyResult: "핵심 지표 제거",
+    keyResultsGuide:
+      "💡 한 달에 3-5개의 핵심 지표를 설정하는 것이 적절합니다. 너무 많으면 집중도가 떨어질 수 있어요.",
+  },
+  focusAreas: {
+    title: "중점 영역 선택",
+    description: "이번 달에 집중할 영역을 선택하세요",
+    selected: "선택된 영역",
+  },
+  quickAccess: {
+    title: "프로젝트 연결",
+    description: "이 먼슬리와 연결된 프로젝트들",
+  },
+  validation: {
+    titleRequired: "제목을 입력해주세요",
+    objectiveRequired: "목표를 입력해주세요",
+    startDateRequired: "시작일을 선택해주세요",
+    endDateRequired: "종료일을 선택해주세요",
+    keyResultRequired: "핵심 지표 제목을 입력해주세요",
+  },
+  success: {
+    title: "먼슬리 수정 완료",
+    description: "먼슬리가 성공적으로 수정되었습니다",
+  },
+  error: {
+    title: "먼슬리 수정 실패",
+    description: "먼슬리 수정 중 오류가 발생했습니다",
   },
 } as const;

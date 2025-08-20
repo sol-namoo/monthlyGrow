@@ -28,13 +28,14 @@ import {
   FileText,
   PenTool,
   Info,
+  MessageSquare,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import type { Retrospective } from "@/lib/types";
+
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   CustomAlert,
@@ -60,11 +61,10 @@ import {
   deleteTaskFromProject,
   fetchAreaById,
   fetchMonthliesByIds,
-  createRetrospective,
-  updateRetrospective,
-  createNote,
-  updateNote,
   updateProject,
+  createUnifiedArchive,
+  updateUnifiedArchive,
+  fetchSingleArchive,
 } from "@/lib/firebase/index";
 import { useLanguage } from "@/hooks/useLanguage";
 import { formatDate, formatDateForInput, getMonthlyStatus } from "@/lib/utils";
@@ -81,6 +81,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RetrospectiveForm } from "@/components/RetrospectiveForm";
+import { NoteForm } from "@/components/NoteForm";
 
 // 태스크 폼 스키마 정의
 const taskFormSchema = z.object({
@@ -382,7 +384,7 @@ export default function ProjectDetailPage({
 
   // 회고 저장 mutation
   const saveRetrospectiveMutation = useMutation({
-    mutationFn: async (retrospectiveData: Retrospective) => {
+    mutationFn: async (retrospectiveData: any) => {
       // undefined 값들을 필터링
       const filteredData = filterUndefinedValues({
         bestMoment: retrospectiveData.bestMoment,
@@ -396,26 +398,51 @@ export default function ProjectDetailPage({
         content: retrospectiveData.content,
       });
 
-      if (project?.retrospective?.id) {
-        // 기존 회고가 있으면 업데이트
-        await updateRetrospective(project.retrospective.id, filteredData);
+      // 기존 아카이브가 있는지 확인
+      const existingArchive = await fetchSingleArchive(
+        user?.uid || "",
+        project?.id || "",
+        "project_retrospective"
+      );
+
+      if (existingArchive) {
+        // 기존 아카이브 업데이트
+        await updateUnifiedArchive(existingArchive.id, {
+          title: filteredData.title || project?.title || "",
+          content: filteredData.content || "",
+          userRating: filteredData.userRating,
+          bookmarked: filteredData.bookmarked,
+          goalAchieved: filteredData.goalAchieved,
+          memorableTask: filteredData.memorableTask,
+          stuckPoints: filteredData.stuckPoints,
+          newLearnings: filteredData.newLearnings,
+          nextProjectImprovements: filteredData.nextProjectImprovements,
+        });
       } else {
-        // 새 회고 생성 (프로젝트 회고용 필드만 포함)
-        const newRetrospective = await createRetrospective({
+        // 새 아카이브 생성
+        const newArchive = await createUnifiedArchive({
           userId: user?.uid || "",
-          projectId: project?.id || "",
-          ...filteredData,
-          // monthlyId는 프로젝트 회고에서는 사용하지 않으므로 제외
+          type: "project_retrospective",
+          parentId: project?.id || "",
+          title: filteredData.title || project?.title || "",
+          content: filteredData.content || "",
+          userRating: filteredData.userRating,
+          bookmarked: filteredData.bookmarked,
+          goalAchieved: filteredData.goalAchieved,
+          memorableTask: filteredData.memorableTask,
+          stuckPoints: filteredData.stuckPoints,
+          newLearnings: filteredData.newLearnings,
+          nextProjectImprovements: filteredData.nextProjectImprovements,
         });
 
-        // 프로젝트에 회고 연결 (필요한 필드만 포함)
+        // 프로젝트에 회고 연결 (아카이브 ID 사용)
         await updateProject(project?.id || "", {
           retrospective: {
-            id: newRetrospective.id,
-            userId: newRetrospective.userId,
-            projectId: newRetrospective.projectId,
-            createdAt: newRetrospective.createdAt,
-            updatedAt: newRetrospective.updatedAt,
+            id: newArchive.id,
+            userId: newArchive.userId,
+            projectId: newArchive.parentId,
+            createdAt: newArchive.createdAt,
+            updatedAt: newArchive.updatedAt,
             ...filteredData,
           },
         });
@@ -444,21 +471,41 @@ export default function ProjectDetailPage({
   // 노트 저장 mutation
   const saveNoteMutation = useMutation({
     mutationFn: async (noteContent: string) => {
-      if (project?.notes && project.notes.length > 0) {
-        // 기존 노트가 있으면 업데이트
-        await updateNote(project.notes[0].id, {
+      // 기존 아카이브가 있는지 확인
+      const existingArchive = await fetchSingleArchive(
+        user?.uid || "",
+        project?.id || "",
+        "project_note"
+      );
+
+      if (existingArchive) {
+        // 기존 아카이브 업데이트
+        await updateUnifiedArchive(existingArchive.id, {
+          title: project?.title || "",
           content: noteContent,
         });
       } else {
-        // 새 노트 생성
-        const newNote = await createNote({
+        // 새 아카이브 생성
+        const newArchive = await createUnifiedArchive({
           userId: user?.uid || "",
+          type: "project_note",
+          parentId: project?.id || "",
+          title: project?.title || "",
           content: noteContent,
         });
 
-        // 프로젝트에 노트 연결
+        // 프로젝트에 노트 연결 (아카이브 ID 사용)
         await updateProject(project?.id || "", {
-          notes: [newNote],
+          notes: [
+            {
+              id: newArchive.id,
+              userId: newArchive.userId,
+              title: project?.title || "",
+              content: noteContent,
+              createdAt: newArchive.createdAt,
+              updatedAt: newArchive.updatedAt,
+            },
+          ],
         });
       }
     },
@@ -486,28 +533,6 @@ export default function ProjectDetailPage({
   const [activeTab, setActiveTab] = useState("overview");
   const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
   const [showRetrospectiveDialog, setShowRetrospectiveDialog] = useState(false); // 회고 모달 상태
-  const [noteContent, setNoteContent] = useState("");
-  const [goalAchieved, setGoalAchieved] = useState("");
-  const [memorableTask, setMemorableTask] = useState("");
-  const [stuckPoints, setStuckPoints] = useState("");
-  const [newLearnings, setNewLearnings] = useState("");
-  const [nextProjectImprovements, setNextProjectImprovements] = useState("");
-  const [userRating, setUserRating] = useState<number | undefined>(undefined);
-  const [bookmarked, setBookmarked] = useState(false);
-  const [hoverRating, setHoverRating] = useState<number | undefined>(undefined);
-
-  // 먼슬리 상세 페이지와 동일한 회고 변수들 추가
-  const [bestMoment, setBestMoment] = useState("");
-  const [routineAdherence, setRoutineAdherence] = useState("");
-  const [unexpectedObstacles, setUnexpectedObstacles] = useState("");
-  const [nextMonthlyApplication, setNextMonthlyApplication] = useState("");
-
-  // 스마트 회고 상태
-  const [planningNeedsImprovement, setPlanningNeedsImprovement] =
-    useState(false);
-  const [executionNeedsImprovement, setExecutionNeedsImprovement] =
-    useState(false);
-  const [otherReason, setOtherReason] = useState("");
 
   // 현재 업데이트 중인 태스크 ID 추적
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
@@ -543,11 +568,7 @@ export default function ProjectDetailPage({
           )
         : [];
 
-      console.log("프로젝트 connectedMonthlies:", project.connectedMonthlies);
-      console.log("추출된 monthlyIds:", monthlyIds);
-
       const monthlies = await fetchMonthliesByIds(monthlyIds);
-      console.log("가져온 먼슬리들:", monthlies);
 
       return monthlies;
     },
@@ -578,93 +599,6 @@ export default function ProjectDetailPage({
     queryFn: () => fetchAllTasksByProjectId(projectId),
     enabled: !!projectId && activeTab === "tasks", // 태스크 탭에서만 로드
   });
-
-  // 회고 모달 상태 변경 시 데이터 로드/초기화
-  useEffect(() => {
-    if (showRetrospectiveDialog && project?.retrospective) {
-      // 기존 회고 데이터가 있으면 폼에 로드
-      setBestMoment(project.retrospective.bestMoment || "");
-      setRoutineAdherence(project.retrospective.routineAdherence || "");
-      setUnexpectedObstacles(project.retrospective.unexpectedObstacles || "");
-      setNextMonthlyApplication(
-        project.retrospective.nextMonthlyApplication || ""
-      );
-      setUserRating(project.retrospective.userRating);
-      setBookmarked(project.retrospective.bookmarked || false);
-
-      // 스마트 회고 데이터 로드
-      if (project.retrospective.incompleteAnalysis) {
-        setPlanningNeedsImprovement(
-          project.retrospective.incompleteAnalysis.planningNeedsImprovement ||
-            false
-        );
-        setExecutionNeedsImprovement(
-          project.retrospective.incompleteAnalysis.executionNeedsImprovement ||
-            false
-        );
-        setOtherReason(
-          project.retrospective.incompleteAnalysis.otherReason || ""
-        );
-      }
-    } else if (!showRetrospectiveDialog) {
-      // 모달이 닫힐 때 폼 초기화
-      setBestMoment("");
-      setRoutineAdherence("");
-      setUnexpectedObstacles("");
-      setNextMonthlyApplication("");
-      setUserRating(undefined);
-      setBookmarked(false);
-      setHoverRating(undefined);
-
-      // 스마트 회고 상태 초기화
-      setPlanningNeedsImprovement(false);
-      setExecutionNeedsImprovement(false);
-      setOtherReason("");
-    }
-  }, [showRetrospectiveDialog, project?.retrospective]);
-
-  // 노트 모달 상태 변경 시 데이터 로드/초기화
-  useEffect(() => {
-    if (showAddNoteDialog && project?.notes && project.notes.length > 0) {
-      // 기존 노트가 있으면 폼에 로드
-      setNoteContent(project.notes[0].content || "");
-    } else if (!showAddNoteDialog) {
-      // 모달이 닫힐 때 폼 초기화
-      setNoteContent("");
-    }
-  }, [showAddNoteDialog, project?.notes]);
-
-  // useEffect를 조건부 return 이전으로 이동
-  useEffect(() => {
-    // 기존 회고 데이터가 있다면 불러와서 폼에 채우기
-    if (project && project.retrospective) {
-      setGoalAchieved(project.retrospective.goalAchieved || "");
-      setMemorableTask(project.retrospective.memorableTask || "");
-      setStuckPoints(project.retrospective.stuckPoints || "");
-      setNewLearnings(project.retrospective.newLearnings || "");
-      setNextProjectImprovements(
-        project.retrospective.nextProjectImprovements || ""
-      );
-      setUserRating(project.retrospective.userRating);
-      setBookmarked(project.retrospective.bookmarked || false);
-    } else {
-      // 회고가 없으면 폼 초기화
-      setGoalAchieved("");
-      setMemorableTask("");
-      setStuckPoints("");
-      setNewLearnings("");
-      setNextProjectImprovements("");
-      setUserRating(undefined);
-      setBookmarked(false);
-    }
-
-    // 기존 노트 데이터가 있다면 불러와서 폼에 채우기
-    if (project?.notes && project.notes.length > 0) {
-      setNoteContent(project.notes[0].content || "");
-    } else {
-      setNoteContent("");
-    }
-  }, [project]);
 
   // 로딩 상태
   if (isLoading || isTasksLoading) {
@@ -755,19 +689,6 @@ export default function ProjectDetailPage({
       : totalTasks > 0
       ? Math.round((completedTasks / totalTasks) * 100)
       : 0;
-
-  // 디버깅용 로그
-  console.log("🔍 Project Detail - Task Counts:", {
-    projectId,
-    taskCounts,
-    completedTasks,
-    totalTasks,
-    progressPercentage,
-    tasksLength: tasks?.length,
-    projectTarget: project?.target,
-    projectCategory: project?.category,
-    projectData: project,
-  });
 
   // 스마트 회고 조건 (완료율 90% 미만)
   const shouldShowSmartRetrospective = progressPercentage < 90;
@@ -891,1235 +812,1148 @@ export default function ProjectDetailPage({
     editTaskForm.reset();
   };
 
-  const handleSaveRetrospective = () => {
-    if (!userRating) {
+  const handleSaveRetrospective = async (data: any) => {
+    try {
+      // 프로젝트 회고 저장 로직
+      const retrospectiveData = {
+        userId: user?.uid || "",
+        projectId: project?.id || "",
+        ...data,
+      };
+
+      // 기존 회고가 있는지 확인
+      const existingArchive = await fetchSingleArchive(
+        user?.uid || "",
+        project?.id || "",
+        "project_retrospective"
+      );
+
+      if (existingArchive) {
+        // 기존 아카이브 업데이트
+        await updateUnifiedArchive(existingArchive.id, {
+          title: data.title || project?.title || "",
+          content: data.content || "",
+          userRating: data.userRating,
+          bookmarked: data.bookmarked,
+          goalAchieved: data.goalAchieved,
+          memorableTask: data.memorableTask,
+          stuckPoints: data.stuckPoints,
+          newLearnings: data.newLearnings,
+          nextProjectImprovements: data.nextProjectImprovements,
+        });
+      } else {
+        // 새 아카이브 생성
+        const newArchive = await createUnifiedArchive({
+          userId: user?.uid || "",
+          type: "project_retrospective",
+          parentId: project?.id || "",
+          title: data.title || project?.title || "",
+          content: data.content || "",
+          userRating: data.userRating,
+          bookmarked: data.bookmarked,
+          goalAchieved: data.goalAchieved,
+          memorableTask: data.memorableTask,
+          stuckPoints: data.stuckPoints,
+          newLearnings: data.newLearnings,
+          nextProjectImprovements: data.nextProjectImprovements,
+        });
+
+        // 프로젝트에 회고 연결 (아카이브 ID 사용)
+        await updateProject(project?.id || "", {
+          retrospective: {
+            id: newArchive.id,
+            userId: newArchive.userId,
+            projectId: newArchive.parentId,
+            createdAt: newArchive.createdAt,
+            updatedAt: newArchive.updatedAt,
+            ...data,
+          },
+        });
+      }
+
+      toast({
+        title: "회고 저장 완료",
+        description: "회고가 성공적으로 저장되었습니다.",
+      });
+      setShowRetrospectiveDialog(false);
+    } catch (error) {
+      console.error("회고 저장 실패:", error);
       toast({
         title: "회고 저장 실패",
-        description: "스스로에게 도움이 되었는지 별점을 선택해주세요.",
+        description: "회고 저장 중 오류가 발생했습니다.",
         variant: "destructive",
       });
-      return;
     }
 
-    const newRetrospective: Retrospective = {
-      id: project.retrospective?.id || `new-project-retro-${Date.now()}`,
-      projectId: project.id,
-      userId: user?.uid || "",
-      createdAt: project.retrospective?.createdAt || new Date(),
-      updatedAt: new Date(),
-      title: project.title,
-      summary:
-        bestMoment.substring(0, 100) + (bestMoment.length > 100 ? "..." : ""),
-      bestMoment,
-      routineAdherence,
-      unexpectedObstacles,
-      nextMonthlyApplication,
-      content: `가장 좋았던 순간: ${bestMoment}\n\n일정 준수: ${routineAdherence}\n\n예상치 못한 장애물: ${unexpectedObstacles}\n\n다음 먼슬리 적용점: ${nextMonthlyApplication}`,
-      userRating,
-      bookmarked,
-      // 스마트 회고 데이터 (완료율 90% 미만 시에만 포함)
-      ...(shouldShowSmartRetrospective && {
-        incompleteAnalysis: {
-          planningNeedsImprovement,
-          executionNeedsImprovement,
-          otherReason: otherReason.trim() || undefined,
-        },
-      }),
+    const renderStarRating = (
+      rating: number | undefined,
+      setRating?: (rating: number) => void
+    ) => {
+      return (
+        <div className="flex items-center gap-1">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <Star
+              key={star}
+              className={`h-7 w-7 transition-all duration-200 ${
+                star <= (rating || 0)
+                  ? "text-yellow-500 fill-yellow-500"
+                  : "text-gray-300"
+              } ${setRating ? "cursor-pointer hover:scale-110" : ""}`}
+              onClick={() => {
+                if (setRating) {
+                  setRating(star);
+                }
+              }}
+            />
+          ))}
+          {rating && (
+            <span className="ml-2 text-sm text-gray-600">{rating}점</span>
+          )}
+        </div>
+      );
     };
 
-    // 실제 mutation을 사용하여 저장
-    saveRetrospectiveMutation.mutate(newRetrospective);
-  };
+    const getMonthlyTitle = (monthlyId: string) => {
+      // TODO: 실제 먼슬리 데이터를 가져와서 사용
+      return monthlyId;
+    };
 
-  const handleSaveNote = () => {
-    if (!noteContent.trim()) {
-      toast({
-        title: translate("paraProjectDetail.note.saveError"),
-        description: translate("paraProjectDetail.note.contentRequired"),
-        variant: "destructive",
-      });
-      return;
-    }
-    // 실제 mutation을 사용하여 저장
-    saveNoteMutation.mutate(noteContent);
-  };
+    const getMonthlyPeriod = (monthlyId: string) => {
+      // TODO: 실제 먼슬리 데이터를 가져와서 사용
+      return "";
+    };
 
-  const renderStarRating = (
-    rating: number | undefined,
-    setRating?: (rating: number) => void
-  ) => {
     return (
-      <div className="flex items-center gap-1">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <Star
-            key={star}
-            className={`h-7 w-7 transition-all duration-200 ${
-              star <= ((hoverRating ?? rating) || 0)
-                ? "text-yellow-500 fill-yellow-500"
-                : "text-gray-300"
-            } ${setRating ? "cursor-pointer hover:scale-110" : ""}`}
-            onClick={() => {
-              if (setRating) {
-                setRating(star);
-              }
-            }}
-            onMouseEnter={() => setRating && setHoverRating(star)}
-            onMouseLeave={() => setRating && setHoverRating(undefined)}
-          />
-        ))}
-        {rating && (
-          <span className="ml-2 text-sm text-gray-600">{rating}점</span>
-        )}
-      </div>
-    );
-  };
-
-  const getMonthlyTitle = (monthlyId: string) => {
-    // TODO: 실제 먼슬리 데이터를 가져와서 사용
-    return monthlyId;
-  };
-
-  const getMonthlyPeriod = (monthlyId: string) => {
-    // TODO: 실제 먼슬리 데이터를 가져와서 사용
-    return "";
-  };
-
-  return (
-    <div
-      className={`container max-w-md px-4 py-6 pb-20 relative ${
-        isNavigating ? "pointer-events-none" : ""
-      }`}
-    >
-      {/* 로딩 오버레이 */}
-      <LoadingOverlay
-        isVisible={isNavigating}
-        message={translate("loading.navigating")}
-      />
-      {/* 헤더 */}
-      <div className="flex items-center justify-between mb-6">
-        <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex gap-2">
+      <div
+        className={`container max-w-md px-4 py-6 pb-20 relative ${
+          isNavigating ? "pointer-events-none" : ""
+        }`}
+      >
+        {/* 로딩 오버레이 */}
+        <LoadingOverlay
+          isVisible={isNavigating}
+          message={translate("loading.navigating")}
+        />
+        {/* 헤더 */}
+        <div className="flex items-center justify-between mb-6">
           <Button
             variant="ghost"
             size="sm"
-            onClick={handleNavigateToEdit}
-            disabled={isNavigating}
+            onClick={() => window.history.back()}
           >
-            <Edit className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowDeleteDialog(true)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-      {/* 프로젝트 기본 정보 (상단) */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-2">
-          <h1 className="text-2xl font-bold">{project.title}</h1>
-          {area ? (
-            <Badge
-              variant={area.name === "미분류" ? "destructive" : "secondary"}
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleNavigateToEdit}
+              disabled={isNavigating}
             >
-              {area.name}
-            </Badge>
-          ) : project.areaId ? (
-            <Badge variant="outline">
-              {translate("paraProjectDetail.areaLoading")}
-            </Badge>
-          ) : (
-            <Badge variant="destructive">
-              {translate("paraProjectDetail.noArea")}
-            </Badge>
-          )}
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
+        {/* 프로젝트 기본 정보 (상단) */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <h1 className="text-2xl font-bold">{project.title}</h1>
+            {area ? (
+              <Badge
+                variant={area.name === "미분류" ? "destructive" : "secondary"}
+              >
+                {area.name}
+              </Badge>
+            ) : project.areaId ? (
+              <Badge variant="outline">
+                {translate("paraProjectDetail.areaLoading")}
+              </Badge>
+            ) : (
+              <Badge variant="destructive">
+                {translate("paraProjectDetail.noArea")}
+              </Badge>
+            )}
+          </div>
 
-        <p className="text-muted-foreground mb-4">{project.description}</p>
+          <p className="text-muted-foreground mb-4">{project.description}</p>
 
-        {/* 상태 및 진행률 */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-sm font-medium">
-              {translate("paraProjectDetail.duration")}
-            </span>
-            <div className="flex items-center gap-1">
-              <Calendar className="h-4 w-4" />
-              <span>
-                {formatDate(project.startDate, currentLanguage)} ~{" "}
-                {formatDate(project.endDate, currentLanguage)}
+          {/* 상태 및 진행률 */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-sm font-medium">
+                {translate("paraProjectDetail.duration")}
+              </span>
+              <div className="flex items-center gap-1">
+                <Calendar className="h-4 w-4" />
+                <span>
+                  {formatDate(project.startDate, currentLanguage)} ~{" "}
+                  {formatDate(project.endDate, currentLanguage)}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">
+                {translate("paraProjectDetail.status")}
+              </span>
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={
+                    getProjectStatus(project) === "scheduled"
+                      ? "secondary"
+                      : getProjectStatus(project) === "in_progress"
+                      ? "default"
+                      : "outline"
+                  }
+                >
+                  {getProjectStatus(project) === "scheduled"
+                    ? translate("paraProjectDetail.statusLabels.planned")
+                    : getProjectStatus(project) === "in_progress"
+                    ? translate("paraProjectDetail.statusLabels.inProgress")
+                    : getProjectStatus(project) === "completed"
+                    ? translate("paraProjectDetail.statusLabels.completed")
+                    : translate("paraProjectDetail.statusLabels.overdue")}
+                </Badge>
+                {getProjectStatus(project) === "overdue" && (
+                  <Badge variant="destructive" className="text-xs">
+                    {translate("paraProjectDetail.overdue")}
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">
+                {translate("paraProjectDetail.target")}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {project.target}
               </span>
             </div>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">
-              {translate("paraProjectDetail.status")}
-            </span>
-            <div className="flex items-center gap-2">
-              <Badge
-                variant={
-                  getProjectStatus(project) === "scheduled"
-                    ? "secondary"
-                    : getProjectStatus(project) === "in_progress"
-                    ? "default"
-                    : "outline"
-                }
-              >
-                {getProjectStatus(project) === "scheduled"
-                  ? translate("paraProjectDetail.statusLabels.planned")
-                  : getProjectStatus(project) === "in_progress"
-                  ? translate("paraProjectDetail.statusLabels.inProgress")
-                  : getProjectStatus(project) === "completed"
-                  ? translate("paraProjectDetail.statusLabels.completed")
-                  : translate("paraProjectDetail.statusLabels.overdue")}
-              </Badge>
-              {getProjectStatus(project) === "overdue" && (
-                <Badge variant="destructive" className="text-xs">
-                  {translate("paraProjectDetail.overdue")}
-                </Badge>
-              )}
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">
+                {translate("paraProjectDetail.target")}{" "}
+                {project.category === "repetitive"
+                  ? translate("paraProjectDetail.targetLabels.count")
+                  : translate("paraProjectDetail.targetLabels.tasks")}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {project.targetCount || 0}
+                {project.category === "repetitive"
+                  ? translate("paraProjectDetail.targetLabels.times")
+                  : translate("paraProjectDetail.targetLabels.tasks")}
+              </span>
             </div>
-          </div>
 
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">
-              {translate("paraProjectDetail.target")}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              {project.target}
-            </span>
-          </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">
+                {translate("paraProjectDetail.progress")}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {progressPercentage || 0}%
+              </span>
+            </div>
 
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">
-              {translate("paraProjectDetail.target")}{" "}
-              {project.category === "repetitive"
-                ? translate("paraProjectDetail.targetLabels.count")
-                : translate("paraProjectDetail.targetLabels.tasks")}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              {project.targetCount || 0}
-              {project.category === "repetitive"
-                ? translate("paraProjectDetail.targetLabels.times")
-                : translate("paraProjectDetail.targetLabels.tasks")}
-            </span>
-          </div>
+            <div className="progress-bar">
+              <div
+                className="progress-value"
+                style={{
+                  width: `${progressPercentage || 0}%`,
+                }}
+              ></div>
+            </div>
 
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">
-              {translate("paraProjectDetail.progress")}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              {progressPercentage || 0}%
-            </span>
-          </div>
-
-          <div className="progress-bar">
-            <div
-              className="progress-value"
-              style={{
-                width: `${progressPercentage || 0}%`,
-              }}
-            ></div>
-          </div>
-
-          {/* 연결된 먼슬리 */}
-          <div>
-            <span className="text-sm font-medium">
-              {translate("paraProjectDetail.connectedMonthlies")}
-            </span>
-            <div className="mt-2 space-y-2">
-              {connectedMonthlies && connectedMonthlies.length > 0 ? (
-                connectedMonthlies.map((monthly) => (
-                  <div
-                    key={monthly.id}
-                    className="flex items-center gap-3 p-2 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors"
-                  >
-                    <BookOpen className="h-4 w-4 text-blue-600 flex-shrink-0" />
-                    <div className="flex flex-col flex-1 min-w-0">
-                      <Link
-                        href={`/monthly/${monthly.id}`}
-                        className="flex items-center gap-2 group"
-                      >
-                        <span className="text-sm text-blue-600 font-medium group-hover:text-blue-700 transition-colors">
-                          {monthly.objective}
-                        </span>
-                        <ExternalLink className="h-3 w-3 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </Link>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-muted-foreground">
-                          {formatDate(monthly.startDate, currentLanguage)} ~{" "}
-                          {formatDate(monthly.endDate, currentLanguage)}
-                        </span>
-                        <Badge
-                          variant={
-                            getMonthlyStatus(monthly) === "in_progress"
-                              ? "default"
-                              : getMonthlyStatus(monthly) === "ended"
-                              ? "secondary"
-                              : "outline"
-                          }
-                          className="text-xs"
+            {/* 연결된 먼슬리 */}
+            <div>
+              <span className="text-sm font-medium">
+                {translate("paraProjectDetail.connectedMonthlies")}
+              </span>
+              <div className="mt-2 space-y-2">
+                {connectedMonthlies && connectedMonthlies.length > 0 ? (
+                  connectedMonthlies.map((monthly) => (
+                    <div
+                      key={monthly.id}
+                      className="flex items-center gap-3 p-2 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors"
+                    >
+                      <BookOpen className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <Link
+                          href={`/monthly/${monthly.id}`}
+                          className="flex items-center gap-2 group"
                         >
-                          {getMonthlyStatus(monthly) === "in_progress"
-                            ? translate(
-                                "paraProjectDetail.statusLabels.inProgress"
-                              )
-                            : getMonthlyStatus(monthly) === "ended"
-                            ? translate(
-                                "paraProjectDetail.statusLabels.completed"
-                              )
-                            : translate(
-                                "paraProjectDetail.statusLabels.planned"
-                              )}
-                        </Badge>
+                          <span className="text-sm text-blue-600 font-medium group-hover:text-blue-700 transition-colors">
+                            {monthly.objective}
+                          </span>
+                          <ExternalLink className="h-3 w-3 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </Link>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-muted-foreground">
+                            {formatDate(monthly.startDate, currentLanguage)} ~{" "}
+                            {formatDate(monthly.endDate, currentLanguage)}
+                          </span>
+                          <Badge
+                            variant={
+                              getMonthlyStatus(monthly) === "in_progress"
+                                ? "default"
+                                : getMonthlyStatus(monthly) === "ended"
+                                ? "secondary"
+                                : "outline"
+                            }
+                            className="text-xs"
+                          >
+                            {getMonthlyStatus(monthly) === "in_progress"
+                              ? translate(
+                                  "paraProjectDetail.statusLabels.inProgress"
+                                )
+                              : getMonthlyStatus(monthly) === "ended"
+                              ? translate(
+                                  "paraProjectDetail.statusLabels.completed"
+                                )
+                              : translate(
+                                  "paraProjectDetail.statusLabels.planned"
+                                )}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
-              ) : (
-                <Card className="p-4 text-center">
-                  <p className="text-muted-foreground">
-                    {translate("paraProjectDetail.noConnectedMonthlies")}
-                  </p>
-                </Card>
-              )}
-            </div>
-          </div>
-          {connectedMonthlies && connectedMonthlies.length > 0 && (
-            <div className="space-y-3">
-              {connectedMonthlies.length >= 3 &&
-                getProjectStatus(project) === "in_progress" && (
-                  <CustomAlert variant="warning" className="mb-4">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>
-                      {translate("paraProjectDetail.longTermProject.title")}
-                    </AlertTitle>
-                    <AlertDescription>
-                      {translate(
-                        "paraProjectDetail.longTermProject.description"
-                      ).replace(
-                        "{count}",
-                        connectedMonthlies.length.toString()
-                      )}
-                    </AlertDescription>
-                  </CustomAlert>
-                )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 탭 영역 */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">
-            {translate("paraProjectDetail.tabs.overview")}
-          </TabsTrigger>
-          <TabsTrigger value="tasks">
-            {translate("paraProjectDetail.tabs.tasks")}
-          </TabsTrigger>
-          <TabsTrigger value="retrospective">
-            {translate("paraProjectDetail.tabs.retrospective")}
-          </TabsTrigger>
-          <TabsTrigger value="note">
-            {translate("paraProjectDetail.tabs.note")}
-          </TabsTrigger>
-        </TabsList>
-
-        {/* 개요 탭 */}
-        <TabsContent value="overview" className="mt-4">
-          <div className="space-y-4">
-            {/* 세부 진행 상황 */}
-            <Card className="p-4 mb-4">
-              <h3 className="font-semibold mb-3">
-                {translate("paraProjectDetail.progressStatus")}
-              </h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {translate("paraProjectDetail.completed")}{" "}
-                    {project.category === "repetitive"
-                      ? translate("paraProjectDetail.targetLabels.count")
-                      : translate("paraProjectDetail.targetLabels.tasks")}
-                  </span>
-                  <span className="font-medium">
-                    {completedTasks || 0}
-                    {project.category === "repetitive"
-                      ? translate("paraProjectDetail.targetLabels.times")
-                      : translate("paraProjectDetail.targetLabels.items")}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {translate("paraProjectDetail.remaining")}{" "}
-                    {project.category === "repetitive"
-                      ? translate("paraProjectDetail.targetLabels.count")
-                      : translate("paraProjectDetail.targetLabels.tasks")}
-                  </span>
-                  <span className="font-medium">
-                    {project.category === "repetitive"
-                      ? Math.max(0, targetCount - (completedTasks || 0))
-                      : (totalTasks || 0) - (completedTasks || 0)}
-                    {project.category === "repetitive"
-                      ? translate("paraProjectDetail.targetLabels.times")
-                      : translate("paraProjectDetail.targetLabels.items")}
-                  </span>
-                </div>
-                <hr />
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {translate("paraProjectDetail.completedTime")}
-                  </span>
-                  <span className="font-medium">
-                    {timeStats?.completedTime || 0}
-                    {translate("paraProjectDetail.hours")}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {translate("paraProjectDetail.remainingTime")}
-                  </span>
-                  <span className="font-medium">
-                    {timeStats?.remainingTime || 0}
-                    {translate("paraProjectDetail.hours")}
-                  </span>
-                </div>
-              </div>
-            </Card>
-
-            {/* 최근 활동 */}
-            <Card className="p-4">
-              <h3 className="font-semibold mb-3">
-                {translate("paraProjectDetail.recentActivity")}
-              </h3>
-              <div className="space-y-2">
-                {tasks && tasks.length > 0 ? (
-                  tasks
-                    .filter((task) => task.updatedAt) // updatedAt이 있는 태스크만
-                    .sort(
-                      (a, b) =>
-                        new Date(b.updatedAt!).getTime() -
-                        new Date(a.updatedAt!).getTime()
-                    ) // 최신순 정렬
-                    .slice(0, 2) // 최근 2개만
-                    .map((task) => (
-                      <div
-                        key={task.id}
-                        className="flex items-center gap-2 text-sm"
-                      >
-                        {task.done ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <Circle className="h-4 w-4 text-muted-foreground" />
-                        )}
-                        <span
-                          className={
-                            task.done
-                              ? "line-through text-muted-foreground"
-                              : ""
-                          }
-                        >
-                          {task.title}
-                        </span>
-                        <span className="text-muted-foreground ml-auto">
-                          {formatDate(task.updatedAt, currentLanguage)}
-                        </span>
-                      </div>
-                    ))
+                  ))
                 ) : (
-                  <p className="text-xs text-muted-foreground">
-                    {translate("paraProjectDetail.noActivity")}
-                  </p>
+                  <Card className="p-4 text-center">
+                    <p className="text-muted-foreground">
+                      {translate("paraProjectDetail.noConnectedMonthlies")}
+                    </p>
+                  </Card>
                 )}
               </div>
-            </Card>
-
-            {/* 프로젝트 정보 */}
-            <Card className="p-4">
-              <h3 className="font-semibold mb-3">
-                {translate("paraProjectDetail.projectInfo")}
-              </h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    {translate("paraProjectDetail.projectType")}
-                  </span>
-                  <span>
-                    {project.category === "repetitive"
-                      ? translate(
-                          "paraProjectDetail.projectTypeLabels.repetitive"
-                        )
-                      : translate("paraProjectDetail.projectTypeLabels.task")}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    {translate("paraProjectDetail.target")}{" "}
-                    {project.category === "repetitive"
-                      ? translate("paraProjectDetail.targetLabels.count")
-                      : translate("paraProjectDetail.targetLabels.tasks")}
-                  </span>
-                  <span>
-                    {project.category === "repetitive" && project.targetCount
-                      ? `${project.target} ${project.targetCount}${translate(
-                          "paraProjectDetail.targetLabels.times"
-                        )}`
-                      : project.target}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    {translate("paraProjectDetail.connectedArea")}
-                  </span>
-                  <span>
-                    {area
-                      ? area.name
-                      : project.areaId
-                      ? translate("settings.loading.areaInfo")
-                      : "연결된 Area 없음"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    {translate("paraProjectDetail.createdAt")}
-                  </span>
-                  <span>{formatDate(project.createdAt, currentLanguage)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    {translate("paraProjectDetail.updatedAt")}
-                  </span>
-                  <span>{formatDate(project.updatedAt, currentLanguage)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    {translate("paraProjectDetail.connectedMonthlies")}
-                  </span>
-                  <span>
-                    {connectedMonthlies && connectedMonthlies.length > 0
-                      ? `${connectedMonthlies.length}개`
-                      : translate("paraProjectDetail.noConnectedMonthlies")}
-                  </span>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* 태스크 탭 */}
-        <TabsContent value="tasks" className="mt-4">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">
-                {translate("paraProjectDetail.taskList")}
-              </h3>
-              {project.category === "task_based" && (
-                <Button size="sm" variant="outline" onClick={openTaskDialog}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  {translate("paraProjectDetail.add")}
-                </Button>
-              )}
             </div>
-
-            {project.category === "repetitive" && (
-              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200 text-sm">
-                  <Info className="h-4 w-4" />
-                  <span className="font-medium">프로젝트 정보</span>
-                </div>
-                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                  프로젝트가 시작된 후에는 시작일을 변경할 수 없습니다.
-                </p>
+            {connectedMonthlies && connectedMonthlies.length > 0 && (
+              <div className="space-y-3">
+                {connectedMonthlies.length >= 3 &&
+                  getProjectStatus(project) === "in_progress" && (
+                    <CustomAlert variant="warning" className="mb-4">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>
+                        {translate("paraProjectDetail.longTermProject.title")}
+                      </AlertTitle>
+                      <AlertDescription>
+                        {translate(
+                          "paraProjectDetail.longTermProject.description"
+                        ).replace(
+                          "{count}",
+                          connectedMonthlies.length.toString()
+                        )}
+                      </AlertDescription>
+                    </CustomAlert>
+                  )}
               </div>
             )}
+          </div>
+        </div>
 
-            <div className="space-y-2">
-              {tasks
-                ?.sort((a, b) => {
-                  // 1. 완료 여부를 최우선 기준으로 정렬 (완료되지 않은 것이 먼저)
-                  if (a.done !== b.done) {
-                    return a.done ? 1 : -1;
-                  }
-                  // 2. 완료 여부가 같으면 날짜순 정렬
-                  return (
-                    new Date(a.date).getTime() - new Date(b.date).getTime()
-                  );
-                })
-                .map((task) => (
-                  <Card
-                    key={task.id}
-                    className={`p-3 transition-all duration-200 hover:shadow-md ${
-                      task.done ? "bg-green-50/50 dark:bg-green-900/20" : ""
-                    } ${updatingTaskId === task.id ? "opacity-50" : ""}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      {/* 인덱스 번호 */}
-                      <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          {tasks.indexOf(task) + 1}
-                        </span>
-                      </div>
+        {/* 탭 영역 */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="overview">
+              {translate("paraProjectDetail.tabs.overview")}
+            </TabsTrigger>
+            <TabsTrigger value="tasks">
+              {translate("paraProjectDetail.tabs.tasks")}
+            </TabsTrigger>
+            <TabsTrigger value="retrospective">
+              {translate("paraProjectDetail.tabs.retrospective")}
+            </TabsTrigger>
+            <TabsTrigger value="note">
+              {translate("paraProjectDetail.tabs.note")}
+            </TabsTrigger>
+          </TabsList>
 
-                      {/* 완료 상태 토글 버튼 */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleTaskToggle(task.id, task.done);
-                        }}
-                        className="flex-shrink-0 hover:scale-110 transition-transform cursor-pointer"
-                        disabled={updatingTaskId === task.id}
-                      >
-                        {updatingTaskId === task.id ? (
-                          <div className="h-3 w-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                        ) : task.done ? (
-                          <CheckCircle2 className="h-3 w-3 text-green-600 fill-green-600" />
-                        ) : (
-                          <Circle className="h-3 w-3 text-muted-foreground hover:text-green-600 hover:fill-green-100" />
-                        )}
-                      </button>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p
-                            className={`text-sm font-medium transition-all duration-200 ${
+          {/* 개요 탭 */}
+          <TabsContent value="overview" className="mt-4">
+            <div className="space-y-4">
+              {/* 세부 진행 상황 */}
+              <Card className="p-4 mb-4">
+                <h3 className="font-semibold mb-3">
+                  {translate("paraProjectDetail.progressStatus")}
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {translate("paraProjectDetail.completed")}{" "}
+                      {project.category === "repetitive"
+                        ? translate("paraProjectDetail.targetLabels.count")
+                        : translate("paraProjectDetail.targetLabels.tasks")}
+                    </span>
+                    <span className="font-medium">
+                      {completedTasks || 0}
+                      {project.category === "repetitive"
+                        ? translate("paraProjectDetail.targetLabels.times")
+                        : translate("paraProjectDetail.targetLabels.items")}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {translate("paraProjectDetail.remaining")}{" "}
+                      {project.category === "repetitive"
+                        ? translate("paraProjectDetail.targetLabels.count")
+                        : translate("paraProjectDetail.targetLabels.tasks")}
+                    </span>
+                    <span className="font-medium">
+                      {project.category === "repetitive"
+                        ? Math.max(0, targetCount - (completedTasks || 0))
+                        : (totalTasks || 0) - (completedTasks || 0)}
+                      {project.category === "repetitive"
+                        ? translate("paraProjectDetail.targetLabels.times")
+                        : translate("paraProjectDetail.targetLabels.items")}
+                    </span>
+                  </div>
+                  <hr />
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {translate("paraProjectDetail.completedTime")}
+                    </span>
+                    <span className="font-medium">
+                      {timeStats?.completedTime || 0}
+                      {translate("paraProjectDetail.hours")}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {translate("paraProjectDetail.remainingTime")}
+                    </span>
+                    <span className="font-medium">
+                      {timeStats?.remainingTime || 0}
+                      {translate("paraProjectDetail.hours")}
+                    </span>
+                  </div>
+                </div>
+              </Card>
+
+              {/* 최근 활동 */}
+              <Card className="p-4">
+                <h3 className="font-semibold mb-3">
+                  {translate("paraProjectDetail.recentActivity")}
+                </h3>
+                <div className="space-y-2">
+                  {tasks && tasks.length > 0 ? (
+                    tasks
+                      .filter((task) => task.updatedAt) // updatedAt이 있는 태스크만
+                      .sort(
+                        (a, b) =>
+                          new Date(b.updatedAt!).getTime() -
+                          new Date(a.updatedAt!).getTime()
+                      ) // 최신순 정렬
+                      .slice(0, 2) // 최근 2개만
+                      .map((task) => (
+                        <div
+                          key={task.id}
+                          className="flex items-center gap-2 text-sm"
+                        >
+                          {task.done ? (
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <Circle className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <span
+                            className={
                               task.done
                                 ? "line-through text-muted-foreground"
                                 : ""
-                            }`}
+                            }
                           >
                             {task.title}
-                          </p>
+                          </span>
+                          <span className="text-muted-foreground ml-auto">
+                            {formatDate(task.updatedAt, currentLanguage)}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            <span>
-                              {formatDate(task.date, currentLanguage)}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            <span>
-                              {typeof task.duration === "string"
-                                ? parseFloat(task.duration)
-                                : task.duration}
-                              시간
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      {project.category === "task_based" && (
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditTaskDialog(task)}
-                            className="flex-shrink-0 h-8 w-8 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteTask(task.id)}
-                            className="flex-shrink-0 h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                )) || []}
-            </div>
-
-            <div className="text-center text-sm text-muted-foreground">
-              {completedTasks || 0}/{totalTasks || 0} 태스크 완료 (
-              {progressPercentage || 0}%)
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* 회고 탭 */}
-        <TabsContent value="retrospective" className="mt-4">
-          {project.retrospective ? (
-            <Card className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-medium">
-                  {project.retrospective.title ||
-                    translate("paraProjectDetail.retrospective.completed")}
-                </h4>
-                <div className="flex items-center gap-2">
-                  {project.retrospective.bookmarked && (
-                    <Bookmark className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                  )}
-                  {renderStarRating(project.retrospective.userRating)}
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
-                {project.retrospective.summary ||
-                  project.retrospective.content ||
-                  project.retrospective.goalAchieved ||
-                  translate("paraProjectDetail.retrospective.noSummary")}
-              </p>
-              <div className="flex justify-end">
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={`/para/archives/${project.retrospective.id}`}>
-                    {translate("paraProjectDetail.retrospective.viewDetail")}
-                  </Link>
-                </Button>
-              </div>
-            </Card>
-          ) : (
-            <div className="rounded-lg border border-dashed p-8 text-center">
-              <p className="text-muted-foreground mb-2">
-                {translate("paraProjectDetail.retrospective.noContent")}
-              </p>
-              <p className="text-sm text-muted-foreground mb-4">
-                {projectWithStatus?.status === "completed"
-                  ? translate("paraProjectDetail.retrospective.description")
-                  : translate(
-                      "paraProjectDetail.retrospective.inProgressDescription"
-                    )}
-              </p>
-              <Button onClick={() => setShowRetrospectiveDialog(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                {translate("paraProjectDetail.retrospective.writeTitle")}
-              </Button>
-            </div>
-          )}
-        </TabsContent>
-
-        {/* 노트 탭 */}
-        <TabsContent value="note" className="mt-4">
-          {project.notes && project.notes.length > 0 ? (
-            <Card className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-medium">
-                  {translate("paraProjectDetail.note.title")}
-                </h4>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowAddNoteDialog(true)}
-                >
-                  <Edit className="mr-1 h-4 w-4" />
-                  {translate("paraProjectDetail.note.edit")}
-                </Button>
-              </div>
-              <p className="text-sm mb-3">{project.notes[0].content}</p>
-              <p className="text-xs text-muted-foreground">
-                {formatDate(project.notes[0].createdAt, currentLanguage)}
-              </p>
-            </Card>
-          ) : (
-            <div className="rounded-lg border border-dashed p-8 text-center">
-              <p className="text-muted-foreground mb-2">
-                {translate("paraProjectDetail.note.noNote")}
-              </p>
-              <p className="text-sm text-muted-foreground mb-4">
-                {translate("paraProjectDetail.note.description")}
-              </p>
-              <Button onClick={() => setShowAddNoteDialog(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                {translate("paraProjectDetail.note.addButton")}
-              </Button>
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
-
-      {/* 삭제 확인 다이얼로그 */}
-      <ConfirmDialog
-        open={showDeleteDialog}
-        onOpenChange={setShowDeleteDialog}
-        title="프로젝트 삭제"
-        type="delete"
-        description="이 프로젝트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
-        onConfirm={() => {
-          toast({
-            title: "프로젝트 삭제 완료",
-            description: "프로젝트가 삭제되었습니다.",
-          });
-          router.push("/para?tab=projects");
-        }}
-      />
-
-      {/* 회고 노트 추가/수정 다이얼로그 (프로젝트 노트용) */}
-      {/* Dialog 관련 import는 회고/노트 다이얼로그에서만 사용 */}
-      {/* 삭제 다이얼로그는 ConfirmDialog만 사용 */}
-
-      {/* 노트 작성/수정 다이얼로그 */}
-      <Dialog open={showAddNoteDialog} onOpenChange={setShowAddNoteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {translate("paraProjectDetail.note.title")}{" "}
-              {project.notes && project.notes.length > 0
-                ? translate("paraProjectDetail.note.edit")
-                : translate("paraProjectDetail.note.add")}
-            </DialogTitle>
-            <DialogDescription>
-              {translate("paraProjectDetail.note.description")}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-4">
-            <Textarea
-              placeholder={translate("paraProjectDetail.note.placeholder")}
-              value={noteContent}
-              onChange={(e) => setNoteContent(e.target.value)}
-              className="min-h-[150px]"
-            />
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="secondary"
-              onClick={() => setShowAddNoteDialog(false)}
-            >
-              {translate("common.cancel")}
-            </Button>
-            <Button onClick={handleSaveNote}>
-              {translate("paraProjectDetail.note.save")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 프로젝트 회고 작성 다이얼로그 */}
-      <Dialog
-        open={showRetrospectiveDialog}
-        onOpenChange={setShowRetrospectiveDialog}
-      >
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>
-              {translate("paraProjectDetail.retrospective.title")}
-            </DialogTitle>
-            <DialogDescription>
-              {translate("paraProjectDetail.retrospective.description")}
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="max-h-[60vh] pr-4">
-            <div className="grid gap-4 py-4">
-              <div>
-                <label
-                  htmlFor="bestMoment"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  {translate(
-                    "paraProjectDetail.retrospective.bestMoment.label"
-                  )}
-                </label>
-                <Textarea
-                  id="bestMoment"
-                  className="mt-1"
-                  rows={2}
-                  value={bestMoment}
-                  onChange={(e) => setBestMoment(e.target.value)}
-                  placeholder={translate(
-                    "paraProjectDetail.retrospective.bestMoment.placeholder"
-                  )}
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="routineAdherence"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  {translate(
-                    "paraProjectDetail.retrospective.routineAdherence.label"
-                  )}
-                </label>
-                <Textarea
-                  id="routineAdherence"
-                  className="mt-1"
-                  rows={2}
-                  value={routineAdherence}
-                  onChange={(e) => setRoutineAdherence(e.target.value)}
-                  placeholder={translate(
-                    "paraProjectDetail.retrospective.routineAdherence.placeholder"
-                  )}
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="unexpectedObstacles"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  {translate(
-                    "paraProjectDetail.retrospective.unexpectedObstacles.label"
-                  )}
-                </label>
-                <Textarea
-                  id="unexpectedObstacles"
-                  className="mt-1"
-                  rows={2}
-                  value={unexpectedObstacles}
-                  onChange={(e) => setUnexpectedObstacles(e.target.value)}
-                  placeholder={translate(
-                    "paraProjectDetail.retrospective.unexpectedObstacles.placeholder"
-                  )}
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="nextMonthlyApplication"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  {translate(
-                    "paraProjectDetail.retrospective.nextMonthlyApplication.label"
-                  )}
-                </label>
-                <Textarea
-                  id="nextMonthlyApplication"
-                  className="mt-1"
-                  rows={2}
-                  value={nextMonthlyApplication}
-                  onChange={(e) => setNextMonthlyApplication(e.target.value)}
-                  placeholder={translate(
-                    "paraProjectDetail.retrospective.nextMonthlyApplication.placeholder"
-                  )}
-                />
-              </div>
-
-              {/* 스마트 회고 섹션 (완료율 90% 미만 시 표시) */}
-              {shouldShowSmartRetrospective && (
-                <div className="border-t pt-4 mt-4">
-                  <div className="mb-3">
-                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      {translate("paraProjectDetail.smartRetrospective.title")}
-                    </h4>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                      {translate(
-                        "paraProjectDetail.smartRetrospective.description"
-                      )}
+                      ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      {translate("paraProjectDetail.noActivity")}
                     </p>
+                  )}
+                </div>
+              </Card>
+
+              {/* 프로젝트 정보 */}
+              <Card className="p-4">
+                <h3 className="font-semibold mb-3">
+                  {translate("paraProjectDetail.projectInfo")}
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      {translate("paraProjectDetail.projectType")}
+                    </span>
+                    <span>
+                      {project.category === "repetitive"
+                        ? translate(
+                            "paraProjectDetail.projectTypeLabels.repetitive"
+                          )
+                        : translate("paraProjectDetail.projectTypeLabels.task")}
+                    </span>
                   </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-3 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg border border-border">
-                      <Checkbox
-                        id="planningNeedsImprovement"
-                        checked={planningNeedsImprovement}
-                        onCheckedChange={(checked) =>
-                          setPlanningNeedsImprovement(checked as boolean)
-                        }
-                      />
-                      <div className="flex-1">
-                        <label
-                          htmlFor="planningNeedsImprovement"
-                          className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer"
-                        >
-                          {translate(
-                            "paraProjectDetail.smartRetrospective.planningNeedsImprovement"
-                          )}
-                        </label>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {translate(
-                            "paraProjectDetail.smartRetrospective.planningDescription"
-                          )}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-3 p-3 bg-muted/50 dark:bg-muted/20 rounded-lg border border-border">
-                      <Checkbox
-                        id="executionNeedsImprovement"
-                        checked={executionNeedsImprovement}
-                        onCheckedChange={(checked) =>
-                          setExecutionNeedsImprovement(checked as boolean)
-                        }
-                      />
-                      <div className="flex-1">
-                        <label
-                          htmlFor="executionNeedsImprovement"
-                          className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer"
-                        >
-                          {translate(
-                            "paraProjectDetail.smartRetrospective.executionNeedsImprovement"
-                          )}
-                        </label>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {translate(
-                            "paraProjectDetail.smartRetrospective.executionDescription"
-                          )}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        {translate(
-                          "paraProjectDetail.smartRetrospective.otherReason"
-                        )}
-                      </label>
-                      <Textarea
-                        className="mt-1"
-                        rows={2}
-                        value={otherReason}
-                        onChange={(e) => setOtherReason(e.target.value)}
-                        placeholder={translate(
-                          "paraProjectDetail.smartRetrospective.otherReasonPlaceholder"
-                        )}
-                      />
-                    </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      {translate("paraProjectDetail.target")}{" "}
+                      {project.category === "repetitive"
+                        ? translate("paraProjectDetail.targetLabels.count")
+                        : translate("paraProjectDetail.targetLabels.tasks")}
+                    </span>
+                    <span>
+                      {project.category === "repetitive" && project.targetCount
+                        ? `${project.target} ${project.targetCount}${translate(
+                            "paraProjectDetail.targetLabels.times"
+                          )}`
+                        : project.target}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      {translate("paraProjectDetail.connectedArea")}
+                    </span>
+                    <span>
+                      {area
+                        ? area.name
+                        : project.areaId
+                        ? translate("settings.loading.areaInfo")
+                        : "연결된 Area 없음"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      {translate("paraProjectDetail.createdAt")}
+                    </span>
+                    <span>
+                      {formatDate(project.createdAt, currentLanguage)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      {translate("paraProjectDetail.updatedAt")}
+                    </span>
+                    <span>
+                      {formatDate(project.updatedAt, currentLanguage)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      {translate("paraProjectDetail.connectedMonthlies")}
+                    </span>
+                    <span>
+                      {connectedMonthlies && connectedMonthlies.length > 0
+                        ? `${connectedMonthlies.length}개`
+                        : translate("paraProjectDetail.noConnectedMonthlies")}
+                    </span>
                   </div>
                 </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  {translate("paraProjectDetail.retrospective.helpful.label")}
-                </label>
-                {renderStarRating(userRating, setUserRating)}
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* 태스크 탭 */}
+          <TabsContent value="tasks" className="mt-4">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">
+                  {translate("paraProjectDetail.taskList")}
+                </h3>
+                {project.category === "task_based" && (
+                  <Button size="sm" variant="outline" onClick={openTaskDialog}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    {translate("paraProjectDetail.add")}
+                  </Button>
+                )}
               </div>
-              <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                <Checkbox
-                  id="bookmarked"
-                  checked={bookmarked}
-                  onCheckedChange={(checked) => {
-                    setBookmarked(checked as boolean);
-                  }}
-                />
-                <div className="flex-1">
-                  <label
-                    htmlFor="bookmarked"
-                    className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer"
-                  >
-                    {translate(
-                      "paraProjectDetail.retrospective.bookmark.label"
-                    )}
-                  </label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {translate(
-                      "paraProjectDetail.retrospective.bookmark.description"
-                    )}
+
+              {project.category === "repetitive" && (
+                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200 text-sm">
+                    <Info className="h-4 w-4" />
+                    <span className="font-medium">프로젝트 정보</span>
+                  </div>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                    프로젝트가 시작된 후에는 시작일을 변경할 수 없습니다.
                   </p>
                 </div>
-                {bookmarked && (
-                  <div className="text-yellow-500">
-                    <Bookmark className="h-5 w-5 fill-current" />
-                  </div>
-                )}
+              )}
+
+              <div className="space-y-2">
+                {tasks
+                  ?.sort((a, b) => {
+                    // 1. 완료 여부를 최우선 기준으로 정렬 (완료되지 않은 것이 먼저)
+                    if (a.done !== b.done) {
+                      return a.done ? 1 : -1;
+                    }
+                    // 2. 완료 여부가 같으면 날짜순 정렬
+                    return (
+                      new Date(a.date).getTime() - new Date(b.date).getTime()
+                    );
+                  })
+                  .map((task) => (
+                    <Card
+                      key={task.id}
+                      className={`p-3 transition-all duration-200 hover:shadow-md ${
+                        task.done ? "bg-green-50/50 dark:bg-green-900/20" : ""
+                      } ${updatingTaskId === task.id ? "opacity-50" : ""}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* 인덱스 번호 */}
+                        <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            {tasks.indexOf(task) + 1}
+                          </span>
+                        </div>
+
+                        {/* 완료 상태 토글 버튼 */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTaskToggle(task.id, task.done);
+                          }}
+                          className="flex-shrink-0 hover:scale-110 transition-transform cursor-pointer"
+                          disabled={updatingTaskId === task.id}
+                        >
+                          {updatingTaskId === task.id ? (
+                            <div className="h-3 w-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                          ) : task.done ? (
+                            <CheckCircle2 className="h-3 w-3 text-green-600 fill-green-600" />
+                          ) : (
+                            <Circle className="h-3 w-3 text-muted-foreground hover:text-green-600 hover:fill-green-100" />
+                          )}
+                        </button>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p
+                              className={`text-sm font-medium transition-all duration-200 ${
+                                task.done
+                                  ? "line-through text-muted-foreground"
+                                  : ""
+                              }`}
+                            >
+                              {task.title}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              <span>
+                                {formatDate(task.date, currentLanguage)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              <span>
+                                {typeof task.duration === "string"
+                                  ? parseFloat(task.duration)
+                                  : task.duration}
+                                시간
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        {project.category === "task_based" && (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditTaskDialog(task)}
+                              className="flex-shrink-0 h-8 w-8 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteTask(task.id)}
+                              className="flex-shrink-0 h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  )) || []}
+              </div>
+
+              <div className="text-center text-sm text-muted-foreground">
+                {completedTasks || 0}/{totalTasks || 0} 태스크 완료 (
+                {progressPercentage || 0}%)
               </div>
             </div>
-          </ScrollArea>
-          <DialogFooter>
-            <Button
-              variant="secondary"
-              onClick={() => setShowRetrospectiveDialog(false)}
+          </TabsContent>
+
+          {/* 회고 탭 */}
+          <TabsContent value="retrospective" className="mt-0">
+            <div className="space-y-4">
+              {project.retrospective ? (
+                <Card className="p-6 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      <h3 className="font-bold">회고</h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {project.retrospective.bookmarked && (
+                        <Bookmark className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                      )}
+                      {renderStarRating(project.retrospective.userRating)}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {project.retrospective.bestMoment && (
+                      <div>
+                        <h4 className="font-semibold text-sm mb-2">
+                          가장 기억에 남는 순간
+                        </h4>
+                        <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
+                          {project.retrospective.bestMoment}
+                        </p>
+                      </div>
+                    )}
+
+                    {project.retrospective.routineAdherence && (
+                      <div>
+                        <h4 className="font-semibold text-sm mb-2">
+                          루틴 준수율
+                        </h4>
+                        <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
+                          {project.retrospective.routineAdherence}
+                        </p>
+                      </div>
+                    )}
+
+                    {project.retrospective.unexpectedObstacles && (
+                      <div>
+                        <h4 className="font-semibold text-sm mb-2">
+                          예상치 못한 장애물
+                        </h4>
+                        <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
+                          {project.retrospective.unexpectedObstacles}
+                        </p>
+                      </div>
+                    )}
+
+                    {project.retrospective.nextMonthlyApplication && (
+                      <div>
+                        <h4 className="font-semibold text-sm mb-2">
+                          다음 달 적용 사항
+                        </h4>
+                        <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
+                          {project.retrospective.nextMonthlyApplication}
+                        </p>
+                      </div>
+                    )}
+
+                    {project.retrospective.stuckPoints && (
+                      <div>
+                        <h4 className="font-semibold text-sm mb-2">
+                          막힌 지점
+                        </h4>
+                        <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
+                          {project.retrospective.stuckPoints}
+                        </p>
+                      </div>
+                    )}
+
+                    {project.retrospective.newLearnings && (
+                      <div>
+                        <h4 className="font-semibold text-sm mb-2">
+                          새로운 학습
+                        </h4>
+                        <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
+                          {project.retrospective.newLearnings}
+                        </p>
+                      </div>
+                    )}
+
+                    {project.retrospective.nextProjectImprovements && (
+                      <div>
+                        <h4 className="font-semibold text-sm mb-2">
+                          다음 프로젝트 개선사항
+                        </h4>
+                        <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
+                          {project.retrospective.nextProjectImprovements}
+                        </p>
+                      </div>
+                    )}
+
+                    {project.retrospective.memorableTask && (
+                      <div>
+                        <h4 className="font-semibold text-sm mb-2">
+                          가장 기억에 남는 작업
+                        </h4>
+                        <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
+                          {project.retrospective.memorableTask}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end gap-2 mt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowRetrospectiveDialog(true)}
+                    >
+                      <Edit className="mr-2 h-4 w-4" />
+                      {translate("paraProjectDetail.retrospective.editTitle")}
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/para/archives/${project.retrospective.id}`}>
+                        {translate(
+                          "paraProjectDetail.retrospective.viewDetail"
+                        )}
+                      </Link>
+                    </Button>
+                  </div>
+                </Card>
+              ) : (
+                <Card className="p-8 text-center bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
+                  <div className="mb-4">
+                    <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                  </div>
+                  <h3 className="text-lg font-medium mb-2">
+                    {translate("paraProjectDetail.retrospective.noContent")}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    {projectWithStatus?.status === "completed"
+                      ? translate("paraProjectDetail.retrospective.description")
+                      : translate(
+                          "paraProjectDetail.retrospective.inProgressDescription"
+                        )}
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="w-full bg-transparent"
+                    onClick={() => setShowRetrospectiveDialog(true)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    {translate("paraProjectDetail.retrospective.writeTitle")}
+                  </Button>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* 노트 탭 */}
+          <TabsContent value="note" className="mt-0">
+            <div className="space-y-4">
+              {project.notes && project.notes.length > 0 ? (
+                <Card className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
+                  <div className="flex items-center gap-2 mb-3">
+                    <MessageSquare className="h-4 w-4" />
+                    <h3 className="font-bold">노트</h3>
+                    <span className="text-xs text-muted-foreground">
+                      마지막 업데이트:{" "}
+                      {project.notes[0].updatedAt
+                        ? formatDate(
+                            project.notes[0].updatedAt,
+                            currentLanguage
+                          )
+                        : formatDate(
+                            project.notes[0].createdAt,
+                            currentLanguage
+                          )}
+                    </span>
+                  </div>
+                  <div className="p-4 bg-muted/40 dark:bg-muted/30 rounded-lg min-h-[120px]">
+                    <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                      {project.notes[0].content}
+                    </p>
+                  </div>
+                </Card>
+              ) : (
+                <Card className="p-8 text-center bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
+                  <div className="mb-4">
+                    <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                  </div>
+                  <h3 className="text-lg font-medium mb-2">
+                    {translate("paraProjectDetail.note.noNote")}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    {translate("paraProjectDetail.note.description")}
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="w-full bg-transparent"
+                    onClick={() => setShowAddNoteDialog(true)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    {translate("paraProjectDetail.note.addButton")}
+                  </Button>
+                </Card>
+              )}
+
+              {project.notes && project.notes.length > 0 && (
+                <Button
+                  variant="outline"
+                  className="w-full bg-transparent"
+                  onClick={() => setShowAddNoteDialog(true)}
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  {translate("paraProjectDetail.note.edit")}
+                </Button>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* 삭제 확인 다이얼로그 */}
+        <ConfirmDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          title="프로젝트 삭제"
+          type="delete"
+          description="이 프로젝트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+          onConfirm={() => {
+            toast({
+              title: "프로젝트 삭제 완료",
+              description: "프로젝트가 삭제되었습니다.",
+            });
+            router.push("/para?tab=projects");
+          }}
+        />
+
+        {/* 회고 노트 추가/수정 다이얼로그 (프로젝트 노트용) */}
+        {/* Dialog 관련 import는 회고/노트 다이얼로그에서만 사용 */}
+        {/* 삭제 다이얼로그는 ConfirmDialog만 사용 */}
+
+        {/* 노트 작성/수정 다이얼로그 */}
+        {showAddNoteDialog && (
+          <NoteForm
+            type="project"
+            parent={project}
+            onClose={() => setShowAddNoteDialog(false)}
+            onSave={() => {
+              // 노트 저장 후 데이터 새로고침
+              queryClient.invalidateQueries({
+                queryKey: ["project", projectId],
+              });
+            }}
+          />
+        )}
+
+        {/* 프로젝트 회고 작성 다이얼로그 */}
+        {showRetrospectiveDialog && (
+          <RetrospectiveForm
+            type="project"
+            title={project?.title || ""}
+            keyResults={[]}
+            onClose={() => setShowRetrospectiveDialog(false)}
+            onSave={handleSaveRetrospective}
+          />
+        )}
+
+        {/* 태스크 추가 모달 */}
+        <Dialog open={showTaskDialog} onOpenChange={setShowTaskDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>새 태스크 추가</DialogTitle>
+              <DialogDescription>
+                프로젝트에 새로운 태스크를 추가하세요.
+              </DialogDescription>
+            </DialogHeader>
+
+            <form
+              onSubmit={taskForm.handleSubmit(onTaskSubmit)}
+              className="space-y-4"
             >
-              취소
-            </Button>
-            <Button onClick={handleSaveRetrospective}>
-              {translate("paraProjectDetail.retrospective.save")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 태스크 추가 모달 */}
-      <Dialog open={showTaskDialog} onOpenChange={setShowTaskDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>새 태스크 추가</DialogTitle>
-            <DialogDescription>
-              프로젝트에 새로운 태스크를 추가하세요.
-            </DialogDescription>
-          </DialogHeader>
-
-          <form
-            onSubmit={taskForm.handleSubmit(onTaskSubmit)}
-            className="space-y-4"
-          >
-            <div>
-              <Label htmlFor="task-title">태스크 제목</Label>
-              <Input
-                id="task-title"
-                placeholder="태스크 제목을 입력하세요"
-                {...taskForm.register("title")}
-              />
-              {taskForm.formState.errors.title && (
-                <p className="text-sm text-red-500 mt-1">
-                  {taskForm.formState.errors.title.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="task-date">날짜</Label>
-              <Input
-                id="task-date"
-                type="date"
-                min={formatDateForInput(project.startDate)}
-                max={formatDateForInput(project.endDate)}
-                {...taskForm.register("date")}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                {translate("paraProjectDetail.duration")}:{" "}
-                {formatDate(project.startDate, currentLanguage)} ~{" "}
-                {formatDate(project.endDate, currentLanguage)}
-              </p>
-              {taskForm.formState.errors.date && (
-                <p className="text-sm text-red-500 mt-1">
-                  {taskForm.formState.errors.date.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="task-duration">
-                {translate("paraProjectDetail.taskForm.duration")}
-              </Label>
-              <Input
-                id="task-duration"
-                type="number"
-                min="0.1"
-                max="24"
-                step="0.1"
-                placeholder="1.0"
-                {...taskForm.register("duration", { valueAsNumber: true })}
-              />
-              {taskForm.formState.errors.duration && (
-                <p className="text-sm text-red-500 mt-1">
-                  {taskForm.formState.errors.duration.message}
-                </p>
-              )}
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowTaskDialog(false)}
-              >
-                {translate("paraProjectDetail.taskForm.cancel")}
-              </Button>
-              <Button type="submit" disabled={addTaskMutation.isPending}>
-                {addTaskMutation.isPending
-                  ? translate("paraProjectDetail.taskForm.adding")
-                  : translate("paraProjectDetail.taskForm.addTitle")}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* 태스크 수정 모달 */}
-      <Dialog open={showEditTaskDialog} onOpenChange={setShowEditTaskDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {translate("paraProjectDetail.taskForm.editTitle")}
-            </DialogTitle>
-            <DialogDescription>
-              {translate("paraProjectDetail.taskForm.editDescription")}
-            </DialogDescription>
-          </DialogHeader>
-
-          <form
-            onSubmit={editTaskForm.handleSubmit(onEditTaskSubmit)}
-            className="space-y-4"
-          >
-            <div>
-              <Label htmlFor="edit-task-title">
-                {translate("paraProjectDetail.taskForm.title")}
-              </Label>
-              <Input
-                id="edit-task-title"
-                placeholder={translate(
-                  "paraProjectDetail.taskForm.titlePlaceholder"
+              <div>
+                <Label htmlFor="task-title">태스크 제목</Label>
+                <Input
+                  id="task-title"
+                  placeholder="태스크 제목을 입력하세요"
+                  {...taskForm.register("title")}
+                />
+                {taskForm.formState.errors.title && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {taskForm.formState.errors.title.message}
+                  </p>
                 )}
-                {...editTaskForm.register("title")}
-              />
-              {editTaskForm.formState.errors.title && (
-                <p className="text-sm text-red-500 mt-1">
-                  {editTaskForm.formState.errors.title.message}
+              </div>
+
+              <div>
+                <Label htmlFor="task-date">날짜</Label>
+                <Input
+                  id="task-date"
+                  type="date"
+                  min={formatDateForInput(project.startDate)}
+                  max={formatDateForInput(project.endDate)}
+                  {...taskForm.register("date")}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {translate("paraProjectDetail.duration")}:{" "}
+                  {formatDate(project.startDate, currentLanguage)} ~{" "}
+                  {formatDate(project.endDate, currentLanguage)}
                 </p>
-              )}
-            </div>
+                {taskForm.formState.errors.date && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {taskForm.formState.errors.date.message}
+                  </p>
+                )}
+              </div>
 
-            <div>
-              <Label htmlFor="edit-task-date">
-                {translate("paraProjectDetail.taskForm.date")}
-              </Label>
-              <Input
-                id="edit-task-date"
-                type="date"
-                min={formatDateForInput(project.startDate)}
-                max={formatDateForInput(project.endDate)}
-                {...editTaskForm.register("date")}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                {translate("paraProjectDetail.duration")}:{" "}
-                {formatDate(project.startDate, currentLanguage)} ~{" "}
-                {formatDate(project.endDate, currentLanguage)}
-              </p>
-              {editTaskForm.formState.errors.date && (
-                <p className="text-sm text-red-500 mt-1">
-                  {editTaskForm.formState.errors.date.message}
+              <div>
+                <Label htmlFor="task-duration">
+                  {translate("paraProjectDetail.taskForm.duration")}
+                </Label>
+                <Input
+                  id="task-duration"
+                  type="number"
+                  min="0.1"
+                  max="24"
+                  step="0.1"
+                  placeholder="1.0"
+                  {...taskForm.register("duration", { valueAsNumber: true })}
+                />
+                {taskForm.formState.errors.duration && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {taskForm.formState.errors.duration.message}
+                  </p>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowTaskDialog(false)}
+                >
+                  {translate("paraProjectDetail.taskForm.cancel")}
+                </Button>
+                <Button type="submit" disabled={addTaskMutation.isPending}>
+                  {addTaskMutation.isPending
+                    ? translate("paraProjectDetail.taskForm.adding")
+                    : translate("paraProjectDetail.taskForm.addTitle")}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* 태스크 수정 모달 */}
+        <Dialog open={showEditTaskDialog} onOpenChange={setShowEditTaskDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                {translate("paraProjectDetail.taskForm.editTitle")}
+              </DialogTitle>
+              <DialogDescription>
+                {translate("paraProjectDetail.taskForm.editDescription")}
+              </DialogDescription>
+            </DialogHeader>
+
+            <form
+              onSubmit={editTaskForm.handleSubmit(onEditTaskSubmit)}
+              className="space-y-4"
+            >
+              <div>
+                <Label htmlFor="edit-task-title">
+                  {translate("paraProjectDetail.taskForm.title")}
+                </Label>
+                <Input
+                  id="edit-task-title"
+                  placeholder={translate(
+                    "paraProjectDetail.taskForm.titlePlaceholder"
+                  )}
+                  {...editTaskForm.register("title")}
+                />
+                {editTaskForm.formState.errors.title && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {editTaskForm.formState.errors.title.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="edit-task-date">
+                  {translate("paraProjectDetail.taskForm.date")}
+                </Label>
+                <Input
+                  id="edit-task-date"
+                  type="date"
+                  min={formatDateForInput(project.startDate)}
+                  max={formatDateForInput(project.endDate)}
+                  {...editTaskForm.register("date")}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {translate("paraProjectDetail.duration")}:{" "}
+                  {formatDate(project.startDate, currentLanguage)} ~{" "}
+                  {formatDate(project.endDate, currentLanguage)}
                 </p>
-              )}
-            </div>
+                {editTaskForm.formState.errors.date && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {editTaskForm.formState.errors.date.message}
+                  </p>
+                )}
+              </div>
 
-            <div>
-              <Label htmlFor="edit-task-duration">
-                {translate("paraProjectDetail.taskForm.duration")}
-              </Label>
-              <Input
-                id="edit-task-duration"
-                type="number"
-                min="0.1"
-                max="24"
-                step="0.1"
-                placeholder="1.0"
-                {...editTaskForm.register("duration", { valueAsNumber: true })}
-              />
-              {editTaskForm.formState.errors.duration && (
-                <p className="text-sm text-red-500 mt-1">
-                  {editTaskForm.formState.errors.duration.message}
-                </p>
-              )}
-            </div>
+              <div>
+                <Label htmlFor="edit-task-duration">
+                  {translate("paraProjectDetail.taskForm.duration")}
+                </Label>
+                <Input
+                  id="edit-task-duration"
+                  type="number"
+                  min="0.1"
+                  max="24"
+                  step="0.1"
+                  placeholder="1.0"
+                  {...editTaskForm.register("duration", {
+                    valueAsNumber: true,
+                  })}
+                />
+                {editTaskForm.formState.errors.duration && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {editTaskForm.formState.errors.duration.message}
+                  </p>
+                )}
+              </div>
 
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowEditTaskDialog(false);
-                  setEditingTask(null);
-                  editTaskForm.reset();
-                }}
-              >
-                취소
-              </Button>
-              <Button type="submit" disabled={updateTaskMutation.isPending}>
-                {updateTaskMutation.isPending
-                  ? translate("paraProjectDetail.taskForm.editing")
-                  : translate("paraProjectDetail.taskForm.save")}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowEditTaskDialog(false);
+                    setEditingTask(null);
+                    editTaskForm.reset();
+                  }}
+                >
+                  취소
+                </Button>
+                <Button type="submit" disabled={updateTaskMutation.isPending}>
+                  {updateTaskMutation.isPending
+                    ? translate("paraProjectDetail.taskForm.editing")
+                    : translate("paraProjectDetail.taskForm.save")}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
-      {/* 삭제 확인 다이얼로그 */}
-      <ConfirmDialog
-        open={showDeleteDialog}
-        onOpenChange={setShowDeleteDialog}
-        title="프로젝트 삭제"
-        description="이 프로젝트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
-        onConfirm={() => {
-          deleteProjectMutation.mutate();
-          setShowDeleteDialog(false);
-        }}
-      />
-    </div>
-  );
+        {/* 삭제 확인 다이얼로그 */}
+        <ConfirmDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          title="프로젝트 삭제"
+          description="이 프로젝트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+          onConfirm={() => {
+            deleteProjectMutation.mutate();
+            setShowDeleteDialog(false);
+          }}
+        />
+      </div>
+    );
+  };
 }

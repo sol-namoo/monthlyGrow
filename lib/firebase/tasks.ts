@@ -1,5 +1,6 @@
 import {
   collection,
+  collectionGroup,
   doc,
   getDoc,
   getDocs,
@@ -466,47 +467,34 @@ export const getTodayTasks = async (
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // 프로젝트 서브컬렉션에서 오늘 날짜의 태스크 조회
-    const projectsQuery = query(
-      collection(db, "projects"),
-      where("userId", "==", userId)
+    // collectionGroup 쿼리로 모든 태스크 서브컬렉션에서 오늘 날짜의 태스크를 한 번에 조회
+    const tasksQuery = query(
+      collectionGroup(db, "tasks"),
+      where("userId", "==", userId),
+      where("date", ">=", Timestamp.fromDate(today)),
+      where("date", "<", Timestamp.fromDate(tomorrow))
     );
 
-    const projectsSnapshot = await getDocs(projectsQuery);
+    const tasksSnapshot = await getDocs(tasksQuery);
     const todayTasks: Task[] = [];
 
-    // 각 프로젝트의 서브컬렉션에서 태스크 조회
-    for (const projectDoc of projectsSnapshot.docs) {
-      const projectId = projectDoc.id;
+    // 각 태스크 문서에서 프로젝트 ID 추출 (경로에서)
+    tasksSnapshot.docs.forEach((doc) => {
+      const data = doc.data() as any;
+      // 경로에서 프로젝트 ID 추출: projects/{projectId}/tasks/{taskId}
+      const pathParts = doc.ref.path.split("/");
+      const projectId = pathParts[1]; // projects 다음 부분이 projectId
 
-      try {
-        const subTasksQuery = query(
-          collection(db, "projects", projectId, "tasks"),
-          where("date", ">=", Timestamp.fromDate(today)),
-          where("date", "<", Timestamp.fromDate(tomorrow))
-        );
-
-        const subTasksSnapshot = await getDocs(subTasksQuery);
-        const projectTasks = subTasksSnapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            projectId: projectId, // 프로젝트 ID 추가
-            ...data,
-            date: data.date.toDate(),
-            completedAt: data.completedAt?.toDate(),
-            createdAt: data.createdAt.toDate(),
-            updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-          } as Task;
-        });
-
-        todayTasks.push(...projectTasks);
-      } catch (error) {
-        console.error(`프로젝트 ${projectId}의 태스크 조회 실패:`, error);
-        // 개별 프로젝트 조회 실패는 전체 조회를 중단하지 않음
-        continue;
-      }
-    }
+      todayTasks.push({
+        id: doc.id,
+        projectId: projectId,
+        ...data,
+        date: data.date.toDate(),
+        completedAt: data.completedAt?.toDate(),
+        createdAt: data.createdAt.toDate(),
+        updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      } as Task);
+    });
 
     return sortTasksByDateAndTitle(todayTasks);
   } catch (error) {
@@ -558,37 +546,39 @@ export const getCompletedTasksByMonthlyPeriod = async (
       return [];
     }
 
-    // 먼슬리 기간 동안의 모든 완료된 태스크를 조회
+    // 먼슬리 기간 설정
     const startOfMonth = new Date(startDate);
     startOfMonth.setHours(0, 0, 0, 0);
     const endOfMonth = new Date(endDate);
     endOfMonth.setHours(23, 59, 59, 999);
 
-    // 1. 사용자의 모든 프로젝트 조회
+    // 1. 사용자의 모든 프로젝트 ID 목록 가져오기
     const projectsQuery = query(
       collection(db, "projects"),
       where("userId", "==", userId)
     );
     const projectsSnapshot = await getDocs(projectsQuery);
+    const projectIds = projectsSnapshot.docs.map((doc) => doc.id);
 
-    const allCompletedTasks: Task[] = [];
+    if (projectIds.length === 0) {
+      return [];
+    }
 
-    // 2. 각 프로젝트의 서브컬렉션에서 완료된 태스크 조회
-    for (const projectDoc of projectsSnapshot.docs) {
-      const projectId = projectDoc.id;
-
+    // 2. 각 프로젝트의 서브컬렉션에서 완료된 태스크들을 병렬로 조회 (단순화된 쿼리)
+    const tasksPromises = projectIds.map(async (projectId) => {
       try {
-        const subTasksQuery = query(
+        // 단순히 완료된 태스크만 조회 (날짜 필터링은 클라이언트에서)
+        const tasksQuery = query(
           collection(db, "projects", projectId, "tasks"),
           where("done", "==", true)
         );
+        const tasksSnapshot = await getDocs(tasksQuery);
 
-        const subTasksSnapshot = await getDocs(subTasksQuery);
-        const projectTasks = subTasksSnapshot.docs.map((doc) => {
+        const projectTasks = tasksSnapshot.docs.map((doc) => {
           const data = doc.data();
           return {
             id: doc.id,
-            projectId: projectId,
+            projectId,
             ...data,
             date: data.date.toDate(),
             completedAt: data.completedAt?.toDate(),
@@ -597,37 +587,49 @@ export const getCompletedTasksByMonthlyPeriod = async (
           } as Task;
         });
 
-        allCompletedTasks.push(...projectTasks);
+        return projectTasks;
       } catch (error) {
         console.error(
           `프로젝트 ${projectId}의 완료된 태스크 조회 실패:`,
           error
         );
-        // 개별 프로젝트 조회 실패는 전체 조회를 중단하지 않음
-        continue;
+        return [];
       }
+    });
+
+    const allTasksResults = await Promise.all(tasksPromises);
+    const allCompletedTasks = allTasksResults.flat();
+
+    if (allCompletedTasks.length === 0) {
+      return [];
     }
 
-    // 3. 먼슬리 기간 내의 태스크만 필터링 (completedAt 기준)
+    // 3. 클라이언트에서 날짜 범위 필터링
     const monthlyCompletedTasks = allCompletedTasks.filter((task) => {
-      const completedAt = task.completedAt || task.date; // completedAt이 없으면 date 사용
+      const completedAt = task.completedAt || task.date;
       const completedDate =
         completedAt instanceof Date ? completedAt : new Date(completedAt);
       return completedDate >= startOfMonth && completedDate <= endOfMonth;
     });
 
+    if (monthlyCompletedTasks.length === 0) {
+      return [];
+    }
+
     // 4. 프로젝트 정보를 배치로 가져와서 성능 최적화
-    const projectIds = [
+    const uniqueProjectIds = [
       ...new Set(monthlyCompletedTasks.map((task) => task.projectId)),
     ];
     const projectDocs = await Promise.all(
-      projectIds.map((projectId) => getDoc(doc(db, "projects", projectId)))
+      uniqueProjectIds.map((projectId) =>
+        getDoc(doc(db, "projects", projectId))
+      )
     );
 
     const projectDataMap = new Map();
     projectDocs.forEach((doc, index) => {
       if (doc.exists()) {
-        projectDataMap.set(projectIds[index], doc.data());
+        projectDataMap.set(uniqueProjectIds[index], doc.data());
       }
     });
 
@@ -639,6 +641,7 @@ export const getCompletedTasksByMonthlyPeriod = async (
           .filter(Boolean)
       ),
     ];
+
     const areaDocs = await Promise.all(
       areaIds.map((areaId) => getDoc(doc(db, "areas", areaId)))
     );
@@ -668,23 +671,19 @@ export const getCompletedTasksByMonthlyPeriod = async (
           projectTitle: projectData.title || "제목 없음",
           areaName,
           taskTitle: task.title,
-          completedAt: task.completedAt || task.date, // 완료 시점 (completedAt이 있으면 사용, 없으면 date 사용)
+          completedAt: task.completedAt || task.date,
           date: task.date,
         };
       })
-      .filter(
-        (
-          item
-        ): item is {
-          taskId: string;
-          projectId: string;
-          projectTitle: string;
-          areaName: string;
-          taskTitle: string;
-          completedAt: Date;
-          date: Date;
-        } => item !== null
-      );
+      .filter((item) => item !== null) as {
+      taskId: string;
+      projectId: string;
+      projectTitle: string;
+      areaName: string;
+      taskTitle: string;
+      completedAt: Date;
+      date: Date;
+    }[];
 
     return result;
   } catch (error) {

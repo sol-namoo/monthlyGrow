@@ -11,6 +11,8 @@ import {
   orderBy,
   limit,
   runTransaction,
+  startAfter,
+  QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "./config";
 import {
@@ -61,6 +63,84 @@ export const fetchRecentMonthliesByUserId = async (
       updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
     } as Monthly;
   });
+};
+
+export const fetchPastMonthliesByUserIdWithPaging = async (
+  userId: string,
+  pageSize: number = 10,
+  lastDoc?: QueryDocumentSnapshot,
+  sortBy: "latest" | "oldest" | "completionRate" = "latest"
+): Promise<{
+  monthlies: Monthly[];
+  lastDoc: QueryDocumentSnapshot | null;
+  hasMore: boolean;
+}> => {
+  // 간단한 쿼리로 변경 (복합 인덱스 불필요)
+  let q = query(
+    collection(db, "monthlies"),
+    where("userId", "==", userId),
+    orderBy("endDate", "desc") // 기본적으로 최신순으로 정렬
+  );
+
+  // 페이지네이션 적용
+  if (lastDoc) {
+    q = query(q, startAfter(lastDoc), limit(pageSize * 2)); // 여유있게 가져와서 필터링
+  } else {
+    q = query(q, limit(pageSize * 2)); // 여유있게 가져와서 필터링
+  }
+
+  const querySnapshot = await getDocs(q);
+  const allMonthlies = querySnapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      startDate: data.startDate.toDate(),
+      endDate: data.endDate.toDate(),
+      createdAt: data.createdAt.toDate(),
+      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+    } as Monthly;
+  });
+
+  // getMonthlyStatus를 사용하여 과거 먼슬리만 필터링
+  const { getMonthlyStatus } = await import("../utils");
+  const pastMonthlies = allMonthlies.filter((monthly) => getMonthlyStatus(monthly) === "ended");
+
+  // 정렬 적용
+  let sortedMonthlies = [...pastMonthlies];
+  switch (sortBy) {
+    case "latest":
+      sortedMonthlies.sort((a, b) => b.endDate.getTime() - a.endDate.getTime());
+      break;
+    case "oldest":
+      sortedMonthlies.sort((a, b) => a.endDate.getTime() - b.endDate.getTime());
+      break;
+    case "completionRate":
+      sortedMonthlies.sort((a, b) => {
+        const aProgress = calculateMonthlyProgress(a);
+        const bProgress = calculateMonthlyProgress(b);
+        return bProgress - aProgress; // 내림차순 (높은 완료율이 위로)
+      });
+      break;
+  }
+
+  // 페이지 크기만큼 자르기
+  const paginatedMonthlies = sortedMonthlies.slice(0, pageSize);
+
+  return {
+    monthlies: paginatedMonthlies,
+    lastDoc: querySnapshot.docs[querySnapshot.docs.length - 1] || null,
+    hasMore: paginatedMonthlies.length === pageSize && sortedMonthlies.length > pageSize,
+  };
+};
+
+// 먼슬리 완료율 계산 헬퍼 함수
+const calculateMonthlyProgress = (monthly: Monthly): number => {
+  if (!monthly.keyResults || monthly.keyResults.length === 0) {
+    return 0;
+  }
+  const completedCount = monthly.keyResults.filter((kr) => kr.isCompleted).length;
+  return (completedCount / monthly.keyResults.length) * 100;
 };
 
 export const fetchMonthlyById = async (monthlyId: string): Promise<Monthly> => {
@@ -231,7 +311,7 @@ export const createMonthly = async (
     };
 
     const docRef = await addDoc(collection(db, "monthlies"), newMonthly);
-    console.log(`✅ 먼슬리 생성 완료 - ID: ${docRef.id}`);
+
 
     return {
       id: docRef.id,
@@ -245,7 +325,7 @@ export const createMonthly = async (
       updatedAt: new Date(),
     } as Monthly;
   } catch (error) {
-    console.error("❌ 먼슬리 생성 실패:", error);
+
     if (error instanceof Error) {
       throw new Error(`먼슬리 생성에 실패했습니다: ${error.message}`);
     }
@@ -264,9 +344,9 @@ export const updateMonthly = async (
     });
 
     await updateDoc(doc(db, "monthlies", monthlyId), filteredData);
-    console.log(`✅ 먼슬리 업데이트 완료 - ID: ${monthlyId}`);
+
   } catch (error) {
-    console.error(`❌ 먼슬리 업데이트 실패 - ID: ${monthlyId}`, error);
+
     throw new Error("먼슬리 업데이트에 실패했습니다.");
   }
 };
@@ -320,9 +400,9 @@ export const deleteMonthlyById = async (monthlyId: string): Promise<void> => {
       transaction.delete(monthlyRef);
     });
 
-    console.log(`✅ 먼슬리 삭제 완료 - ID: ${monthlyId}`);
+
   } catch (error) {
-    console.error(`❌ 먼슬리 삭제 실패 - ID: ${monthlyId}`, error);
+
     if (error instanceof Error) {
       throw new Error(`먼슬리 삭제에 실패했습니다: ${error.message}`);
     }

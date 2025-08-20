@@ -73,8 +73,30 @@ export const paraProjectDetail = {
   },
   retrospective: {
     title: "Project Retrospective",
-    bestMoment: "Best Moment",
-    bestMomentPlaceholder: "Record the best moment from this project",
+    bestMoment: {
+      label: "Best Moment",
+      placeholder: "Record the best moment from this project",
+    },
+    routineAdherence: {
+      label: "Routine Adherence",
+      placeholder: "How well did you follow your planned routine?",
+    },
+    unexpectedObstacles: {
+      label: "Unexpected Obstacles",
+      placeholder: "Were there any unexpected obstacles?",
+    },
+    nextMonthlyApplication: {
+      label: "Next Monthly Application",
+      placeholder: "What will you apply to the next monthly?",
+    },
+    helpful: {
+      label: "Was this retrospective helpful to you?",
+    },
+    bookmark: {
+      label: "Mark as a retrospective to read again",
+      description:
+        "Important retrospectives can be bookmarked for easy access later",
+    },
     challenges: "Challenges",
     challengesPlaceholder: "Record the challenges you faced in this project",
     learnings: "Learnings",
@@ -93,6 +115,19 @@ export const paraProjectDetail = {
     inProgressDescription:
       "Project is in progress. You can write a retrospective after completion",
     writeTitle: "Write Retrospective",
+    smartRetrospective: {
+      title: "Smart Retrospective",
+      description:
+        "Additional analysis that appears when project completion rate is below 90%",
+      planningNeedsImprovement: "Planning Improvement Needed",
+      planningDescription:
+        "There were areas that needed improvement in the project planning phase",
+      executionNeedsImprovement: "Execution Improvement Needed",
+      executionDescription:
+        "There were areas that needed improvement in the project execution process",
+      otherReason: "Other Reasons",
+      otherReasonPlaceholder: "Record any other areas that need improvement",
+    },
   },
   delete: {
     title: "Delete Project",

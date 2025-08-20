@@ -43,13 +43,17 @@ import {
   deleteMonthlyById,
   updateProjectConnectedMonthlies,
   getCompletedTasksByMonthlyPeriod,
+  fetchSingleArchive,
+  createUnifiedArchive,
+  updateUnifiedArchive,
 } from "@/lib/firebase/index";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase/index";
 import { formatDate, getMonthlyStatus } from "@/lib/utils";
 import { RetrospectiveForm } from "@/components/RetrospectiveForm";
-import { MonthlyNoteForm } from "@/components/MonthlyNoteForm";
+import { NoteForm } from "@/components/NoteForm";
 import { ProjectConnectionDialog } from "@/components/monthly/ProjectConnectionDialog";
+import { RatingDisplay } from "@/components/ui/rating-display";
 
 interface MonthlyDetailContentProps {
   monthly: Monthly & { connectedProjects?: Project[] };
@@ -87,7 +91,7 @@ export function MonthlyDetailContent({
   // 사용자 정보
   const [user] = useAuthState(auth);
 
-  // 완료된 태스크 조회 (느슨한 관계 지원)
+  // 완료된 태스크 조회 (느슨한 관계 지원) - 탭이 활성화될 때만 가져오기
   const { data: completedTasks, isLoading: completedTasksLoading } = useQuery({
     queryKey: [
       "completedTasks",
@@ -101,7 +105,51 @@ export function MonthlyDetailContent({
         new Date(monthly.startDate),
         new Date(monthly.endDate)
       ),
-    enabled: !!user?.uid && !!monthly.id,
+    enabled: !!user?.uid && !!monthly.id && activeTab === "completed-tasks",
+    staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
+    gcTime: 10 * 60 * 1000, // 10분간 가비지 컬렉션 방지
+  });
+
+  // 먼슬리 관련 아카이브 조회 (회고와 노트 각각 하나씩만) - 탭이 활성화될 때만 가져오기
+  const { data: monthlyRetrospective, isLoading: retrospectiveLoading } =
+    useQuery({
+      queryKey: ["monthly-retrospective", monthly.id],
+      queryFn: async () => {
+        console.log("🔍 회고 조회 중:", {
+          userId: user?.uid,
+          monthlyId: monthly.id,
+        });
+        const result = await fetchSingleArchive(
+          user?.uid || "",
+          monthly.id,
+          "monthly_retrospective"
+        );
+        console.log("📋 회고 조회 결과:", result);
+        return result;
+      },
+      enabled: !!user?.uid && !!monthly.id && activeTab === "retrospective",
+      staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
+      gcTime: 10 * 60 * 1000, // 10분간 가비지 컬렉션 방지
+    });
+
+  const { data: monthlyNote, isLoading: noteLoading } = useQuery({
+    queryKey: ["monthly-note", monthly.id],
+    queryFn: async () => {
+      console.log("🔍 노트 조회 중:", {
+        userId: user?.uid,
+        monthlyId: monthly.id,
+      });
+      const result = await fetchSingleArchive(
+        user?.uid || "",
+        monthly.id,
+        "monthly_note"
+      );
+      console.log("📋 노트 조회 결과:", result);
+      return result;
+    },
+    enabled: !!user?.uid && !!monthly.id && activeTab === "notes",
+    staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
+    gcTime: 10 * 60 * 1000, // 10분간 가비지 컬렉션 방지
   });
 
   // completed tasks가 로드되면 모든 프로젝트를 기본적으로 접힌 상태로 설정
@@ -138,6 +186,10 @@ export function MonthlyDetailContent({
       ? Math.round((keyResultsCompleted / keyResultsTotal) * 100)
       : 0;
 
+  // 회고/노트 수정 가능 여부: 진행중이거나 완료된 먼슬리에서만 가능
+  const canEditRetrospectiveAndNote =
+    status === "in_progress" || status === "ended";
+
   // Key Result 업데이트 뮤테이션
   const updateKeyResultMutation = useMutation({
     mutationFn: async ({
@@ -160,18 +212,18 @@ export function MonthlyDetailContent({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["monthlies"] });
       toast({
-        title: translate("monthly.detail.keyResultUpdate.success.title"),
+        title: translate("monthlyDetail.keyResultUpdate.success.title"),
         description: translate(
-          "monthly.detail.keyResultUpdate.success.description"
+          "monthlyDetail.keyResultUpdate.success.description"
         ),
       });
     },
     onError: (error) => {
       console.error("Key Result 업데이트 실패:", error);
       toast({
-        title: translate("monthly.detail.keyResultUpdate.error.title"),
+        title: translate("monthlyDetail.keyResultUpdate.error.title"),
         description: translate(
-          "monthly.detail.keyResultUpdate.error.description"
+          "monthlyDetail.keyResultUpdate.error.description"
         ),
         variant: "destructive",
       });
@@ -183,8 +235,8 @@ export function MonthlyDetailContent({
     mutationFn: () => deleteMonthlyById(monthly.id),
     onSuccess: () => {
       toast({
-        title: translate("monthly.detail.delete.success.title"),
-        description: translate("monthly.detail.delete.success.description"),
+        title: translate("monthlyDetail.delete.success.title"),
+        description: translate("monthlyDetail.delete.success.description"),
       });
       if (onDelete) {
         onDelete();
@@ -193,8 +245,8 @@ export function MonthlyDetailContent({
     onError: (error) => {
       console.error("먼슬리 삭제 실패:", error);
       toast({
-        title: translate("monthly.detail.delete.error.title"),
-        description: translate("monthly.detail.delete.error.description"),
+        title: translate("monthlyDetail.delete.error.title"),
+        description: translate("monthlyDetail.delete.error.description"),
         variant: "destructive",
       });
     },
@@ -256,13 +308,126 @@ export function MonthlyDetailContent({
     });
   };
 
-  const handleRetrospectiveSave = (data: any) => {
-    // TODO: 회고 데이터를 저장하는 로직 구현
-    console.log("회고 데이터:", data);
-    toast({
-      title: "회고 저장 완료",
-      description: "회고가 성공적으로 저장되었습니다.",
+  // undefined 값을 정리하고 failedKeyResults 데이터를 최적화하는 함수
+  const cleanFailedKeyResults = (failedKeyResults: any[]): any[] => {
+    if (!Array.isArray(failedKeyResults)) return [];
+
+    return failedKeyResults.map((item) => {
+      const cleaned: any = {
+        keyResultId: item.keyResultId,
+        keyResultTitle: item.keyResultTitle,
+        reason: item.reason,
+      };
+
+      // reason이 'other'이고 customReason이 비어있는 경우 reason을 'other'로 유지
+      if (item.reason === "other") {
+        if (item.customReason && item.customReason.trim()) {
+          cleaned.customReason = item.customReason.trim();
+        }
+        // customReason이 비어있어도 reason: 'other'는 유지
+      }
+
+      return cleaned;
     });
+  };
+
+  // undefined 값을 null로 변환하는 함수 (다른 필드용)
+  const cleanUndefinedValues = (obj: any): any => {
+    if (obj === undefined) return null;
+    if (obj === null) return null;
+    if (Array.isArray(obj)) {
+      return obj.map(cleanUndefinedValues);
+    }
+    if (typeof obj === "object") {
+      const cleaned: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined) {
+          cleaned[key] = cleanUndefinedValues(value);
+        }
+      }
+      return cleaned;
+    }
+    return obj;
+  };
+
+  const handleRetrospectiveSave = async (data: any) => {
+    try {
+      console.log("회고 저장 시작:", {
+        data,
+        userId: user?.uid,
+        monthlyId: monthly.id,
+      });
+
+      // 먼슬리 회고 저장 로직
+      const retrospectiveData = {
+        userId: user?.uid || "",
+        monthlyId: monthly.id,
+        ...data,
+      };
+
+      // 기존 회고가 있는지 확인
+      const existingArchive = await fetchSingleArchive(
+        user?.uid || "",
+        monthly.id,
+        "monthly_retrospective"
+      );
+
+      if (existingArchive) {
+        // 기존 아카이브 업데이트
+        await updateUnifiedArchive(existingArchive.id, {
+          title: monthly.objective || "",
+          content: data.freeformContent || "",
+          userRating: data.userRating,
+          bookmarked: data.bookmarked,
+          bestMoment: data.bestMoment,
+          keyResultsReview: data.keyResultsReview,
+          completedKeyResults: data.completedKeyResults,
+          failedKeyResults: cleanFailedKeyResults(data.failedKeyResults),
+          unexpectedObstacles: data.unexpectedObstacles,
+          nextMonthlyApplication: data.nextMonthlyApplication,
+        });
+      } else {
+        // 새 아카이브 생성
+
+        const archiveData = {
+          userId: user?.uid || "",
+          type: "monthly_retrospective" as const,
+          parentId: monthly.id,
+          title: monthly.objective || "",
+          content: data.freeformContent || "",
+          userRating: data.userRating,
+          bookmarked: data.bookmarked,
+          bestMoment: data.bestMoment,
+          keyResultsReview: data.keyResultsReview,
+          completedKeyResults: data.completedKeyResults,
+          failedKeyResults: cleanFailedKeyResults(data.failedKeyResults),
+          unexpectedObstacles: data.unexpectedObstacles,
+          nextMonthlyApplication: data.nextMonthlyApplication,
+        };
+
+        console.log("새 아카이브 생성 시도:", archiveData);
+        await createUnifiedArchive(archiveData);
+      }
+
+      console.log("회고 데이터:", data);
+      // 회고 저장 후 아카이브 데이터 새로고침
+      queryClient.invalidateQueries({
+        queryKey: ["monthly-retrospective", monthly.id],
+      });
+      toast({
+        title: translate("monthlyDetail.retrospective.saveSuccess"),
+        description: translate(
+          "monthlyDetail.retrospective.saveSuccessDescription"
+        ),
+      });
+    } catch (error) {
+      console.error("회고 저장 실패:", error);
+      toast({
+        title: "회고 저장 실패",
+        description: "회고 저장 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
   };
 
   const title = `${monthly.objective}`;
@@ -429,7 +594,7 @@ export function MonthlyDetailContent({
             <div className="flex items-center gap-2 mb-2">
               <FolderOpen className="h-4 w-4 text-green-600 dark:text-green-400" />
               <span className="text-sm font-medium">
-                {translate("monthly.detail.connectedProjects")}
+                {translate("monthlyDetail.connectedProjects")}
               </span>
             </div>
 
@@ -461,16 +626,16 @@ export function MonthlyDetailContent({
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="key-results" className="min-w-0 flex-1">
-            {translate("monthly.detail.tabs.keyResults")}
+            {translate("monthlyDetail.tabs.keyResults")}
           </TabsTrigger>
           <TabsTrigger value="completed-tasks" className="min-w-0 flex-1">
-            {translate("monthly.detail.tabs.completedTasks")}
+            {translate("monthlyDetail.tabs.completedTasks")}
           </TabsTrigger>
           <TabsTrigger value="retrospective" className="min-w-0 flex-1">
-            {translate("monthly.detail.tabs.retrospective")}
+            {translate("monthlyDetail.tabs.retrospective")}
           </TabsTrigger>
           <TabsTrigger value="notes" className="min-w-0 flex-1">
-            {translate("monthly.detail.tabs.note")}
+            {translate("monthlyDetail.tabs.note")}
           </TabsTrigger>
         </TabsList>
 
@@ -529,14 +694,12 @@ export function MonthlyDetailContent({
                       >
                         {keyResult.isCompleted
                           ? translate(
-                              "monthly.detail.keyResults.status.completed"
+                              "monthlyDetail.keyResults.status.completed"
                             )
                           : status === "planned"
-                          ? translate(
-                              "monthly.detail.keyResults.status.planned"
-                            )
+                          ? translate("monthlyDetail.keyResults.status.planned")
                           : translate(
-                              "monthly.detail.keyResults.status.inProgress"
+                              "monthlyDetail.keyResults.status.inProgress"
                             )}
                       </Badge>
                       {!isPastMonthly && (
@@ -558,17 +721,17 @@ export function MonthlyDetailContent({
                   <div className="w-12 h-12 mx-auto rounded-full border-2 border-muted-foreground/30"></div>
                 </div>
                 <h3 className="text-lg font-medium mb-2">
-                  {translate("monthly.detail.keyResults.noKeyResults")}
+                  {translate("monthlyDetail.keyResults.noKeyResults")}
                 </h3>
                 <p className="text-sm text-muted-foreground mb-6">
                   {translate(
-                    "monthly.detail.keyResults.noKeyResultsDescription"
+                    "monthlyDetail.keyResults.noKeyResultsDescription"
                   )}
                 </p>
                 {!isPastMonthly && (
                   <Button variant="outline" className="w-full bg-transparent">
                     <Plus className="mr-2 h-4 w-4" />
-                    {translate("monthly.detail.keyResults.addKeyResult")}
+                    {translate("monthlyDetail.keyResults.addKeyResult")}
                   </Button>
                 )}
               </Card>
@@ -579,7 +742,7 @@ export function MonthlyDetailContent({
               !isPastMonthly && (
                 <Button variant="outline" className="w-full bg-transparent">
                   <Plus className="mr-2 h-4 w-4" />
-                  {translate("monthly.detail.keyResults.addKeyResult")}
+                  {translate("monthlyDetail.keyResults.addKeyResult")}
                 </Button>
               )}
           </div>
@@ -708,20 +871,20 @@ export function MonthlyDetailContent({
                   <div className="w-12 h-12 mx-auto rounded-full border-2 border-muted-foreground/30"></div>
                 </div>
                 <h3 className="text-lg font-medium mb-2">
-                  {translate("monthly.detail.completedTasks.noTasks.title")}
+                  {translate("monthlyDetail.completedTasks.noTasks.title")}
                 </h3>
                 <p className="text-sm text-muted-foreground mb-6">
                   {translate(
-                    "monthly.detail.completedTasks.noTasks.description"
+                    "monthlyDetail.completedTasks.noTasks.description"
                   )}
                   <br />
-                  {translate("monthly.detail.completedTasks.noTasks.hint")}
+                  {translate("monthlyDetail.completedTasks.noTasks.hint")}
                 </p>
 
                 <Button asChild className="w-full">
                   <Link href="/para/projects">
                     <FolderOpen className="mr-2 h-4 w-4" />
-                    {translate("monthly.detail.viewProjects")}
+                    {translate("monthlyDetail.viewProjects")}
                   </Link>
                 </Button>
               </Card>
@@ -732,17 +895,24 @@ export function MonthlyDetailContent({
         {/* 회고 탭 */}
         <TabsContent value="retrospective" className="mt-0">
           <div className="space-y-4">
-            {status === "planned" ? (
+            {retrospectiveLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  회고 데이터를 불러오는 중...
+                </p>
+              </div>
+            ) : status === "planned" ? (
               <Card className="p-8 text-center bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
                 <div className="mb-4">
                   <Target className="h-12 w-12 mx-auto text-muted-foreground/50" />
                 </div>
                 <h3 className="text-lg font-medium mb-2">
-                  {translate("monthly.detail.retrospective.notStarted.title")}
+                  {translate("monthlyDetail.retrospective.notStarted.title")}
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   {translate(
-                    "monthly.detail.retrospective.notStarted.description"
+                    "monthlyDetail.retrospective.notStarted.description"
                   )}
                 </p>
               </Card>
@@ -750,7 +920,7 @@ export function MonthlyDetailContent({
               <>
                 {/* 회고 목록 */}
                 <div className="space-y-4">
-                  {monthly.retrospective ? (
+                  {monthlyRetrospective ? (
                     <Card className="p-6 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
@@ -758,51 +928,139 @@ export function MonthlyDetailContent({
                           <h3 className="font-bold">회고</h3>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs">
-                            {monthly.retrospective.userRating}/5
-                          </Badge>
-                          {monthly.retrospective.bookmarked && (
-                            <Bookmark className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                          )}
+                          <RatingDisplay
+                            rating={monthlyRetrospective.userRating || 0}
+                            bookmarked={monthlyRetrospective.bookmarked}
+                            size="sm"
+                          />
                         </div>
                       </div>
 
                       <div className="space-y-4">
-                        <div>
-                          <h4 className="font-semibold text-sm mb-2">
-                            가장 기억에 남는 순간
-                          </h4>
-                          <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
-                            {monthly.retrospective.bestMoment}
-                          </p>
-                        </div>
+                        {monthlyRetrospective.bestMoment && (
+                          <div>
+                            <h4 className="font-semibold text-sm mb-2">
+                              가장 기억에 남는 순간
+                            </h4>
+                            <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
+                              {monthlyRetrospective.bestMoment}
+                            </p>
+                          </div>
+                        )}
 
-                        <div>
-                          <h4 className="font-semibold text-sm mb-2">
-                            루틴 준수율
-                          </h4>
-                          <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
-                            {monthly.retrospective.routineAdherence}
-                          </p>
-                        </div>
+                        {monthlyRetrospective.routineAdherence && (
+                          <div>
+                            <h4 className="font-semibold text-sm mb-2">
+                              루틴 준수율
+                            </h4>
+                            <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
+                              {monthlyRetrospective.routineAdherence}
+                            </p>
+                          </div>
+                        )}
 
-                        <div>
-                          <h4 className="font-semibold text-sm mb-2">
-                            예상치 못한 장애물
-                          </h4>
-                          <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
-                            {monthly.retrospective.unexpectedObstacles}
-                          </p>
-                        </div>
+                        {monthlyRetrospective.unexpectedObstacles && (
+                          <div>
+                            <h4 className="font-semibold text-sm mb-2">
+                              예상치 못한 장애물
+                            </h4>
+                            <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
+                              {monthlyRetrospective.unexpectedObstacles}
+                            </p>
+                          </div>
+                        )}
 
-                        <div>
-                          <h4 className="font-semibold text-sm mb-2">
-                            다음 달 적용 사항
-                          </h4>
-                          <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
-                            {monthly.retrospective.nextMonthlyApplication}
-                          </p>
-                        </div>
+                        {monthlyRetrospective.keyResultsReview && (
+                          <div>
+                            <h4 className="font-semibold text-sm mb-2">
+                              핵심 지표 리뷰
+                            </h4>
+                            <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
+                              {monthlyRetrospective.keyResultsReview}
+                            </p>
+                          </div>
+                        )}
+
+                        {monthlyRetrospective.nextMonthlyApplication && (
+                          <div>
+                            <h4 className="font-semibold text-sm mb-2">
+                              다음 달 적용 사항
+                            </h4>
+                            <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
+                              {monthlyRetrospective.nextMonthlyApplication}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Key Results 실패 이유 표시 (새로 추가) */}
+                        {monthlyRetrospective.failedKeyResults &&
+                          monthlyRetrospective.failedKeyResults.length > 0 && (
+                            <div>
+                              <h4 className="font-semibold text-sm mb-2 text-red-700 dark:text-red-300">
+                                달성하지 못한 Key Results 분석
+                              </h4>
+                              <div className="space-y-2">
+                                {monthlyRetrospective.failedKeyResults.map(
+                                  (failedKr, index) => (
+                                    <div
+                                      key={index}
+                                      className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg"
+                                    >
+                                      <div className="flex items-center justify-between mb-2">
+                                        <h5 className="text-sm font-medium text-red-800 dark:text-red-200">
+                                          {failedKr.keyResultTitle}
+                                        </h5>
+                                        <Badge
+                                          variant="destructive"
+                                          className="text-xs"
+                                        >
+                                          {translate(
+                                            "monthlyDetail.retrospectiveForm.status.failed"
+                                          )}
+                                        </Badge>
+                                      </div>
+                                      <div className="text-xs text-red-700 dark:text-red-300">
+                                        <span className="font-medium">
+                                          {translate(
+                                            "monthlyDetail.retrospective.failureReason"
+                                          )}
+                                          :{" "}
+                                        </span>
+                                        {failedKr.reason ===
+                                          "unrealisticGoal" &&
+                                          translate(
+                                            "monthlyDetail.retrospectiveForm.failedReasonOptions.unrealisticGoal"
+                                          )}
+                                        {failedKr.reason === "timeManagement" &&
+                                          translate(
+                                            "monthlyDetail.retrospectiveForm.failedReasonOptions.timeManagement"
+                                          )}
+                                        {failedKr.reason ===
+                                          "priorityMismatch" &&
+                                          translate(
+                                            "monthlyDetail.retrospectiveForm.failedReasonOptions.priorityMismatch"
+                                          )}
+                                        {failedKr.reason ===
+                                          "externalFactors" &&
+                                          translate(
+                                            "monthlyDetail.retrospectiveForm.failedReasonOptions.externalFactors"
+                                          )}
+                                        {failedKr.reason === "motivation" &&
+                                          translate(
+                                            "monthlyDetail.retrospectiveForm.failedReasonOptions.motivation"
+                                          )}
+                                        {failedKr.reason === "other" &&
+                                          (failedKr.customReason ||
+                                            translate(
+                                              "monthlyDetail.retrospectiveForm.failedReasonOptions.other"
+                                            ))}
+                                      </div>
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          )}
                       </div>
                     </Card>
                   ) : (
@@ -811,10 +1069,14 @@ export function MonthlyDetailContent({
                         <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground/50" />
                       </div>
                       <h3 className="text-lg font-medium mb-2">
-                        아직 작성된 회고가 없어요
+                        {translate(
+                          "monthlyDetail.retrospective.noRetrospective"
+                        )}
                       </h3>
                       <p className="text-sm text-muted-foreground mb-6">
-                        이번 먼슬리에 대한 회고를 작성해보세요
+                        {translate(
+                          "monthlyDetail.retrospective.noRetrospectiveDescription"
+                        )}
                       </p>
                       {!isPastMonthly && (
                         <Button
@@ -823,7 +1085,9 @@ export function MonthlyDetailContent({
                           onClick={() => setShowRetrospectiveModal(true)}
                         >
                           <Plus className="mr-2 h-4 w-4" />
-                          회고 작성하기
+                          {translate(
+                            "monthlyDetail.retrospective.writeRetrospective"
+                          )}
                         </Button>
                       )}
                     </Card>
@@ -837,34 +1101,56 @@ export function MonthlyDetailContent({
         {/* 노트 탭 */}
         <TabsContent value="notes" className="mt-0">
           <div className="space-y-4">
-            <Card className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
-              <div className="flex items-center gap-2 mb-3">
-                <MessageSquare className="h-4 w-4" />
-                <h3 className="font-bold">노트</h3>
-                <span className="text-xs text-muted-foreground">
-                  마지막 업데이트:{" "}
-                  {monthly.updatedAt
-                    ? formatDate(monthly.updatedAt, "ko")
-                    : "없음"}
-                </span>
-              </div>
-              <div className="p-4 bg-muted/40 dark:bg-muted/30 rounded-lg min-h-[120px]">
-                <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                  {typeof monthly.note === "string"
-                    ? monthly.note
-                    : "이번 먼슬리에 대한 메모를 작성해보세요"}
+            {monthlyNote ? (
+              <Card className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
+                <div className="flex items-center gap-2 mb-3">
+                  <MessageSquare className="h-4 w-4" />
+                  <h3 className="font-bold">노트</h3>
+                  <span className="text-xs text-muted-foreground">
+                    마지막 업데이트:{" "}
+                    {monthlyNote.updatedAt
+                      ? formatDate(monthlyNote.updatedAt, "ko")
+                      : "없음"}
+                  </span>
+                </div>
+                <div className="p-4 bg-muted/40 dark:bg-muted/30 rounded-lg min-h-[120px]">
+                  <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                    {monthlyNote.content}
+                  </p>
+                </div>
+              </Card>
+            ) : (
+              <Card className="p-8 text-center bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
+                <div className="mb-4">
+                  <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                </div>
+                <h3 className="text-lg font-medium mb-2">
+                  {translate("monthlyDetail.note.noNote")}
+                </h3>
+                <p className="text-sm text-muted-foreground mb-6">
+                  {translate("monthlyDetail.note.noNoteDescription")}
                 </p>
-              </div>
-            </Card>
+                {!isPastMonthly && (
+                  <Button
+                    variant="outline"
+                    className="w-full bg-transparent"
+                    onClick={() => setShowNoteForm(true)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    {translate("monthlyDetail.note.writeNote")}
+                  </Button>
+                )}
+              </Card>
+            )}
 
-            {!isPastMonthly && (
+            {!isPastMonthly && monthlyNote && (
               <Button
                 variant="outline"
                 className="w-full bg-transparent"
                 onClick={() => setShowNoteForm(true)}
               >
                 <Edit className="mr-2 h-4 w-4" />
-                노트 편집하기
+                {translate("monthlyDetail.note.editNote")}
               </Button>
             )}
           </div>
@@ -876,22 +1162,23 @@ export function MonthlyDetailContent({
         <ConfirmDialog
           open={showDeleteDialog}
           onOpenChange={setShowDeleteDialog}
-          title={translate("monthly.detail.delete.title")}
-          description={translate("monthly.detail.delete.description")}
+          title={translate("monthlyDetail.delete.title")}
+          description={translate("monthlyDetail.delete.description")}
           onConfirm={() => {
             deleteMutation.mutate();
             setShowDeleteDialog(false);
           }}
           onCancel={() => setShowDeleteDialog(false)}
-          confirmText={translate("monthly.detail.delete.confirm")}
-          cancelText={translate("monthly.detail.delete.cancel")}
+          confirmText={translate("monthlyDetail.delete.confirm")}
+          cancelText={translate("monthlyDetail.delete.cancel")}
         />
       )}
 
       {/* 회고 작성 모달 */}
-      {showRetrospectiveModal && !isPastMonthly && (
+      {showRetrospectiveModal && canEditRetrospectiveAndNote && (
         <RetrospectiveForm
-          monthlyTitle={monthly.objective}
+          type="monthly"
+          title={monthly.objective}
           keyResults={monthly.keyResults || []}
           onClose={() => setShowRetrospectiveModal(false)}
           onSave={handleRetrospectiveSave}
@@ -899,14 +1186,15 @@ export function MonthlyDetailContent({
       )}
 
       {/* 노트 편집 모달 */}
-      {showNoteForm && !isPastMonthly && (
-        <MonthlyNoteForm
-          monthly={monthly}
+      {showNoteForm && canEditRetrospectiveAndNote && (
+        <NoteForm
+          type="monthly"
+          parent={monthly}
           onClose={() => setShowNoteForm(false)}
           onSave={() => {
             // 노트 저장 후 데이터 새로고침
             queryClient.invalidateQueries({
-              queryKey: ["monthly", monthly.id],
+              queryKey: ["monthly-note", monthly.id],
             });
           }}
         />

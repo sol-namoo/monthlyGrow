@@ -32,5 +32,5 @@ export const storage = getStorage(app);
 
 // Set persistence to LOCAL (localStorage)
 setPersistence(auth, browserLocalPersistence).catch((error) => {
-  console.error("Auth persistence 설정 실패:", error);
+  
 }); 

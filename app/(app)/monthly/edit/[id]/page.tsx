@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, use, Suspense, useEffect } from "react";
+import { useState, use, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,21 +17,15 @@ import {
 } from "@/components/ui/select";
 import {
   ChevronLeft,
-  Calendar,
   Info,
   X,
   Plus,
   Target,
-  Save,
   Clock,
   Trophy,
-  MessageSquare,
   FolderOpen,
   ExternalLink,
-  ChevronDown,
-  ChevronRight,
   Edit,
-  Trash2,
   Compass,
   Heart,
   Brain,
@@ -55,12 +49,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Checkbox } from "@/components/ui/checkbox";
 import { formatDate, getMonthlyStatus } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
@@ -71,12 +59,15 @@ import {
   fetchAllProjectsByUserId,
   updateMonthly,
   fetchAllAreasByUserId,
+  createUnifiedArchive,
+  updateUnifiedArchive,
+  fetchSingleArchive,
 } from "@/lib/firebase/index";
 import { useToast } from "@/hooks/use-toast";
-import { Monthly, KeyResult } from "@/lib/types";
+import { KeyResult } from "@/lib/types";
 
 import { RetrospectiveForm } from "@/components/RetrospectiveForm";
-import { MonthlyNoteForm } from "@/components/MonthlyNoteForm";
+import { NoteForm } from "@/components/NoteForm";
 
 // 아이콘 컴포넌트 가져오기 함수
 const getIconComponent = (iconId: string) => {
@@ -249,16 +240,16 @@ export default function EditMonthlyPage({
       queryClient.invalidateQueries({ queryKey: ["monthly", id] });
       queryClient.invalidateQueries({ queryKey: ["monthlies"] });
       toast({
-        title: translate("monthly.edit.success.title"),
-        description: translate("monthly.edit.success.description"),
+        title: translate("monthlyEdit.success.title"),
+        description: translate("monthlyEdit.success.description"),
       });
       router.push(`/monthly/${id}`);
     },
     onError: (error) => {
       console.error("먼슬리 업데이트 실패:", error);
       toast({
-        title: translate("monthly.edit.error.title"),
-        description: translate("monthly.edit.error.description"),
+        title: translate("monthlyEdit.error.title"),
+        description: translate("monthlyEdit.error.description"),
         variant: "destructive",
       });
     },
@@ -304,8 +295,8 @@ export default function EditMonthlyPage({
 
     if (!objective.trim()) {
       toast({
-        title: translate("monthly.edit.validation.title"),
-        description: translate("monthly.edit.validation.objectiveRequired"),
+        title: translate("monthlyEdit.validation.title"),
+        description: translate("monthlyEdit.validation.objectiveRequired"),
         variant: "destructive",
       });
       return;
@@ -313,8 +304,8 @@ export default function EditMonthlyPage({
 
     if (keyResults.length === 0) {
       toast({
-        title: translate("monthly.edit.validation.title"),
-        description: translate("monthly.edit.validation.minKeyResults"),
+        title: translate("monthlyEdit.validation.title"),
+        description: translate("monthlyEdit.validation.minKeyResults"),
         variant: "destructive",
       });
       return;
@@ -322,8 +313,8 @@ export default function EditMonthlyPage({
 
     if (keyResults.some((kr) => !kr.title.trim())) {
       toast({
-        title: translate("monthly.edit.validation.title"),
-        description: translate("monthly.edit.validation.keyResultRequired"),
+        title: translate("monthlyEdit.validation.title"),
+        description: translate("monthlyEdit.validation.keyResultRequired"),
         variant: "destructive",
       });
       return;
@@ -343,14 +334,14 @@ export default function EditMonthlyPage({
         <div className="text-center py-12">
           <Info className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h2 className="text-xl font-bold mb-2">
-            {translate("monthly.edit.error.notFound")}
+            {translate("monthlyEdit.error.notFound")}
           </h2>
           <p className="text-muted-foreground mb-4">
-            {translate("monthly.edit.error.notFoundDescription")}
+            {translate("monthlyEdit.error.notFoundDescription")}
           </p>
           <Button asChild>
             <Link href="/monthly">
-              {translate("monthly.edit.error.backToList")}
+              {translate("monthlyEdit.error.backToList")}
             </Link>
           </Button>
         </div>
@@ -367,16 +358,17 @@ export default function EditMonthlyPage({
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <h1 className="text-xl font-bold">{translate("monthly.edit.title")}</h1>
+        <h1 className="text-xl font-bold">{translate("monthlyEdit.title")}</h1>
         <div className="w-10"></div>
       </div>
 
       {/* 상태 경고 */}
-      {status === "ended" && (
+      {status === "planned" && (
         <Alert className="mb-6">
           <Info className="h-4 w-4" />
           <AlertDescription>
-            {translate("monthly.edit.error.completed")}
+            아직 시작하지 않은 먼슬리입니다. 회고와 노트는 먼슬리가 시작된 후에
+            작성할 수 있습니다.
           </AlertDescription>
         </Alert>
       )}
@@ -387,7 +379,7 @@ export default function EditMonthlyPage({
           <div>
             <div className="mb-4">
               <Label className="text-sm font-medium text-muted-foreground">
-                {translate("monthly.edit.basicInfo.monthSelection")}
+                {translate("monthlyEdit.basicInfo.monthSelection")}
               </Label>
               <div className="flex items-center gap-3 mt-2">
                 <Select
@@ -402,7 +394,7 @@ export default function EditMonthlyPage({
                   <SelectTrigger className="flex-1">
                     <SelectValue
                       placeholder={translate(
-                        "monthly.edit.basicInfo.monthPlaceholder"
+                        "monthlyEdit.basicInfo.monthPlaceholder"
                       )}
                     />
                   </SelectTrigger>
@@ -437,14 +429,12 @@ export default function EditMonthlyPage({
                 htmlFor="objective"
                 className="text-sm font-medium text-muted-foreground"
               >
-                {translate("monthly.edit.form.objective")}
+                {translate("monthlyEdit.form.objective")}
               </Label>
               <Input
                 value={objective}
                 onChange={(e) => setObjective(e.target.value)}
-                placeholder={translate(
-                  "monthly.edit.form.objectivePlaceholder"
-                )}
+                placeholder={translate("monthlyEdit.form.objectivePlaceholder")}
                 className="text-lg font-semibold border-none bg-transparent p-0 focus-visible:ring-0"
                 disabled={status === "ended"}
               />
@@ -452,7 +442,7 @@ export default function EditMonthlyPage({
                 value={objectiveDescription}
                 onChange={(e) => setObjectiveDescription(e.target.value)}
                 placeholder={translate(
-                  "monthly.edit.form.keyResultDescriptionPlaceholder"
+                  "monthlyEdit.form.keyResultDescriptionPlaceholder"
                 )}
                 className="text-sm text-muted-foreground border-none bg-transparent p-0 resize-none focus-visible:ring-0"
                 rows={2}
@@ -684,7 +674,7 @@ export default function EditMonthlyPage({
           <div className="space-y-4">
             <div className="p-3 bg-muted/20 rounded-lg">
               <p className="text-xs text-muted-foreground">
-                {translate("monthly.edit.form.keyResultsGuide")}
+                {translate("monthlyEdit.form.keyResultsGuide")}
               </p>
             </div>
 
@@ -713,7 +703,7 @@ export default function EditMonthlyPage({
                       updateKeyResult(index, "title", e.target.value)
                     }
                     placeholder={translate(
-                      "monthly.edit.form.keyResultTitlePlaceholder"
+                      "monthlyEdit.form.keyResultTitlePlaceholder"
                     )}
                     disabled={status === "ended"}
                   />
@@ -723,7 +713,7 @@ export default function EditMonthlyPage({
                       updateKeyResult(index, "description", e.target.value)
                     }
                     placeholder={translate(
-                      "monthly.edit.form.keyResultDescriptionPlaceholder"
+                      "monthlyEdit.form.keyResultDescriptionPlaceholder"
                     )}
                     rows={2}
                     disabled={status === "ended"}
@@ -779,24 +769,77 @@ export default function EditMonthlyPage({
       {/* 회고 작성 모달 */}
       {showRetrospectiveModal && (
         <RetrospectiveForm
-          monthlyTitle={monthly?.objective || ""}
+          type="monthly"
+          title={monthly?.objective || ""}
           keyResults={monthly?.keyResults || []}
           onClose={() => setShowRetrospectiveModal(false)}
-          onSave={(data) => {
-            console.log("회고 저장:", data);
-            toast({
-              title: "회고 저장 완료",
-              description: "회고가 성공적으로 저장되었습니다.",
-            });
-            setShowRetrospectiveModal(false);
+          onSave={async (data) => {
+            try {
+              // 먼슬리 회고 저장 로직
+              const retrospectiveData = {
+                userId: user?.uid || "",
+                monthlyId: monthly?.id || "",
+                ...data,
+              };
+
+              // 기존 회고가 있는지 확인
+              const existingArchive = await fetchSingleArchive(
+                user?.uid || "",
+                monthly?.id || "",
+                "monthly_retrospective"
+              );
+
+              if (existingArchive) {
+                // 기존 아카이브 업데이트
+                await updateUnifiedArchive(existingArchive.id, {
+                  title: data.title || monthly?.objective || "",
+                  content: data.content || "",
+                  userRating: data.userRating,
+                  bookmarked: data.bookmarked,
+                  bestMoment: data.bestMoment,
+                  routineAdherence: data.routineAdherence,
+                  unexpectedObstacles: data.unexpectedObstacles,
+                  nextMonthlyApplication: data.nextMonthlyApplication,
+                });
+              } else {
+                // 새 아카이브 생성
+                await createUnifiedArchive({
+                  userId: user?.uid || "",
+                  type: "monthly_retrospective",
+                  parentId: monthly?.id || "",
+                  title: data.title || monthly?.objective || "",
+                  content: data.content || "",
+                  userRating: data.userRating,
+                  bookmarked: data.bookmarked,
+                  bestMoment: data.bestMoment,
+                  routineAdherence: data.routineAdherence,
+                  unexpectedObstacles: data.unexpectedObstacles,
+                  nextMonthlyApplication: data.nextMonthlyApplication,
+                });
+              }
+
+              toast({
+                title: "회고 저장 완료",
+                description: "회고가 성공적으로 저장되었습니다.",
+              });
+              setShowRetrospectiveModal(false);
+            } catch (error) {
+              console.error("회고 저장 실패:", error);
+              toast({
+                title: "회고 저장 실패",
+                description: "회고 저장 중 오류가 발생했습니다.",
+                variant: "destructive",
+              });
+            }
           }}
         />
       )}
 
       {/* 노트 편집 모달 */}
       {showNoteForm && monthly && (
-        <MonthlyNoteForm
-          monthly={monthly}
+        <NoteForm
+          type="monthly"
+          parent={monthly}
           onClose={() => setShowNoteForm(false)}
           onSave={() => {
             // 노트 저장 후 데이터 새로고침

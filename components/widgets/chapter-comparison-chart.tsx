@@ -16,7 +16,6 @@ interface MonthlyComparisonChartProps {
   data: {
     name: string;
     completion: number;
-    focusHours: number;
   }[];
 }
 
@@ -37,25 +36,12 @@ export function MonthlyComparisonChart({ data }: MonthlyComparisonChartProps) {
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="name" />
         <YAxis />
-        <Tooltip
-          formatter={(value, name) => [
-            name === translate("charts.completionRate")
-              ? `${value}%`
-              : `${value}개`,
-            name,
-          ]}
-        />
+        <Tooltip formatter={(value, name) => [`${value}%`, name]} />
         <Legend />
         <Bar
           dataKey="completion"
           name={translate("charts.completionRate")}
           fill="#8884d8"
-          radius={[4, 4, 0, 0]}
-        />
-        <Bar
-          dataKey="focusHours"
-          name={translate("charts.focusTime")}
-          fill="#82ca9d"
           radius={[4, 4, 0, 0]}
         />
       </BarChart>

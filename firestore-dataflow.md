@@ -13,8 +13,9 @@
 - **Area**: 삶의 영역 분류 (건강, 자기계발, 가족 등)
 - **Resource**: 참고 자료 및 링크
 - **Task**: 프로젝트 내 세부 작업
-- **Retrospective**: 먼슬리/프로젝트 회고
-- **Note**: 자유 메모
+- **UnifiedArchive**: 통합된 회고 및 노트 관리
+- **Retrospective**: 먼슬리/프로젝트 회고 (Legacy)
+- **Note**: 자유 메모 (Legacy)
 
 ## 🔄 데이터 관계도
 
@@ -37,8 +38,7 @@ User (개인화된 데이터)
 │   │   ├── projectId (프로젝트 ID)
 │   │   ├── monthlyTargetCount (이번 달 목표)
 │   │   └── monthlyDoneCount (이번 달 완료)
-│   ├── retrospective (먼슬리 회고)
-│   └── note (먼슬리 노트)
+│   └── (회고/노트는 unified_archives에서 관리)
 ├── Projects (행동 단위)
 │   ├── areaId (소속 영역)
 │   ├── target (전체 목표)
@@ -189,89 +189,113 @@ interface KeyResult {
 }
 ```
 
-### 6. Retrospectives 컬렉션
+### 6. Unified Archives 컬렉션
+
+통합된 회고 및 노트 관리 시스템입니다.
 
 ```typescript
 {
   id: string;
   userId: string;
-  monthlyId?: string; // 먼슬리 회고인 경우
-  projectId?: string; // 프로젝트 회고인 경우
-  createdAt: Date;
-  updatedAt: Date;
-  content?: string; // 자유 회고 내용
+  type: "monthly_retrospective" | "project_retrospective" | "monthly_note" | "project_note";
+  parentId: string; // Monthly ID 또는 Project ID
+  parentType: "monthly" | "project";
 
-  // 먼슬리용 필드
+  // 공통 필드
+  title: string; // 제목 (자동 생성 또는 사용자 입력)
+  content: string; // 내용
+  userRating?: number; // 별점 (1-5)
+  bookmarked: boolean; // 북마크 여부
+
+  // 회고 전용 필드
   bestMoment?: string;
   routineAdherence?: string;
   unexpectedObstacles?: string;
   nextMonthlyApplication?: string;
+  stuckPoints?: string;
+  newLearnings?: string;
+  nextProjectImprovements?: string;
+  memorableTask?: string;
 
-  // Key Results 중심 필드 (Monthly 구조에 맞게 추가)
+  // Key Results 실패 이유 데이터 (새로 추가)
   keyResultsReview?: {
     completedKeyResults?: string[]; // 완료된 Key Results ID 목록
     failedKeyResults?: {
       keyResultId: string;
-      reason:
-        | "unrealisticGoal"
-        | "timeManagement"
-        | "priorityMismatch"
-        | "externalFactors"
-        | "other"; // 실패 이유
+      keyResultTitle: string; // Key Result 제목 (조회 시 편의용)
+      reason: "unrealisticGoal" | "timeManagement" | "priorityMismatch" | "externalFactors" | "motivation" | "other";
+      customReason?: string; // "other" 선택 시 사용자 입력 이유
     }[];
   };
 
-  // 프로젝트용 필드
-  goalAchieved?: string;
-  memorableTask?: string;
-  stuckPoints?: string;
-  newLearnings?: string;
-  nextProjectImprovements?: string;
-
-  // 스마트 회고 필드 (완료율 90% 미만 시)
-  incompleteAnalysis?: {
-    planningNeedsImprovement?: boolean;
-    executionNeedsImprovement?: boolean;
-    otherReason?: string;
-  };
-
-  // 공통 필드
-  userRating?: number; // 별점 (1~5)
-  bookmarked?: boolean; // 북마크 여부
-  title?: string; // 회고 제목
-  summary?: string; // 요약
+  createdAt: Date;
+  updatedAt: Date;
 }
 ```
 
-### 7. Notes 컬렉션
-
-자유 메모를 저장합니다.
-
-```typescript
-{
-  id: string; // 문서 ID (자동 생성)
-  userId: string; // 사용자 ID
-  content: string; // 노트 내용
-  createdAt: Date; // 생성일시
-  updatedAt: Date; // 수정일시
-}
-```
-
-### 8. Snapshots 컬렉션
+### 7. Snapshots 컬렉션
 
 월별 진척률 요약을 저장합니다.
 
 ```typescript
 {
   id: string; // 문서 ID (자동 생성)
-  monthlyId: string; // 먼슬리 ID
-  projectId: string; // 프로젝트 ID
+  userId: string; // 사용자 ID
   year: number; // 년도
   month: number; // 월
   snapshotDate: Date; // 스냅샷 생성일
-  doneCount: number; // 완료된 횟수
-  targetCount: number; // 목표 횟수
-  reward: string; // 보상
+
+  // 먼슬리 정보
+  monthlyIds: string[]; // 해당 월의 먼슬리 ID들
+  monthlyTitles: string[]; // 해당 월의 먼슬리 제목들
+
+  // 완료된 프로젝트 정보
+  completedProjects: number; // 완료된 프로젝트 수
+  totalProjects: number; // 전체 프로젝트 수
+  completionRate: number; // 완료율 (%)
+
+  // 태스크 정보
+  totalTasks: number; // 전체 태스크 수
+  completedTasks: number; // 완료된 태스크 수
+
+  // 집중 시간
+  focusTime: number; // 총 집중 시간 (분)
+
+  // 보상 정보
+  rewards: string[]; // 보상 목록
+
+  // 영역별 통계
+  areaStats: {
+    [areaId: string]: {
+      name: string;
+      projectCount: number;
+      completedProjectCount: number;
+      focusTime: number;
+      completionRate: number;
+    };
+  };
+
+  // 실패 분석 데이터 (새로 추가)
+  failureAnalysis?: {
+    totalKeyResults: number;
+    failedKeyResults: number;
+    failureRate: number;
+    failureReasons: {
+      reason: string;
+      label: string;
+      count: number;
+      percentage: number;
+    }[];
+    failedKeyResultsDetail: {
+      keyResultId: string;
+      keyResultTitle: string;
+      reason: string;
+      customReason?: string;
+    }[];
+  };
+
+  createdAt: Date;
+  updatedAt: Date;
 }
 ```
 
@@ -343,6 +367,26 @@ interface KeyResult {
 5. 스냅샷 생성 (먼슬리별 목표치 정보 포함)
 ```
 
+### 5. 실패 패턴 분석 플로우 (새로 추가)
+
+```
+1. 먼슬리 회고 작성 시 실패한 Key Results 선택
+2. 각 실패한 Key Result에 대해 실패 이유 선택
+   - 목표 과다 (unrealisticGoal)
+   - 시간 관리 (timeManagement)
+   - 우선순위 (priorityMismatch)
+   - 외부 요인 (externalFactors)
+   - 동기 부족 (motivation)
+   - 기타 (other) - 사용자 입력
+3. 실패 이유 데이터를 unified_archives에 저장
+4. 월말 스냅샷 생성 시 실패 분석 데이터 포함
+5. 홈 대시보드에서 실패 패턴 분석 위젯 표시
+   - 전체 실패율
+   - 주요 실패 이유 분포
+   - 월별/연도별 트렌드
+   - 개선 제안
+```
+
 ## ⚡ 성능 최적화
 
 ### 1. Denormalization
@@ -368,6 +412,13 @@ interface KeyResult {
 - **먼슬리 생성/수정**: `connectedProjects[*].monthlyTargetCount` 입력/갱신
 - **태스크 완료**: 해당 프로젝트가 활성 먼슬리와 연결된 경우 `monthlyDoneCount` 업데이트
 - **조회**: 먼슬리별 진행률 = `monthlyDoneCount / monthlyTargetCount`
+
+### 5. 실패 패턴 분석 최적화 (새로 추가)
+
+- **스냅샷 우선 조회**: 실패 분석 시 스냅샷 데이터를 우선적으로 사용
+- **Fallback 메커니즘**: 스냅샷이 없는 경우 아카이브 데이터 사용
+- **성능 향상**: 복잡한 아카이브 조회 대신 스냅샷 조회로 빠른 분석
+- **데이터 일관성**: 스냅샷 생성 시점의 실패 상태를 정확히 보존
 
 ## 🔒 보안 규칙
 
