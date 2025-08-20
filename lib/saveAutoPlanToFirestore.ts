@@ -16,6 +16,8 @@ interface SavePlanOptions {
   customizations?: {
     startDate?: Date;
     adjustments?: Record<string, any>;
+    selectedMonthlyId?: string;
+    monthlyStartDate?: Date;
   };
 }
 
@@ -78,7 +80,18 @@ export async function savePlanToFirestore(options: SavePlanOptions) {
     }
 
     // 2. Projects 및 Tasks 저장 (Monthly 생성 없음)
-    const startDate = customizations.startDate || new Date();
+    // Monthly 기반 입력인 경우 Monthly 시작일과 오늘 중 더 늦은 날짜를 사용
+    let startDate = customizations.startDate || new Date();
+
+    // Monthly 기반 입력이고 Monthly 시작일이 과거인 경우 오늘부터 시작
+    if (customizations.selectedMonthlyId && customizations.monthlyStartDate) {
+      const monthlyStartDate = new Date(customizations.monthlyStartDate);
+      const today = new Date();
+      startDate = new Date(
+        Math.max(monthlyStartDate.getTime(), today.getTime())
+      );
+    }
+
     const projectRefs: string[] = [];
 
     for (const project of plan.projects) {
@@ -131,12 +144,19 @@ export async function savePlanToFirestore(options: SavePlanOptions) {
             collection(db, "projects", projectRef.id, "tasks")
           );
 
-          // 작업 날짜를 프로젝트 기간 내에 분산
+          // 작업 날짜를 프로젝트 기간 내에 균등하게 분산
           const taskDate = new Date(
             projectStartDate.getTime() +
-              (i / project.tasks.length) *
+              (i / (project.tasks.length - 1)) *
                 (projectEndDate.getTime() - projectStartDate.getTime())
           );
+
+          // 첫 번째 태스크는 시작일, 마지막 태스크는 종료일로 설정
+          if (i === 0) {
+            taskDate.setTime(projectStartDate.getTime());
+          } else if (i === project.tasks.length - 1) {
+            taskDate.setTime(projectEndDate.getTime());
+          }
 
           const taskData = {
             id: taskRef.id,

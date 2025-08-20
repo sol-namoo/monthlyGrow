@@ -46,7 +46,7 @@ export const fetchRecentMonthliesByUserId = async (
   const q = query(
     collection(db, "monthlies"),
     where("userId", "==", userId),
-    orderBy("createdAt", "desc"),
+    orderBy("endDate", "desc"),
     limit(pageSize)
   );
   const querySnapshot = await getDocs(q);
@@ -336,7 +336,7 @@ export const fetchProjectsByMonthlyId = async (
   const q = query(
     collection(db, "projects"),
     where("connectedMonthlies", "array-contains", monthlyId),
-    orderBy("createdAt", "desc")
+    orderBy("endDate", "desc")
   );
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => {
@@ -360,7 +360,7 @@ export const fetchCurrentMonthlyProjects = async (
   const q = query(
     collection(db, "projects"),
     where("userId", "==", userId),
-    orderBy("createdAt", "desc")
+    orderBy("endDate", "desc")
   );
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => {

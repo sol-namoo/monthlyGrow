@@ -281,6 +281,7 @@ export const para = {
       all: "전체",
       monthly: "먼슬리",
       project: "프로젝트",
+      note: "노트",
     },
     sort: {
       latest: "최신순",

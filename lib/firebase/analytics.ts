@@ -452,6 +452,7 @@ export const fetchAreaCountsByUserId = async (
   }
 };
 
+// 아카이브된 프로젝트와 먼슬리 회고를 각각 10개씩 가져와서 합치는 함수
 export const fetchArchivesByUserIdWithPaging = async (
   userId: string,
   pageSize: number = 10,
@@ -463,45 +464,183 @@ export const fetchArchivesByUserIdWithPaging = async (
     const orderByField = sortBy === "title" ? "title" : "createdAt";
     const orderDirection = sortBy === "title" ? "asc" : "desc";
 
-    // 아카이브된 프로젝트들
+    // 완료된 프로젝트들 10개씩 가져오기 (endDate가 지난 프로젝트들)
+    // 종료일 기준으로 정렬
     let projectsQuery = query(
       collection(db, "projects"),
       where("userId", "==", userId),
-      where("status", "==", "archived"),
-      orderBy(orderByField, orderDirection),
-      limit(pageSize)
+      orderBy("endDate", "desc"),
+      limit(pageSize * 2) // 더 많이 가져와서 클라이언트에서 필터링
     );
 
     if (lastDoc) {
       projectsQuery = query(
         collection(db, "projects"),
         where("userId", "==", userId),
-        where("status", "==", "archived"),
-        orderBy(orderByField, orderDirection),
+        orderBy("endDate", "desc"),
+        startAfter(lastDoc),
+        limit(pageSize * 2)
+      );
+    }
+
+    const projectsSnapshot = await getDocs(projectsQuery);
+    const projectArchives = projectsSnapshot.docs
+      .filter((doc) => {
+        const data = doc.data();
+        return data.endDate && data.endDate.toDate() <= new Date();
+      })
+      .slice(0, pageSize)
+      .map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          type: "project",
+          ...data,
+          startDate: data.startDate.toDate(),
+          endDate: data.endDate.toDate(),
+          createdAt: data.createdAt.toDate(),
+          updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+        } as any;
+      });
+
+    // retrospectives 컬렉션에서 회고 데이터 가져오기
+    let retrospectivesQuery = query(
+      collection(db, "retrospectives"),
+      where("userId", "==", userId),
+      orderBy("createdAt", "desc"),
+      limit(pageSize)
+    );
+
+    if (lastDoc) {
+      retrospectivesQuery = query(
+        collection(db, "retrospectives"),
+        where("userId", "==", userId),
+        orderBy("createdAt", "desc"),
         startAfter(lastDoc),
         limit(pageSize)
       );
     }
 
-    const projectsSnapshot = await getDocs(projectsQuery);
-    const archives = projectsSnapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        type: "project",
-        ...data,
-        startDate: data.startDate.toDate(),
-        endDate: data.endDate.toDate(),
-        createdAt: data.createdAt.toDate(),
-        updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-      } as any;
-    });
+    const retrospectivesSnapshot = await getDocs(retrospectivesQuery);
+
+    // 각 회고에 대해 해당하는 먼슬리 정보도 가져오기
+    const monthlyArchives = await Promise.all(
+      retrospectivesSnapshot.docs.map(async (retroDoc) => {
+        const retroData = retroDoc.data();
+
+        // 해당 먼슬리 정보 가져오기
+        const monthlyRef = docRef(db, "monthlies", retroData.monthlyId);
+        const monthlySnap = await getDoc(monthlyRef);
+
+        if (!monthlySnap.exists()) {
+          return null;
+        }
+
+        const monthlyData = monthlySnap.data();
+
+        return {
+          id: retroDoc.id,
+          type: "monthly",
+          title: monthlyData.objective || monthlyData.objectiveDescription,
+          summary: retroData.bestMoment || "",
+          userRating: retroData.userRating || 0,
+          bookmarked: retroData.bookmarked || false,
+          monthlyId: retroData.monthlyId,
+          startDate: monthlyData.startDate.toDate(),
+          endDate: monthlyData.endDate.toDate(),
+          createdAt:
+            retroData.createdAt?.toDate() || monthlyData.createdAt.toDate(),
+          updatedAt:
+            retroData.updatedAt?.toDate() || monthlyData.updatedAt?.toDate(),
+        } as any;
+      })
+    );
+
+    // null 값 제거
+    const validMonthlyArchives = monthlyArchives.filter(
+      (archive) => archive !== null
+    );
+
+    // notes 컬렉션에서 노트 데이터 가져오기
+    let notesQuery = query(
+      collection(db, "notes"),
+      where("userId", "==", userId),
+      orderBy("createdAt", "desc"),
+      limit(pageSize)
+    );
+
+    if (lastDoc) {
+      notesQuery = query(
+        collection(db, "notes"),
+        where("userId", "==", userId),
+        orderBy("createdAt", "desc"),
+        startAfter(lastDoc),
+        limit(pageSize)
+      );
+    }
+
+    const notesSnapshot = await getDocs(notesQuery);
+
+    // 각 노트에 대해 해당하는 먼슬리 정보도 가져오기
+    const noteArchives = await Promise.all(
+      notesSnapshot.docs.map(async (noteDoc) => {
+        const noteData = noteDoc.data();
+
+        // 해당 먼슬리 정보 가져오기
+        const monthlyRef = docRef(db, "monthlies", noteData.monthlyId);
+        const monthlySnap = await getDoc(monthlyRef);
+
+        if (!monthlySnap.exists()) {
+          return null;
+        }
+
+        const monthlyData = monthlySnap.data();
+
+        return {
+          id: noteDoc.id,
+          type: "note",
+          title: monthlyData.objective || monthlyData.objectiveDescription,
+          summary: noteData.content || "",
+          userRating: 0, // 노트는 별점 없음
+          bookmarked: false, // 노트는 북마크 없음
+          monthlyId: noteData.monthlyId,
+          startDate: monthlyData.startDate.toDate(),
+          endDate: monthlyData.endDate.toDate(),
+          createdAt:
+            noteData.createdAt?.toDate() || monthlyData.createdAt.toDate(),
+          updatedAt:
+            noteData.updatedAt?.toDate() || monthlyData.updatedAt?.toDate(),
+        } as any;
+      })
+    );
+
+    // null 값 제거
+    const validNoteArchives = noteArchives.filter(
+      (archive) => archive !== null
+    );
+
+    // 프로젝트, 먼슬리 회고, 노트 아카이브 합치기 (총 30개)
+    const allArchives = [
+      ...projectArchives,
+      ...validMonthlyArchives,
+      ...validNoteArchives,
+    ];
+
+    // 정렬 기준에 따라 정렬
+    if (sortBy === "rating") {
+      allArchives.sort((a, b) => (b.userRating || 0) - (a.userRating || 0));
+    } else {
+      allArchives.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    }
 
     const lastVisible = projectsSnapshot.docs[projectsSnapshot.docs.length - 1];
-    const hasMore = projectsSnapshot.docs.length === pageSize;
+    const hasMore =
+      projectArchives.length === pageSize ||
+      validMonthlyArchives.length === pageSize ||
+      validNoteArchives.length === pageSize;
 
     return {
-      archives,
+      archives: allArchives,
       lastDoc: lastVisible,
       hasMore,
     };
@@ -545,13 +684,34 @@ export const fetchArchiveCountByUserId = async (
   userId: string
 ): Promise<number> => {
   try {
-    const q = query(
+    // 완료된 프로젝트 수 (endDate가 지난 프로젝트들)
+    const projectsQuery = query(
       collection(db, "projects"),
-      where("userId", "==", userId),
-      where("status", "==", "archived")
+      where("userId", "==", userId)
     );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.size;
+    const projectsSnapshot = await getDocs(projectsQuery);
+    const projectCount = projectsSnapshot.docs.filter((doc) => {
+      const data = doc.data();
+      return data.endDate && data.endDate.toDate() <= new Date();
+    }).length;
+
+    // retrospectives 컬렉션에서 회고 수 계산
+    const retrospectivesQuery = query(
+      collection(db, "retrospectives"),
+      where("userId", "==", userId)
+    );
+    const retrospectivesSnapshot = await getDocs(retrospectivesQuery);
+    const monthlyCount = retrospectivesSnapshot.size;
+
+    // notes 컬렉션에서 노트 수 계산
+    const notesQuery = query(
+      collection(db, "notes"),
+      where("userId", "==", userId)
+    );
+    const notesSnapshot = await getDocs(notesQuery);
+    const noteCount = notesSnapshot.size;
+
+    return projectCount + monthlyCount + noteCount;
   } catch (error) {
     console.error("아카이브 수 조회 실패:", error);
     return 0;

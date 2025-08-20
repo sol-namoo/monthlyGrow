@@ -63,7 +63,7 @@ export default function ArchiveDetailPage({
     enabled: !!id,
   });
 
-  // 노트 탭이 활성화되었을 때만 먼슬리 정보를 가져오기
+  // 먼슬리 회고인 경우 먼슬리 정보를 가져오기
   const {
     data: monthly,
     isLoading: monthlyLoading,
@@ -71,7 +71,7 @@ export default function ArchiveDetailPage({
   } = useQuery({
     queryKey: ["monthly", retrospective?.monthlyId],
     queryFn: () => fetchMonthlyById(retrospective!.monthlyId!),
-    enabled: !!retrospective?.monthlyId && activeTab === "freeform",
+    enabled: !!retrospective?.monthlyId,
   });
 
   // 에러 상태

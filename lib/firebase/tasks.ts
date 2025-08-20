@@ -67,10 +67,14 @@ export const fetchAllTasksByUserId = async (
     }
   }
 
-  // 날짜순으로 정렬
-  return allTasks.sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
+  // 완료 여부를 최우선 기준으로 정렬 (완료되지 않은 것이 먼저)
+  return allTasks.sort((a, b) => {
+    if (a.done !== b.done) {
+      return a.done ? 1 : -1;
+    }
+    // 완료 여부가 같으면 날짜순 정렬
+    return new Date(b.date).getTime() - new Date(a.date).getTime();
+  });
 };
 
 export const fetchAllTasksByProjectId = async (
@@ -81,7 +85,7 @@ export const fetchAllTasksByProjectId = async (
     orderBy("date", "desc")
   );
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => {
+  const tasks = querySnapshot.docs.map((doc) => {
     const data = doc.data();
     return {
       id: doc.id,
@@ -91,6 +95,15 @@ export const fetchAllTasksByProjectId = async (
       createdAt: data.createdAt.toDate(),
       updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
     } as Task;
+  });
+
+  // 완료 여부를 최우선 기준으로 정렬 (완료되지 않은 것이 먼저)
+  return tasks.sort((a, b) => {
+    if (a.done !== b.done) {
+      return a.done ? 1 : -1;
+    }
+    // 완료 여부가 같으면 날짜순 정렬
+    return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
 };
 
@@ -502,16 +515,20 @@ export const getTodayTasks = async (
   }
 };
 
-// 태스크를 날짜와 제목으로 정렬하는 유틸리티 함수
+// 태스크를 완료 여부, 날짜, 제목으로 정렬하는 유틸리티 함수
 const sortTasksByDateAndTitle = (tasks: Task[]): Task[] => {
   return tasks.sort((a, b) => {
-    // 먼저 날짜로 정렬
+    // 1. 완료 여부를 최우선 기준으로 정렬 (완료되지 않은 것이 먼저)
+    if (a.done !== b.done) {
+      return a.done ? 1 : -1;
+    }
+    // 2. 완료 여부가 같으면 날짜로 정렬
     const dateComparison =
       new Date(a.date).getTime() - new Date(b.date).getTime();
     if (dateComparison !== 0) {
       return dateComparison;
     }
-    // 날짜가 같으면 제목으로 정렬
+    // 3. 날짜가 같으면 제목으로 정렬
     return a.title.localeCompare(b.title);
   });
 };

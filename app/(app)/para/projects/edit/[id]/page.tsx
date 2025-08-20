@@ -449,10 +449,14 @@ export default function EditProjectPage({
       done: task.done,
     }));
 
-    // 날짜순으로 정렬
-    const sortedTasks = formattedTasks.sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
+    // 완료 여부를 최우선 기준으로 정렬 (완료되지 않은 것이 먼저)
+    const sortedTasks = formattedTasks.sort((a, b) => {
+      if (a.done !== b.done) {
+        return a.done ? 1 : -1;
+      }
+      // 완료 여부가 같으면 날짜순 정렬
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
 
     // useFieldArray의 replace를 직접 사용 (key 속성 추가)
     const tasksWithKeys = sortedTasks.map((task, index) => ({

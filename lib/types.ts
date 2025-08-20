@@ -231,6 +231,8 @@ export interface Retrospective {
 export interface Note {
   id: string;
   userId: string;
+  monthlyId?: string; // 먼슬리 노트인 경우
+  projectId?: string; // 프로젝트 노트인 경우
   content: string;
   createdAt: Date;
   updatedAt: Date;

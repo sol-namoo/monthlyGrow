@@ -27,7 +27,7 @@ export const fetchAllProjectsByUserId = async (
   const q = query(
     collection(db, "projects"),
     where("userId", "==", userId),
-    orderBy("createdAt", "desc")
+    orderBy("endDate", "desc")
   );
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => {
@@ -66,7 +66,7 @@ export const fetchActiveProjectsByUserId = async (
     collection(db, "projects"),
     where("userId", "==", userId),
     where("status", "==", "active"),
-    orderBy("createdAt", "desc")
+    orderBy("endDate", "desc")
   );
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => {
@@ -105,7 +105,7 @@ export const fetchArchivedProjectsByUserId = async (
     collection(db, "projects"),
     where("userId", "==", userId),
     where("status", "==", "archived"),
-    orderBy("createdAt", "desc")
+    orderBy("endDate", "desc")
   );
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => {
@@ -177,7 +177,7 @@ export const fetchProjectsByAreaId = async (
   const q = query(
     collection(db, "projects"),
     where("areaId", "==", areaId),
-    orderBy("createdAt", "desc")
+    orderBy("endDate", "desc")
   );
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => {
@@ -215,7 +215,7 @@ export const fetchProjectsByMonthlyId = async (
   const q = query(
     collection(db, "projects"),
     where("connectedMonthlies", "array-contains", monthlyId),
-    orderBy("createdAt", "desc")
+    orderBy("endDate", "desc")
   );
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => {
@@ -255,7 +255,7 @@ export const fetchCurrentMonthlyProjects = async (
   const q = query(
     collection(db, "projects"),
     where("userId", "==", userId),
-    orderBy("createdAt", "desc")
+    orderBy("endDate", "desc")
   );
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => {

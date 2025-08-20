@@ -29,6 +29,23 @@ export default function FutureMonthliesTab({
     return projectCounts[monthly.id] || 0;
   };
 
+  // 월 표시를 위한 함수
+  const getMonthDisplay = (monthly: Monthly) => {
+    const startDate = monthly.startDate instanceof Date ? monthly.startDate : new Date(monthly.startDate);
+    const year = startDate.getFullYear();
+    const month = startDate.getMonth() + 1;
+    
+    if (currentLanguage === 'ko') {
+      return `${year}년 ${month}월`;
+    } else {
+      const monthNames = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      return `${monthNames[month - 1]} ${year}`;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* 미래 먼슬리 헤더 */}
@@ -51,15 +68,20 @@ export default function FutureMonthliesTab({
           {monthlies.map((monthly) => (
             <Card key={monthly.id} className="p-4">
               <Link href={`/monthly/${monthly.id}`} className="block">
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="outline" className="text-xs">
+                        {getMonthDisplay(monthly)}
+                      </Badge>
+                    </div>
                     <h3 className="font-bold">{monthly.objective}</h3>
-                    {monthly.objective && (
+                    {monthly.objectiveDescription && (
                       <p className="text-sm text-muted-foreground mt-1">
-                        {monthly.objective}
+                        {monthly.objectiveDescription}
                       </p>
                     )}
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs text-muted-foreground mt-2">
                       {translate("monthly.futureMonthlies.keyResults")}:{" "}
                       {monthly.keyResults?.length || 0}
                       {translate(

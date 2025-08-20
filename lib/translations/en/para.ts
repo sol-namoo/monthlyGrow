@@ -284,6 +284,7 @@ export const para = {
       all: "All",
       monthly: "Monthly",
       project: "Project",
+      note: "Note",
     },
     sort: {
       latest: "Latest",

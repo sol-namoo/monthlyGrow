@@ -607,16 +607,14 @@ export const monthlyNew = {
         description: "An error occurred while deleting the monthly",
       },
     },
-    keyResult: {
-      update: {
-        success: {
-          title: "Key Metric Updated Successfully",
-          description: "Key metric has been updated successfully",
-        },
-        error: {
-          title: "Key Metric Update Failed",
-          description: "An error occurred while updating the key metric",
-        },
+    keyResultUpdate: {
+      success: {
+        title: "Key Metric Updated Successfully",
+        description: "Key metric has been updated successfully",
+      },
+      error: {
+        title: "Key Metric Update Failed",
+        description: "An error occurred while updating the key metric",
       },
     },
   },

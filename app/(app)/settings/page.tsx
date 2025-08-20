@@ -658,23 +658,25 @@ export default function SettingsPage() {
         <section>
           <h2 className="mb-4 text-xl font-bold">도움말 및 가이드</h2>
           <Card className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
-            <div className="flex items-center justify-between space-y-4">
-              <div>
-                <Label className="text-sm font-medium">
-                  앱 사용법 다시 보기
-                </Label>
-                <p className="text-xs text-gray-500">
-                  앱 사용법을 다시 확인하세요
-                </p>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium">
+                    앱 사용법 다시 보기
+                  </Label>
+                  <p className="text-xs text-gray-500">
+                    앱 사용법을 다시 확인하세요
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleOnboardingRestart}
+                >
+                  <BookOpen className="h-4 w-4 mr-1" />
+                  시작
+                </Button>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleOnboardingRestart}
-              >
-                <BookOpen className="h-4 w-4 mr-1" />
-                시작
-              </Button>
             </div>
           </Card>
         </section>

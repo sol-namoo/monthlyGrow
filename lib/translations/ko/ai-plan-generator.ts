@@ -125,6 +125,11 @@ export const aiPlanGenerator = {
     planExported: "계획이 성공적으로 내보내졌습니다!",
   },
 
+  // 상태 메시지
+  status: {
+    saving: "저장 중...",
+  },
+
   // 기존 영역 정보
   existingAreas: {
     title: "기존 영역 정보",
@@ -171,7 +176,9 @@ export const aiPlanGenerator = {
     times: "회",
     items: "개",
     dailyTime: "일일",
+    duration: "기간",
     hours: "시간",
+    minutes: "분",
     mainTasks: "주요 작업:",
     showMore: "더보기",
     showLess: "접기",

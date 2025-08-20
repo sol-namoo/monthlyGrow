@@ -41,6 +41,7 @@ export const fetchAllRetrospectivesByUserId = async (
 export const fetchRetrospectiveById = async (
   retrospectiveId: string
 ): Promise<Retrospective> => {
+  // 먼저 retrospectives 컬렉션에서 찾기
   const docRef = doc(db, "retrospectives", retrospectiveId);
   const docSnap = await getDoc(docRef);
   if (docSnap.exists()) {
@@ -51,9 +52,38 @@ export const fetchRetrospectiveById = async (
       createdAt: data.createdAt.toDate(),
       updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
     } as Retrospective;
-  } else {
-    throw new Error("Retrospective not found");
   }
+
+  // retrospectives 컬렉션에서 찾지 못한 경우, monthlies 컬렉션에서 찾기
+  const monthliesQuery = query(
+    collection(db, "monthlies"),
+    where("retrospective.id", "==", retrospectiveId)
+  );
+  const monthliesSnapshot = await getDocs(monthliesQuery);
+
+  if (!monthliesSnapshot.empty) {
+    const monthlyDoc = monthliesSnapshot.docs[0];
+    const monthlyData = monthlyDoc.data();
+    const retrospectiveData = monthlyData.retrospective;
+
+    return {
+      id: retrospectiveData.id,
+      monthlyId: monthlyDoc.id,
+      bestMoment: retrospectiveData.bestMoment,
+      routineAdherence: retrospectiveData.routineAdherence,
+      unexpectedObstacles: retrospectiveData.unexpectedObstacles,
+      nextMonthlyApplication: retrospectiveData.nextMonthlyApplication,
+      userRating: retrospectiveData.userRating,
+      bookmarked: retrospectiveData.bookmarked,
+      userId: monthlyData.userId,
+      createdAt: retrospectiveData.createdAt.toDate(),
+      updatedAt:
+        retrospectiveData.updatedAt?.toDate() ||
+        retrospectiveData.createdAt.toDate(),
+    } as Retrospective;
+  }
+
+  throw new Error("Retrospective not found");
 };
 
 export const fetchRetrospectivesByMonthlyId = async (

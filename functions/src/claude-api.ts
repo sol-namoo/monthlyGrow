@@ -42,7 +42,17 @@ async function fetchUserAreas(userId: string) {
 }
 
 // 시스템 프롬프트 정의
-const SYSTEM_PROMPT = `You are a Monthly Grow app plan generation assistant. Convert user's natural language plans into areas, projects, tasks, and resources only. Use this JSON format:
+const SYSTEM_PROMPT = `You are a Monthly Grow app plan generation assistant. Convert user's natural language plans into areas, projects, tasks, and resources only. 
+
+**Monthly 기반 계획 생성 시 중요 사항:**
+- Monthly의 목표, Key Results, 중점 영역을 정확히 반영한 프로젝트를 생성하세요.
+- Monthly의 보상 달성을 위한 구체적인 단계를 포함하세요.
+- 생성된 프로젝트는 Monthly의 목표와 직접적으로 연관되어야 합니다.
+- 중점 영역에 맞는 영역으로 프로젝트를 분류하세요.
+- 프로젝트 기간은 Monthly 기간보다 짧거나 길 수 있습니다 (목표 달성에 필요한 경우).
+- Monthly는 참고점으로 고려하되, 프로젝트 기간은 실제 목표 달성에 필요한 기간으로 설정하세요.
+
+Use this JSON format:
 
 {
   "areas": [
@@ -140,36 +150,36 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
         if (monthlyDoc.exists) {
           const monthlyData = monthlyDoc.data();
           if (monthlyData) {
-            // Monthly 데이터를 프롬프트에 포함할 형태로 변환
-            monthlyContext = `\n\n=== 선택된 Monthly 정보 ===\n`;
-            monthlyContext += `목표: ${monthlyData.objective}\n`;
+            // Monthly 데이터를 프롬프트에 포함할 형태로 변환 (영어로)
+            monthlyContext = `\n\n=== Selected Monthly Information ===\n`;
+            monthlyContext += `Objective: ${monthlyData.objective}\n`;
 
             if (monthlyData.objectiveDescription) {
-              monthlyContext += `목표 설명: ${monthlyData.objectiveDescription}\n`;
+              monthlyContext += `Objective Description: ${monthlyData.objectiveDescription}\n`;
             }
 
             if (monthlyData.keyResults && monthlyData.keyResults.length > 0) {
-              monthlyContext += `\n주요 성과 지표 (Key Results):\n`;
+              monthlyContext += `\nKey Results:\n`;
               monthlyData.keyResults.forEach((kr: any, index: number) => {
                 monthlyContext += `${index + 1}. ${kr.title}`;
                 if (kr.description) {
                   monthlyContext += ` - ${kr.description}`;
                 }
                 if (kr.targetCount) {
-                  monthlyContext += ` (목표: ${kr.targetCount}회)`;
+                  monthlyContext += ` (Target: ${kr.targetCount} times)`;
                 }
                 monthlyContext += `\n`;
               });
             }
 
             if (monthlyData.focusAreas && monthlyData.focusAreas.length > 0) {
-              monthlyContext += `\n중점 영역: ${monthlyData.focusAreas.join(
+              monthlyContext += `\nFocus Areas: ${monthlyData.focusAreas.join(
                 ", "
               )}\n`;
             }
 
             if (monthlyData.reward) {
-              monthlyContext += `보상: ${monthlyData.reward}\n`;
+              monthlyContext += `Reward: ${monthlyData.reward}\n`;
             }
 
             // Monthly 기간 계산 (참고용)
@@ -183,9 +193,14 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             const monthlyWeeks = Math.ceil(diffDays / 7);
 
-            monthlyContext += `\nMonthly 기간: ${monthlyWeeks}주 (${diffDays}일) - 참고용`;
-            monthlyContext += `\n위 Monthly 정보를 바탕으로 구체적인 프로젝트와 태스크를 생성해주세요.`;
-            monthlyContext += `\n=== Monthly 정보 끝 ===\n`;
+            monthlyContext += `\nMonthly Duration: ${monthlyWeeks} weeks (${diffDays} days) - for reference`;
+            monthlyContext += `\n\nImportant: Based on the above Monthly information, create specific projects and tasks.`;
+            monthlyContext += `\n- Create projects directly related to the objective and Key Results.`;
+            monthlyContext += `\n- Categorize projects into areas that match the focus areas.`;
+            monthlyContext += `\n- Include specific steps to achieve the reward.`;
+            monthlyContext += `\n- Project duration can be shorter or longer than Monthly duration based on goal requirements.`;
+            monthlyContext += `\n- Consider Monthly as a reference point, but set project duration based on actual needs.`;
+            monthlyContext += `\n=== End of Monthly Information ===\n`;
           }
         }
       } catch (error) {
@@ -224,7 +239,7 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
       messages: [
         {
           role: "user",
-          content: `다음 계획을 Monthly Grow 앱 형식으로 변환해주세요:${monthlyContext}${constraintsContext}\n\n${userInput}`,
+          content: `Convert the following plan into Monthly Grow app format:${monthlyContext}${constraintsContext}\n\n${userInput}`,
         },
       ],
     });

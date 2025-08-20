@@ -72,13 +72,43 @@ import {
   fetchArchiveCountByUserId,
   fetchProjectsByUserIdWithPaging,
   fetchResourcesWithAreasByUserIdWithPaging,
-  fetchArchivesByUserIdWithPaging,
   getTaskCountsForMultipleProjects,
 } from "@/lib/firebase/index";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatDateShort } from "@/lib/utils";
 import { useLanguage } from "@/hooks/useLanguage";
 import { ProjectCard } from "@/components/widgets/project-card";
+import dynamic from "next/dynamic";
+
+// 아카이브 탭을 lazy loading으로 import
+const ArchivesTab = dynamic(() => import("@/components/para/ArchivesTab"), {
+  loading: () => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-4 w-32" />
+        <div className="flex gap-2">
+          <Skeleton className="h-8 w-24" />
+          <Skeleton className="h-8 w-24" />
+        </div>
+      </div>
+      <div className="space-y-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Card key={i} className="p-4">
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+              <div className="flex gap-2">
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-6 w-20" />
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  ),
+  ssr: false,
+});
 
 function ParaPageContent() {
   const router = useRouter();
@@ -104,8 +134,6 @@ function ParaPageContent() {
   const [projectFilter, setProjectFilter] = useState("all");
   const [projectSortBy, setProjectSortBy] = useState("latest");
   const [resourceSortBy, setResourceSortBy] = useState("latest");
-  const [archiveSortBy, setArchiveSortBy] = useState("latest");
-  const [filterType, setFilterType] = useState("all");
 
   // Areas는 한 번에 가져오기 (개수가 많지 않을 것으로 예상)
   const { data: areas = [], isLoading: areasLoading } = useQuery({
@@ -210,29 +238,6 @@ function ParaPageContent() {
     initialPageParam: { lastDoc: undefined },
   });
 
-  // 아카이브 무한 쿼리
-  const {
-    data: archivesData,
-    fetchNextPage: fetchNextArchives,
-    hasNextPage: hasNextArchives,
-    isFetchingNextPage: isFetchingNextArchives,
-    isLoading: archivesLoading,
-    refetch: refetchArchives,
-  } = useInfiniteQuery({
-    queryKey: ["archives", user?.uid, archiveSortBy],
-    queryFn: ({ pageParam }) =>
-      fetchArchivesByUserIdWithPaging(
-        user?.uid || "",
-        10,
-        pageParam?.lastDoc,
-        archiveSortBy
-      ),
-    enabled: !!user?.uid,
-    getNextPageParam: (lastPage) =>
-      lastPage.hasMore ? { lastDoc: lastPage.lastDoc } : undefined,
-    initialPageParam: { lastDoc: undefined },
-  });
-
   // 정렬 변경 시 쿼리 다시 실행
   useEffect(() => {
     if (user?.uid) {
@@ -246,19 +251,11 @@ function ParaPageContent() {
     }
   }, [resourceSortBy, user?.uid, refetchResources]);
 
-  useEffect(() => {
-    if (user?.uid) {
-      refetchArchives();
-    }
-  }, [archiveSortBy, user?.uid, refetchArchives]);
-
   // 데이터 평탄화
   const allProjects =
     projectsData?.pages.flatMap((page) => page.projects) || [];
   const allResources =
     resourcesData?.pages.flatMap((page) => page.resources) || [];
-  const allArchives =
-    archivesData?.pages.flatMap((page) => page.archives) || [];
 
   // 프로젝트별 태스크 개수 가져오기 (배치 최적화)
   const { data: projectTaskCounts = {}, isLoading: taskCountsLoading } =
@@ -820,164 +817,7 @@ function ParaPageContent() {
         </TabsContent>
 
         <TabsContent value="archives" className="mt-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground h-9">
-              <Archive className="h-4 w-4" />
-              <span>{translate("para.archives.description")}</span>
-            </div>
-          </div>
-          {/* 아카이브 필터링 및 정렬 */}
-          <div className="flex items-center justify-between mb-4">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  {filterType === "all" ? (
-                    <Filter className="mr-2 h-4 w-4" />
-                  ) : (
-                    <Filter className="mr-2 h-4 w-4 text-primary" />
-                  )}
-                  {filterType === "all"
-                    ? translate("para.archives.filter.all")
-                    : filterType === "monthly"
-                    ? translate("para.archives.filter.monthly")
-                    : translate("para.archives.filter.project")}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => setFilterType("all")}>
-                  {translate("para.archives.filter.all")}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilterType("monthly")}>
-                  {translate("para.archives.filter.monthly")}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilterType("project")}>
-                  {translate("para.archives.filter.project")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* 정렬 드롭다운 */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  {archiveSortBy === "latest" ? (
-                    <ArrowUpDown className="mr-2 h-4 w-4" />
-                  ) : (
-                    <Star className="mr-2 h-4 w-4" />
-                  )}
-                  {archiveSortBy === "latest"
-                    ? translate("para.archives.sort.latest")
-                    : translate("para.archives.sort.rating")}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => setArchiveSortBy("latest")}>
-                  <ArrowUpDown className="mr-2 h-4 w-4" />
-                  {translate("para.archives.sort.latest")}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setArchiveSortBy("rating")}>
-                  <Star className="mr-2 h-4 w-4" />
-                  {translate("para.archives.sort.rating")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          {archivesLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-32 w-full" />
-              <Skeleton className="h-32 w-full" />
-              <Skeleton className="h-32 w-full" />
-            </div>
-          ) : allArchives.length === 0 ? (
-            <Card className="p-6 text-center border-dashed bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
-              <div className="mb-4 flex justify-center">
-                <div className="rounded-full bg-muted/50 dark:bg-muted/30 p-4">
-                  <Archive className="h-8 w-8 text-muted-foreground/50" />
-                </div>
-              </div>
-              <h3 className="text-lg font-bold mb-2">
-                {translate("para.archives.noArchives.title")}
-              </h3>
-              <p className="text-muted-foreground">
-                {translate("para.archives.noArchives.description")}
-              </p>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {allArchives
-                .filter((archive) => {
-                  if (filterType === "all") return true;
-                  if (filterType === "monthly") return archive.monthlyId;
-                  if (filterType === "project") return archive.projectId;
-                  return true;
-                })
-                .map((archive) => (
-                  <Card
-                    key={archive.id}
-                    className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40"
-                  >
-                    <Link
-                      href={`/para/archives/${archive.id}`}
-                      className="block"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-lg font-bold">
-                          {archive.title || translate("para.archives.noTitle")}
-                        </h3>
-                        <Badge
-                          className={`text-xs ${
-                            archive.monthlyId
-                              ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
-                              : "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300"
-                          }`}
-                        >
-                          {archive.monthlyId
-                            ? translate("para.archives.monthlyRetrospective")
-                            : translate("para.archives.projectRetrospective")}
-                        </Badge>
-                      </div>
-                      <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
-                        {archive.summary ||
-                          translate("para.archives.noSummary")}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          <span>
-                            {formatDate(archive.createdAt, currentLanguage)}
-                          </span>
-                          {renderStars(archive.userRating)}
-                          {archive.bookmarked && (
-                            <Bookmark className="h-3 w-3 text-yellow-500 fill-yellow-500" />
-                          )}
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </Link>
-                  </Card>
-                ))}
-
-              {/* 더보기 버튼 */}
-              {hasNextArchives && (
-                <div className="flex justify-center pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => fetchNextArchives()}
-                    disabled={isFetchingNextArchives}
-                  >
-                    {isFetchingNextArchives ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {translate("para.archives.loading")}
-                      </>
-                    ) : (
-                      translate("para.archives.loadMore")
-                    )}
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
+          <ArchivesTab userId={user?.uid || ""} />
         </TabsContent>
       </Tabs>
     </div>

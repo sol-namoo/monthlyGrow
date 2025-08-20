@@ -274,16 +274,14 @@ export const monthly = {
       editTooltip: "먼슬리 수정",
       deleteTooltip: "먼슬리 삭제",
     },
-    keyResult: {
-      update: {
-        success: {
-          title: "핵심 지표 업데이트 완료",
-          description: "핵심 지표가 성공적으로 업데이트되었습니다",
-        },
-        error: {
-          title: "핵심 지표 업데이트 실패",
-          description: "핵심 지표 업데이트 중 오류가 발생했습니다",
-        },
+    keyResultUpdate: {
+      success: {
+        title: "핵심 지표 업데이트 완료",
+        description: "핵심 지표가 성공적으로 업데이트되었습니다",
+      },
+      error: {
+        title: "핵심 지표 업데이트 실패",
+        description: "핵심 지표 업데이트 중 오류가 발생했습니다",
       },
     },
   },

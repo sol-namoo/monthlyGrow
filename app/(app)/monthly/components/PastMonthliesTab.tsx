@@ -44,6 +44,43 @@ export default function PastMonthliesTab({
     };
   };
 
+  // 월별 내림차순 정렬 (최근 완료된 먼슬리가 위에 오도록)
+  const sortedMonthlies = [...monthlies].sort((a, b) => {
+    const dateA = a.endDate instanceof Date ? a.endDate : new Date(a.endDate);
+    const dateB = b.endDate instanceof Date ? b.endDate : new Date(b.endDate);
+    return dateB.getTime() - dateA.getTime();
+  });
+
+  // 월 표시를 위한 함수
+  const getMonthDisplay = (monthly: Monthly) => {
+    const endDate =
+      monthly.endDate instanceof Date
+        ? monthly.endDate
+        : new Date(monthly.endDate);
+    const year = endDate.getFullYear();
+    const month = endDate.getMonth() + 1;
+
+    if (currentLanguage === "ko") {
+      return `${year}년 ${month}월`;
+    } else {
+      const monthNames = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+      return `${monthNames[month - 1]} ${year}`;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* 지난 먼슬리 헤더 */}
@@ -51,26 +88,31 @@ export default function PastMonthliesTab({
         <div className="text-sm text-muted-foreground">
           {translate("monthly.pastMonthlies.totalCount").replace(
             "{count}",
-            monthlies.length.toString()
+            sortedMonthlies.length.toString()
           )}
         </div>
       </div>
 
       {/* 지난 먼슬리 리스트 */}
-      {monthlies.length > 0 ? (
+      {sortedMonthlies.length > 0 ? (
         <div className="space-y-4">
-          {monthlies.map((monthly) => (
+          {sortedMonthlies.map((monthly) => (
             <Card key={monthly.id} className="p-4">
               <Link href={`/monthly/${monthly.id}`} className="block">
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="outline" className="text-xs">
+                        {getMonthDisplay(monthly)}
+                      </Badge>
+                    </div>
                     <h3 className="font-bold">{monthly.objective}</h3>
-                    {monthly.objective && (
+                    {monthly.objectiveDescription && (
                       <p className="text-sm text-muted-foreground mt-1">
-                        {monthly.objective}
+                        {monthly.objectiveDescription}
                       </p>
                     )}
-                    <div className="flex items-center gap-4 mt-1">
+                    <div className="flex items-center gap-4 mt-2">
                       <p className="text-xs text-muted-foreground">
                         {translate("monthly.pastMonthlies.keyResults")}:{" "}
                         {monthly.keyResults?.filter((kr) => kr.isCompleted)
@@ -84,7 +126,7 @@ export default function PastMonthliesTab({
                     </div>
                   </div>
                   <Badge
-                    className={`whitespace-nowrap ${
+                    className={`whitespace-nowrap ml-4 ${
                       getCompletionRate(monthly) === 100
                         ? "bg-green-100 text-green-800 hover:bg-green-100"
                         : "bg-orange-100 text-orange-800 hover:bg-orange-100"

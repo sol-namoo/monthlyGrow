@@ -40,6 +40,8 @@ import {
   Music,
   Palette,
   Utensils,
+  Clock,
+  Calendar,
 } from "lucide-react";
 
 // 아이콘 컴포넌트 가져오기 함수
@@ -84,6 +86,7 @@ function processConstraints(
 
   // 프로젝트 기간이 설정되지 않았으면 기본 최대값 설정
   if (!processed.projectWeeks) {
+    // Monthly 기간과 관계없이 최대 6개월까지 허용 (1주일부터 가능)
     processed.maxProjectWeeks = 24; // 최대 6개월
   }
 
@@ -208,9 +211,26 @@ export default function PlanGenerator() {
 
       // AI 계획 생성 요청
       const generatePlan = httpsCallable(functions, "generatePlan");
+
+      // Monthly 기반 입력일 때 구체적인 Monthly 정보를 포함한 userInput 생성 (영어로)
+      let userInputForAI = userGoal.trim();
+      if (inputType === "monthly" && selectedMonthly) {
+        userInputForAI = `Generate plan based on Monthly: ${selectedMonthly.objective}`;
+        if (selectedMonthly.objectiveDescription) {
+          userInputForAI += ` - ${selectedMonthly.objectiveDescription}`;
+        }
+        if (
+          selectedMonthly.keyResults &&
+          selectedMonthly.keyResults.length > 0
+        ) {
+          userInputForAI += ` (Key Results: ${selectedMonthly.keyResults
+            .map((kr) => kr.title)
+            .join(", ")})`;
+        }
+      }
+
       const requestData = {
-        userInput:
-          inputType === "monthly" ? "Monthly 기반 계획 생성" : userGoal.trim(),
+        userInput: userInputForAI,
         constraints: processedConstraints,
         existingAreas: existingAreas,
         inputType: inputType,
@@ -781,6 +801,8 @@ export default function PlanGenerator() {
             setGeneratedPlan(updatedPlan);
             setShowAreaMatching(false);
           }}
+          inputType={inputType}
+          selectedMonthly={selectedMonthly}
         />
       )}
     </div>
@@ -795,6 +817,8 @@ function PlanPreview({
   existingAreas,
   onAreaMatchingUpdate,
   onAreaMatchingComplete,
+  inputType,
+  selectedMonthly,
 }: {
   plan: GeneratedPlan;
   showAreaMatching: boolean;
@@ -810,6 +834,8 @@ function PlanPreview({
     >
   ) => void;
   onAreaMatchingComplete: () => void;
+  inputType: "manual" | "monthly";
+  selectedMonthly?: any;
 }) {
   const { translate } = useLanguage();
   const [isSaving, setIsSaving] = useState(false);
@@ -882,13 +908,21 @@ function PlanPreview({
         });
       }
 
-      const result = await savePlanToFirestore({ plan: updatedPlan });
+      // Monthly 기반 입력인 경우 Monthly 정보 전달
+      const customizations: any = {};
+      if (inputType === "monthly" && selectedMonthly) {
+        customizations.selectedMonthlyId = selectedMonthly.id;
+        customizations.monthlyStartDate = selectedMonthly.startDate;
+      }
+
+      const result = await savePlanToFirestore({
+        plan: updatedPlan,
+        customizations,
+      });
 
       if (result.success) {
-        // 성공 시 10초 후 대시보드로 이동
-        setTimeout(() => {
-          window.location.href = "/dashboard";
-        }, 10000);
+        // 성공 시 즉시 /para로 이동
+        window.location.href = "/para";
       } else {
         setSaveError(translate("aiPlanGenerator.errors.saveFailed"));
       }
@@ -1262,11 +1296,16 @@ function PlanPreview({
                       : translate("aiPlanGenerator.projectDetails.items")}
                   </span>
                   <span className="bg-gray-100 px-2 py-1 rounded">
-                    ⏰ {translate("aiPlanGenerator.projectDetails.dailyTime")}{" "}
-                    {project.estimatedDailyTime
-                      ? Math.round(project.estimatedDailyTime / 60)
-                      : 0}
-                    {translate("aiPlanGenerator.projectDetails.hours")}
+                    📅 {translate("aiPlanGenerator.projectDetails.duration")}{" "}
+                    {project.durationWeeks}주 ({project.durationWeeks * 7}일)
+                  </span>
+                  <span className="bg-gray-100 px-2 py-1 rounded">
+                    🕐 총 작업 시간:{" "}
+                    {project.tasks.reduce(
+                      (sum, task) => sum + (task.duration || 0),
+                      0
+                    )}
+                    시간
                   </span>
                 </div>
 
@@ -1275,14 +1314,87 @@ function PlanPreview({
                   <p className="text-sm font-medium mb-1">
                     {translate("aiPlanGenerator.projectDetails.mainTasks")}
                   </p>
-                  <ul className="text-sm text-gray-600 space-y-1">
+                  <ul className="text-sm text-gray-600 space-y-2">
                     {project.tasks
                       .slice(
                         0,
                         expandedProjects.has(index) ? project.tasks.length : 3
                       )
                       .map((task, taskIndex) => (
-                        <li key={taskIndex}>• {task.title}</li>
+                        <li key={taskIndex} className="flex items-start gap-2">
+                          <span className="text-gray-400 mt-1">•</span>
+                          <div className="flex-1">
+                            <div className="font-medium">{task.title}</div>
+                            <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {(() => {
+                                  // Monthly 기반 입력인 경우 Monthly 시작일 고려
+                                  let projectStartDate = new Date();
+                                  if (
+                                    inputType === "monthly" &&
+                                    selectedMonthly
+                                  ) {
+                                    const monthlyStartDate = new Date(
+                                      selectedMonthly.startDate
+                                    );
+                                    const today = new Date();
+                                    projectStartDate = new Date(
+                                      Math.max(
+                                        monthlyStartDate.getTime(),
+                                        today.getTime()
+                                      )
+                                    );
+                                  }
+
+                                  const projectEndDate = new Date(
+                                    projectStartDate.getTime() +
+                                      project.durationWeeks *
+                                        7 *
+                                        24 *
+                                        60 *
+                                        60 *
+                                        1000
+                                  );
+
+                                  const taskIndex = project.tasks.indexOf(task);
+                                  const taskDate = new Date(
+                                    projectStartDate.getTime() +
+                                      (taskIndex / (project.tasks.length - 1)) *
+                                        (projectEndDate.getTime() -
+                                          projectStartDate.getTime())
+                                  );
+
+                                  // 첫 번째와 마지막 태스크 날짜 조정
+                                  if (taskIndex === 0) {
+                                    taskDate.setTime(
+                                      projectStartDate.getTime()
+                                    );
+                                  } else if (
+                                    taskIndex ===
+                                    project.tasks.length - 1
+                                  ) {
+                                    taskDate.setTime(projectEndDate.getTime());
+                                  }
+
+                                  return taskDate.toLocaleDateString("ko-KR", {
+                                    month: "short",
+                                    day: "numeric",
+                                  });
+                                })()}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {task.duration}시간
+                              </span>
+                              {task.description && (
+                                <span className="text-gray-400">
+                                  {task.description}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </li>
                       ))}
                     {project.tasks.length > 3 &&
                       !expandedProjects.has(index) && (
@@ -1325,8 +1437,11 @@ function PlanPreview({
         <Button
           onClick={handleSavePlan}
           disabled={isSaving || isEditing}
-          className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
+          {isSaving && (
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+          )}
           {isSaving
             ? translate("aiPlanGenerator.status.saving")
             : translate("aiPlanGenerator.result.saveButton")}

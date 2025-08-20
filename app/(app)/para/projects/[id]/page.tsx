@@ -1440,10 +1440,16 @@ export default function ProjectDetailPage({
 
             <div className="space-y-2">
               {tasks
-                ?.sort(
-                  (a, b) =>
+                ?.sort((a, b) => {
+                  // 1. 완료 여부를 최우선 기준으로 정렬 (완료되지 않은 것이 먼저)
+                  if (a.done !== b.done) {
+                    return a.done ? 1 : -1;
+                  }
+                  // 2. 완료 여부가 같으면 날짜순 정렬
+                  return (
                     new Date(a.date).getTime() - new Date(b.date).getTime()
-                )
+                  );
+                })
                 .map((task) => (
                   <Card
                     key={task.id}

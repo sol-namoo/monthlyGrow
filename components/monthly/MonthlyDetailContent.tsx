@@ -23,6 +23,7 @@ import {
   Edit,
   Trash2,
   Plus,
+  Bookmark,
 } from "lucide-react";
 import Link from "next/link";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -159,18 +160,18 @@ export function MonthlyDetailContent({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["monthlies"] });
       toast({
-        title: translate("monthly.detail.keyResult.update.success.title"),
+        title: translate("monthly.detail.keyResultUpdate.success.title"),
         description: translate(
-          "monthly.detail.keyResult.update.success.description"
+          "monthly.detail.keyResultUpdate.success.description"
         ),
       });
     },
     onError: (error) => {
       console.error("Key Result 업데이트 실패:", error);
       toast({
-        title: translate("monthly.detail.keyResult.update.error.title"),
+        title: translate("monthly.detail.keyResultUpdate.error.title"),
         description: translate(
-          "monthly.detail.keyResult.update.error.description"
+          "monthly.detail.keyResultUpdate.error.description"
         ),
         variant: "destructive",
       });
@@ -274,21 +275,33 @@ export function MonthlyDetailContent({
       {/* Header */}
       {showHeader && (
         <div className="mb-6 flex items-center justify-end">
-          {showActions && !isPastMonthly && (
+          {showActions && (
             <div className="flex gap-2">
-              <Button variant="ghost" size="icon" asChild>
-                <Link href={`/monthly/edit/${monthly.id}`}>
-                  <Edit className="h-5 w-5" />
-                </Link>
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-destructive"
-                onClick={() => setShowDeleteDialog(true)}
-              >
-                <Trash2 className="h-5 w-5" />
-              </Button>
+              {!isPastMonthly ? (
+                <>
+                  <Button variant="ghost" size="icon" asChild>
+                    <Link href={`/monthly/edit/${monthly.id}`}>
+                      <Edit className="h-5 w-5" />
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive"
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    <Trash2 className="h-5 w-5" />
+                  </Button>
+                </>
+              ) : (
+                monthly.retrospective && (
+                  <Button variant="ghost" size="icon" asChild>
+                    <Link href={`/para/archives/${monthly.retrospective.id}`}>
+                      <FolderOpen className="h-5 w-5" />
+                    </Link>
+                  </Button>
+                )
+              )}
             </div>
           )}
         </div>
@@ -737,28 +750,84 @@ export function MonthlyDetailContent({
               <>
                 {/* 회고 목록 */}
                 <div className="space-y-4">
-                  {/* 여기에 회고 목록이 표시됩니다 */}
-                  <Card className="p-8 text-center bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
-                    <div className="mb-4">
-                      <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground/50" />
-                    </div>
-                    <h3 className="text-lg font-medium mb-2">
-                      아직 작성된 회고가 없어요
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-6">
-                      이번 먼슬리에 대한 회고를 작성해보세요
-                    </p>
-                    {!isPastMonthly && (
-                      <Button
-                        variant="outline"
-                        className="w-full bg-transparent"
-                        onClick={() => setShowRetrospectiveModal(true)}
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        회고 작성하기
-                      </Button>
-                    )}
-                  </Card>
+                  {monthly.retrospective ? (
+                    <Card className="p-6 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <MessageSquare className="h-4 w-4" />
+                          <h3 className="font-bold">회고</h3>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            {monthly.retrospective.userRating}/5
+                          </Badge>
+                          {monthly.retrospective.bookmarked && (
+                            <Bookmark className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="font-semibold text-sm mb-2">
+                            가장 기억에 남는 순간
+                          </h4>
+                          <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
+                            {monthly.retrospective.bestMoment}
+                          </p>
+                        </div>
+
+                        <div>
+                          <h4 className="font-semibold text-sm mb-2">
+                            루틴 준수율
+                          </h4>
+                          <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
+                            {monthly.retrospective.routineAdherence}
+                          </p>
+                        </div>
+
+                        <div>
+                          <h4 className="font-semibold text-sm mb-2">
+                            예상치 못한 장애물
+                          </h4>
+                          <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
+                            {monthly.retrospective.unexpectedObstacles}
+                          </p>
+                        </div>
+
+                        <div>
+                          <h4 className="font-semibold text-sm mb-2">
+                            다음 달 적용 사항
+                          </h4>
+                          <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
+                            {monthly.retrospective.nextMonthlyApplication}
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  ) : (
+                    <Card className="p-8 text-center bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
+                      <div className="mb-4">
+                        <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                      </div>
+                      <h3 className="text-lg font-medium mb-2">
+                        아직 작성된 회고가 없어요
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-6">
+                        이번 먼슬리에 대한 회고를 작성해보세요
+                      </p>
+                      {!isPastMonthly && (
+                        <Button
+                          variant="outline"
+                          className="w-full bg-transparent"
+                          onClick={() => setShowRetrospectiveModal(true)}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          회고 작성하기
+                        </Button>
+                      )}
+                    </Card>
+                  )}
                 </div>
               </>
             )}
