@@ -3,6 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,7 @@ interface RetrospectiveFormProps {
     description?: string;
     isCompleted: boolean;
   }>;
+  existingData?: any; // 기존 데이터
   onClose: () => void;
   onSave: (data: any) => void;
 }
@@ -37,6 +39,7 @@ export function RetrospectiveForm({
   type,
   title,
   keyResults = [],
+  existingData,
   onClose,
   onSave,
 }: RetrospectiveFormProps) {
@@ -95,14 +98,7 @@ export function RetrospectiveForm({
           "monthlyDetail.retrospectiveForm.validation.unexpectedObstaclesRequired"
         )
       ),
-    keyResultsReview: z
-      .string()
-      .min(
-        1,
-        translate(
-          "monthlyDetail.retrospectiveForm.validation.keyResultsReviewRequired"
-        )
-      ),
+    keyResultsReview: z.string().optional(),
     completedKeyResults: z.array(z.string()).optional(),
     failedKeyResults: z
       .array(
@@ -139,22 +135,46 @@ export function RetrospectiveForm({
   const form = useForm<RetrospectiveFormData>({
     resolver: zodResolver(retrospectiveFormSchema),
     defaultValues: {
-      bestMoment: "",
-      unexpectedObstacles: "",
-      keyResultsReview: "",
-      completedKeyResults: [],
-      failedKeyResults: [],
-      nextMonthlyApplication: "",
-      freeformContent: "",
-      userRating: 0,
-      bookmarked: false,
+      bestMoment: existingData?.bestMoment || "",
+      unexpectedObstacles: existingData?.unexpectedObstacles || "",
+      keyResultsReview: existingData?.keyResultsReview || "",
+      completedKeyResults:
+        existingData?.keyResultsReview?.completedKeyResults || [],
+      failedKeyResults: existingData?.keyResultsReview?.failedKeyResults || [],
+      nextMonthlyApplication: existingData?.nextMonthlyApplication || "",
+      freeformContent: existingData?.content || "",
+      userRating: existingData?.userRating || 1,
+      bookmarked: existingData?.bookmarked || false,
     },
   });
 
-  const handleSubmit = (data: RetrospectiveFormData) => {
-    onSave(data);
-    form.reset();
-    onClose();
+  // 기존 데이터가 있을 때 폼 업데이트
+  useEffect(() => {
+    if (existingData) {
+      form.reset({
+        bestMoment: existingData.bestMoment || "",
+        unexpectedObstacles: existingData.unexpectedObstacles || "",
+        keyResultsReview: existingData.keyResultsReview || "",
+        completedKeyResults:
+          existingData.keyResultsReview?.completedKeyResults || [],
+        failedKeyResults: existingData.keyResultsReview?.failedKeyResults || [],
+        nextMonthlyApplication: existingData.nextMonthlyApplication || "",
+        freeformContent: existingData.content || "",
+        userRating: existingData.userRating || 1,
+        bookmarked: existingData.bookmarked || false,
+      });
+    }
+  }, [existingData, form]);
+
+  const handleSubmit = async (data: RetrospectiveFormData) => {
+    try {
+      await onSave(data);
+      form.reset();
+      onClose();
+    } catch (error) {
+      console.error("회고 저장 중 오류:", error);
+      // 에러가 발생해도 폼은 닫지 않음
+    }
   };
 
   const renderStarRating = (
@@ -192,13 +212,23 @@ export function RetrospectiveForm({
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
           <div>
             <label className="text-sm font-medium">
-              {translate("monthlyDetail.retrospectiveForm.bestMoment")}
+              {type === "project"
+                ? translate(
+                    "monthlyDetail.retrospectiveForm.project.bestMoment"
+                  )
+                : translate("monthlyDetail.retrospectiveForm.bestMoment")}
             </label>
             <Textarea
               {...form.register("bestMoment")}
-              placeholder={translate(
-                "monthlyDetail.retrospectiveForm.bestMomentPlaceholder"
-              )}
+              placeholder={
+                type === "project"
+                  ? translate(
+                      "monthlyDetail.retrospectiveForm.project.bestMomentPlaceholder"
+                    )
+                  : translate(
+                      "monthlyDetail.retrospectiveForm.bestMomentPlaceholder"
+                    )
+              }
               rows={3}
             />
             {form.formState.errors.bestMoment && (
@@ -210,13 +240,25 @@ export function RetrospectiveForm({
 
           <div>
             <label className="text-sm font-medium">
-              {translate("monthlyDetail.retrospectiveForm.unexpectedObstacles")}
+              {type === "project"
+                ? translate(
+                    "monthlyDetail.retrospectiveForm.project.unexpectedObstacles"
+                  )
+                : translate(
+                    "monthlyDetail.retrospectiveForm.unexpectedObstacles"
+                  )}
             </label>
             <Textarea
               {...form.register("unexpectedObstacles")}
-              placeholder={translate(
-                "monthlyDetail.retrospectiveForm.unexpectedObstaclesPlaceholder"
-              )}
+              placeholder={
+                type === "project"
+                  ? translate(
+                      "monthlyDetail.retrospectiveForm.project.unexpectedObstaclesPlaceholder"
+                    )
+                  : translate(
+                      "monthlyDetail.retrospectiveForm.unexpectedObstaclesPlaceholder"
+                    )
+              }
               rows={3}
             />
             {form.formState.errors.unexpectedObstacles && (
@@ -426,15 +468,25 @@ export function RetrospectiveForm({
 
           <div>
             <label className="text-sm font-medium">
-              {translate(
-                "monthlyDetail.retrospectiveForm.nextMonthlyApplication"
-              )}
+              {type === "project"
+                ? translate(
+                    "monthlyDetail.retrospectiveForm.project.nextProjectImprovements"
+                  )
+                : translate(
+                    "monthlyDetail.retrospectiveForm.nextMonthlyApplication"
+                  )}
             </label>
             <Textarea
               {...form.register("nextMonthlyApplication")}
-              placeholder={translate(
-                "monthlyDetail.retrospectiveForm.nextMonthlyApplicationPlaceholder"
-              )}
+              placeholder={
+                type === "project"
+                  ? translate(
+                      "monthlyDetail.retrospectiveForm.project.nextProjectImprovementsPlaceholder"
+                    )
+                  : translate(
+                      "monthlyDetail.retrospectiveForm.nextMonthlyApplicationPlaceholder"
+                    )
+              }
               rows={3}
             />
             {form.formState.errors.nextMonthlyApplication && (

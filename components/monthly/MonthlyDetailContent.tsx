@@ -24,6 +24,22 @@ import {
   Trash2,
   Plus,
   Bookmark,
+  Compass,
+  Heart,
+  Brain,
+  Briefcase,
+  DollarSign,
+  Users,
+  Gamepad2,
+  Dumbbell,
+  BookOpen,
+  Home,
+  Car,
+  Plane,
+  Camera,
+  Music,
+  Palette,
+  Utensils,
 } from "lucide-react";
 import Link from "next/link";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -41,7 +57,6 @@ import { Monthly, Project } from "@/lib/types";
 import {
   updateMonthly,
   deleteMonthlyById,
-  updateProjectConnectedMonthlies,
   getCompletedTasksByMonthlyPeriod,
   fetchSingleArchive,
   createUnifiedArchive,
@@ -52,8 +67,32 @@ import { auth } from "@/lib/firebase/index";
 import { formatDate, getMonthlyStatus } from "@/lib/utils";
 import { RetrospectiveForm } from "@/components/RetrospectiveForm";
 import { NoteForm } from "@/components/NoteForm";
-import { ProjectConnectionDialog } from "@/components/monthly/ProjectConnectionDialog";
+import { RetrospectiveContent } from "@/components/monthly/RetrospectiveContent";
+
 import { RatingDisplay } from "@/components/ui/rating-display";
+
+// 아이콘 컴포넌트 가져오기 함수
+const getIconComponent = (iconId: string) => {
+  const iconMap: Record<string, any> = {
+    compass: Compass,
+    heart: Heart,
+    brain: Brain,
+    briefcase: Briefcase,
+    dollarSign: DollarSign,
+    users: Users,
+    gamepad2: Gamepad2,
+    dumbbell: Dumbbell,
+    bookOpen: BookOpen,
+    home: Home,
+    car: Car,
+    plane: Plane,
+    camera: Camera,
+    music: Music,
+    palette: Palette,
+    utensils: Utensils,
+  };
+  return iconMap[iconId] || Compass;
+};
 
 interface MonthlyDetailContentProps {
   monthly: Monthly & { connectedProjects?: Project[] };
@@ -80,8 +119,6 @@ export function MonthlyDetailContent({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showRetrospectiveModal, setShowRetrospectiveModal] = useState(false);
   const [showNoteForm, setShowNoteForm] = useState(false);
-  const [showProjectConnectionDialog, setShowProjectConnectionDialog] =
-    useState(false);
 
   // Collapse 상태 관리 - 기본적으로 모든 프로젝트를 접힌 상태로 설정
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(
@@ -252,49 +289,6 @@ export function MonthlyDetailContent({
     },
   });
 
-  // 프로젝트 연결 업데이트 뮤테이션
-  const updateProjectConnectionsMutation = useMutation({
-    mutationFn: async (projectIds: string[]) => {
-      // 기존 연결된 프로젝트들의 connectedMonthlies에서 현재 monthly 제거
-      const existingProjectIds =
-        monthly.connectedProjects?.map((p) => p.id) || [];
-      const projectsToRemove = existingProjectIds.filter(
-        (id) => !projectIds.includes(id)
-      );
-
-      for (const projectId of projectsToRemove) {
-        await updateProjectConnectedMonthlies(projectId, monthly.id, false);
-      }
-
-      // 새로 연결할 프로젝트들의 connectedMonthlies에 현재 monthly 추가
-      const projectsToAdd = projectIds.filter(
-        (id) => !existingProjectIds.includes(id)
-      );
-
-      for (const projectId of projectsToAdd) {
-        await updateProjectConnectedMonthlies(projectId, monthly.id, true);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["monthly-projects", monthly.id],
-      });
-      queryClient.invalidateQueries({ queryKey: ["monthly", monthly.id] });
-      toast({
-        title: "프로젝트 연결 완료",
-        description: "프로젝트 연결이 성공적으로 업데이트되었습니다.",
-      });
-    },
-    onError: (error) => {
-      console.error("프로젝트 연결 업데이트 실패:", error);
-      toast({
-        title: "프로젝트 연결 실패",
-        description: "프로젝트 연결 업데이트 중 오류가 발생했습니다.",
-        variant: "destructive",
-      });
-    },
-  });
-
   const toggleKeyResultCompletion = (keyResultIndex: number) => {
     // 완료된 먼슬리에서는 토글 불가
     if (isPastMonthly) {
@@ -439,7 +433,7 @@ export function MonthlyDetailContent({
     <div className="space-y-4">
       {/* Header */}
       {showHeader && (
-        <div className="mb-6 flex items-center justify-end">
+        <div className="flex items-center justify-end">
           {showActions && (
             <div className="flex gap-2">
               {!isPastMonthly ? (
@@ -473,7 +467,7 @@ export function MonthlyDetailContent({
       )}
 
       {/* Monthly Info Card */}
-      <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/15 border-primary/30 dark:from-primary/20 dark:to-primary/25 dark:border-primary/40">
+      <Card className="p-4 bg-gradient-to-r from-primary/10 to-primary/15 border-primary/30 dark:from-primary/20 dark:to-primary/25 dark:border-primary/40">
         <div className="space-y-4">
           <div>
             <div className="flex items-center gap-2 mb-3">
@@ -552,8 +546,8 @@ export function MonthlyDetailContent({
       </Card>
 
       {/* 중점 영역 및 연결된 프로젝트 */}
-      <Card className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
-        <div className="space-y-4">
+      <Card className="p-3 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
+        <div className="space-y-3">
           {/* 중점 영역 */}
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -568,16 +562,33 @@ export function MonthlyDetailContent({
                 : [];
 
               return validAreas.length > 0 ? (
-                <div className="flex flex-wrap gap-1">
-                  {validAreas.map((area) => (
-                    <Badge
-                      key={area.id}
-                      variant="outline"
-                      className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700"
-                    >
-                      {area.name}
-                    </Badge>
-                  ))}
+                <div className="grid grid-cols-3 gap-1.5">
+                  {validAreas.map((area) => {
+                    const IconComponent = getIconComponent(
+                      area.icon || "compass"
+                    );
+                    return (
+                      <div
+                        key={area.id}
+                        className="flex flex-col items-center justify-center rounded-lg border border-blue-200 dark:border-blue-700 p-2 bg-blue-50 dark:bg-blue-900/20"
+                      >
+                        <div
+                          className="mb-1 rounded-full p-1"
+                          style={{
+                            backgroundColor: `${area.color}20`,
+                          }}
+                        >
+                          <IconComponent
+                            className="h-2.5 w-2.5"
+                            style={{ color: area.color }}
+                          />
+                        </div>
+                        <span className="text-xs text-center font-medium text-blue-700 dark:text-blue-300 leading-tight">
+                          {area.name}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-2">
@@ -624,7 +635,7 @@ export function MonthlyDetailContent({
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4 mb-6">
+        <TabsList className="grid w-full grid-cols-4 mb-4">
           <TabsTrigger value="key-results" className="min-w-0 flex-1">
             {translate("monthlyDetail.tabs.keyResults")}
           </TabsTrigger>
@@ -641,7 +652,7 @@ export function MonthlyDetailContent({
 
         {/* Key Results 탭 */}
         <TabsContent value="key-results" className="mt-0">
-          <div className="space-y-4">
+          <div className="space-y-3">
             {monthly.keyResults && monthly.keyResults.length > 0 ? (
               monthly.keyResults.map((keyResult, index) => (
                 <Card
@@ -750,7 +761,7 @@ export function MonthlyDetailContent({
 
         {/* 완료된 할 일 탭 */}
         <TabsContent value="completed-tasks" className="mt-0">
-          <div className="space-y-4">
+          <div className="space-y-3">
             {completedTasksLoading ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
@@ -920,177 +931,25 @@ export function MonthlyDetailContent({
               <>
                 {/* 회고 목록 */}
                 <div className="space-y-4">
-                  {monthlyRetrospective ? (
-                    <Card className="p-6 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
-                          <MessageSquare className="h-4 w-4" />
-                          <h3 className="font-bold">회고</h3>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <RatingDisplay
-                            rating={monthlyRetrospective.userRating || 0}
-                            bookmarked={monthlyRetrospective.bookmarked}
-                            size="sm"
-                          />
-                        </div>
-                      </div>
+                  <RetrospectiveContent
+                    retrospective={monthlyRetrospective}
+                    canEdit={false}
+                    onEdit={() => setShowRetrospectiveModal(true)}
+                    onWrite={() => setShowRetrospectiveModal(true)}
+                    isPast={isPastMonthly}
+                    type="monthly"
+                  />
 
-                      <div className="space-y-4">
-                        {monthlyRetrospective.bestMoment && (
-                          <div>
-                            <h4 className="font-semibold text-sm mb-2">
-                              가장 기억에 남는 순간
-                            </h4>
-                            <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
-                              {monthlyRetrospective.bestMoment}
-                            </p>
-                          </div>
-                        )}
-
-                        {monthlyRetrospective.routineAdherence && (
-                          <div>
-                            <h4 className="font-semibold text-sm mb-2">
-                              루틴 준수율
-                            </h4>
-                            <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
-                              {monthlyRetrospective.routineAdherence}
-                            </p>
-                          </div>
-                        )}
-
-                        {monthlyRetrospective.unexpectedObstacles && (
-                          <div>
-                            <h4 className="font-semibold text-sm mb-2">
-                              예상치 못한 장애물
-                            </h4>
-                            <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
-                              {monthlyRetrospective.unexpectedObstacles}
-                            </p>
-                          </div>
-                        )}
-
-                        {monthlyRetrospective.keyResultsReview && (
-                          <div>
-                            <h4 className="font-semibold text-sm mb-2">
-                              핵심 지표 리뷰
-                            </h4>
-                            <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
-                              {monthlyRetrospective.keyResultsReview}
-                            </p>
-                          </div>
-                        )}
-
-                        {monthlyRetrospective.nextMonthlyApplication && (
-                          <div>
-                            <h4 className="font-semibold text-sm mb-2">
-                              다음 달 적용 사항
-                            </h4>
-                            <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
-                              {monthlyRetrospective.nextMonthlyApplication}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Key Results 실패 이유 표시 (새로 추가) */}
-                        {monthlyRetrospective.failedKeyResults &&
-                          monthlyRetrospective.failedKeyResults.length > 0 && (
-                            <div>
-                              <h4 className="font-semibold text-sm mb-2 text-red-700 dark:text-red-300">
-                                달성하지 못한 Key Results 분석
-                              </h4>
-                              <div className="space-y-2">
-                                {monthlyRetrospective.failedKeyResults.map(
-                                  (failedKr, index) => (
-                                    <div
-                                      key={index}
-                                      className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg"
-                                    >
-                                      <div className="flex items-center justify-between mb-2">
-                                        <h5 className="text-sm font-medium text-red-800 dark:text-red-200">
-                                          {failedKr.keyResultTitle}
-                                        </h5>
-                                        <Badge
-                                          variant="destructive"
-                                          className="text-xs"
-                                        >
-                                          {translate(
-                                            "monthlyDetail.retrospectiveForm.status.failed"
-                                          )}
-                                        </Badge>
-                                      </div>
-                                      <div className="text-xs text-red-700 dark:text-red-300">
-                                        <span className="font-medium">
-                                          {translate(
-                                            "monthlyDetail.retrospective.failureReason"
-                                          )}
-                                          :{" "}
-                                        </span>
-                                        {failedKr.reason ===
-                                          "unrealisticGoal" &&
-                                          translate(
-                                            "monthlyDetail.retrospectiveForm.failedReasonOptions.unrealisticGoal"
-                                          )}
-                                        {failedKr.reason === "timeManagement" &&
-                                          translate(
-                                            "monthlyDetail.retrospectiveForm.failedReasonOptions.timeManagement"
-                                          )}
-                                        {failedKr.reason ===
-                                          "priorityMismatch" &&
-                                          translate(
-                                            "monthlyDetail.retrospectiveForm.failedReasonOptions.priorityMismatch"
-                                          )}
-                                        {failedKr.reason ===
-                                          "externalFactors" &&
-                                          translate(
-                                            "monthlyDetail.retrospectiveForm.failedReasonOptions.externalFactors"
-                                          )}
-                                        {failedKr.reason === "motivation" &&
-                                          translate(
-                                            "monthlyDetail.retrospectiveForm.failedReasonOptions.motivation"
-                                          )}
-                                        {failedKr.reason === "other" &&
-                                          (failedKr.customReason ||
-                                            translate(
-                                              "monthlyDetail.retrospectiveForm.failedReasonOptions.other"
-                                            ))}
-                                      </div>
-                                    </div>
-                                  )
-                                )}
-                              </div>
-                            </div>
-                          )}
-                      </div>
-                    </Card>
-                  ) : (
-                    <Card className="p-8 text-center bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
-                      <div className="mb-4">
-                        <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground/50" />
-                      </div>
-                      <h3 className="text-lg font-medium mb-2">
-                        {translate(
-                          "monthlyDetail.retrospective.noRetrospective"
-                        )}
-                      </h3>
-                      <p className="text-sm text-muted-foreground mb-6">
-                        {translate(
-                          "monthlyDetail.retrospective.noRetrospectiveDescription"
-                        )}
-                      </p>
-                      {!isPastMonthly && (
-                        <Button
-                          variant="outline"
-                          className="w-full bg-transparent"
-                          onClick={() => setShowRetrospectiveModal(true)}
-                        >
-                          <Plus className="mr-2 h-4 w-4" />
-                          {translate(
-                            "monthlyDetail.retrospective.writeRetrospective"
-                          )}
-                        </Button>
-                      )}
-                    </Card>
+                  {/* 회고 수정 버튼 */}
+                  {canEditRetrospectiveAndNote && monthlyRetrospective && (
+                    <Button
+                      variant="outline"
+                      className="w-full bg-transparent"
+                      onClick={() => setShowRetrospectiveModal(true)}
+                    >
+                      <Edit className="mr-2 h-4 w-4" />
+                      {translate("monthlyDetail.retrospective.editTitle")}
+                    </Button>
                   )}
                 </div>
               </>
@@ -1130,7 +989,7 @@ export function MonthlyDetailContent({
                 <p className="text-sm text-muted-foreground mb-6">
                   {translate("monthlyDetail.note.noNoteDescription")}
                 </p>
-                {!isPastMonthly && (
+                {canEditRetrospectiveAndNote && (
                   <Button
                     variant="outline"
                     className="w-full bg-transparent"
@@ -1143,7 +1002,7 @@ export function MonthlyDetailContent({
               </Card>
             )}
 
-            {!isPastMonthly && monthlyNote && (
+            {canEditRetrospectiveAndNote && monthlyNote && (
               <Button
                 variant="outline"
                 className="w-full bg-transparent"
@@ -1197,27 +1056,6 @@ export function MonthlyDetailContent({
               queryKey: ["monthly-note", monthly.id],
             });
           }}
-        />
-      )}
-
-      {/* 프로젝트 연결 다이얼로그 */}
-      {!isPastMonthly && (
-        <ProjectConnectionDialog
-          open={showProjectConnectionDialog}
-          onOpenChange={setShowProjectConnectionDialog}
-          selectedProjects={
-            monthly.connectedProjects?.map((project) => ({
-              projectId: project.id,
-              monthlyTargetCount: 1,
-            })) || []
-          }
-          onProjectsChange={(projects) => {
-            const projectIds = projects.map((p) => p.projectId);
-            updateProjectConnectionsMutation.mutate(projectIds);
-            setShowProjectConnectionDialog(false);
-          }}
-          monthlyStartDate={monthly.startDate}
-          monthlyEndDate={monthly.endDate}
         />
       )}
     </div>

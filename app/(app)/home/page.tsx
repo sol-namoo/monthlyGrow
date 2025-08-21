@@ -368,7 +368,7 @@ export default function HomePage() {
   const changeRate = 0; // 추후 통계 fetch로 대체
 
   return (
-    <div className="container max-w-md px-4 py-6">
+    <div className="container max-w-md px-4 py-6 pb-20">
       {/* 헤더 섹션 */}
       <div className="mb-8">
         <div className="flex items-center gap-4 mb-6">

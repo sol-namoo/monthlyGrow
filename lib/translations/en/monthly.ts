@@ -139,6 +139,12 @@ export const monthlyDetail = {
   connectProjectsHint: 'Use the "Edit" button at the top to connect projects',
   noFocusAreas: "No focus areas have been set.",
   connectedProjects: "Connected Projects",
+  quickAccess: {
+    title: "Project Connection",
+    description: "Projects connected to this monthly",
+    addProject: "Add Project",
+    edit: "Edit",
+  },
   tabs: {
     keyResults: "Key Results",
     completedTasks: "Done Tasks",
@@ -217,6 +223,7 @@ export const monthlyDetail = {
     noRetrospective: "No retrospective written yet",
     noRetrospectiveDescription: "Write a retrospective for this monthly",
     writeRetrospective: "Write Retrospective",
+    editTitle: "Edit Retrospective",
     failureReason: "Failure Reason",
   },
   retrospectiveForm: {
@@ -260,6 +267,18 @@ export const monthlyDetail = {
       keyResultsReviewRequired: "Please enter key results review",
       nextMonthlyApplicationRequired:
         "Please enter what to apply to next monthly",
+    },
+    // Project retrospective translations
+    project: {
+      bestMoment: "Best moment of this project",
+      bestMomentPlaceholder:
+        "e.g., The moment I felt accomplished when the feature was completed",
+      unexpectedObstacles: "Unexpected obstacles",
+      unexpectedObstaclesPlaceholder:
+        "e.g., Technical issues or schedule delays",
+      nextProjectImprovements: "What to apply to next project",
+      nextProjectImprovementsPlaceholder:
+        "e.g., Better planning or technology stack selection",
     },
   },
   projectMigration: {

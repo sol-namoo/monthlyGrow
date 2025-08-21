@@ -300,8 +300,8 @@ export function RetrospectiveTab({
                 )}
             </div>
 
-            {canEditRetrospectiveAndNote && (
-              <div className="flex justify-end gap-2 mt-4">
+            <div className="flex justify-end gap-2 mt-4">
+              {canEditRetrospectiveAndNote && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -310,13 +310,13 @@ export function RetrospectiveTab({
                   <Edit className="mr-2 h-4 w-4" />
                   {translate("monthlyDetail.retrospective.editTitle")}
                 </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={`/para/archives/${monthlyRetrospective.id}`}>
-                    {translate("monthlyDetail.retrospective.viewDetail")}
-                  </Link>
-                </Button>
-              </div>
-            )}
+              )}
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/para/archives/${monthlyRetrospective.id}`}>
+                  {translate("monthlyDetail.retrospective.viewDetail")}
+                </Link>
+              </Button>
+            </div>
           </Card>
         ) : (
           <Card className="p-8 text-center bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">

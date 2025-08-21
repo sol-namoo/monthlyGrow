@@ -431,6 +431,36 @@ export default function ArchiveDetailPage({
                   </div>
                 </Card>
               )}
+
+              {/* 먼슬리 회고에서 작성한 Key Results 실패 이유 */}
+              {archive.type.includes("monthly_retrospective") &&
+                archive.keyResultsReview?.failedKeyResults &&
+                archive.keyResultsReview.failedKeyResults.length > 0 && (
+                  <Card>
+                    <div className="p-4">
+                      <h3 className="font-medium mb-2">
+                        핵심 지표 실패 이유 분석
+                      </h3>
+                      <div className="space-y-2">
+                        {archive.keyResultsReview.failedKeyResults.map(
+                          (kr: any, index: number) => (
+                            <div
+                              key={index}
+                              className="p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800"
+                            >
+                              <p className="text-sm font-medium text-orange-800 dark:text-orange-200">
+                                {kr.keyResultTitle}
+                              </p>
+                              <p className="text-xs text-orange-600 dark:text-orange-300 mt-1">
+                                {kr.customReason || kr.reason}
+                              </p>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                )}
             </>
           )}
 
@@ -454,7 +484,8 @@ export default function ArchiveDetailPage({
           <RetrospectiveForm
             type={archive.type.includes("monthly") ? "monthly" : "project"}
             title={archive.title || ""}
-            keyResults={[]} // 아카이브에서는 keyResults 정보가 없으므로 빈 배열
+            keyResults={monthly?.keyResults || []} // 먼슬리 정보가 있으면 keyResults 전달
+            existingData={archive} // 기존 데이터 전달
             onClose={() => setShowRetrospectiveModal(false)}
             onSave={async (data) => {
               try {

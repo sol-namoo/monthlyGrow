@@ -46,6 +46,7 @@ export {
 // Project 관련 함수들
 export {
   fetchAllProjectsByUserId,
+  fetchProjectsOverlappingWithMonthly,
   fetchActiveProjectsByUserId,
   fetchArchivedProjectsByUserId,
   fetchProjectById,

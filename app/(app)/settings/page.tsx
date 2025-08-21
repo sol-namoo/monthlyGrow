@@ -357,7 +357,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="container max-w-md px-4 py-6">
+    <div className="container max-w-md px-4 py-6 pb-20">
       <h1 className="mb-6 text-2xl font-bold">{texts.title}</h1>
 
       <div className="space-y-8">

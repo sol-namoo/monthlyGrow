@@ -24,12 +24,24 @@ import { Project } from "../types";
 export const fetchAllProjectsByUserId = async (
   userId: string
 ): Promise<Project[]> => {
+  console.log("🔍 fetchAllProjectsByUserId 호출:", { userId });
+
   const q = query(
     collection(db, "projects"),
     where("userId", "==", userId),
     orderBy("endDate", "desc")
   );
   const querySnapshot = await getDocs(q);
+
+  console.log("🔍 fetchAllProjectsByUserId 결과:", {
+    userId,
+    docsCount: querySnapshot.docs.length,
+    docs: querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      data: doc.data(),
+    })),
+  });
+
   return querySnapshot.docs.map((doc) => {
     const data = doc.data();
     return {
@@ -57,6 +69,101 @@ export const fetchAllProjectsByUserId = async (
       notes: data.notes || [],
     } as Project;
   });
+};
+
+export const fetchProjectsOverlappingWithMonthly = async (
+  userId: string,
+  monthlyStartDate: Date,
+  monthlyEndDate: Date
+): Promise<Project[]> => {
+  // Firestore 복합 쿼리 제약으로 인해 모든 프로젝트를 가져온 후 클라이언트에서 필터링
+  const q = query(
+    collection(db, "projects"),
+    where("userId", "==", userId),
+    orderBy("endDate", "desc")
+  );
+  const querySnapshot = await getDocs(q);
+  const allProjects = querySnapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      userId: data.userId,
+      title: data.title,
+      description: data.description,
+      category: data.category,
+      areaId: data.areaId,
+      area: data.area,
+      completedTasks: data.completedTasks || 0,
+      startDate: data.startDate.toDate(),
+      endDate: data.endDate.toDate(),
+      createdAt: data.createdAt.toDate(),
+      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      connectedMonthlies: data.connectedMonthlies || [],
+      target: data.target,
+      targetCount: data.targetCount,
+      isCarriedOver: data.isCarriedOver,
+      originalMonthlyId: data.originalMonthlyId,
+      carriedOverAt: data.carriedOverAt
+        ? data.carriedOverAt.toDate()
+        : undefined,
+      migrationStatus: data.migrationStatus,
+      notes: data.notes || [],
+    } as Project;
+  });
+
+  // 먼슬리 기간과 겹치는 프로젝트만 필터링
+  console.log("🔍 필터링 시작:", {
+    monthlyStartDate: monthlyStartDate.toLocaleDateString("en-CA"),
+    monthlyEndDate: monthlyEndDate.toLocaleDateString("en-CA"),
+    totalProjects: allProjects.length,
+    allProjects: allProjects.map((p) => ({
+      title: p.title,
+      start: p.startDate.toLocaleDateString("en-CA"),
+      end: p.endDate.toLocaleDateString("en-CA"),
+    })),
+  });
+
+  const filteredProjects = allProjects.filter((project) => {
+    // 로컬 시간대로 날짜를 YYYY-MM-DD 형식으로 변환
+    const projectStart = new Date(project.startDate);
+    const projectEnd = new Date(project.endDate);
+    const monthlyStart = new Date(monthlyStartDate);
+    const monthlyEnd = new Date(monthlyEndDate);
+
+    // 로컬 시간대 기준으로 날짜 문자열 생성 (YYYY-MM-DD)
+    const projectStartStr = projectStart.toLocaleDateString("en-CA"); // YYYY-MM-DD 형식
+    const projectEndStr = projectEnd.toLocaleDateString("en-CA");
+    const monthlyStartStr = monthlyStart.toLocaleDateString("en-CA");
+    const monthlyEndStr = monthlyEnd.toLocaleDateString("en-CA");
+
+    // 문자열 비교로 날짜 비교 (더 안전함)
+    const overlaps =
+      projectStartStr <= monthlyEndStr && projectEndStr >= monthlyStartStr;
+
+    console.log("📅 프로젝트 필터링:", {
+      projectTitle: project.title,
+      projectStart: projectStartStr,
+      projectEnd: projectEndStr,
+      monthlyStart: monthlyStartStr,
+      monthlyEnd: monthlyEndStr,
+      overlaps,
+      condition1: projectStartStr <= monthlyEndStr,
+      condition2: projectEndStr >= monthlyStartStr,
+    });
+
+    return overlaps;
+  });
+
+  console.log("✅ 필터링 결과:", {
+    filteredCount: filteredProjects.length,
+    projects: filteredProjects.map((p) => ({
+      title: p.title,
+      start: p.startDate.toISOString(),
+      end: p.endDate.toISOString(),
+    })),
+  });
+
+  return filteredProjects;
 };
 
 export const fetchActiveProjectsByUserId = async (
@@ -306,7 +413,6 @@ export const createProject = async (
 
     const docRef = await addDoc(collection(db, "projects"), newProject);
 
-
     return {
       id: docRef.id,
       userId: projectData.userId,
@@ -330,7 +436,6 @@ export const createProject = async (
       notes: projectData.notes || [],
     } as Project;
   } catch (error) {
-
     if (error instanceof Error) {
       throw new Error(`프로젝트 생성에 실패했습니다: ${error.message}`);
     }
@@ -349,9 +454,7 @@ export const updateProject = async (
     });
 
     await updateDoc(doc(db, "projects", projectId), filteredData);
-
   } catch (error) {
-
     throw new Error("프로젝트 업데이트에 실패했습니다.");
   }
 };
@@ -359,9 +462,7 @@ export const updateProject = async (
 export const deleteProjectById = async (projectId: string): Promise<void> => {
   try {
     await deleteDoc(doc(db, "projects", projectId));
-
   } catch (error) {
-
     throw new Error("프로젝트 삭제에 실패했습니다.");
   }
 };
@@ -402,10 +503,7 @@ export const updateProjectConnectedMonthlies = async (
       connectedMonthlies: updatedConnectedMonthlies,
       updatedAt: updateTimestamp(),
     });
-
-
   } catch (error) {
-
     throw new Error("프로젝트 연결 업데이트에 실패했습니다.");
   }
 };

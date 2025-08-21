@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use, Suspense, lazy } from "react";
+import { useState, use, Suspense, lazy, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,7 +22,13 @@ import {
   getTaskTimeStatsByProjectId,
   fetchAreaById,
   fetchMonthliesByIds,
+  updateProject,
 } from "@/lib/firebase/index";
+import {
+  fetchSingleArchive,
+  createUnifiedArchive,
+  updateUnifiedArchive,
+} from "@/lib/firebase/unified-archives";
 import { useLanguage } from "@/hooks/useLanguage";
 import { formatDate } from "@/lib/utils";
 import { useForm } from "react-hook-form";
@@ -178,6 +184,14 @@ export default function ProjectDetailPage({
     queryKey: ["timeStats", projectId],
     queryFn: () => getTaskTimeStatsByProjectId(projectId),
     enabled: !!projectId && activeTab === "overview",
+  });
+
+  // 프로젝트 회고 데이터 가져오기
+  const { data: projectRetrospective } = useQuery({
+    queryKey: ["projectRetrospective", projectId],
+    queryFn: () =>
+      fetchSingleArchive(user?.uid || "", projectId, "project_retrospective"),
+    enabled: !!user?.uid && !!projectId,
   });
 
   // 프로젝트의 모든 tasks 가져오기
@@ -469,6 +483,7 @@ export default function ProjectDetailPage({
           >
             <RetrospectiveTab
               project={project}
+              retrospective={projectRetrospective}
               onEditRetrospective={() => setShowRetrospectiveDialog(true)}
             />
           </Suspense>
@@ -527,9 +542,54 @@ export default function ProjectDetailPage({
           type="project"
           title={project?.title || ""}
           keyResults={[]}
+          existingData={project?.retrospective}
           onClose={() => setShowRetrospectiveDialog(false)}
-          onSave={() => {
-            // 회고 저장 로직
+          onSave={async (data) => {
+            try {
+              if (projectRetrospective) {
+                // 기존 회고가 있으면 업데이트
+                await updateUnifiedArchive(projectRetrospective.id, {
+                  bestMoment: data.bestMoment,
+                  unexpectedObstacles: data.unexpectedObstacles,
+                  nextProjectImprovements: data.nextMonthlyApplication,
+                  userRating: data.userRating,
+                  bookmarked: data.bookmarked,
+                  content: data.freeformContent,
+                });
+              } else {
+                // 새 회고 생성
+                await createUnifiedArchive({
+                  userId: user?.uid || "",
+                  type: "project_retrospective",
+                  parentId: projectId,
+                  title: project?.title || "",
+                  bestMoment: data.bestMoment,
+                  unexpectedObstacles: data.unexpectedObstacles,
+                  nextProjectImprovements: data.nextMonthlyApplication,
+                  userRating: data.userRating,
+                  bookmarked: data.bookmarked,
+                  content: data.freeformContent,
+                });
+              }
+
+              toast({
+                title: "회고 저장 완료",
+                description: "회고가 성공적으로 저장되었습니다.",
+              });
+              setShowRetrospectiveDialog(false);
+
+              // 데이터 새로고침
+              queryClient.invalidateQueries({
+                queryKey: ["projectRetrospective", projectId],
+              });
+            } catch (error) {
+              console.error("회고 저장 중 오류:", error);
+              toast({
+                title: "저장 실패",
+                description: "회고 저장 중 오류가 발생했습니다.",
+                variant: "destructive",
+              });
+            }
           }}
         />
       )}

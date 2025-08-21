@@ -226,6 +226,7 @@ export const monthlyDetail = {
     noRetrospective: "아직 작성된 회고가 없어요",
     noRetrospectiveDescription: "이번 먼슬리에 대한 회고를 작성해보세요",
     writeRetrospective: "회고 작성하기",
+    editTitle: "회고 수정하기",
     failureReason: "실패 이유",
   },
   retrospectiveForm: {
@@ -268,6 +269,16 @@ export const monthlyDetail = {
       unexpectedObstaclesRequired: "예기치 못한 방해 요소를 입력해주세요",
       keyResultsReviewRequired: "핵심 지표 리뷰를 입력해주세요",
       nextMonthlyApplicationRequired: "다음 먼슬리 적용점을 입력해주세요",
+    },
+    // 프로젝트 회고용 번역
+    project: {
+      bestMoment: "이번 프로젝트에서 가장 좋았던 순간",
+      bestMomentPlaceholder: "예: 기능 구현이 완료되어 성취감을 느낀 순간",
+      unexpectedObstacles: "예기치 못한 방해 요소",
+      unexpectedObstaclesPlaceholder: "예: 기술적 문제나 일정 지연",
+      nextProjectImprovements: "다음 프로젝트에 적용할 점",
+      nextProjectImprovementsPlaceholder:
+        "예: 더 나은 계획 수립이나 기술 스택 선택",
     },
   },
   delete: {

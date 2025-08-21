@@ -47,7 +47,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { Progress } from "@/components/ui/progress";
 import { formatDate, getMonthlyStatus } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -56,7 +56,6 @@ import { auth } from "@/lib/firebase/index";
 import { useLanguage } from "@/hooks/useLanguage";
 import {
   fetchMonthlyById,
-  fetchAllProjectsByUserId,
   updateMonthly,
   fetchAllAreasByUserId,
   createUnifiedArchive,
@@ -131,10 +130,16 @@ export default function EditMonthlyPage({
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [reward, setReward] = useState("");
   const [keyResults, setKeyResults] = useState<KeyResult[]>([]);
-  const [quickAccessProjects, setQuickAccessProjects] = useState<string[]>([]);
+  const [selectedProjects, setSelectedProjects] = useState<
+    Array<{
+      projectId: string;
+      monthlyTargetCount?: number;
+    }>
+  >([]);
   const [selectedFocusAreas, setSelectedFocusAreas] = useState<string[]>([]);
 
-  const [showQuickAccessDialog, setShowQuickAccessDialog] = useState(false);
+  const [showProjectConnectionDialog, setShowProjectConnectionDialog] =
+    useState(false);
 
   // 선택 가능한 월 옵션 생성 (현재 월부터 6개월)
   const currentDate = new Date();
@@ -156,7 +161,7 @@ export default function EditMonthlyPage({
   const [showRetrospectiveModal, setShowRetrospectiveModal] = useState(false);
   const [showNoteForm, setShowNoteForm] = useState(false);
 
-  // 연결된 프로젝트들의 상세 정보 가져오기
+  // 연결된 프로젝트들의 상세 정보 가져오기 (선택된 프로젝트 정보 표시용)
   const { data: allProjects = [] } = useQuery({
     queryKey: ["all-projects", user?.uid],
     queryFn: () => fetchAllProjectsByUserId(user?.uid || ""),
@@ -191,7 +196,12 @@ export default function EditMonthlyPage({
       setSelectedYear(startDateObj.getFullYear());
       setSelectedMonth(startDateObj.getMonth() + 1);
       setKeyResults(monthly.keyResults || []);
-      setQuickAccessProjects(monthly.quickAccessProjects || []);
+      setSelectedProjects(
+        (monthly.quickAccessProjects || []).map((projectId) => ({
+          projectId,
+          monthlyTargetCount: 1,
+        }))
+      );
       setSelectedFocusAreas(monthly.focusAreas || []);
     }
   }, [monthly]);
@@ -230,7 +240,7 @@ export default function EditMonthlyPage({
         objectiveDescription,
         reward,
         keyResults,
-        quickAccessProjects,
+        quickAccessProjects: selectedProjects.map((p) => p.projectId),
         focusAreas: selectedFocusAreas,
       };
 
@@ -290,9 +300,7 @@ export default function EditMonthlyPage({
   };
 
   // 폼 제출
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleSubmit = () => {
     if (!objective.trim()) {
       toast({
         title: translate("monthlyEdit.validation.title"),
@@ -352,7 +360,7 @@ export default function EditMonthlyPage({
   const status = getMonthlyStatus(monthly);
 
   return (
-    <div className="container max-w-md px-4 py-6 pb-20">
+    <div className="container max-w-md px-3 py-4 pb-20">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
@@ -374,8 +382,8 @@ export default function EditMonthlyPage({
       )}
 
       {/* Monthly Info Card */}
-      <Card className="p-6 mb-6 border border-border">
-        <div className="space-y-6">
+      <Card className="p-4 mb-4 border border-border">
+        <div className="space-y-4">
           <div>
             <div className="mb-4">
               <Label className="text-sm font-medium text-muted-foreground">
@@ -504,7 +512,7 @@ export default function EditMonthlyPage({
       </Card>
 
       {/* 중점 영역 선택 (선택사항) */}
-      <Card className="p-4 mb-6">
+      <Card className="p-4 mb-4">
         <div className="mb-4">
           <h3 className="font-bold text-sm flex items-center gap-2">
             <Target className="h-4 w-4" />
@@ -519,7 +527,7 @@ export default function EditMonthlyPage({
         </div>
 
         {/* Area 선택 그리드 */}
-        <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-4 gap-1.5">
           {allAreas.map((area) => {
             const IconComponent = getIconComponent(area.icon || "compass");
             const isSelected = selectedFocusAreas.includes(area.id);
@@ -527,7 +535,7 @@ export default function EditMonthlyPage({
             return (
               <div
                 key={area.id}
-                className={`flex flex-col items-center justify-center rounded-lg border p-3 cursor-pointer transition-colors ${
+                className={`flex flex-col items-center justify-center rounded-lg border p-2 cursor-pointer transition-colors ${
                   isSelected
                     ? "border-primary bg-primary/5"
                     : "border-gray-200 hover:bg-gray-50"
@@ -543,17 +551,17 @@ export default function EditMonthlyPage({
                 }}
               >
                 <div
-                  className="mb-2 rounded-full p-2"
+                  className="mb-1.5 rounded-full p-1.5"
                   style={{
                     backgroundColor: `${area.color}20`,
                   }}
                 >
                   <IconComponent
-                    className="h-4 w-4"
+                    className="h-3 w-3"
                     style={{ color: area.color }}
                   />
                 </div>
-                <span className="text-xs text-center font-medium">
+                <span className="text-xs text-center font-medium leading-tight">
                   {area.name}
                 </span>
               </div>
@@ -574,7 +582,7 @@ export default function EditMonthlyPage({
       </Card>
 
       {/* 프로젝트 연결 (선택사항) */}
-      <Card className="p-4 mb-6">
+      <Card className="p-4 mb-4">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="font-bold text-sm flex items-center gap-2">
@@ -592,49 +600,41 @@ export default function EditMonthlyPage({
             variant="ghost"
             size="sm"
             className="text-xs"
-            onClick={() => setShowQuickAccessDialog(true)}
+            onClick={() => setShowProjectConnectionDialog(true)}
           >
             <Edit className="mr-1 h-3 w-3" />
-            {translate("monthlyDetail.quickAccess.edit")}
-          </Button>
-        </div>
-      </Card>
-
-      {/* 프로젝트 바로가기 */}
-      <Card className="p-4 mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-bold text-sm">
-            {translate("monthlyDetail.quickAccess.title")}
-          </h3>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-xs"
-            onClick={() => setShowQuickAccessDialog(true)}
-          >
-            <Edit className="mr-1 h-3 w-3" />
-            {translate("monthlyDetail.quickAccess.edit")}
+            프로젝트 선택
           </Button>
         </div>
 
-        {quickAccessProjects && quickAccessProjects.length > 0 ? (
+        {selectedProjects.length > 0 ? (
           <div className="space-y-2">
-            {quickAccessProjects.map((projectId) => {
-              const projectInfo = allProjects.find((p) => p.id === projectId);
+            {selectedProjects.map((selectedProject) => {
+              const projectInfo = allProjects.find(
+                (p) => p.id === selectedProject.projectId
+              );
               return (
-                <Link key={projectId} href={`/para/projects/${projectId}`}>
+                <Link
+                  key={selectedProject.projectId}
+                  href={`/para/projects/${selectedProject.projectId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
                     <div className="w-3 h-3 rounded-full bg-blue-500"></div>
                     <div className="flex-1">
                       <p className="font-medium text-sm">
-                        {projectInfo?.title || `프로젝트 ID: ${projectId}`}
+                        {projectInfo?.title ||
+                          `프로젝트 ID: ${selectedProject.projectId}`}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {projectInfo?.area ||
                           translate("monthlyDetail.uncategorized")}
                       </p>
                     </div>
-                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex items-center gap-2">
+                      <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                    </div>
                   </div>
                 </Link>
               );
@@ -642,127 +642,91 @@ export default function EditMonthlyPage({
           </div>
         ) : (
           <div className="p-4 bg-muted/20 rounded-lg text-center">
-            <p className="text-sm text-muted-foreground mb-3">
-              {translate("monthlyDetail.quickAccess.description")}
+            <p className="text-sm text-muted-foreground">
+              연결된 프로젝트가 없습니다
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-transparent"
-              onClick={() => setShowQuickAccessDialog(true)}
-            >
-              <Plus className="mr-2 h-3 w-3" />
-              {translate("monthlyDetail.quickAccess.addProject")}
-            </Button>
           </div>
         )}
       </Card>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 mb-6 text-xs">
-          <TabsTrigger value="key-results">
-            {translate("monthlyDetail.tabs.keyResults")}
-          </TabsTrigger>
-          <TabsTrigger value="completed-tasks">
-            {translate("monthlyDetail.tabs.completedTasks")}
-          </TabsTrigger>
-        </TabsList>
+      {/* Key Results */}
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold mb-4">
+          {translate("monthlyDetail.tabs.keyResults")}
+        </h2>
 
-        {/* Key Results 탭 */}
-        <TabsContent value="key-results" className="mt-0">
-          <div className="space-y-4">
-            <div className="p-3 bg-muted/20 rounded-lg">
-              <p className="text-xs text-muted-foreground">
-                {translate("monthlyEdit.form.keyResultsGuide")}
-              </p>
-            </div>
-
-            {keyResults.map((keyResult, index) => (
-              <Card key={index} className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-muted-foreground">
-                    {translate("monthlyDetail.keyResult")} {index + 1}
-                  </span>
-                  {keyResults.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeKeyResult(index)}
-                      disabled={status === "ended"}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Input
-                    value={keyResult.title}
-                    onChange={(e) =>
-                      updateKeyResult(index, "title", e.target.value)
-                    }
-                    placeholder={translate(
-                      "monthlyEdit.form.keyResultTitlePlaceholder"
-                    )}
-                    disabled={status === "ended"}
-                  />
-                  <Textarea
-                    value={keyResult.description}
-                    onChange={(e) =>
-                      updateKeyResult(index, "description", e.target.value)
-                    }
-                    placeholder={translate(
-                      "monthlyEdit.form.keyResultDescriptionPlaceholder"
-                    )}
-                    rows={2}
-                    disabled={status === "ended"}
-                  />
-                </div>
-              </Card>
-            ))}
-
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full bg-transparent"
-              onClick={addKeyResult}
-              disabled={status === "ended"}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Key Result 추가
-            </Button>
+        <div className="space-y-4">
+          <div className="p-3 bg-muted/20 rounded-lg">
+            <p className="text-xs text-muted-foreground">
+              {translate("monthlyEdit.form.keyResultsGuide")}
+            </p>
           </div>
-        </TabsContent>
 
-        {/* 완료된 할 일 탭 */}
-        <TabsContent value="completed-tasks" className="mt-0">
-          <div className="space-y-4">
-            <Card className="p-8 text-center">
-              <div className="mb-4">
-                <div className="w-12 h-12 mx-auto rounded-full border-2 border-muted-foreground/30"></div>
+          {keyResults.map((keyResult, index) => (
+            <Card key={index} className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-muted-foreground">
+                  {translate("monthlyDetail.keyResult")} {index + 1}
+                </span>
+                {keyResults.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeKeyResult(index)}
+                    disabled={status === "ended"}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
-              <h3 className="text-lg font-medium mb-2">
-                완료된 할 일이 없어요
-              </h3>
-              <p className="text-sm text-muted-foreground mb-6">
-                {status === "planned"
-                  ? "아직 시작하지 않은 먼슬리입니다."
-                  : "이번 달에 완료한 태스크가 아직 없습니다."}
-                <br />
-                프로젝트에서 할 일을 확인해보세요!
-              </p>
-
-              <Button asChild className="w-full">
-                <Link href="/para/projects">
-                  <FolderOpen className="mr-2 h-4 w-4" />
-                  프로젝트 보러 가기
-                </Link>
-              </Button>
+              <div className="space-y-2">
+                <Input
+                  value={keyResult.title}
+                  onChange={(e) =>
+                    updateKeyResult(index, "title", e.target.value)
+                  }
+                  placeholder={translate(
+                    "monthlyEdit.form.keyResultTitlePlaceholder"
+                  )}
+                  disabled={status === "ended"}
+                />
+                <Textarea
+                  value={keyResult.description}
+                  onChange={(e) =>
+                    updateKeyResult(index, "description", e.target.value)
+                  }
+                  placeholder={translate(
+                    "monthlyEdit.form.keyResultDescriptionPlaceholder"
+                  )}
+                  rows={2}
+                  disabled={status === "ended"}
+                />
+              </div>
             </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+          ))}
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full bg-transparent"
+            onClick={addKeyResult}
+            disabled={status === "ended"}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Key Result 추가
+          </Button>
+
+          <Button
+            type="button"
+            onClick={handleSubmit}
+            className="w-full"
+            disabled={status === "ended"}
+          >
+            완료
+          </Button>
+        </div>
+      </div>
 
       {/* 프로젝트 바로가기 다이얼로그 */}
 
@@ -849,19 +813,6 @@ export default function EditMonthlyPage({
           }}
         />
       )}
-
-      {/* 완료 버튼 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 z-50">
-        <div className="container max-w-md mx-auto">
-          <Button
-            onClick={handleSubmit}
-            disabled={updateMutation.isPending || status === "ended"}
-            className="w-full"
-          >
-            {updateMutation.isPending ? "저장 중..." : "완료"}
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }

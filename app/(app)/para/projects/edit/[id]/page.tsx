@@ -594,7 +594,7 @@ export default function EditProjectPage({
       if (deletedTaskIds.length > 0) {
         for (const taskId of deletedTaskIds) {
           try {
-            await deleteTaskFromProject(taskId);
+            await deleteTaskFromProject(project.id, taskId);
           } catch (error) {
             console.error(`❌ 태스크 삭제 실패: ${taskId}`, error);
           }
@@ -749,7 +749,7 @@ export default function EditProjectPage({
 
   return (
     <div
-      className={`container max-w-md px-4 py-6 relative ${
+      className={`container max-w-md px-4 py-4 relative h-fit ${
         isSubmitting ? "pointer-events-none" : ""
       }`}
     >
@@ -780,7 +780,7 @@ export default function EditProjectPage({
         </p>
       </div>
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <Card className="p-6">
           <h2 className="mb-4 text-lg font-semibold">기본 정보</h2>
 
@@ -1047,80 +1047,18 @@ export default function EditProjectPage({
         </Card>
 
         {/* 태스크 목록 섹션 */}
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold">태스크 목록</h2>
               <span className="text-sm text-muted-foreground">
                 ({fields.length}개)
               </span>
             </div>
-            {(form.watch("category") === "task_based" ||
-              (form.watch("category") === "repetitive" &&
-                completedTasks >= form.watch("targetCount"))) && (
-              <div className="flex gap-2">
-                {selectedTasks.length > 0 && (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => {
-                      // 1. UI에서 선택된 태스크들 제거
-                      const remainingTasks = fields.filter(
-                        (field) => !selectedTasks.includes(field.id)
-                      );
-
-                      // 2. 삭제된 태스크들 분류
-                      const deletedExistingTasks = selectedTasks.filter(
-                        (taskId) => {
-                          const field = fields.find((f) => f.id === taskId);
-                          return field && !field.id.startsWith("temp_"); // 기존 Firestore 태스크만
-                        }
-                      );
-
-                      const deletedNewTasks = selectedTasks.filter((taskId) => {
-                        const field = fields.find((f) => f.id === taskId);
-                        return field && field.id.startsWith("temp_"); // 새로 추가된 태스크만
-                      });
-
-                      // 3. 상태 업데이트
-                      setDeletedTaskIds((prev) => [
-                        ...prev,
-                        ...deletedExistingTasks,
-                      ]);
-                      setNewTaskIds((prev) => {
-                        const updated = new Set(prev);
-                        deletedNewTasks.forEach((id) => updated.delete(id));
-                        return updated;
-                      });
-
-                      // 4. 폼 업데이트
-                      replace(remainingTasks);
-
-                      // 5. 선택 상태 초기화
-                      setSelectedTasks([]);
-
-                      toast({
-                        title: "태스크 삭제됨",
-                        description: `${selectedTasks.length}개 태스크가 삭제되었습니다. 저장 시 반영됩니다.`,
-                      });
-                    }}
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    삭제 ({selectedTasks.length})
-                  </Button>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addTask}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  태스크 추가
-                </Button>
-              </div>
-            )}
+            <Button type="button" variant="outline" size="sm" onClick={addTask}>
+              <Plus className="h-4 w-4 mr-2" />
+              태스크 추가
+            </Button>
           </div>
 
           {form.watch("category") === "repetitive" && (
@@ -1135,6 +1073,64 @@ export default function EditProjectPage({
             </div>
           )}
 
+          {/* 삭제 버튼 - 선택된 태스크가 있을 때만 표시 */}
+          {(form.watch("category") === "task_based" ||
+            (form.watch("category") === "repetitive" &&
+              completedTasks >= form.watch("targetCount"))) &&
+            selectedTasks.length > 0 && (
+              <div className="mb-3">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    // 1. UI에서 선택된 태스크들 제거
+                    const remainingTasks = fields.filter(
+                      (field) => !selectedTasks.includes(field.id)
+                    );
+
+                    // 2. 삭제된 태스크들 분류
+                    const deletedExistingTasks = selectedTasks.filter(
+                      (taskId) => {
+                        const field = fields.find((f) => f.id === taskId);
+                        return field && !field.id.startsWith("temp_"); // 기존 Firestore 태스크만
+                      }
+                    );
+
+                    const deletedNewTasks = selectedTasks.filter((taskId) => {
+                      const field = fields.find((f) => f.id === taskId);
+                      return field && field.id.startsWith("temp_"); // 새로 추가된 태스크만
+                    });
+
+                    // 3. 상태 업데이트
+                    setDeletedTaskIds((prev) => [
+                      ...prev,
+                      ...deletedExistingTasks,
+                    ]);
+                    setNewTaskIds((prev) => {
+                      const updated = new Set(prev);
+                      deletedNewTasks.forEach((id) => updated.delete(id));
+                      return updated;
+                    });
+
+                    // 4. 폼 업데이트
+                    replace(remainingTasks);
+
+                    // 5. 선택 상태 초기화
+                    setSelectedTasks([]);
+
+                    toast({
+                      title: "태스크 삭제됨",
+                      description: `${selectedTasks.length}개 태스크가 삭제되었습니다. 저장 시 반영됩니다.`,
+                    });
+                  }}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  삭제 ({selectedTasks.length})
+                </Button>
+              </div>
+            )}
+
           <div className="space-y-4">
             {fields.length === 0 ? (
               <div className="text-center p-8 border-2 border-dashed rounded-lg">
@@ -1146,41 +1142,44 @@ export default function EditProjectPage({
                 </p>
               </div>
             ) : (
-              <div className="max-h-[calc(100vh-120px)] overflow-y-auto space-y-2 pr-2">
+              <div className="max-h-[400px] overflow-y-auto space-y-2 pr-2">
                 {fields.map((field, index) => (
                   <div key={field.id} className="group">
-                    {/* 선택 체크박스 (카드 위쪽) - 작업형 또는 반복형에서 추가된 태스크만 표시 */}
-                    {(form.watch("category") === "task_based" ||
-                      (form.watch("category") === "repetitive" &&
-                        index >= form.watch("targetCount"))) && (
-                      <div className="flex justify-start mb-2">
-                        <Checkbox
-                          checked={selectedTasks.includes(field.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedTasks((prev) => [...prev, field.id]);
-                            } else {
-                              setSelectedTasks((prev) =>
-                                prev.filter((id) => id !== field.id)
-                              );
-                            }
-                          }}
-                        />
+                    {/* 체크박스와 넘버링 - 카드 바깥에 배치 */}
+                    <div className="flex items-center gap-2 mb-2">
+                      {/* 선택 체크박스 - 작업형 또는 반복형에서 추가된 태스크만 표시 */}
+                      {(form.watch("category") === "task_based" ||
+                        (form.watch("category") === "repetitive" &&
+                          index >= form.watch("targetCount"))) && (
+                        <div className="flex-shrink-0">
+                          <Checkbox
+                            checked={selectedTasks.includes(field.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedTasks((prev) => [...prev, field.id]);
+                              } else {
+                                setSelectedTasks((prev) =>
+                                  prev.filter((id) => id !== field.id)
+                                );
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {/* 인덱스 번호 */}
+                      <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {index + 1}
+                        </span>
                       </div>
-                    )}
+                    </div>
 
                     {/* 태스크 카드 */}
-                    <div className="p-4 border rounded-xl bg-card shadow-sm hover:shadow-md transition-all duration-200 group-hover:border-primary/20">
-                      <div className="space-y-4">
+                    <div className="p-3 border rounded-xl bg-card shadow-sm hover:shadow-md transition-all duration-200 group-hover:border-primary/20">
+                      <div className="space-y-3">
                         {/* 첫 번째 줄: 완료 상태, 제목 */}
                         <div className="flex items-center gap-3">
-                          {/* 인덱스 번호 */}
-                          <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
-                            <span className="text-xs font-medium text-muted-foreground">
-                              {index + 1}
-                            </span>
-                          </div>
-
                           {/* 완료 상태 표시 (작은 배지) */}
                           {form.watch(`tasks.${index}.done`) && (
                             <div className="flex-shrink-0 w-2 h-2 bg-green-500 rounded-full" />
@@ -1203,13 +1202,13 @@ export default function EditProjectPage({
                         </div>
 
                         {/* 두 번째 줄: 날짜, 시간 */}
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                             <Input
                               type="date"
                               {...form.register(`tasks.${index}.date`)}
-                              className="w-auto text-sm min-w-0"
+                              className="w-full text-sm min-w-0"
                               min={form.watch("startDate")}
                               max={form.watch("endDate")}
                               readOnly={
@@ -1237,7 +1236,7 @@ export default function EditProjectPage({
                                 index < form.watch("targetCount")
                               }
                             />
-                            <span className="text-sm text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               시간
                             </span>
                           </div>
@@ -1262,18 +1261,19 @@ export default function EditProjectPage({
           </div>
         </Card>
 
-        {/* 월간 연결 섹션 */}
+        {/* 먼슬리 연결 섹션 */}
         <Card className="p-6">
-          <h2 className="mb-4 text-lg font-semibold">월간 연결</h2>
+          <h2 className="mb-4 text-lg font-semibold">먼슬리 연결</h2>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              이 프로젝트를 특정 월간에 연결하여 월별 목표로 관리할 수 있습니다.
+              이 프로젝트를 특정 먼슬리에 연결하여 월별 목표로 관리할 수
+              있습니다.
             </p>
 
             {/* 현재 연결된 먼슬리들 표시 */}
             {selectedMonthlyIds.length > 0 && allMonthlies.length > 0 && (
               <div>
-                <Label>현재 연결된 월간</Label>
+                <Label>현재 연결된 먼슬리</Label>
                 <div className="mt-2 space-y-2">
                   {allMonthlies
                     .filter((monthly) =>
@@ -1322,7 +1322,7 @@ export default function EditProjectPage({
                               htmlFor={`target-${monthly.id}`}
                               className="text-sm font-medium"
                             >
-                              이 월간에서 완성할 태스크 개수
+                              이 먼슬리에서 완성할 태스크 개수
                             </Label>
                             <Badge variant="secondary" className="text-xs">
                               권장: {getDefaultTargetCount(monthly)}개
@@ -1380,7 +1380,7 @@ export default function EditProjectPage({
 
             <div className="text-center p-4 border-2 border-dashed rounded-lg">
               <p className="text-sm text-muted-foreground mb-2">
-                새로운 월간에 연결하거나 기존 연결을 관리하세요
+                새로운 먼슬리에 연결하거나 기존 연결을 관리하세요
               </p>
               <Button
                 type="button"
@@ -1390,7 +1390,7 @@ export default function EditProjectPage({
                 }}
               >
                 <Plus className="h-4 w-4 mr-2" />
-                월간 연결 관리
+                먼슬리 연결 관리
               </Button>
             </div>
           </div>

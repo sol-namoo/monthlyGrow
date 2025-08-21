@@ -164,8 +164,8 @@ function MonthlyPageContent() {
     (currentTab === "past" && pastMonthliesLoading)
   ) {
     return (
-      <div className="container max-w-md px-4 py-6 pb-20">
-        <div className="mb-6">
+      <div className="container max-w-md px-3 py-4 pb-20">
+        <div className="mb-4">
           <Skeleton className="h-8 w-48 mb-4" />
           <Skeleton className="h-4 w-full mb-2" />
           <Skeleton className="h-4 w-3/4" />
@@ -199,12 +199,12 @@ function MonthlyPageContent() {
   };
 
   return (
-    <div className="container max-w-md px-4 py-6 pb-20">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="container max-w-md px-3 py-4 pb-20">
+      <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-bold">{translate("monthly.title")}</h1>
       </div>
 
-      <Tabs value={currentTab} onValueChange={handleTabChange} className="mb-6">
+      <Tabs value={currentTab} onValueChange={handleTabChange} className="mb-4">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="current">
             {translate("monthly.tabs.current")}
@@ -225,7 +225,7 @@ function MonthlyPageContent() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="current" className="mt-6 space-y-6">
+        <TabsContent value="current" className="space-y-4">
           {currentMonthly ? (
             <MonthlyDetailContent
               monthly={currentMonthly}
@@ -259,7 +259,7 @@ function MonthlyPageContent() {
           )}
         </TabsContent>
 
-        <TabsContent value="future" className="mt-6">
+        <TabsContent value="future" className="mt-4">
           <Suspense
             fallback={
               <div className="space-y-4">
@@ -277,7 +277,7 @@ function MonthlyPageContent() {
           </Suspense>
         </TabsContent>
 
-        <TabsContent value="past" className="mt-6">
+        <TabsContent value="past" className="mt-4">
           <Suspense
             fallback={
               <div className="space-y-4">

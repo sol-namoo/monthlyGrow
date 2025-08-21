@@ -42,6 +42,7 @@ import {
   Music,
   Palette,
   Utensils,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -59,7 +60,7 @@ import {
 import { Monthly, KeyResult } from "@/lib/types";
 import Loading from "@/components/feedback/Loading";
 import { useLanguage } from "@/hooks/useLanguage";
-// import { QuickAccessProjectsDialog } from "@/components/monthly/QuickAccessProjectsDialog";
+import { ProjectConnectionDialog } from "@/components/monthly/ProjectConnectionDialog";
 import { getMonthStartDate, getMonthEndDate } from "@/lib/utils";
 
 type MonthlyFormData = {
@@ -102,14 +103,20 @@ function NewMonthlyPageContent() {
   const [user, userLoading] = useAuthState(auth);
   const { translate, currentLanguage } = useLanguage();
 
-  // 프로젝트 바로가기 상태
-  const [showQuickAccessDialog, setShowQuickAccessDialog] = useState(false);
-  const [quickAccessProjects, setQuickAccessProjects] = useState<string[]>([]);
+  // 프로젝트 연결 상태
+  const [showProjectConnectionDialog, setShowProjectConnectionDialog] =
+    useState(false);
+  const [selectedProjects, setSelectedProjects] = useState<
+    Array<{
+      projectId: string;
+      monthlyTargetCount?: number;
+    }>
+  >([]);
 
   // Area 선택 상태
   const [selectedFocusAreas, setSelectedFocusAreas] = useState<string[]>([]);
 
-  // 연결된 프로젝트들의 상세 정보 가져오기
+  // 연결된 프로젝트들의 상세 정보 가져오기 (선택된 프로젝트 정보 표시용)
   const { data: allProjects = [] } = useQuery({
     queryKey: ["all-projects", user?.uid],
     queryFn: () => fetchAllProjectsByUserId(user?.uid || ""),
@@ -263,7 +270,9 @@ function NewMonthlyPageContent() {
         reward: data.reward || "",
         keyResults,
         quickAccessProjects:
-          quickAccessProjects.length > 0 ? quickAccessProjects : undefined,
+          selectedProjects.length > 0
+            ? selectedProjects.map((p) => p.projectId)
+            : undefined,
       };
 
       await createMonthly(monthlyData);
@@ -294,7 +303,7 @@ function NewMonthlyPageContent() {
   }
 
   return (
-    <div className="container max-w-md px-4 py-6 pb-20">
+    <div className="container max-w-md px-3 py-4 pb-20">
       {/* 헤더 */}
       <div className="mb-6 flex items-center gap-3">
         <Button variant="ghost" size="sm" asChild>
@@ -356,15 +365,15 @@ function NewMonthlyPageContent() {
       )}
 
       {/* 폼 */}
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {/* 기본 정보 */}
-        <Card className="p-6 border border-border">
+        <Card className="p-4 border border-border">
           <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
             <Target className="h-5 w-5 text-primary" />
             {translate("monthlyNew.basicInfo.title")}
           </h2>
 
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div>
               <Label className="text-sm font-medium">
                 {translate("monthlyNew.basicInfo.monthSelection")}
@@ -479,7 +488,7 @@ function NewMonthlyPageContent() {
           </div>
 
           {/* Area 선택 그리드 */}
-          <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 gap-1.5">
             {allAreas.map((area) => {
               const IconComponent = getIconComponent(area.icon || "compass");
               const isSelected = selectedFocusAreas.includes(area.id);
@@ -487,7 +496,7 @@ function NewMonthlyPageContent() {
               return (
                 <div
                   key={area.id}
-                  className={`flex flex-col items-center justify-center rounded-lg border p-3 cursor-pointer transition-colors ${
+                  className={`flex flex-col items-center justify-center rounded-lg border p-2 cursor-pointer transition-colors ${
                     isSelected
                       ? "border-primary bg-primary/5"
                       : "border-gray-200 hover:bg-gray-50"
@@ -503,17 +512,17 @@ function NewMonthlyPageContent() {
                   }}
                 >
                   <div
-                    className="mb-2 rounded-full p-2"
+                    className="mb-1.5 rounded-full p-1.5"
                     style={{
                       backgroundColor: `${area.color}20`,
                     }}
                   >
                     <IconComponent
-                      className="h-4 w-4"
+                      className="h-3 w-3"
                       style={{ color: area.color }}
                     />
                   </div>
-                  <span className="text-xs text-center font-medium">
+                  <span className="text-xs text-center font-medium leading-tight">
                     {area.name}
                   </span>
                 </div>
@@ -533,13 +542,13 @@ function NewMonthlyPageContent() {
           )}
         </Card>
 
-        {/* 프로젝트 바로가기 (선택사항) */}
+        {/* 프로젝트 연결 (선택사항) */}
         <Card className="p-4">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg font-semibold flex items-center gap-2">
                 <FolderOpen className="h-5 w-5" />
-                프로젝트 바로가기
+                프로젝트 연결
                 <Badge variant="secondary" className="text-xs">
                   선택사항
                 </Badge>
@@ -552,60 +561,65 @@ function NewMonthlyPageContent() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setShowQuickAccessDialog(true)}
+              onClick={() => setShowProjectConnectionDialog(true)}
             >
               <Plus className="h-4 w-4 mr-1" />
-              프로젝트 추가
+              프로젝트 선택
             </Button>
           </div>
 
-          {quickAccessProjects.length > 0 ? (
+          {selectedProjects.length > 0 ? (
             <div className="space-y-2">
-              {quickAccessProjects.map((projectId) => {
-                const projectInfo = allProjects.find((p) => p.id === projectId);
+              {selectedProjects.map((selectedProject) => {
+                const projectInfo = allProjects.find(
+                  (p) => p.id === selectedProject.projectId
+                );
                 return (
-                  <div
-                    key={projectId}
-                    className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
+                  <Link
+                    key={selectedProject.projectId}
+                    href={`/para/projects/${selectedProject.projectId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">
-                        {projectInfo?.title || `프로젝트 ID: ${projectId}`}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {projectInfo?.area || "미분류"}
-                      </p>
+                    <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
+                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">
+                          {projectInfo?.title ||
+                            `프로젝트 ID: ${selectedProject.projectId}`}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {projectInfo?.area || "미분류"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setSelectedProjects((prev) =>
+                              prev.filter(
+                                (p) => p.projectId !== selectedProject.projectId
+                              )
+                            );
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setQuickAccessProjects((prev) =>
-                          prev.filter((id) => id !== projectId)
-                        );
-                      }}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
           ) : (
             <div className="p-4 bg-muted/20 rounded-lg text-center">
-              <p className="text-sm text-muted-foreground mb-3">
-                추가된 프로젝트가 없습니다
+              <p className="text-sm text-muted-foreground">
+                연결된 프로젝트가 없습니다
               </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowQuickAccessDialog(true)}
-              >
-                <Plus className="mr-2 h-3 w-3" />
-                프로젝트 추가하기
-              </Button>
             </div>
           )}
         </Card>
@@ -701,24 +715,15 @@ function NewMonthlyPageContent() {
         </div>
       </form>
 
-      {/* 프로젝트 바로가기 다이얼로그 */}
-      {/* <QuickAccessProjectsDialog
-        monthly={{
-          id: "",
-          userId: user?.uid || "",
-          objective: "",
-          objectiveDescription: "",
-          startDate: defaultStartDate,
-          endDate: defaultEndDate,
-          focusAreas: [],
-          keyResults: [],
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          quickAccessProjects,
-        }}
-        open={showQuickAccessDialog}
-        onOpenChange={setShowQuickAccessDialog}
-      /> */}
+      {/* 프로젝트 연결 다이얼로그 */}
+      <ProjectConnectionDialog
+        open={showProjectConnectionDialog}
+        onOpenChange={setShowProjectConnectionDialog}
+        selectedProjects={selectedProjects}
+        onProjectsChange={setSelectedProjects}
+        monthlyStartDate={defaultStartDate}
+        monthlyEndDate={defaultEndDate}
+      />
     </div>
   );
 }
