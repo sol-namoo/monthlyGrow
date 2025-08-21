@@ -49,6 +49,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [formError, setFormError] = useState("");
   const [isSigningUp, setIsSigningUp] = useState(false);
+  const [isSampleUserLogin, setIsSampleUserLogin] = useState(false);
   let newUser: User;
 
   // 인증 상태 확인 (자동 리다이렉션 없이)
@@ -56,10 +57,10 @@ export default function LoginPage() {
 
   // 이미 로그인된 경우 홈으로 리다이렉션 (회원가입 중이 아닐 때만)
   useEffect(() => {
-    if (user && !loading && !isSigningUp) {
+    if (user && !loading && !isSigningUp && !isSampleUserLogin) {
       router.push("/home");
     }
-  }, [user, loading, router, isSigningUp]);
+  }, [user, loading, router, isSigningUp, isSampleUserLogin]);
 
   // 로딩 중인 경우에만 로딩 화면 표시
   if (loading) {
@@ -163,6 +164,7 @@ export default function LoginPage() {
   // 샘플 유저 로그인 핸들러
   const handleSampleUserLogin = async (language: "ko" | "en") => {
     setIsLoading(true);
+    setIsSampleUserLogin(true); // 샘플 유저 로그인 상태 설정
     try {
       const sampleUsers = {
         ko: {
@@ -193,10 +195,10 @@ export default function LoginPage() {
       // 언어 설정 저장
       localStorage.setItem("preLoginLanguage", language);
 
-      // 홈으로 이동
       router.push("/onboarding");
     } catch (error: any) {
       console.error("❌ 샘플 유저 로그인 실패:", error);
+      setIsSampleUserLogin(false); // 에러 시 상태 초기화
     } finally {
       setIsLoading(false);
     }
