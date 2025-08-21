@@ -12,9 +12,9 @@ export const onboarding = {
   gameDesc: "월간 먼슬리와 보상 시스템으로 동기를 유지합니다",
 
   // 먼슬리 생성
-  createMonthly: "첫 번째 먼슬리 만들기",
-  createMonthlyDesc: "이번 달의 목표를 설정해보세요",
-  laterCreate: "지금 만들지 않고 나중에 만들 수도 있어요",
+  createMonthly: "OKR 시스템 기반 먼슬리",
+  createMonthlyDesc:
+    "목표(Objective)와 핵심 결과(Key Results)로 성과를 측정합니다",
 
   // 폼 필드
   objective: "이번 달의 목표 (Objective)",

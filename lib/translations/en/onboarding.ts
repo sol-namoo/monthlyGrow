@@ -13,9 +13,8 @@ export const onboarding = {
   gameDesc: "Maintain motivation through monthly goals and reward systems",
 
   // Monthly creation
-  createMonthly: "Create Your First Monthly",
-  createMonthlyDesc: "Set your goal for this month",
-  laterCreate: "You can create it later if you don't want to make it now",
+  createMonthly: "OKR System-Based Monthly",
+  createMonthlyDesc: "Measure performance with Objectives and Key Results",
 
   // Form fields
   objective: "This Month's Goal (Objective)",
