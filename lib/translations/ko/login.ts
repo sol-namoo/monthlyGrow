@@ -42,4 +42,9 @@ export const login = {
   termsContent: "MonthlyGrow 서비스를 이용하기 전에 이용약관을 확인해주세요.",
   agreeButton: "동의합니다",
   cancelButton: "취소",
+
+  // 샘플 유저 관련
+  sampleUserSection: "체험용 계정",
+  sampleUserKorean: "🇰🇷 한국어 샘플 유저로 체험하기",
+  sampleUserEnglish: "🇺🇸 Try English Sample User",
 };

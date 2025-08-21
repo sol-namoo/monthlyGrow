@@ -160,6 +160,48 @@ export default function LoginPage() {
     }
   };
 
+  // 샘플 유저 로그인 핸들러
+  const handleSampleUserLogin = async (language: "ko" | "en") => {
+    setIsLoading(true);
+    try {
+      const sampleUsers = {
+        ko: {
+          email: process.env.NEXT_PUBLIC_SAMPLE_USER_KO_EMAIL || "",
+          password: process.env.NEXT_PUBLIC_SAMPLE_USER_KO_PASSWORD || "",
+          language: "ko" as Language,
+        },
+        en: {
+          email: process.env.NEXT_PUBLIC_SAMPLE_USER_EN_EMAIL || "",
+          password: process.env.NEXT_PUBLIC_SAMPLE_USER_EN_PASSWORD || "",
+          language: "en" as Language,
+        },
+      };
+
+      const sampleUser = sampleUsers[language];
+
+      // Firebase Auth로 로그인
+      const result = await signInWithEmailAndPassword(
+        auth,
+        sampleUser.email,
+        sampleUser.password
+      );
+
+      const user = result.user;
+
+      console.log("✅ 샘플 유저 로그인 성공:", user.uid, user.email);
+
+      // 언어 설정 저장
+      localStorage.setItem("preLoginLanguage", language);
+
+      // 홈으로 이동
+      router.push("/onboarding");
+    } catch (error: any) {
+      console.error("❌ 샘플 유저 로그인 실패:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const agreeRegisterNewbie = async () => {
     setIsLoading(true);
 
@@ -351,14 +393,6 @@ export default function LoginPage() {
           </div>
           <h1 className="text-3xl font-bold">{translate("login.title")}</h1>
           <p className="text-muted-foreground">{translate("login.subtitle")}</p>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="mt-4 text-muted-foreground hover:text-foreground"
-            onClick={() => router.push("/onboarding")}
-          >
-            {translate("login.previewButton")}
-          </Button>
         </div>
 
         <Card className="p-6">
@@ -415,6 +449,68 @@ export default function LoginPage() {
                   <Mail className="mr-2 h-4 w-4" />
                   {translate("login.emailLogin")}
                 </Button>
+              </div>
+
+              {/* 샘플 유저 로그인 섹션 */}
+              <div className="mt-6 pt-6 border-t border-border">
+                <div className="text-center mb-4">
+                  <span className="text-xs text-muted-foreground bg-card px-2">
+                    {translate("login.sampleUserSection")}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-sm border border-dashed border-muted-foreground/30 hover:border-muted-foreground/50 hover:bg-muted/50"
+                    onClick={() => handleSampleUserLogin("ko")}
+                    disabled={isLoading}
+                  >
+                    {translate("login.sampleUserKorean")}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-sm border border-dashed border-muted-foreground/30 hover:border-muted-foreground/50 hover:bg-muted/50"
+                    onClick={() => handleSampleUserLogin("en")}
+                    disabled={isLoading}
+                  >
+                    {translate("login.sampleUserEnglish")}
+                  </Button>
+                </div>
+
+                {/* 사용방법 미리보기 버튼 */}
+                <div className="mt-4 text-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-sm border-primary/20 text-primary hover:bg-primary/5 hover:border-primary/40 transition-all duration-200"
+                    onClick={() => router.push("/onboarding")}
+                    disabled={isLoading}
+                  >
+                    <svg
+                      className="mr-2 h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                      />
+                    </svg>
+                    {translate("login.previewButton")}
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (

@@ -41,4 +41,9 @@ export const login = {
   termsContent: "Please review the terms of service before using MonthlyGrow.",
   agreeButton: "Agree",
   cancelButton: "Cancel",
+
+  // Sample user related
+  sampleUserSection: "Demo Accounts",
+  sampleUserKorean: "🇰🇷 Try Korean Sample User",
+  sampleUserEnglish: "🇺🇸 Try English Sample User",
 };
