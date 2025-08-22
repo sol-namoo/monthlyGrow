@@ -71,8 +71,6 @@ export default function ArchivesTab({ userId }: ArchivesTabProps) {
     return true;
   });
 
-
-
   // 로딩 스켈레톤
   if (archivesLoading) {
     return (

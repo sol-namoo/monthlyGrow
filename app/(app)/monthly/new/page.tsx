@@ -269,10 +269,7 @@ function NewMonthlyPageContent() {
         focusAreas: selectedFocusAreas, // 선택된 Area ID 배열
         reward: data.reward || "",
         keyResults,
-        quickAccessProjects:
-          selectedProjects.length > 0
-            ? selectedProjects.map((p) => p.projectId)
-            : undefined,
+        quickAccessProjects: selectedProjects.map((p) => p.projectId),
       };
 
       await createMonthly(monthlyData);

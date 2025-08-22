@@ -231,9 +231,6 @@ export const createTask = async (
       "tasks"
     );
     const docRef = await addDoc(subcollectionRef, newTask);
-    console.log(
-      `✅ 프로젝트 서브컬렉션에 태스크 생성 완료 - Project: ${taskData.projectId}, Task: ${docRef.id}`
-    );
 
     return {
       id: docRef.id,
@@ -270,9 +267,6 @@ export const updateTask = async (
       doc(db, "projects", projectId, "tasks", taskId),
       filteredData
     );
-    console.log(
-      `✅ 프로젝트 서브컬렉션 태스크 업데이트 완료 - Project: ${projectId}, Task: ${taskId}`
-    );
   } catch (error) {
     console.error(
       `❌ 프로젝트 서브컬렉션 태스크 업데이트 실패 - Project: ${projectId}, Task: ${taskId}`,
@@ -304,10 +298,6 @@ export const addTaskToProject = async (
     // 서브컬렉션에 저장
     const subcollectionRef = collection(db, "projects", projectId, "tasks");
     const docRef = await addDoc(subcollectionRef, newTask);
-
-    console.log(
-      `✅ 프로젝트 서브컬렉션에 태스크 추가 완료 - Project: ${projectId}, Task: ${docRef.id}`
-    );
 
     return {
       id: docRef.id,
@@ -345,9 +335,6 @@ export const updateTaskInProject = async (
       doc(db, "projects", projectId, "tasks", taskId),
       filteredData
     );
-    console.log(
-      `✅ 프로젝트 서브컬렉션 태스크 업데이트 완료 - Project: ${projectId}, Task: ${taskId}`
-    );
   } catch (error) {
     console.error(
       `❌ 프로젝트 서브컬렉션 태스크 업데이트 실패 - Project: ${projectId}, Task: ${taskId}`,
@@ -364,9 +351,6 @@ export const deleteTaskFromProject = async (
   try {
     // 서브컬렉션에서 삭제
     await deleteDoc(doc(db, "projects", projectId, "tasks", taskId));
-    console.log(
-      `✅ 서브컬렉션 태스크 삭제 완료 - Project: ${projectId}, Task: ${taskId}`
-    );
   } catch (error) {
     console.error(
       `❌ 서브컬렉션 태스크 삭제 실패 - Project: ${projectId}, Task: ${taskId}`,
@@ -440,10 +424,6 @@ export const toggleTaskCompletionInSubcollection = async (
     }
 
     await updateDoc(taskRef, updateData);
-
-    console.log(
-      `✅ Task completion toggled in subcollection - Project: ${projectId}, Task: ${taskId}, completed: ${newDone}`
-    );
   } catch (error) {
     console.error(
       `❌ Task completion toggle in subcollection failed - Project: ${projectId}, Task: ${taskId}`,

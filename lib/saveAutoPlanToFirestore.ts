@@ -44,9 +44,6 @@ export async function savePlanToFirestore(options: SavePlanOptions) {
         if (area.existingId) {
           // 기존 Areas 재사용
           areaIdMap[area.name] = area.existingId;
-          console.log(
-            `기존 영역 재사용: ${area.name} (ID: ${area.existingId})`
-          );
         } else {
           // 새로운 Areas 생성
           const areaRef = doc(collection(db, "areas"));
@@ -59,16 +56,8 @@ export async function savePlanToFirestore(options: SavePlanOptions) {
             createdAt: now,
             updatedAt: now,
           });
-          console.log(`새 영역 생성: ${area.name} (ID: ${areaRef.id})`);
         }
       }
-
-      // Area 매핑 검증 및 디버깅
-      console.log("생성된 areaIdMap:", areaIdMap);
-      console.log(
-        "프로젝트들의 areaName:",
-        plan.projects.map((p) => p.areaName)
-      );
 
       // 모든 프로젝트의 areaName이 areaIdMap에 있는지 확인
       for (const project of plan.projects) {
@@ -130,16 +119,7 @@ export async function savePlanToFirestore(options: SavePlanOptions) {
         });
 
         // 4. Tasks 서브컬렉션 저장
-        console.log(
-          `프로젝트 "${project.title}"의 태스크 개수:`,
-          project.tasks?.length || 0
-        );
-
         if (project.tasks && project.tasks.length > 0) {
-          console.log(
-            `프로젝트 "${project.title}"에 ${project.tasks.length}개 태스크 저장 시작`
-          );
-
           for (let i = 0; i < project.tasks.length; i++) {
             const task = project.tasks[i];
             const taskRef = doc(
@@ -177,16 +157,10 @@ export async function savePlanToFirestore(options: SavePlanOptions) {
               updatedAt: now,
             };
 
-            console.log(
-              `태스크 ${i + 1} 저장: "${taskData.title}" (ID: ${taskRef.id})`
-            );
             transaction.set(taskRef, taskData);
           }
-
-          console.log(`프로젝트 "${project.title}" 태스크 저장 완료`);
         } else {
           // 태스크가 없는 경우 기본 태스크 생성
-          console.log(`프로젝트 "${project.title}"에 기본 태스크 생성`);
           const taskRef = doc(
             collection(db, "projects", projectRef.id, "tasks")
           );
@@ -209,9 +183,6 @@ export async function savePlanToFirestore(options: SavePlanOptions) {
             updatedAt: now,
           };
 
-          console.log(
-            `기본 태스크 저장: "${defaultTaskData.title}" (ID: ${taskRef.id})`
-          );
           transaction.set(taskRef, defaultTaskData);
         }
 
@@ -253,9 +224,6 @@ export async function savePlanToFirestore(options: SavePlanOptions) {
         ? plan.successMetrics
         : [];
 
-      console.log("저장할 timeline:", safeTimeline);
-      console.log("저장할 successMetrics:", safeSuccessMetrics);
-
       // originalPlan에서 undefined 값들을 제거
       const cleanOriginalPlan = JSON.parse(
         JSON.stringify(plan, (key, value) => {
@@ -276,10 +244,6 @@ export async function savePlanToFirestore(options: SavePlanOptions) {
       });
 
       // 트랜잭션 완료 - 모든 데이터가 원자적으로 저장됨
-      console.log("✅ AI 계획 저장 트랜잭션 완료");
-      console.log(
-        `📊 저장된 데이터: ${plan.areas.length}개 영역, ${plan.projects.length}개 프로젝트`
-      );
 
       return {
         success: true,

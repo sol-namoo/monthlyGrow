@@ -116,8 +116,6 @@ export function ProjectCard({
 
   const progressInfo = getProgressInfo();
 
-
-
   // 프로젝트 상태 계산
   const getProjectStatus = () => {
     const now = new Date();

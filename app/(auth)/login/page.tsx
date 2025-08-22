@@ -113,10 +113,8 @@ export default function LoginPage() {
       const user = result.user;
       newUser = user;
 
-
       const userDoc = await getDoc(doc(db, "users", user.uid));
       if (!userDoc.exists()) {
-
         setShowTermsModal(true);
       } else {
         // 기존 사용자의 경우 로그인 전 언어 설정을 Firestore에 반영
@@ -168,8 +166,6 @@ export default function LoginPage() {
 
       const user = result.user;
 
-
-
       // 언어 설정 저장
       localStorage.setItem("preLoginLanguage", language);
 
@@ -205,7 +201,6 @@ export default function LoginPage() {
 
       if (preLoginLang) {
         localStorage.removeItem("preLoginLanguage"); // 사용 후 제거
-
       }
     } finally {
       setIsLoading(false);
@@ -228,8 +223,6 @@ export default function LoginPage() {
       );
       const user = result.user;
       newUser = user;
-
-
 
       // 새로 가입한 사용자의 경우 언어 설정을 Firestore에 반영
       const preLoginLang = localStorage.getItem("preLoginLanguage");
@@ -263,8 +256,6 @@ export default function LoginPage() {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       const user = result.user;
-
-
 
       // 사용자 문서가 존재하는지 확인하고, 없으면 온보딩 페이지로 이동
       const userDoc = await getDoc(doc(db, "users", user.uid));

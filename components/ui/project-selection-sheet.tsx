@@ -87,7 +87,6 @@ export function ProjectSelectionSheet({
     queryFn: async () => {
       if (externalProjects) return null;
 
-
       const result = await fetchProjectsByUserIdWithPaging(
         user?.uid || "",
         itemsPerPage,
@@ -164,8 +163,6 @@ export function ProjectSelectionSheet({
 
     return true;
   });
-
-
 
   // 필터 변경 시 프로젝트 목록 초기화
   useEffect(() => {

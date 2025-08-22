@@ -358,7 +358,6 @@ export function MonthlyDetailContent({
 
   const handleRetrospectiveSave = async (data: any) => {
     try {
-
       // 먼슬리 회고 저장 로직
       const retrospectiveData = {
         userId: user?.uid || "",

@@ -88,8 +88,6 @@ export function ProjectConnectionDialog({
     enabled: !!user?.uid && open, // 다이얼로그가 열렸을 때만 쿼리 실행
   });
 
-
-
   // 프로젝트 선택/해제 핸들러
   const toggleProjectSelection = (project: Project) => {
     const isSelected = localSelectedProjects.some(

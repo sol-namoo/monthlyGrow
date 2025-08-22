@@ -120,8 +120,6 @@ function ParaPageContent() {
   const [user, userLoading] = useAuthState(auth);
   const { translate, currentLanguage } = useLanguage();
 
-
-
   const handleTabChange = (value: string) => {
     router.push(`/para?tab=${value}`, { scroll: false });
   };
@@ -303,8 +301,6 @@ function ParaPageContent() {
   const filteredProjects = projectsWithStatus.filter((project) => {
     if (projectFilter === "all") return true;
     const status = getProjectStatus(project);
-
-
 
     return status === projectFilter;
   });

@@ -203,8 +203,6 @@ export default function HomePage() {
     }
   }, [user, loading, toast, router, texts]);
 
-
-
   // 오늘의 task들 (Today 탭에서만 필요)
   const { data: todayTasks = [], isLoading: todayTasksLoading } = useQuery({
     queryKey: ["todayTasks", user?.uid],
@@ -311,7 +309,6 @@ export default function HomePage() {
         )
       )
     : 0;
-
 
   const changeRate = 0; // 추후 통계 fetch로 대체
 

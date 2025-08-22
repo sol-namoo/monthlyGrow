@@ -120,12 +120,8 @@ export const fetchProjectsOverlappingWithMonthly = async (
     const overlaps =
       projectStartStr <= monthlyEndStr && projectEndStr >= monthlyStartStr;
 
-
-
     return overlaps;
   });
-
-
 
   return filteredProjects;
 };
@@ -444,8 +440,6 @@ export const deleteProjectById = async (projectId: string): Promise<void> => {
 
       // 2. 프로젝트 문서 삭제
       transaction.delete(projectRef);
-
-
     });
   } catch (error) {
     console.error(`❌ 프로젝트 삭제 실패: ${projectId}`, error);

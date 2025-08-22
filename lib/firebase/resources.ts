@@ -175,7 +175,6 @@ export const createResource = async (
 
     const docRef = await addDoc(collection(db, "resources"), newResource);
 
-
     return {
       id: docRef.id,
       userId: resourceData.userId,
@@ -206,7 +205,6 @@ export const updateResource = async (
     });
 
     await updateDoc(doc(db, "resources", resourceId), filteredData);
-
   } catch (error) {
     console.error(`❌ 리소스 업데이트 실패 - ID: ${resourceId}`, error);
     throw new Error("리소스 업데이트에 실패했습니다.");
@@ -216,7 +214,6 @@ export const updateResource = async (
 export const deleteResourceById = async (resourceId: string): Promise<void> => {
   try {
     await deleteDoc(doc(db, "resources", resourceId));
-
   } catch (error) {
     console.error(`❌ 리소스 삭제 실패 - ID: ${resourceId}`, error);
     throw new Error("리소스 삭제에 실패했습니다.");

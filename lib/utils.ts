@@ -14,8 +14,6 @@ export const getBrowserLocale = (): string => {
 
   const locale = navigator.language || navigator.languages?.[0] || "en-UK";
 
-
-
   return locale;
 };
 
@@ -32,8 +30,6 @@ export const getUserTimeZone = (): string => {
   }
 
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-
 
   // 타임존을 캐시에 저장
   cachedTimeZone = timeZone;

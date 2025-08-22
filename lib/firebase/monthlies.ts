@@ -316,10 +316,10 @@ export const createMonthly = async (
     }
 
     const baseData = createBaseData(monthlyData.userId);
-    const newMonthly = {
+    const newMonthly = filterUndefinedValues({
       ...monthlyData,
       ...baseData,
-    };
+    });
 
     const docRef = await addDoc(collection(db, "monthlies"), newMonthly);
 
@@ -363,11 +363,11 @@ export const checkMonthlyExists = async (
   startDate: Date,
   endDate: Date
 ): Promise<boolean> => {
-  // 단순한 쿼리로 변경하여 기존 인덱스 사용
+  // 기존 인덱스를 사용하는 단순한 쿼리
   const q = query(
     collection(db, "monthlies"),
     where("userId", "==", userId),
-    orderBy("startDate", "desc")
+    orderBy("startDate", "asc")
   );
   const querySnapshot = await getDocs(q);
 

@@ -13,8 +13,6 @@ export function TimeZoneInitializer() {
     if (!loading) {
       // 사용자가 로그인되었거나 로그아웃되었을 때 타임존 캐시 초기화
       resetTimeZoneCache();
-
-
     }
   }, [user, loading]);
 
