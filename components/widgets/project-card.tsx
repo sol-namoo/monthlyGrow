@@ -116,19 +116,7 @@ export function ProjectCard({
 
   const progressInfo = getProgressInfo();
 
-  // 디버깅용 로그
-  console.log(`ProjectCard ${project.title}:`, {
-    mode,
-    category: project.category,
-    projectCompletedTasks: project.completedTasks,
-    projectTargetCount: project.targetCount,
-    taskCounts,
-    progressInfo,
-    calculatedWidth:
-      mode === "monthly"
-        ? getMonthlyGoalInfo().percentage
-        : progressInfo.percentage,
-  });
+
 
   // 프로젝트 상태 계산
   const getProjectStatus = () => {

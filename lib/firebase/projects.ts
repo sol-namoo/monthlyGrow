@@ -25,23 +25,12 @@ import { Project } from "../types";
 export const fetchAllProjectsByUserId = async (
   userId: string
 ): Promise<Project[]> => {
-  console.log("🔍 fetchAllProjectsByUserId 호출:", { userId });
-
   const q = query(
     collection(db, "projects"),
     where("userId", "==", userId),
     orderBy("endDate", "desc")
   );
   const querySnapshot = await getDocs(q);
-
-  console.log("🔍 fetchAllProjectsByUserId 결과:", {
-    userId,
-    docsCount: querySnapshot.docs.length,
-    docs: querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      data: doc.data(),
-    })),
-  });
 
   return querySnapshot.docs.map((doc) => {
     const data = doc.data();
@@ -113,16 +102,6 @@ export const fetchProjectsOverlappingWithMonthly = async (
   });
 
   // 먼슬리 기간과 겹치는 프로젝트만 필터링
-  console.log("🔍 필터링 시작:", {
-    monthlyStartDate: monthlyStartDate.toLocaleDateString("en-CA"),
-    monthlyEndDate: monthlyEndDate.toLocaleDateString("en-CA"),
-    totalProjects: allProjects.length,
-    allProjects: allProjects.map((p) => ({
-      title: p.title,
-      start: p.startDate.toLocaleDateString("en-CA"),
-      end: p.endDate.toLocaleDateString("en-CA"),
-    })),
-  });
 
   const filteredProjects = allProjects.filter((project) => {
     // 로컬 시간대로 날짜를 YYYY-MM-DD 형식으로 변환
@@ -141,28 +120,12 @@ export const fetchProjectsOverlappingWithMonthly = async (
     const overlaps =
       projectStartStr <= monthlyEndStr && projectEndStr >= monthlyStartStr;
 
-    console.log("📅 프로젝트 필터링:", {
-      projectTitle: project.title,
-      projectStart: projectStartStr,
-      projectEnd: projectEndStr,
-      monthlyStart: monthlyStartStr,
-      monthlyEnd: monthlyEndStr,
-      overlaps,
-      condition1: projectStartStr <= monthlyEndStr,
-      condition2: projectEndStr >= monthlyStartStr,
-    });
+
 
     return overlaps;
   });
 
-  console.log("✅ 필터링 결과:", {
-    filteredCount: filteredProjects.length,
-    projects: filteredProjects.map((p) => ({
-      title: p.title,
-      start: p.startDate.toISOString(),
-      end: p.endDate.toISOString(),
-    })),
-  });
+
 
   return filteredProjects;
 };
@@ -482,9 +445,7 @@ export const deleteProjectById = async (projectId: string): Promise<void> => {
       // 2. 프로젝트 문서 삭제
       transaction.delete(projectRef);
 
-      console.log(
-        `✅ 프로젝트 및 서브컬렉션 삭제 완료: ${projectId} (태스크 ${tasksSnapshot.docs.length}개 포함)`
-      );
+
     });
   } catch (error) {
     console.error(`❌ 프로젝트 삭제 실패: ${projectId}`, error);

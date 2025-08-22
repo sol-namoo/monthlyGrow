@@ -138,7 +138,7 @@ export default function PlanGenerator() {
       const areas = await fetchAllAreasByUserId(user.uid);
       setExistingAreas(areas);
     } catch (error) {
-      console.error("기존 Areas 조회 실패:", error);
+      // 기존 Areas 조회 실패
     } finally {
       setAreasLoading(false);
     }
@@ -367,7 +367,6 @@ export default function PlanGenerator() {
         setError(translate("common.errors.unexpectedResponse"));
       }
     } catch (error) {
-      console.error("계획 생성 오류:", error);
       setError(
         `${translate("aiPlanGenerator.errors.generationFailed")} ${translate(
           "aiPlanGenerator.errors.retryMessage"

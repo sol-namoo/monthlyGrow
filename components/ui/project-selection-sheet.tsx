@@ -87,60 +87,23 @@ export function ProjectSelectionSheet({
     queryFn: async () => {
       if (externalProjects) return null;
 
-      // 디버깅: 페칭 시작
-      console.log(
-        "🔍 페칭 시작 - userId:",
-        user?.uid,
-        "pageLimit:",
-        itemsPerPage
-      );
 
-      // 모든 경우에 10개씩 페이지네이션 사용
-      console.log(
-        "🔍 페칭 시작 - userId:",
-        user?.uid,
-        "pageLimit:",
-        itemsPerPage
-      );
       const result = await fetchProjectsByUserIdWithPaging(
         user?.uid || "",
         itemsPerPage,
         lastDoc,
         "latest"
       );
-      console.log("🔍 페칭 완료 - 결과:", {
-        projectsCount: result.projects.length,
-        hasMore: result.hasMore,
-        lastDoc: result.lastDoc ? "있음" : "없음",
-      });
-
       if (lastDoc === null) {
         // 첫 페이지 로드
         setAllProjects(result.projects);
-        console.log(
-          "🔍 첫 페이지 로드:",
-          result.projects.length,
-          "개 프로젝트"
-        );
-        console.log(
-          "프로젝트들:",
-          result.projects.map((p) => ({ id: p.id, title: p.title }))
-        );
-        console.log("🔍 요청한 페이지 크기:", itemsPerPage);
-        console.log("🔍 실제 반환된 크기:", result.projects.length);
       } else {
         // 추가 페이지 로드
         setAllProjects((prev) => [...prev, ...result.projects]);
-        console.log(
-          "🔍 추가 페이지 로드:",
-          result.projects.length,
-          "개 프로젝트"
-        );
       }
 
       setLastDoc(result.lastDoc);
       setHasMore(result.hasMore);
-      console.log("🔍 hasMore:", result.hasMore, "lastDoc:", result.lastDoc);
 
       return result.projects;
     },
@@ -202,19 +165,7 @@ export function ProjectSelectionSheet({
     return true;
   });
 
-  // 디버깅용 로그
-  console.log("🔍 전체 프로젝트:", projects.length, "개");
-  console.log("🔍 필터링된 프로젝트:", filteredProjects.length, "개");
-  console.log(
-    "🔍 검색어:",
-    searchTerm,
-    "상태필터:",
-    statusFilter,
-    "영역필터:",
-    areaFilter,
-    "연결필터:",
-    showOnlyUnconnected
-  );
+
 
   // 필터 변경 시 프로젝트 목록 초기화
   useEffect(() => {

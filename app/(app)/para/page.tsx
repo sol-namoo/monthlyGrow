@@ -120,14 +120,7 @@ function ParaPageContent() {
   const [user, userLoading] = useAuthState(auth);
   const { translate, currentLanguage } = useLanguage();
 
-  // 디버깅: 번역 시스템 확인
-  useEffect(() => {
-    console.log("PARA 페이지 번역 디버깅:", {
-      currentLanguage,
-      testTranslation: translate("para.resources.other"),
-      testTranslation2: translate("para.archives.filter.all"),
-    });
-  }, [currentLanguage, translate]);
+
 
   const handleTabChange = (value: string) => {
     router.push(`/para?tab=${value}`, { scroll: false });
@@ -153,7 +146,7 @@ function ParaPageContent() {
     queryKey: ["areaCounts", user?.uid],
     queryFn: async () => {
       const counts = await fetchAreaCountsByUserId(user?.uid || "");
-      console.log("PARA: Loaded area counts:", counts);
+
       return counts;
     },
     enabled: !!user?.uid,
@@ -165,7 +158,7 @@ function ParaPageContent() {
       queryKey: ["totalProjectCount", user?.uid],
       queryFn: async () => {
         const count = await fetchProjectCountByUserId(user?.uid || "");
-        console.log("PARA: Total project count:", count);
+
         return count;
       },
       enabled: !!user?.uid,
@@ -177,7 +170,7 @@ function ParaPageContent() {
       queryKey: ["totalResourceCount", user?.uid],
       queryFn: async () => {
         const count = await fetchResourceCountByUserId(user?.uid || "");
-        console.log("PARA: Total resource count:", count);
+
         return count;
       },
       enabled: !!user?.uid,
@@ -189,7 +182,7 @@ function ParaPageContent() {
       queryKey: ["totalArchiveCount", user?.uid],
       queryFn: async () => {
         const count = await fetchArchiveCountByUserId(user?.uid || "");
-        console.log("PARA: Total archive count:", count);
+
         return count;
       },
       enabled: !!user?.uid,
@@ -311,17 +304,7 @@ function ParaPageContent() {
     if (projectFilter === "all") return true;
     const status = getProjectStatus(project);
 
-    // 디버깅: overdue 필터 확인
-    if (projectFilter === "overdue") {
-      console.log("Overdue filter check:", {
-        projectTitle: project.title,
-        status,
-        endDate: project.endDate,
-        completedTasks: project.completedTasks,
-        targetCount: project.targetCount,
-        isOverdue: status === "overdue",
-      });
-    }
+
 
     return status === projectFilter;
   });

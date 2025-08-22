@@ -55,9 +55,7 @@ export const fetchUserById = async (userId: string): Promise<User> => {
     } as User;
   } else {
     // 사용자 문서가 없을 때 기본 사용자 데이터 반환
-    console.log(
-      `사용자 문서가 없습니다. 기본 데이터를 반환합니다. - UID: ${userId}`
-    );
+
     return {
       id: userId,
       profile: {

@@ -14,13 +14,7 @@ export function TimeZoneInitializer() {
       // 사용자가 로그인되었거나 로그아웃되었을 때 타임존 캐시 초기화
       resetTimeZoneCache();
 
-      // 개발 환경에서 로그 출력
-      if (process.env.NODE_ENV === "development") {
-        console.log(
-          "TimeZone cache reset due to auth state change:",
-          user ? "User logged in" : "User logged out"
-        );
-      }
+
     }
   }, [user, loading]);
 

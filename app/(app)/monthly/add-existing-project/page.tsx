@@ -60,7 +60,6 @@ function AddExistingProjectPageContent() {
   const connectProjectsMutation = useMutation({
     mutationFn: async (projectIds: string[]) => {
       // 새로운 구조에서는 프로젝트 연결이 필요 없으므로 아무것도 하지 않음
-      console.log("새로운 구조에서는 프로젝트 연결이 필요 없습니다");
     },
     onSuccess: () => {
       toast({

@@ -104,7 +104,9 @@ export const fetchPastMonthliesByUserIdWithPaging = async (
 
   // getMonthlyStatus를 사용하여 과거 먼슬리만 필터링
   const { getMonthlyStatus } = await import("../utils");
-  const pastMonthlies = allMonthlies.filter((monthly) => getMonthlyStatus(monthly) === "ended");
+  const pastMonthlies = allMonthlies.filter(
+    (monthly) => getMonthlyStatus(monthly) === "ended"
+  );
 
   // 정렬 적용
   let sortedMonthlies = [...pastMonthlies];
@@ -130,7 +132,9 @@ export const fetchPastMonthliesByUserIdWithPaging = async (
   return {
     monthlies: paginatedMonthlies,
     lastDoc: querySnapshot.docs[querySnapshot.docs.length - 1] || null,
-    hasMore: paginatedMonthlies.length === pageSize && sortedMonthlies.length > pageSize,
+    hasMore:
+      paginatedMonthlies.length === pageSize &&
+      sortedMonthlies.length > pageSize,
   };
 };
 
@@ -139,7 +143,9 @@ const calculateMonthlyProgress = (monthly: Monthly): number => {
   if (!monthly.keyResults || monthly.keyResults.length === 0) {
     return 0;
   }
-  const completedCount = monthly.keyResults.filter((kr) => kr.isCompleted).length;
+  const completedCount = monthly.keyResults.filter(
+    (kr) => kr.isCompleted
+  ).length;
   return (completedCount / monthly.keyResults.length) * 100;
 };
 
@@ -169,28 +175,33 @@ export const findMonthlyByMonth = async (
   const startOfMonth = new Date(year, month - 1, 1);
   const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
 
+  // 기존 인덱스를 사용하는 단순한 쿼리
   const q = query(
     collection(db, "monthlies"),
     where("userId", "==", userId),
-    where("startDate", "<=", endOfMonth),
-    where("endDate", ">=", startOfMonth)
+    orderBy("startDate", "asc")
   );
   const querySnapshot = await getDocs(q);
 
-  if (querySnapshot.empty) {
-    return null;
-  }
+  // 클라이언트에서 필터링
+  const monthlies = querySnapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      startDate: data.startDate.toDate(),
+      endDate: data.endDate.toDate(),
+      createdAt: data.createdAt.toDate(),
+      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+    } as Monthly;
+  });
 
-  const doc = querySnapshot.docs[0];
-  const data = doc.data();
-  return {
-    id: doc.id,
-    ...data,
-    startDate: data.startDate.toDate(),
-    endDate: data.endDate.toDate(),
-    createdAt: data.createdAt.toDate(),
-    updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-  } as Monthly;
+  // 해당 월과 겹치는 먼슬리 찾기
+  const matchingMonthly = monthlies.find((monthly) => {
+    return monthly.startDate <= endOfMonth && monthly.endDate >= startOfMonth;
+  });
+
+  return matchingMonthly || null;
 };
 
 export const findIncompleteProjectsInMonthly = async (
@@ -312,7 +323,6 @@ export const createMonthly = async (
 
     const docRef = await addDoc(collection(db, "monthlies"), newMonthly);
 
-
     return {
       id: docRef.id,
       userId: monthlyData.userId,
@@ -325,7 +335,6 @@ export const createMonthly = async (
       updatedAt: new Date(),
     } as Monthly;
   } catch (error) {
-
     if (error instanceof Error) {
       throw new Error(`먼슬리 생성에 실패했습니다: ${error.message}`);
     }
@@ -344,9 +353,7 @@ export const updateMonthly = async (
     });
 
     await updateDoc(doc(db, "monthlies", monthlyId), filteredData);
-
   } catch (error) {
-
     throw new Error("먼슬리 업데이트에 실패했습니다.");
   }
 };
@@ -356,14 +363,33 @@ export const checkMonthlyExists = async (
   startDate: Date,
   endDate: Date
 ): Promise<boolean> => {
+  // 단순한 쿼리로 변경하여 기존 인덱스 사용
   const q = query(
     collection(db, "monthlies"),
     where("userId", "==", userId),
-    where("startDate", "<=", endDate),
-    where("endDate", ">=", startDate)
+    orderBy("startDate", "desc")
   );
   const querySnapshot = await getDocs(q);
-  return !querySnapshot.empty;
+
+  // 클라이언트에서 필터링
+  const monthlies = querySnapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      startDate: data.startDate.toDate(),
+      endDate: data.endDate.toDate(),
+      createdAt: data.createdAt.toDate(),
+      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+    } as Monthly;
+  });
+
+  // 기간이 겹치는 먼슬리가 있는지 확인
+  const hasOverlap = monthlies.some((monthly) => {
+    return monthly.startDate <= endDate && monthly.endDate >= startDate;
+  });
+
+  return hasOverlap;
 };
 
 export const deleteMonthlyById = async (monthlyId: string): Promise<void> => {
@@ -399,10 +425,7 @@ export const deleteMonthlyById = async (monthlyId: string): Promise<void> => {
       // 먼슬리 삭제
       transaction.delete(monthlyRef);
     });
-
-
   } catch (error) {
-
     if (error instanceof Error) {
       throw new Error(`먼슬리 삭제에 실패했습니다: ${error.message}`);
     }

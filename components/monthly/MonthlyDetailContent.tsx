@@ -154,16 +154,11 @@ export function MonthlyDetailContent({
     useQuery({
       queryKey: ["monthly-retrospective", monthly.id],
       queryFn: async () => {
-        console.log("🔍 회고 조회 중:", {
-          userId: user?.uid,
-          monthlyId: monthly.id,
-        });
         const result = await fetchSingleArchive(
           user?.uid || "",
           monthly.id,
           "monthly_retrospective"
         );
-        console.log("📋 회고 조회 결과:", result);
         return result;
       },
       enabled: !!user?.uid && !!monthly.id && activeTab === "retrospective",
@@ -174,16 +169,11 @@ export function MonthlyDetailContent({
   const { data: monthlyNote, isLoading: noteLoading } = useQuery({
     queryKey: ["monthly-note", monthly.id],
     queryFn: async () => {
-      console.log("🔍 노트 조회 중:", {
-        userId: user?.uid,
-        monthlyId: monthly.id,
-      });
       const result = await fetchSingleArchive(
         user?.uid || "",
         monthly.id,
         "monthly_note"
       );
-      console.log("📋 노트 조회 결과:", result);
       return result;
     },
     enabled: !!user?.uid && !!monthly.id && activeTab === "notes",
@@ -303,7 +293,6 @@ export function MonthlyDetailContent({
       }
     },
     onError: (error) => {
-      console.error("먼슬리 삭제 실패:", error);
       toast({
         title: translate("monthlyDetail.delete.error.title"),
         description: translate("monthlyDetail.delete.error.description"),
@@ -369,11 +358,6 @@ export function MonthlyDetailContent({
 
   const handleRetrospectiveSave = async (data: any) => {
     try {
-      console.log("회고 저장 시작:", {
-        data,
-        userId: user?.uid,
-        monthlyId: monthly.id,
-      });
 
       // 먼슬리 회고 저장 로직
       const retrospectiveData = {
@@ -422,11 +406,8 @@ export function MonthlyDetailContent({
           nextMonthlyApplication: data.nextMonthlyApplication,
         };
 
-        console.log("새 아카이브 생성 시도:", archiveData);
         await createUnifiedArchive(archiveData);
       }
-
-      console.log("회고 데이터:", data);
       // 회고 저장 후 아카이브 데이터 새로고침
       queryClient.invalidateQueries({
         queryKey: ["monthly-retrospective", monthly.id],
@@ -438,7 +419,6 @@ export function MonthlyDetailContent({
         ),
       });
     } catch (error) {
-      console.error("회고 저장 실패:", error);
       toast({
         title: "회고 저장 실패",
         description: "회고 저장 중 오류가 발생했습니다.",

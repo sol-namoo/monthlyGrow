@@ -172,7 +172,6 @@ export function RetrospectiveForm({
       form.reset();
       onClose();
     } catch (error) {
-      console.error("회고 저장 중 오류:", error);
       // 에러가 발생해도 폼은 닫지 않음
     }
   };

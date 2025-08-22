@@ -605,7 +605,7 @@ export default function EditProjectPage({
           try {
             await deleteTaskFromProject(project.id, taskId);
           } catch (error) {
-            console.error(`❌ 태스크 삭제 실패: ${taskId}`, error);
+            // 태스크 삭제 실패
           }
         }
       }
@@ -640,12 +640,9 @@ export default function EditProjectPage({
               done: task.done,
             });
           } else {
-            console.warn(
-              `⚠️ 알 수 없는 태스크: ${task.title} (ID: ${task.id})`
-            );
+            // 알 수 없는 태스크
           }
         } catch (error) {
-          console.error(`❌ 태스크 처리 실패: ${task.title}`, error);
           throw new Error(`태스크 저장 실패: ${task.title}`);
         }
       }
@@ -673,7 +670,6 @@ export default function EditProjectPage({
 
       router.replace(`/para/projects/${project.id}`);
     } catch (error) {
-      console.error("프로젝트 수정 실패:", error);
       toast({
         title: "프로젝트 수정 실패",
         description: "프로젝트 수정 중 오류가 발생했습니다.",

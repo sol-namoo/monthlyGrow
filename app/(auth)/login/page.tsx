@@ -113,28 +113,10 @@ export default function LoginPage() {
       const user = result.user;
       newUser = user;
 
-      console.log("✅ 계정 인증 성공:", user.uid, user.displayName);
-      console.log("🔍 사용자 정보 상세:", {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        providerId: user.providerId,
-        isAnonymous: user.isAnonymous,
-      });
 
-      // Google Identity Toolkit 응답 구조 확인
-      console.log("🔍 전체 사용자 객체:", user);
-      console.log("🔍 사용자 객체의 모든 속성:", Object.keys(user));
-
-      // providerData 확인 (Google 로그인의 경우)
-      if (user.providerData && user.providerData.length > 0) {
-        console.log("🔍 Provider Data:", user.providerData[0]);
-      }
       const userDoc = await getDoc(doc(db, "users", user.uid));
       if (!userDoc.exists()) {
-        console.log(
-          "새로운 사용자임을 감지했습니다. 약관 동의를 위한 모달을 엽니다."
-        );
+
         setShowTermsModal(true);
       } else {
         // 기존 사용자의 경우 로그인 전 언어 설정을 Firestore에 반영
@@ -145,15 +127,11 @@ export default function LoginPage() {
               language: preLoginLang as Language,
             });
             localStorage.removeItem("preLoginLanguage"); // 사용 후 제거
-            console.log(
-              "✅ 로그인 전 언어 설정을 Firestore에 반영:",
-              preLoginLang
-            );
+            // 언어 설정 업데이트 성공
           } catch (error) {
-            console.warn("언어 설정 업데이트 실패:", error);
+            // 언어 설정 업데이트 실패
           }
         }
-        console.log("정상 로그인 → 홈으로 이동");
         router.push("/home");
       }
     } finally {
@@ -190,14 +168,13 @@ export default function LoginPage() {
 
       const user = result.user;
 
-      console.log("✅ 샘플 유저 로그인 성공:", user.uid, user.email);
+
 
       // 언어 설정 저장
       localStorage.setItem("preLoginLanguage", language);
 
       router.push("/onboarding");
     } catch (error: any) {
-      console.error("❌ 샘플 유저 로그인 실패:", error);
       setIsSampleUserLogin(false); // 에러 시 상태 초기화
     } finally {
       setIsLoading(false);
@@ -228,10 +205,8 @@ export default function LoginPage() {
 
       if (preLoginLang) {
         localStorage.removeItem("preLoginLanguage"); // 사용 후 제거
-        console.log("✅ 새 사용자 언어 설정 반영:", preLoginLang);
-      }
 
-      console.log("✅ 기본 사용자 문서 생성 완료");
+      }
     } finally {
       setIsLoading(false);
       // 온보딩 페이지로 이동
@@ -254,14 +229,7 @@ export default function LoginPage() {
       const user = result.user;
       newUser = user;
 
-      console.log("✅ 이메일 회원가입 성공:", user.uid, user.email);
-      console.log("🔍 이메일 사용자 정보 상세:", {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        providerId: user.providerId,
-        isAnonymous: user.isAnonymous,
-      });
+
 
       // 새로 가입한 사용자의 경우 언어 설정을 Firestore에 반영
       const preLoginLang = localStorage.getItem("preLoginLanguage");
@@ -271,17 +239,15 @@ export default function LoginPage() {
             language: preLoginLang as Language,
           });
           localStorage.removeItem("preLoginLang"); // 사용 후 제거
-          console.log("✅ 이메일 회원가입 시 언어 설정 반영:", preLoginLang);
+          // 언어 설정 반영 성공
         } catch (error) {
-          console.warn("언어 설정 업데이트 실패:", error);
+          // 언어 설정 업데이트 실패
         }
       }
 
       // 새로 가입한 사용자는 항상 온보딩 페이지로 이동
-      console.log("새로 가입한 사용자입니다. 온보딩 페이지로 이동합니다.");
       router.push("/onboarding");
     } catch (error: any) {
-      console.error("❌ 이메일 회원가입 실패:", error);
       setFormError(getAuthErrorMessage(error.code));
       setIsSigningUp(false);
     } finally {
@@ -298,28 +264,16 @@ export default function LoginPage() {
       const result = await signInWithEmailAndPassword(auth, email, password);
       const user = result.user;
 
-      console.log("✅ 이메일 로그인 성공:", user.uid, user.email);
-      console.log("🔍 이메일 로그인 사용자 정보 상세:", {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        providerId: user.providerId,
-        isAnonymous: user.isAnonymous,
-      });
+
 
       // 사용자 문서가 존재하는지 확인하고, 없으면 온보딩 페이지로 이동
       const userDoc = await getDoc(doc(db, "users", user.uid));
       if (!userDoc.exists()) {
-        console.log(
-          "새로운 이메일 사용자임을 감지했습니다. 온보딩 페이지로 이동합니다."
-        );
         router.push("/onboarding");
       } else {
-        console.log("기존 사용자입니다. 홈으로 이동합니다.");
         router.push("/home");
       }
     } catch (error: any) {
-      console.error("❌ 이메일 로그인 실패:", error);
       setFormError(getAuthErrorMessage(error.code));
     } finally {
       setIsLoading(false);

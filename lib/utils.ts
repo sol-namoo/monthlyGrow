@@ -14,10 +14,7 @@ export const getBrowserLocale = (): string => {
 
   const locale = navigator.language || navigator.languages?.[0] || "en-UK";
 
-  // 개발 환경에서 로케일 정보 출력
-  if (process.env.NODE_ENV === "development") {
-    console.log("Browser locale detected:", locale);
-  }
+
 
   return locale;
 };
@@ -36,10 +33,7 @@ export const getUserTimeZone = (): string => {
 
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  // 개발 환경에서 시간대 정보 출력 (한 번만)
-  if (process.env.NODE_ENV === "development") {
-    console.log("User timezone detected:", timeZone);
-  }
+
 
   // 타임존을 캐시에 저장
   cachedTimeZone = timeZone;

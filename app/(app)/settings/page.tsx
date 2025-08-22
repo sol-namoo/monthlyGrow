@@ -157,9 +157,7 @@ export default function SettingsPage() {
     setSavingStates((prev) => ({ ...prev, [key]: true }));
 
     try {
-      console.log(`Saving setting: ${key} = ${value}`);
       await updateSettings({ [key]: value });
-      console.log(`Setting saved successfully: ${key} = ${value}`);
 
       toast({
         title: successMessage || texts.saveSuccess,

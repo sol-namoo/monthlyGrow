@@ -49,7 +49,7 @@ export class PlanCache {
         }
       }
     } catch (error) {
-      console.warn("캐시 조회 실패:", error);
+      // 캐시 조회 실패
     }
 
     return null;
@@ -71,7 +71,7 @@ export class PlanCache {
         usageCount: 1,
       });
     } catch (error) {
-      console.warn("캐시 저장 실패:", error);
+      // 캐시 저장 실패
     }
   }
 }

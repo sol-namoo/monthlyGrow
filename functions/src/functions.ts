@@ -23,9 +23,7 @@ export const onTaskCompleted = onDocumentUpdated(
       if (userId) {
         try {
           await updateMonthlyProgress(userId, projectId, 1);
-          console.log(
-            `Updated monthly progress for task ${event.params.taskId} in project ${projectId}`
-          );
+
         } catch (error) {
           console.error(
             `Failed to update monthly progress for task ${event.params.taskId}:`,

@@ -81,7 +81,6 @@ export default function OnboardingPage() {
         try {
           const userDoc = await getDoc(doc(db, "users", user.uid));
           if (!userDoc.exists()) {
-            console.log("온보딩 페이지에서 사용자 문서를 생성합니다.");
             await createUser({
               uid: user.uid,
               email: user.email || "",
@@ -89,7 +88,6 @@ export default function OnboardingPage() {
               photoURL: user.photoURL || "",
               emailVerified: user.emailVerified || false,
             });
-            console.log("✅ 사용자 문서 생성 완료");
           }
         } catch (error) {
           console.error("사용자 문서 생성 중 오류:", error);

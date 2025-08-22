@@ -88,42 +88,7 @@ export function ProjectConnectionDialog({
     enabled: !!user?.uid && open, // 다이얼로그가 열렸을 때만 쿼리 실행
   });
 
-  // 다이얼로그가 열렸을 때만 로그 출력
-  if (open) {
-    console.log("🔍 쿼리 상태:", {
-      userId: user?.uid,
-      isEnabled: !!user?.uid && open,
-      open,
-      isLoading,
-      allProjectsError,
-      allProjectsCount: allProjects.length,
-    });
-  }
 
-  // 다이얼로그가 열렸을 때만 로그 출력
-  if (open) {
-    console.log("🔍 디버깅 - 모든 프로젝트:", {
-      userId: user?.uid,
-      allProjectsCount: allProjects.length,
-      allProjects: allProjects.map((p) => ({
-        title: p.title,
-        start: p.startDate.toLocaleDateString("en-CA"),
-        end: p.endDate.toLocaleDateString("en-CA"),
-      })),
-    });
-
-    // 디버깅용 로그
-    console.log("🎯 ProjectConnectionDialog:", {
-      monthlyStartDate: monthlyStartDate.toLocaleDateString("en-CA"),
-      monthlyEndDate: monthlyEndDate.toLocaleDateString("en-CA"),
-      overlappingProjectsCount: overlappingProjects.length,
-      projects: overlappingProjects.map((p) => ({
-        title: p.title,
-        start: p.startDate.toLocaleDateString("en-CA"),
-        end: p.endDate.toLocaleDateString("en-CA"),
-      })),
-    });
-  }
 
   // 프로젝트 선택/해제 핸들러
   const toggleProjectSelection = (project: Project) => {

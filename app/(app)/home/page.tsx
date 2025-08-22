@@ -71,19 +71,10 @@ export default function HomePage() {
   // 태스크 완료/미완료 토글 함수
   const handleTaskToggle = async (task: Task) => {
     try {
-      console.log("태스크 토글 시작:", {
-        taskId: task.id,
-        projectId: task.projectId,
-        currentDone: task.done,
-        title: task.title,
-      });
-
       // 모든 태스크는 서브컬렉션에 있으므로 projectId가 필수
       if (!task.projectId) {
         throw new Error("프로젝트 ID가 없는 태스크입니다.");
       }
-
-      console.log("서브컬렉션 태스크 처리:", task.projectId, task.id);
       await toggleTaskCompletionInSubcollection(task.projectId, task.id);
 
       // 쿼리 무효화하여 데이터 새로고침
@@ -108,7 +99,6 @@ export default function HomePage() {
           : "태스크를 완료로 변경했습니다.",
       });
     } catch (error) {
-      console.error("태스크 토글 실패:", error);
       toast({
         title: "오류 발생",
         description: "태스크 상태 변경에 실패했습니다.",
@@ -213,18 +203,7 @@ export default function HomePage() {
     }
   }, [user, loading, toast, router, texts]);
 
-  // 사용자 ID 디버깅 (개발 환경에서만)
-  useEffect(() => {
-    if (user && process.env.NODE_ENV === "development") {
-      console.log("🏠 홈페이지 사용자 정보:", {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        providerId: user.providerId,
-        isAnonymous: user.isAnonymous,
-      });
-    }
-  }, [user]);
+
 
   // 오늘의 task들 (Today 탭에서만 필요)
   const { data: todayTasks = [], isLoading: todayTasksLoading } = useQuery({
@@ -333,21 +312,7 @@ export default function HomePage() {
       )
     : 0;
 
-  // 디버깅: D-day 계산 정보 (개발 환경에서만)
-  if (process.env.NODE_ENV === "development" && currentMonthly) {
-    console.log("D-day 계산 정보:", {
-      today: today.toISOString(),
-      endDate: currentMonthly.endDate,
-      endDateParsed: new Date(currentMonthly.endDate).toISOString(),
-      daysLeft,
-      currentMonthly: {
-        id: currentMonthly.id,
-        objective: currentMonthly.objective,
-        startDate: currentMonthly.startDate,
-        endDate: currentMonthly.endDate,
-      },
-    });
-  }
+
   const changeRate = 0; // 추후 통계 fetch로 대체
 
   return (

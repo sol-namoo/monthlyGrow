@@ -25,16 +25,11 @@ export function NoteTab({ monthly, onOpenNoteForm }: NoteTabProps) {
   const { data: monthlyNote, isLoading: noteLoading } = useQuery({
     queryKey: ["monthly-note", monthly.id],
     queryFn: async () => {
-      console.log("🔍 노트 조회 중:", {
-        userId: user?.uid,
-        monthlyId: monthly.id,
-      });
       const result = await fetchSingleArchive(
         user?.uid || "",
         monthly.id,
         "monthly_note"
       );
-      console.log("📋 노트 조회 결과:", result);
       return result;
     },
     enabled: !!user?.uid && !!monthly.id,
