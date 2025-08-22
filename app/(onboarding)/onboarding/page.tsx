@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/index";
-import { createUser } from "@/lib/firebase/users";
+import { createUser, updateUserSettings } from "@/lib/firebase/users";
 import {
   ChevronRight,
   ChevronLeft,
@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/hooks/useLanguage";
+import { Language } from "@/lib/translations";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase/index";
@@ -81,6 +82,9 @@ export default function OnboardingPage() {
         try {
           const userDoc = await getDoc(doc(db, "users", user.uid));
           if (!userDoc.exists()) {
+            // 로그인 전 언어 설정 확인
+            const preLoginLang = localStorage.getItem("preLoginLanguage");
+
             await createUser({
               uid: user.uid,
               email: user.email || "",
@@ -88,6 +92,18 @@ export default function OnboardingPage() {
               photoURL: user.photoURL || "",
               emailVerified: user.emailVerified || false,
             });
+
+            // 언어 설정이 있으면 적용
+            if (preLoginLang) {
+              try {
+                await updateUserSettings(user.uid, {
+                  language: preLoginLang as Language,
+                });
+                localStorage.removeItem("preLoginLanguage");
+              } catch (error) {
+                console.error("온보딩 중 언어 설정 실패:", error);
+              }
+            }
           }
         } catch (error) {
           console.error("사용자 문서 생성 중 오류:", error);

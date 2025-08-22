@@ -210,9 +210,6 @@ export default function SettingsPage() {
     if (value !== currentValue) {
       form.setValue("theme", value);
       await saveSetting("theme", value, texts.theme + " " + texts.saveSuccess);
-
-      // 테마 변경 후 페이지 새로고침
-      window.location.reload();
     }
   };
 
@@ -647,9 +644,6 @@ export default function SettingsPage() {
                 </select>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              {texts.deviceSettingsNote}
-            </p>
           </Card>
         </section>
 

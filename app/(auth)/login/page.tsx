@@ -186,20 +186,24 @@ export default function LoginPage() {
       // 로그인 전 언어 설정 가져오기
       const preLoginLang = localStorage.getItem("preLoginLanguage");
 
-      await setDoc(
-        userRef,
-        {
-          displayName: newUser.displayName,
-          email: newUser.email,
-          photoUrl: newUser.photoURL,
-          settings: {
-            language: preLoginLang || "en",
-          },
-        },
-        { merge: true }
-      );
+      // createUser 함수를 사용하여 완전한 사용자 문서 생성
+      await createUser({
+        uid: newUser.uid,
+        email: newUser.email || "",
+        displayName: newUser.displayName || "",
+        photoURL: newUser.photoURL || "",
+        emailVerified: newUser.emailVerified || false,
+      });
 
+      // 언어 설정이 있으면 적용
       if (preLoginLang) {
+        try {
+          await updateUserSettings(newUser.uid, {
+            language: preLoginLang as Language,
+          });
+        } catch (error) {
+          console.error("Google 로그인 언어 설정 실패:", error);
+        }
         localStorage.removeItem("preLoginLanguage"); // 사용 후 제거
       }
     } finally {
@@ -224,19 +228,8 @@ export default function LoginPage() {
       const user = result.user;
       newUser = user;
 
-      // 새로 가입한 사용자의 경우 언어 설정을 Firestore에 반영
-      const preLoginLang = localStorage.getItem("preLoginLanguage");
-      if (preLoginLang) {
-        try {
-          await updateUserSettings(user.uid, {
-            language: preLoginLang as Language,
-          });
-          localStorage.removeItem("preLoginLang"); // 사용 후 제거
-          // 언어 설정 반영 성공
-        } catch (error) {
-          // 언어 설정 업데이트 실패
-        }
-      }
+      // 새로 가입한 사용자는 preLoginLanguage를 유지하고 온보딩에서 처리
+      // (온보딩 페이지에서 createUser 시 언어 설정이 적용됨)
 
       // 새로 가입한 사용자는 항상 온보딩 페이지로 이동
       router.push("/onboarding");

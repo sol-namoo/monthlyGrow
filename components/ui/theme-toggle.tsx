@@ -21,13 +21,9 @@ export function ThemeToggle() {
   const { translate, currentLanguage } = useLanguage();
 
   const handleThemeChange = async (newTheme: "light" | "dark" | "system") => {
-    setTheme(newTheme);
-
-    // Firestore에 설정 저장
+    // Firestore에 설정 저장 (useSettings 훅에서 자동으로 setTheme도 호출됨)
     try {
       await updateSettings({ theme: newTheme });
-      // 테마 변경 후 페이지 새로고침
-      window.location.reload();
     } catch (error) {
       console.error("테마 설정 저장 실패:", error);
     }

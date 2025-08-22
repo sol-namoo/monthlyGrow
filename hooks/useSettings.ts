@@ -49,12 +49,8 @@ export function useSettings() {
 
         setSettings(userSettings);
 
-        // 초기 로드 시에만 테마 동기화 (이미 설정된 테마와 다를 때만)
-        if (
-          !isInitialized &&
-          userSettings.theme &&
-          userSettings.theme !== resolvedTheme
-        ) {
+        // 사용자 설정의 테마가 있고 현재 테마와 다르면 업데이트
+        if (userSettings.theme && userSettings.theme !== resolvedTheme) {
           setTheme(userSettings.theme);
         }
         setIsInitialized(true);
@@ -87,8 +83,8 @@ export function useSettings() {
         await updateUserSettings(user.uid, updates);
         setSettings((prev) => ({ ...prev, ...updates }));
 
-        // 테마 변경 시에만 next-themes와 동기화
-        if (updates.theme && updates.theme !== resolvedTheme) {
+        // 테마 변경 시 즉시 next-themes와 동기화
+        if (updates.theme) {
           setTheme(updates.theme);
         }
       } catch (error) {

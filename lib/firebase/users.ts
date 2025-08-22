@@ -162,11 +162,57 @@ export const createUser = async (userData: {
   }
 };
 
+/**
+ * 사용자 문서가 존재하는지 확인하고, 없으면 기본 문서를 생성합니다.
+ */
+const ensureUserDocumentExists = async (userId: string): Promise<void> => {
+  const userDocRef = doc(db, "users", userId);
+  const userDoc = await getDoc(userDocRef);
+
+  if (!userDoc.exists()) {
+    // 사용자 문서가 없으면 기본 문서를 생성
+    const baseData = createBaseData(userId);
+    const defaultUser = {
+      profile: {
+        displayName: "",
+        email: "",
+        emailVerified: false,
+        createdAt: baseData.createdAt,
+        updatedAt: baseData.updatedAt,
+      },
+      settings: {
+        defaultReward: "",
+        defaultRewardEnabled: false,
+        carryOver: true,
+        aiRecommendations: true,
+        notifications: true,
+        theme: "system" as const,
+        language: "ko" as const,
+        monthlyProjectCardDisplay: "monthly_only" as const,
+        createdAt: baseData.createdAt,
+        updatedAt: baseData.updatedAt,
+      },
+      preferences: {
+        timezone: "Asia/Seoul",
+        dateFormat: "YYYY-MM-DD",
+        weeklyStartDay: "monday" as const,
+        createdAt: baseData.createdAt,
+        updatedAt: baseData.updatedAt,
+      },
+      ...baseData,
+    };
+
+    await setDoc(userDocRef, defaultUser);
+  }
+};
+
 export const updateUserProfile = async (
   userId: string,
   updateData: Partial<Omit<UserProfile, "id" | "userId" | "createdAt">>
 ): Promise<void> => {
   try {
+    await ensureUserDocumentExists(userId);
+
     const filteredData = filterUndefinedValues({
       ...updateData,
       updatedAt: updateTimestamp(),
@@ -186,16 +232,20 @@ export const updateUserSettings = async (
   updateData: Partial<Omit<UserSettings, "id" | "userId" | "createdAt">>
 ): Promise<void> => {
   try {
-    const filteredData = filterUndefinedValues({
-      ...updateData,
-      updatedAt: updateTimestamp(),
-    });
+    await ensureUserDocumentExists(userId);
 
-    // users 컬렉션의 settings 필드를 업데이트
-    await updateDoc(doc(db, "users", userId), {
-      settings: filteredData,
+    const filteredData = filterUndefinedValues(updateData);
+
+    // Firestore의 점 표기법을 사용하여 중첩된 필드 업데이트
+    const updateFields: any = {};
+    Object.keys(filteredData).forEach((key) => {
+      updateFields[`settings.${key}`] = filteredData[key];
     });
+    updateFields["settings.updatedAt"] = updateTimestamp();
+
+    await updateDoc(doc(db, "users", userId), updateFields);
   } catch (error) {
+    console.error("설정 업데이트 실패:", error);
     throw new Error("사용자 설정 업데이트에 실패했습니다.");
   }
 };
@@ -205,16 +255,20 @@ export const updateUserPreferences = async (
   updateData: Partial<Omit<UserPreferences, "id" | "userId" | "createdAt">>
 ): Promise<void> => {
   try {
-    const filteredData = filterUndefinedValues({
-      ...updateData,
-      updatedAt: updateTimestamp(),
-    });
+    await ensureUserDocumentExists(userId);
 
-    // users 컬렉션의 preferences 필드를 업데이트
-    await updateDoc(doc(db, "users", userId), {
-      preferences: filteredData,
+    const filteredData = filterUndefinedValues(updateData);
+
+    // Firestore의 점 표기법을 사용하여 중첩된 필드 업데이트
+    const updateFields: any = {};
+    Object.keys(filteredData).forEach((key) => {
+      updateFields[`preferences.${key}`] = filteredData[key];
     });
+    updateFields["preferences.updatedAt"] = updateTimestamp();
+
+    await updateDoc(doc(db, "users", userId), updateFields);
   } catch (error) {
+    console.error("선호도 업데이트 실패:", error);
     throw new Error("사용자 선호도 업데이트에 실패했습니다.");
   }
 };
