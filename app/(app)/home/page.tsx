@@ -555,14 +555,18 @@ export default function HomePage() {
                 todayTasks.map((task, index) => (
                   <Card
                     key={task.id}
-                    className={`p-3 transition-all duration-200 hover:shadow-md ${
+                    className={`p-3 transition-all duration-200 hover:shadow-md cursor-pointer ${
                       task.done ? "bg-green-50/50 dark:bg-green-900/20" : ""
                     }`}
+                    onClick={() => handleTaskToggle(task)}
                   >
                     <div className="flex items-center gap-3">
                       {/* 완료 상태 토글 버튼 */}
                       <button
-                        onClick={() => handleTaskToggle(task)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTaskToggle(task);
+                        }}
                         className="flex-shrink-0 hover:scale-110 transition-transform cursor-pointer"
                       >
                         {task.done ? (
@@ -609,6 +613,7 @@ export default function HomePage() {
                             size="sm"
                             asChild
                             className="flex-shrink-0 h-8 w-8 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <Link href={`/para/projects/${task.projectId}`}>
                               <ExternalLink className="h-4 w-4" />

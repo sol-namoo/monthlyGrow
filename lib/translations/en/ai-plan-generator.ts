@@ -51,7 +51,7 @@ export const aiPlanGenerator = {
   // 결과 섹션
   result: {
     title: "Your Generated Plan",
-    saveButton: "Save to Monthly",
+    saveButton: "Save Generated Plan",
     exportButton: "Export Plan",
     shareButton: "Share Plan",
     editButton: "Edit Plan",
@@ -90,8 +90,8 @@ export const aiPlanGenerator = {
 
   // 모달 및 다이얼로그
   modal: {
-    saveTitle: "Save Plan to Monthly",
-    saveDescription: "Choose which monthly to save this plan to:",
+    saveTitle: "Save Generated Plan",
+    saveDescription: "Save this plan to the PARA system:",
     saveButton: "Save Plan",
     cancelButton: "Cancel",
     noMonthlies: "No monthlies available. Create a monthly first.",
@@ -106,6 +106,7 @@ export const aiPlanGenerator = {
     categoryRequired: "Please select a category",
     generationFailed:
       "Failed to generate plan. Please check your input and try again.",
+    retryMessage: "Please try generating again.",
     saveFailed: "Failed to save plan. Please try again.",
     networkError: "Network error. Please check your connection and try again.",
   },
@@ -127,11 +128,6 @@ export const aiPlanGenerator = {
     planGenerated: "Your personalized plan has been generated!",
     planSaved: "Plan has been saved to your monthly successfully!",
     planExported: "Plan has been exported successfully!",
-  },
-
-  // 상태 메시지
-  status: {
-    saving: "Saving...",
   },
 
   // 기존 영역 정보

@@ -76,7 +76,7 @@ import {
 const projectFormSchema = z
   .object({
     title: z.string().min(1, "프로젝트 제목을 입력해주세요"),
-    description: z.string().min(1, "프로젝트 설명을 입력해주세요"),
+    description: z.string().optional(),
     category: z.enum(["repetitive", "task_based"], {
       required_error: "프로젝트 유형을 선택해주세요",
     }),
@@ -455,7 +455,7 @@ function NewProjectPageContent() {
       (projectEndDate.getTime() - projectStartDate.getTime()) /
         (1000 * 60 * 60 * 24)
     );
-    const targetCount = parseInt(form.watch("targetCount")) || 1;
+    const targetCount = form.watch("targetCount") || 1;
 
     // 겹치는 기간 비율에 따라 태스크 개수 계산
     return Math.max(
@@ -551,10 +551,11 @@ function NewProjectPageContent() {
     const targetCount = form.watch("targetCount");
     const startDate = form.watch("startDate");
     const dueDate = form.watch("dueDate");
-    const currentTasks = form.getValues("tasks");
+    const currentTasks = form.getValues("tasks") || [];
 
     if (category === "repetitive" && targetCount && startDate && dueDate) {
-      const targetNumber = parseInt(targetCount);
+      const targetNumber =
+        typeof targetCount === "string" ? parseInt(targetCount) : targetCount;
       if (
         !isNaN(targetNumber) &&
         targetNumber > 0 &&
@@ -695,7 +696,7 @@ function NewProjectPageContent() {
         // 반복형 프로젝트: 자동으로 태스크 생성
         const startDate = createValidDate(data.startDate);
         const endDate = createValidDate(data.dueDate);
-        const targetCount = parseInt(data.targetCount);
+        const targetCount = data.targetCount;
 
         tasks = generateRepetitiveTasks(targetCount, startDate, endDate);
       } else {
@@ -731,13 +732,13 @@ function NewProjectPageContent() {
 
       const projectData = {
         title: data.title,
-        description: data.description,
+        description: data.description || "",
         category: data.category,
         areaId, // 필수 필드
         startDate: createValidDate(data.startDate),
         endDate: createValidDate(data.dueDate),
         target: data.target,
-        targetCount: parseInt(data.targetCount),
+        targetCount: data.targetCount,
         completedTasks: 0,
         connectedMonthlies, // 선택된 월간 ID 배열
         notes: [], // 초기에는 빈 배열
@@ -807,11 +808,6 @@ function NewProjectPageContent() {
     }
   };
 
-  // 월간 연결 대화상자 열기
-  const openMonthlyConnectionDialog = () => {
-    setShowMonthlyConnectionDialog(true);
-  };
-
   const calculateDuration = (startDate: string, dueDate: string) => {
     if (!startDate || !dueDate) return 0;
     const start = new Date(startDate);
@@ -824,7 +820,8 @@ function NewProjectPageContent() {
   const calculateWeeklyAverage = (targetCount: string) => {
     if (!targetCount || !form.watch("startDate") || !form.watch("dueDate"))
       return 0;
-    const count = parseInt(targetCount);
+    const count =
+      typeof targetCount === "string" ? parseInt(targetCount) : targetCount;
     const duration = calculateDuration(
       form.watch("startDate"),
       form.watch("dueDate")
@@ -837,7 +834,9 @@ function NewProjectPageContent() {
     form.watch("startDate"),
     form.watch("dueDate")
   );
-  const weeklyAverage = calculateWeeklyAverage(form.watch("targetCount"));
+  const weeklyAverage = calculateWeeklyAverage(
+    String(form.watch("targetCount"))
+  );
 
   // 로딩 상태 확인
   if (userLoading || monthliesLoading || areasLoading) {
@@ -911,6 +910,30 @@ function NewProjectPageContent() {
           <h2 className="mb-4 text-lg font-semibold">기본 정보</h2>
 
           <div className="space-y-4">
+            <div>
+              <Label htmlFor="area">소속 영역</Label>
+              <Select
+                value={form.watch("area")}
+                onValueChange={(value) => form.setValue("area", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="영역을 선택해주세요" />
+                </SelectTrigger>
+                <SelectContent>
+                  {areas.map((area) => (
+                    <SelectItem key={area.id} value={area.id}>
+                      {area.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.area && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.area.message}
+                </p>
+              )}
+            </div>
+
             {/* 프로젝트 유형 선택 */}
             <div>
               <Label>프로젝트 유형</Label>
@@ -982,7 +1005,12 @@ function NewProjectPageContent() {
             </div>
 
             <div>
-              <Label htmlFor="description">프로젝트 설명</Label>
+              <div className="flex items-center gap-2 mb-2">
+                <Label htmlFor="description">프로젝트 설명</Label>
+                <Badge variant="secondary" className="text-xs">
+                  선택사항
+                </Badge>
+              </div>
               <Textarea
                 id="description"
                 {...form.register("description")}
@@ -995,30 +1023,6 @@ function NewProjectPageContent() {
                 </p>
               )}
             </div>
-
-            <div>
-              <Label htmlFor="area">소속 영역</Label>
-              <Select
-                value={form.watch("area")}
-                onValueChange={(value) => form.setValue("area", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="영역을 선택해주세요" />
-                </SelectTrigger>
-                <SelectContent>
-                  {areas.map((area) => (
-                    <SelectItem key={area.id} value={area.id}>
-                      {area.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.formState.errors.area && (
-                <p className="mt-1 text-sm text-red-500">
-                  {form.formState.errors.area.message}
-                </p>
-              )}
-            </div>
           </div>
         </Card>
 
@@ -1026,6 +1030,34 @@ function NewProjectPageContent() {
           <h2 className="mb-4 text-lg font-semibold">일정 및 목표</h2>
 
           <div className="space-y-4">
+            <div>
+              <Label htmlFor="target">목표 설명</Label>
+              <Controller
+                name="target"
+                control={form.control}
+                render={({ field }) => (
+                  <Input
+                    id="target"
+                    type="text"
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder={getTargetPlaceholder(form.watch("category"))}
+                    className="flex-1"
+                  />
+                )}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                {form.watch("category") === "repetitive"
+                  ? "반복할 행동의 구체적인 목표를 설명하세요"
+                  : "완성할 결과물의 구체적인 목표를 설명하세요"}
+              </p>
+              {form.formState.errors.target && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.target.message}
+                </p>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="startDate">시작일</Label>
@@ -1120,34 +1152,6 @@ function NewProjectPageContent() {
             )}
 
             <div>
-              <Label htmlFor="target">목표 설명</Label>
-              <Controller
-                name="target"
-                control={form.control}
-                render={({ field }) => (
-                  <Input
-                    id="target"
-                    type="text"
-                    value={field.value}
-                    onChange={field.onChange}
-                    placeholder={getTargetPlaceholder(form.watch("category"))}
-                    className="flex-1"
-                  />
-                )}
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                {form.watch("category") === "repetitive"
-                  ? "반복할 행동의 구체적인 목표를 설명하세요"
-                  : "완성할 결과물의 구체적인 목표를 설명하세요"}
-              </p>
-              {form.formState.errors.target && (
-                <p className="mt-1 text-sm text-red-500">
-                  {form.formState.errors.target.message}
-                </p>
-              )}
-            </div>
-
-            <div>
               <Label htmlFor="targetCount">
                 {translate("para.projects.targetCount.label")}
                 <span className="ml-1 text-xs text-muted-foreground">
@@ -1199,13 +1203,10 @@ function NewProjectPageContent() {
                     />
                   )}
                 />
-                <span className="text-sm text-muted-foreground">
-                  {getUnitLabel(form.watch("category"))}
-                </span>
+                <div className="text-xs text-muted-foreground">
+                  {form.watch("category") === "repetitive" ? "회" : "개"}
+                </div>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {getTargetDescription(form.watch("category"))}
-              </p>
               {form.formState.errors.targetCount && (
                 <p className="mt-1 text-sm text-red-500">
                   {form.formState.errors.targetCount.message}
@@ -1467,19 +1468,19 @@ function NewProjectPageContent() {
                           </div>
 
                           {/* 두 번째 줄: 날짜, 시간 */}
-                          <div className="flex items-center gap-3">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                               <Input
                                 type="date"
                                 {...form.register(`tasks.${index}.date`)}
-                                className="w-auto text-sm min-w-0"
+                                className="w-full text-sm min-w-0"
                                 min={form.watch("startDate")}
                                 max={form.watch("dueDate")}
                               />
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-shrink-0">
                               <Clock className="h-4 w-4 text-muted-foreground" />
                               <Input
                                 type="number"
@@ -1497,7 +1498,7 @@ function NewProjectPageContent() {
                                 placeholder="1.0"
                                 min="0.1"
                                 step="0.1"
-                                className="w-20 text-sm"
+                                className="w-16 text-sm"
                               />
                               <span className="text-xs text-muted-foreground">
                                 시간
@@ -1578,64 +1579,6 @@ function NewProjectPageContent() {
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
-
-                        {/* 먼슬리별 태스크 개수 설정 */}
-                        <div className="mt-3 pt-3 border-t border-border">
-                          <div className="flex items-center gap-2">
-                            <Label
-                              htmlFor={`target-${monthly.id}`}
-                              className="text-sm font-medium"
-                            >
-                              이 먼슬리에서 완성할 태스크 개수
-                            </Label>
-                            <Badge variant="secondary" className="text-xs">
-                              권장: {getDefaultTargetCount(monthly)}개
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Input
-                              id={`target-${monthly.id}`}
-                              type="number"
-                              min="1"
-                              max="100"
-                              value={
-                                monthlyTargetCounts[monthly.id] ||
-                                getDefaultTargetCount(monthly)
-                              }
-                              onChange={(e) => {
-                                const value = parseInt(e.target.value) || 1;
-                                updateMonthlyTargetCount(monthly.id, value);
-                              }}
-                              className="w-20"
-                            />
-                            <span className="text-sm text-muted-foreground">
-                              개
-                            </span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                updateMonthlyTargetCount(
-                                  monthly.id,
-                                  getDefaultTargetCount(monthly)
-                                );
-                              }}
-                              className="text-xs"
-                            >
-                              권장값 적용
-                            </Button>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            프로젝트 기간과 먼슬리 기간을 고려한 권장
-                            개수입니다.
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            (프로젝트 정보: 미완료 태스크{" "}
-                            {form.watch("targetCount") || 0}개 / 총 태스크{" "}
-                            {form.watch("targetCount") || 0}개)
-                          </p>
-                        </div>
                       </div>
                     ))}
                 </div>
@@ -1650,7 +1593,7 @@ function NewProjectPageContent() {
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  openMonthlyConnectionDialog();
+                  setShowMonthlyConnectionDialog(true);
                 }}
               >
                 <Plus className="h-4 w-4 mr-2" />

@@ -50,7 +50,7 @@ export const aiPlanGenerator = {
   // 결과 섹션
   result: {
     title: "생성된 계획",
-    saveButton: "먼슬리에 저장",
+    saveButton: "생성된 계획 저장",
     exportButton: "계획 내보내기",
     shareButton: "계획 공유",
     editButton: "계획 편집",
@@ -87,8 +87,8 @@ export const aiPlanGenerator = {
 
   // 모달 및 다이얼로그
   modal: {
-    saveTitle: "먼슬리에 계획 저장",
-    saveDescription: "이 계획을 저장할 먼슬리를 선택하세요:",
+    saveTitle: "생성된 계획 저장",
+    saveDescription: "이 계획을 PARA 시스템에 저장합니다:",
     saveButton: "계획 저장",
     cancelButton: "취소",
     noMonthlies: "사용 가능한 먼슬리가 없습니다. 먼저 먼슬리를 만드세요.",
@@ -103,6 +103,7 @@ export const aiPlanGenerator = {
     categoryRequired: "카테고리를 선택해주세요",
     generationFailed:
       "계획 생성에 실패했습니다. 입력 내용을 확인하고 다시 시도해주세요.",
+    retryMessage: "생성을 다시 시도해 주세요.",
     saveFailed: "계획 저장에 실패했습니다. 다시 시도해주세요.",
     networkError: "네트워크 오류입니다. 연결을 확인하고 다시 시도해주세요.",
   },
@@ -123,11 +124,6 @@ export const aiPlanGenerator = {
     planGenerated: "개인화된 계획이 생성되었습니다!",
     planSaved: "계획이 먼슬리에 성공적으로 저장되었습니다!",
     planExported: "계획이 성공적으로 내보내졌습니다!",
-  },
-
-  // 상태 메시지
-  status: {
-    saving: "저장 중...",
   },
 
   // 기존 영역 정보

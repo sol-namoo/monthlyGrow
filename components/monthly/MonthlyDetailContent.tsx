@@ -40,6 +40,8 @@ import {
   Music,
   Palette,
   Utensils,
+  CheckCircle2,
+  Circle,
 } from "lucide-react";
 import Link from "next/link";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -246,16 +248,32 @@ export function MonthlyDetailContent({
         keyResults: updatedKeyResults,
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["monthlies"] });
-      toast({
-        title: translate("monthlyDetail.keyResultUpdate.success.title"),
-        description: translate(
-          "monthlyDetail.keyResultUpdate.success.description"
-        ),
+    onMutate: async ({ keyResultIndex, isCompleted }) => {
+      // 낙관적 업데이트: 서버 응답을 기다리지 않고 즉시 UI 업데이트
+      await queryClient.cancelQueries({ queryKey: ["monthly", monthly.id] });
+
+      const previousMonthly = queryClient.getQueryData(["monthly", monthly.id]);
+
+      queryClient.setQueryData(["monthly", monthly.id], (old: any) => {
+        if (!old) return old;
+        const updatedKeyResults = [...old.keyResults];
+        updatedKeyResults[keyResultIndex] = {
+          ...updatedKeyResults[keyResultIndex],
+          isCompleted,
+        };
+        return { ...old, keyResults: updatedKeyResults };
       });
+
+      return { previousMonthly };
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
+      // 에러 발생 시 이전 상태로 롤백
+      if (context?.previousMonthly) {
+        queryClient.setQueryData(
+          ["monthly", monthly.id],
+          context.previousMonthly
+        );
+      }
       console.error("Key Result 업데이트 실패:", error);
       toast({
         title: translate("monthlyDetail.keyResultUpdate.error.title"),
@@ -264,6 +282,11 @@ export function MonthlyDetailContent({
         ),
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      // 성공/실패 관계없이 쿼리 무효화하여 서버와 동기화
+      queryClient.invalidateQueries({ queryKey: ["monthly", monthly.id] });
+      queryClient.invalidateQueries({ queryKey: ["monthlies"] });
     },
   });
 
@@ -668,13 +691,19 @@ export function MonthlyDetailContent({
                     onClick={() => toggleKeyResultCompletion(index)}
                   >
                     <div className="flex items-center gap-3">
-                      <div
-                        className={`w-4 h-4 rounded-full transition-colors flex-shrink-0 ${
-                          keyResult.isCompleted
-                            ? "bg-green-500"
-                            : "border-2 border-gray-300 dark:border-gray-600"
-                        }`}
-                      ></div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleKeyResultCompletion(index);
+                        }}
+                        className="flex-shrink-0 hover:scale-110 transition-transform cursor-pointer"
+                      >
+                        {keyResult.isCompleted ? (
+                          <CheckCircle2 className="h-3 w-3 text-green-600 fill-green-600" />
+                        ) : (
+                          <Circle className="h-3 w-3 text-muted-foreground hover:text-green-600 hover:fill-green-100" />
+                        )}
+                      </button>
                       <div>
                         <h4
                           className={`font-medium ${
@@ -713,7 +742,8 @@ export function MonthlyDetailContent({
                               "monthlyDetail.keyResults.status.inProgress"
                             )}
                       </Badge>
-                      {!isPastMonthly && (
+                      {/* 수정 버튼 - 기능 미구현으로 주석 처리 */}
+                      {/* {!isPastMonthly && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -721,7 +751,7 @@ export function MonthlyDetailContent({
                         >
                           <Edit className="h-3 w-3" />
                         </Button>
-                      )}
+                      )} */}
                     </div>
                   </div>
                 </Card>

@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { CheckCircle2, Circle } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { formatDate } from "@/lib/utils";
-import { Project, Task } from "@/lib/types";
+import { Project, Task, Area } from "@/lib/types";
 
 interface OverviewTabProps {
   project: Project;
@@ -10,6 +10,7 @@ interface OverviewTabProps {
   timeStats: any;
   completedTasks: number;
   totalTasks: number;
+  area?: Area | null;
 }
 
 export function OverviewTab({
@@ -18,6 +19,7 @@ export function OverviewTab({
   timeStats,
   completedTasks,
   totalTasks,
+  area,
 }: OverviewTabProps) {
   const { translate, currentLanguage } = useLanguage();
 
@@ -163,11 +165,7 @@ export function OverviewTab({
             <span className="text-muted-foreground">
               {translate("paraProjectDetail.connectedArea")}
             </span>
-            <span>
-              {project.areaId
-                ? translate("settings.loading.areaInfo")
-                : "연결된 Area 없음"}
-            </span>
+            <span>{area?.title || project.area || "연결된 Area 없음"}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">

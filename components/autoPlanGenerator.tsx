@@ -368,7 +368,11 @@ export default function PlanGenerator() {
       }
     } catch (error) {
       console.error("계획 생성 오류:", error);
-      setError(translate("common.errors.serviceError"));
+      setError(
+        `${translate("aiPlanGenerator.errors.generationFailed")} ${translate(
+          "aiPlanGenerator.errors.retryMessage"
+        )}`
+      );
     } finally {
       setIsGenerating(false);
     }

@@ -75,7 +75,7 @@ import { MonthlyConnectionDialog } from "@/components/ui/monthly-connection-dial
 const editProjectFormSchema = z
   .object({
     title: z.string().min(1, "프로젝트 제목을 입력해주세요"),
-    description: z.string().min(1, "프로젝트 설명을 입력해주세요"),
+    description: z.string().optional(),
     category: z.enum(["repetitive", "task_based"], {
       required_error: "프로젝트 유형을 선택해주세요",
     }),
@@ -786,6 +786,25 @@ export default function EditProjectPage({
           <h2 className="mb-4 text-lg font-semibold">기본 정보</h2>
 
           <div className="space-y-4">
+            <div>
+              <Label htmlFor="areaId">소속 영역</Label>
+              <Select
+                value={form.watch("areaId")}
+                onValueChange={(value) => form.setValue("areaId", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="영역을 선택해주세요" />
+                </SelectTrigger>
+                <SelectContent>
+                  {areas.map((area) => (
+                    <SelectItem key={area.id} value={area.id}>
+                      {area.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* 프로젝트 유형 선택 */}
             <div>
               <Label>프로젝트 유형</Label>
@@ -867,7 +886,12 @@ export default function EditProjectPage({
             </div>
 
             <div>
-              <Label htmlFor="description">프로젝트 설명</Label>
+              <div className="flex items-center gap-2 mb-2">
+                <Label htmlFor="description">프로젝트 설명</Label>
+                <Badge variant="secondary" className="text-xs">
+                  선택사항
+                </Badge>
+              </div>
               <Textarea
                 id="description"
                 {...form.register("description")}
@@ -880,25 +904,6 @@ export default function EditProjectPage({
                 </p>
               )}
             </div>
-
-            <div>
-              <Label htmlFor="areaId">소속 영역</Label>
-              <Select
-                value={form.watch("areaId")}
-                onValueChange={(value) => form.setValue("areaId", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="영역을 선택해주세요" />
-                </SelectTrigger>
-                <SelectContent>
-                  {areas.map((area) => (
-                    <SelectItem key={area.id} value={area.id}>
-                      {area.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         </Card>
 
@@ -906,6 +911,30 @@ export default function EditProjectPage({
           <h2 className="mb-4 text-lg font-semibold">일정 및 목표</h2>
 
           <div className="space-y-4">
+            <div>
+              <Label htmlFor="target">목표 설명</Label>
+              <Input
+                id="target"
+                type="text"
+                {...form.register("target")}
+                placeholder={
+                  form.watch("category") === "repetitive"
+                    ? "예: 주요 개념 정리"
+                    : "예: 완성된 이력서 1부"
+                }
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                {form.watch("category") === "repetitive"
+                  ? "반복할 행동의 구체적인 목표를 설명하세요"
+                  : "완성할 결과물의 구체적인 목표를 설명하세요"}
+              </p>
+              {form.formState.errors.target && (
+                <p className="mt-1 text-sm text-red-500">
+                  {form.formState.errors.target.message}
+                </p>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="startDate">시작일</Label>
@@ -981,30 +1010,6 @@ export default function EditProjectPage({
                 }
               />
             )}
-
-            <div>
-              <Label htmlFor="target">목표 설명</Label>
-              <Input
-                id="target"
-                type="text"
-                {...form.register("target")}
-                placeholder={
-                  form.watch("category") === "repetitive"
-                    ? "예: 주요 개념 정리"
-                    : "예: 완성된 이력서 1부"
-                }
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                {form.watch("category") === "repetitive"
-                  ? "반복할 행동의 구체적인 목표를 설명하세요"
-                  : "완성할 결과물의 구체적인 목표를 설명하세요"}
-              </p>
-              {form.formState.errors.target && (
-                <p className="mt-1 text-sm text-red-500">
-                  {form.formState.errors.target.message}
-                </p>
-              )}
-            </div>
 
             <div>
               <Label htmlFor="targetCount">
