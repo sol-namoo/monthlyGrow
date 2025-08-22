@@ -193,7 +193,7 @@ function NewAreaPageContent() {
 
   return (
     <div
-      className={`container max-w-md px-4 py-6 relative ${
+      className={`container max-w-md px-4 py-6 pb-20 relative ${
         isSubmitting ? "pointer-events-none" : ""
       }`}
     >

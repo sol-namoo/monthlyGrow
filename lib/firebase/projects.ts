@@ -11,6 +11,7 @@ import {
   orderBy,
   startAfter,
   limit,
+  runTransaction,
 } from "firebase/firestore";
 import { db } from "./config";
 import {
@@ -461,8 +462,32 @@ export const updateProject = async (
 
 export const deleteProjectById = async (projectId: string): Promise<void> => {
   try {
-    await deleteDoc(doc(db, "projects", projectId));
+    await runTransaction(db, async (transaction) => {
+      const projectRef = doc(db, "projects", projectId);
+      const projectDoc = await transaction.get(projectRef);
+
+      if (!projectDoc.exists()) {
+        throw new Error("프로젝트를 찾을 수 없습니다.");
+      }
+
+      // 1. 프로젝트의 모든 태스크 서브컬렉션 삭제
+      const tasksQuery = query(collection(db, "projects", projectId, "tasks"));
+      const tasksSnapshot = await getDocs(tasksQuery);
+
+      // 트랜잭션 내에서 태스크들 삭제
+      tasksSnapshot.docs.forEach((taskDoc) => {
+        transaction.delete(taskDoc.ref);
+      });
+
+      // 2. 프로젝트 문서 삭제
+      transaction.delete(projectRef);
+
+      console.log(
+        `✅ 프로젝트 및 서브컬렉션 삭제 완료: ${projectId} (태스크 ${tasksSnapshot.docs.length}개 포함)`
+      );
+    });
   } catch (error) {
+    console.error(`❌ 프로젝트 삭제 실패: ${projectId}`, error);
     throw new Error("프로젝트 삭제에 실패했습니다.");
   }
 };

@@ -285,7 +285,7 @@ function ParaPageContent() {
     (allProjects.length > 0 && taskCountsLoading)
   ) {
     return (
-      <div className="container max-w-md px-4 py-6">
+      <div className="container max-w-md px-4 py-6 pb-20">
         <div className="mb-6">
           <Skeleton className="h-8 w-48 mb-4" />
           <Skeleton className="h-4 w-full mb-2" />

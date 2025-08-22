@@ -19,12 +19,9 @@ export const para = {
       description: {
         repetitive:
           "반복형 프로젝트는 목표 횟수에 따라 할 일이 자동으로 생성됩니다",
-        taskBased:
-          "작업형 프로젝트는 목표 할 일 수에 따라 빈 할 일이 생성됩니다",
       },
       hint: {
         repetitive: "목표 횟수를 입력하면 할 일이 자동으로 생성됩니다",
-        taskBased: "목표 할 일 수를 입력하면 빈 할 일이 생성됩니다",
         setup: "목표 횟수와 프로젝트 기간을 설정해주세요",
       },
       monthly: {

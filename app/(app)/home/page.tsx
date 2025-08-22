@@ -253,23 +253,6 @@ export default function HomePage() {
       gcTime: 10 * 60 * 1000, // 10분간 가비지 컬렉션 방지
     });
 
-  // 오늘의 태스크에 필요한 프로젝트 정보만 가져오기 (최적화)
-  const { data: todayProjects = [], isLoading: todayProjectsLoading } =
-    useQuery({
-      queryKey: ["todayProjects", user?.uid],
-      queryFn: async () => {
-        if (!user || todayTasks.length === 0) return [];
-        const allProjects = await fetchAllProjectsByUserId(user.uid);
-        const projectIds = [
-          ...new Set(todayTasks.map((task) => task.projectId)),
-        ];
-        return allProjects.filter((project) => projectIds.includes(project.id));
-      },
-      enabled: !!user && activeTab === "today" && todayTasks.length > 0,
-      staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
-      gcTime: 10 * 60 * 1000, // 10분간 가비지 컬렉션 방지
-    });
-
   // 미분류 리소스만 가져오기 (최적화)
   const { data: uncategorizedResources = [] } = useQuery({
     queryKey: ["uncategorizedResources", user?.uid],
@@ -569,86 +552,73 @@ export default function HomePage() {
 
             <div className="space-y-2">
               {todayTasks.length > 0 ? (
-                todayTasks.map((task, index) => {
-                  const project = todayProjects.find(
-                    (p) => p.id === task.projectId
-                  );
-                  return (
-                    <Card
-                      key={task.id}
-                      className={`p-3 transition-all duration-200 hover:shadow-md ${
-                        task.done ? "bg-green-50/50 dark:bg-green-900/20" : ""
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        {/* 완료 상태 토글 버튼 */}
-                        <button
-                          onClick={() => handleTaskToggle(task)}
-                          className="flex-shrink-0 hover:scale-110 transition-transform cursor-pointer"
-                        >
-                          {task.done ? (
-                            <CheckCircle2 className="h-3 w-3 text-green-600 fill-green-600" />
-                          ) : (
-                            <Circle className="h-3 w-3 text-muted-foreground hover:text-green-600 hover:fill-green-100" />
-                          )}
-                        </button>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p
-                              className={`text-sm font-medium transition-all duration-200 ${
-                                task.done
-                                  ? "line-through text-muted-foreground"
-                                  : ""
-                              }`}
-                            >
-                              {task.title}
-                            </p>
+                todayTasks.map((task, index) => (
+                  <Card
+                    key={task.id}
+                    className={`p-3 transition-all duration-200 hover:shadow-md ${
+                      task.done ? "bg-green-50/50 dark:bg-green-900/20" : ""
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* 완료 상태 토글 버튼 */}
+                      <button
+                        onClick={() => handleTaskToggle(task)}
+                        className="flex-shrink-0 hover:scale-110 transition-transform cursor-pointer"
+                      >
+                        {task.done ? (
+                          <CheckCircle2 className="h-3 w-3 text-green-600 fill-green-600" />
+                        ) : (
+                          <Circle className="h-3 w-3 text-muted-foreground hover:text-green-600 hover:fill-green-100" />
+                        )}
+                      </button>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p
+                            className={`text-sm font-medium transition-all duration-200 ${
+                              task.done
+                                ? "line-through text-muted-foreground"
+                                : ""
+                            }`}
+                          >
+                            {task.title}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            <span>
+                              {formatDate(task.date, currentLanguage)}
+                            </span>
                           </div>
-                          {/* 프로젝트명을 별도 행으로 표시 */}
-                          {project && (
-                            <div className="mb-1">
-                              <span className="text-xs text-muted-foreground">
-                                {project.title}
-                              </span>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              <span>
-                                {formatDate(task.date, currentLanguage)}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              <span>
-                                {typeof task.duration === "string"
-                                  ? parseFloat(task.duration)
-                                  : task.duration}
-                                시간
-                              </span>
-                            </div>
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            <span>
+                              {typeof task.duration === "string"
+                                ? parseFloat(task.duration)
+                                : task.duration}
+                              시간
+                            </span>
                           </div>
                         </div>
-                        {/* 프로젝트로 연결되는 OUTlink 버튼 */}
-                        {project && (
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              asChild
-                              className="flex-shrink-0 h-8 w-8 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
-                            >
-                              <Link href={`/para/projects/${project.id}`}>
-                                <ExternalLink className="h-4 w-4" />
-                              </Link>
-                            </Button>
-                          </div>
-                        )}
                       </div>
-                    </Card>
-                  );
-                })
+                      {/* 프로젝트로 연결되는 OUTlink 버튼 */}
+                      {task.projectId && (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            className="flex-shrink-0 h-8 w-8 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                          >
+                            <Link href={`/para/projects/${task.projectId}`}>
+                              <ExternalLink className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                ))
               ) : (
                 <Card className="p-6 text-center border-dashed border-border bg-card/80 dark:bg-card/60">
                   <div className="mb-3 text-2xl">📝</div>
@@ -662,7 +632,7 @@ export default function HomePage() {
           </section>
 
           {/* 빠른 액션 */}
-          {/* <section>
+          <section>
             <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
               <Zap className="h-5 w-5 text-primary" />
               {texts.quickActions}
@@ -701,7 +671,7 @@ export default function HomePage() {
                 <span className="text-sm">{texts.generateWithAI}</span>
               </Button>
             </div>
-          </section> */}
+          </section>
         </TabsContent>
 
         <TabsContent value="dashboard" className="mt-4">

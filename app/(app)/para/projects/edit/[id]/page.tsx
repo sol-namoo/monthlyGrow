@@ -69,6 +69,7 @@ import {
 } from "@/components/ui/custom-alert";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { Alert } from "@/components/ui/alert";
+import { MonthlyConnectionDialog } from "@/components/ui/monthly-connection-dialog";
 
 // 프로젝트 편집 폼 스키마 정의
 const editProjectFormSchema = z
@@ -749,7 +750,7 @@ export default function EditProjectPage({
 
   return (
     <div
-      className={`container max-w-md px-4 py-4 relative h-fit ${
+      className={`container max-w-md px-4 py-4 pb-20 relative h-fit ${
         isSubmitting ? "pointer-events-none" : ""
       }`}
     >
@@ -788,54 +789,62 @@ export default function EditProjectPage({
             {/* 프로젝트 유형 선택 */}
             <div>
               <Label>프로젝트 유형</Label>
-              <RadioGroup
-                value={form.watch("category")}
-                onValueChange={(value: "repetitive" | "task_based") => {
-                  handleCategoryChange(value);
-                }}
-                className="mt-2"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                    <RadioGroupItem
-                      value="repetitive"
-                      id="repetitive"
-                      className="mt-1"
-                    />
-                    <div className="flex-1">
-                      <Label
-                        htmlFor="repetitive"
-                        className="text-sm font-medium cursor-pointer"
-                      >
-                        반복형 프로젝트
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        동일한 행동을 여러 번 반복하는 프로젝트 (운동, 독서,
-                        습관 등)
-                      </p>
+              <div className="mt-2 space-y-3">
+                <div
+                  className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                  onClick={() => handleCategoryChange("repetitive")}
+                >
+                  <div className="mt-1 flex-shrink-0">
+                    <div
+                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                        form.watch("category") === "repetitive"
+                          ? "border-primary bg-primary"
+                          : "border-muted-foreground/25"
+                      }`}
+                    >
+                      {form.watch("category") === "repetitive" && (
+                        <div className="w-2 h-2 rounded-full bg-primary-foreground" />
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                    <RadioGroupItem
-                      value="task_based"
-                      id="task_based"
-                      className="mt-1"
-                    />
-                    <div className="flex-1">
-                      <Label
-                        htmlFor="task_based"
-                        className="text-sm font-medium cursor-pointer"
-                      >
-                        작업형 프로젝트
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        다양한 업무를 단계별로 완료하는 프로젝트 (개발, 학습,
-                        창작 등)
-                      </p>
+                  <div className="flex-1">
+                    <div className="text-sm font-medium cursor-pointer">
+                      반복형 프로젝트
                     </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      동일한 행동을 여러 번 반복하는 프로젝트 (운동, 독서, 습관
+                      등)
+                    </p>
                   </div>
                 </div>
-              </RadioGroup>
+                <div
+                  className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                  onClick={() => handleCategoryChange("task_based")}
+                >
+                  <div className="mt-1 flex-shrink-0">
+                    <div
+                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                        form.watch("category") === "task_based"
+                          ? "border-primary bg-primary"
+                          : "border-muted-foreground/25"
+                      }`}
+                    >
+                      {form.watch("category") === "task_based" && (
+                        <div className="w-2 h-2 rounded-full bg-primary-foreground" />
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm font-medium cursor-pointer">
+                      작업형 프로젝트
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      다양한 업무를 단계별로 완료하는 프로젝트 (개발, 학습, 창작
+                      등)
+                    </p>
+                  </div>
+                </div>
+              </div>
               {form.formState.errors.category && (
                 <p className="mt-1 text-sm text-red-500">
                   {form.formState.errors.category.message}
@@ -1411,124 +1420,14 @@ export default function EditProjectPage({
         </div>
       </form>
 
-      {/* 월간 연결 대화상자 */}
-      <Dialog
+      <MonthlyConnectionDialog
         open={showMonthlyConnectionDialog}
         onOpenChange={setShowMonthlyConnectionDialog}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>월간에 연결</DialogTitle>
-            <DialogDescription>
-              이 프로젝트를 연결할 월간을 선택하세요. (프로젝트 기간과 겹치는
-              월간만 표시됩니다)
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {availableMonthliesForConnection.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">
-                  연결할 수 있는 월간이 없습니다.
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  프로젝트 기간과 겹치는 월간만 연결할 수 있습니다.
-                </p>
-                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <p className="text-xs text-blue-700 dark:text-blue-300">
-                    💡 <strong>팁:</strong> 월간을 먼저 생성하거나 프로젝트
-                    기간을 조정해보세요.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  {availableMonthliesForConnection.map((monthly) => (
-                    <div
-                      key={monthly.id}
-                      className={`p-3 border rounded-lg ${
-                        selectedMonthlyIds.includes(monthly.id)
-                          ? "border-primary bg-primary/5"
-                          : "border-border"
-                      }`}
-                    >
-                      <div
-                        className="cursor-pointer"
-                        onClick={() => toggleMonthlySelection(monthly.id)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-medium">{monthly.objective}</h4>
-                            {selectedMonthlyIds.includes(monthly.id) && (
-                              <Badge variant="outline" className="text-xs">
-                                선택됨
-                              </Badge>
-                            )}
-                          </div>
-                          <span
-                            className={`text-xs px-2 py-1 rounded-full ${
-                              getMonthlyStatus(monthly) === "in_progress"
-                                ? "bg-green-100 text-green-700"
-                                : getMonthlyStatus(monthly) === "planned"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-gray-100 text-gray-700"
-                            }`}
-                          >
-                            {getMonthlyStatus(monthly) === "in_progress"
-                              ? "진행 중"
-                              : getMonthlyStatus(monthly) === "planned"
-                              ? "예정"
-                              : "완료"}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDate(monthly.startDate)} -{" "}
-                          {formatDate(monthly.endDate)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          연결된 프로젝트:{" "}
-                          {getConnectedProjectCount(monthly.id)}개
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => {
-                      setShowMonthlyConnectionDialog(false);
-                      toast({
-                        title: "월간 연결 설정됨",
-                        description: `${selectedMonthlyIds.length}개 월간이 선택되었습니다. 저장 시 적용됩니다.`,
-                      });
-                    }}
-                    className="flex-1"
-                  >
-                    확인 ({selectedMonthlyIds.length}개)
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      // 변경사항 취소 - 원래 연결된 월간들로 되돌리기
-                      if (project?.connectedMonthlies) {
-                        setSelectedMonthlyIds(project.connectedMonthlies);
-                      } else {
-                        setSelectedMonthlyIds([]);
-                      }
-                      setShowMonthlyConnectionDialog(false);
-                    }}
-                    className="flex-1"
-                  >
-                    취소
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+        availableMonthlies={availableMonthliesForConnection}
+        selectedMonthlyIds={selectedMonthlyIds}
+        onMonthlySelectionChange={setSelectedMonthlyIds}
+        onConfirm={() => {}}
+      />
 
       {/* 카테고리 변경 다이얼로그 */}
       <Dialog

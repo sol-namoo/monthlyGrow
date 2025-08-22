@@ -51,7 +51,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 // 로딩 스켈레톤 컴포넌트
 function AreaDetailSkeleton() {
   return (
-    <div className="container max-w-md px-4 py-6">
+    <div className="container max-w-md px-4 py-6 pb-20">
       <div className="flex items-center justify-between mb-6">
         <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
           <ChevronLeft className="h-4 w-4" />
@@ -154,7 +154,7 @@ export default function AreaDetailPage({
   // 에러 상태
   if (areaError || projectsError || resourcesError) {
     return (
-      <div className="container max-w-md px-4 py-6">
+      <div className="container max-w-md px-4 py-6 pb-20">
         <div className="flex items-center justify-between mb-6">
           <Button
             variant="ghost"
@@ -177,7 +177,7 @@ export default function AreaDetailPage({
   // 데이터가 없는 경우
   if (!areaData) {
     return (
-      <div className="container max-w-md px-4 py-6">
+      <div className="container max-w-md px-4 py-6 pb-20">
         <div className="flex items-center justify-between mb-6">
           <Button
             variant="ghost"
@@ -232,7 +232,7 @@ export default function AreaDetailPage({
 
   return (
     <Suspense fallback={<AreaDetailSkeleton />}>
-      <div className="container max-w-md px-4 py-6">
+      <div className="container max-w-md px-4 py-6 pb-20">
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-6">
           <Button

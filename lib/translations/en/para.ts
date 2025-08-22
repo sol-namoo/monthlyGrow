@@ -19,12 +19,9 @@ export const para = {
       description: {
         repetitive:
           "Repetitive projects automatically generate tasks based on target count",
-        taskBased:
-          "Task-based projects generate empty tasks based on target task count",
       },
       hint: {
         repetitive: "Enter target count to automatically generate tasks",
-        taskBased: "Enter target task count to generate empty tasks",
         setup: "Please set target count and project duration",
       },
       monthly: {

@@ -94,7 +94,7 @@ const getIconComponent = (iconId: string) => {
 // 로딩 스켈레톤 컴포넌트
 function EditMonthlySkeleton() {
   return (
-    <div className="container max-w-md px-4 py-6">
+    <div className="container max-w-md px-4 py-6 pb-20">
       <div className="mb-6 flex items-center">
         <Skeleton className="h-8 w-8 mr-2" />
         <Skeleton className="h-6 w-32" />
@@ -338,7 +338,7 @@ export default function EditMonthlyPage({
 
   if (!monthly) {
     return (
-      <div className="container max-w-md px-4 py-6">
+      <div className="container max-w-md px-4 py-6 pb-20">
         <div className="text-center py-12">
           <Info className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h2 className="text-xl font-bold mb-2">

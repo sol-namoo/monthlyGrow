@@ -54,7 +54,7 @@ import type { Area, Project, Resource } from "@/lib/types";
 // 로딩 스켈레톤 컴포넌트
 function EditAreaSkeleton() {
   return (
-    <div className="container max-w-md px-4 py-6">
+    <div className="container max-w-md px-4 py-6 pb-20">
       <div className="mb-6 flex items-center">
         <Skeleton className="h-8 w-8 mr-2" />
         <Skeleton className="h-6 w-32" />
@@ -146,7 +146,7 @@ function EditAreaPageContent({ params }: { params: Promise<{ id: string }> }) {
   // "미분류" 영역은 수정 불가
   if (area.name === "미분류") {
     return (
-      <div className="container max-w-md px-4 py-6">
+      <div className="container max-w-md px-4 py-6 pb-20">
         <div className="mb-6 flex items-center">
           <Button
             variant="ghost"
@@ -279,7 +279,7 @@ function EditAreaPageContent({ params }: { params: Promise<{ id: string }> }) {
 
   return (
     <div
-      className={`container max-w-md px-4 py-6 relative ${
+      className={`container max-w-md px-4 py-6 pb-20 relative ${
         isSubmitting ? "pointer-events-none" : ""
       }`}
     >
