@@ -1170,7 +1170,8 @@ function NewProjectPageContent() {
                       value={field.value}
                       onChange={(e) => {
                         const value = e.target.value;
-                        field.onChange(value);
+                        const numValue = parseInt(value) || 0;
+                        field.onChange(numValue);
 
                         // 실시간으로 태스크 목록 업데이트
                         const category = form.watch("category");
