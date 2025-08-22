@@ -662,7 +662,7 @@ export default function HomePage() {
           </section>
 
           {/* 빠른 액션 */}
-          <section>
+          {/* <section>
             <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
               <Zap className="h-5 w-5 text-primary" />
               {texts.quickActions}
@@ -701,7 +701,7 @@ export default function HomePage() {
                 <span className="text-sm">{texts.generateWithAI}</span>
               </Button>
             </div>
-          </section>
+          </section> */}
         </TabsContent>
 
         <TabsContent value="dashboard" className="mt-4">
