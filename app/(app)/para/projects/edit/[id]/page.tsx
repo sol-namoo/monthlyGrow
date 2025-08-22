@@ -353,9 +353,8 @@ export default function EditProjectPage({
     // 같은 카테고리면 변경하지 않음
     if (currentCategory === newCategory) return;
 
-    // 현재 태스크가 있는지 확인
-    const currentTasks = form.watch("tasks") || [];
-    const hasTasks = currentTasks.length > 0;
+    // 현재 태스크가 있는지 확인 (fields 배열 사용)
+    const hasTasks = fields.length > 0;
 
     // 태스크가 있으면 무조건 다이얼로그 표시
     if (hasTasks) {
@@ -370,6 +369,15 @@ export default function EditProjectPage({
   // 카테고리 변경 적용
   const applyCategoryChange = (newCategory: "repetitive" | "task_based") => {
     form.setValue("category", newCategory);
+
+    if (newCategory === "repetitive") {
+      // 반복형으로 변경 시 기존 태스크 초기화
+      replace([]);
+      // 삭제된 태스크 ID들도 초기화
+      setDeletedTaskIds([]);
+      setNewTaskIds(new Set());
+    }
+    // 작업형으로 변경 시 기존 태스크 유지
   };
 
   // 월간 상태 확인

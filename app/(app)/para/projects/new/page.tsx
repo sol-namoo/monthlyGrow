@@ -849,7 +849,7 @@ function NewProjectPageContent() {
 
   return (
     <div
-      className={`container max-w-md px-4 py-6 pb-20 relative ${
+      className={`container max-w-md px-4 py-4 pb-20 relative ${
         isSubmitting ? "pointer-events-none opacity-60" : ""
       }`}
     >
@@ -858,7 +858,7 @@ function NewProjectPageContent() {
         isVisible={isSubmitting}
         message="프로젝트를 생성하고 있습니다..."
       />
-      <div className="mb-6 flex items-center">
+      <div className="mb-4 flex items-center">
         <Button
           variant="ghost"
           size="icon"
@@ -870,10 +870,10 @@ function NewProjectPageContent() {
         <h1 className="text-2xl font-bold">프로젝트 만들기</h1>
       </div>
 
-      <div className="mb-6 text-center">
-        <div className="mb-4 flex justify-center">
-          <div className="rounded-full bg-primary/10 p-4">
-            <Briefcase className="h-8 w-8 text-primary" />
+      <div className="mb-4 text-center">
+        <div className="mb-3 flex justify-center">
+          <div className="rounded-full bg-primary/10 p-3">
+            <Briefcase className="h-6 w-6 text-primary" />
           </div>
         </div>
         <h2 className="text-lg font-bold mb-2">
@@ -893,7 +893,7 @@ function NewProjectPageContent() {
       </div>
 
       {currentMonthly && (
-        <Card className="mb-6 p-4">
+        <Card className="mb-4 p-4">
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-blue-500" />
             <span className="font-medium">{currentMonthly.objective}</span>
@@ -905,8 +905,8 @@ function NewProjectPageContent() {
         </Card>
       )}
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <Card className="p-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <Card className="p-4">
           <h2 className="mb-4 text-lg font-semibold">기본 정보</h2>
 
           <div className="space-y-4">
@@ -1026,7 +1026,7 @@ function NewProjectPageContent() {
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-4">
           <h2 className="mb-4 text-lg font-semibold">일정 및 목표</h2>
 
           <div className="space-y-4">
@@ -1271,7 +1271,7 @@ function NewProjectPageContent() {
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-4">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold">태스크 목록</h2>
@@ -1527,7 +1527,7 @@ function NewProjectPageContent() {
         </Card>
 
         {/* 먼슬리 연결 섹션 */}
-        <Card className="p-6">
+        <Card className="p-4">
           <h2 className="mb-4 text-lg font-semibold">먼슬리 연결</h2>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">

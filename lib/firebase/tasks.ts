@@ -81,9 +81,12 @@ export const fetchAllTasksByUserId = async (
 export const fetchAllTasksByProjectId = async (
   projectId: string
 ): Promise<Task[]> => {
+  // Collection Group 방식으로 서버사이드 정렬
   const q = query(
-    collection(db, "projects", projectId, "tasks"),
-    orderBy("date", "desc")
+    collectionGroup(db, "tasks"),
+    where("projectId", "==", projectId),
+    orderBy("done", "asc"),
+    orderBy("date", "asc")
   );
   const querySnapshot = await getDocs(q);
   const tasks = querySnapshot.docs.map((doc) => {
@@ -98,14 +101,7 @@ export const fetchAllTasksByProjectId = async (
     } as Task;
   });
 
-  // 완료 여부를 최우선 기준으로 정렬 (완료되지 않은 것이 먼저)
-  return tasks.sort((a, b) => {
-    if (a.done !== b.done) {
-      return a.done ? 1 : -1;
-    }
-    // 완료 여부가 같으면 날짜순 정렬
-    return new Date(b.date).getTime() - new Date(a.date).getTime();
-  });
+  return tasks;
 };
 
 export const getTaskCountsByProjectId = async (

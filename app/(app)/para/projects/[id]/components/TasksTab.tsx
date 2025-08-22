@@ -26,6 +26,17 @@ export function TasksTab({
 }: TasksTabProps) {
   const { translate, currentLanguage } = useLanguage();
 
+  // 태스크 정렬: 완료되지 않은 것이 먼저, 그 다음 날짜순
+  const sortedTasks =
+    tasks?.sort((a, b) => {
+      // 1. 완료 여부로 정렬 (완료되지 않은 것이 먼저)
+      if (a.done !== b.done) {
+        return a.done ? 1 : -1;
+      }
+      // 2. 완료 여부가 같으면 날짜순 정렬 (빠른 날짜가 먼저)
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    }) || [];
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -41,7 +52,7 @@ export function TasksTab({
       </div>
 
       <div className="space-y-2">
-        {tasks?.map((task: any) => (
+        {sortedTasks.map((task: any) => (
           <Card key={task.id} className="p-3">
             <div className="flex items-center gap-3">
               <button
@@ -80,4 +91,4 @@ export function TasksTab({
       </div>
     </div>
   );
-} 
+}
