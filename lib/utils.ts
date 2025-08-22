@@ -72,11 +72,8 @@ export const createLocalDate = (
   day: number
 ): Date => {
   // month는 0-based이므로 1을 빼줌
-  const date = new Date(year, month - 1, day);
-
-  // 타임존 오프셋을 고려하여 정확한 날짜 생성
-  const timezoneOffset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() + timezoneOffset);
+  // 타임존 오프셋 추가하지 않고 순수하게 로컬 날짜로 생성
+  return new Date(year, month - 1, day);
 };
 
 /**
@@ -93,14 +90,12 @@ export const getMonthStartDate = (year: number, month: number): Date => {
  * 특정 월의 마지막 날짜 생성
  * @param year 년도
  * @param month 월 (1-12)
- * @returns 해당 월의 마지막 날짜
+ * @returns 해당 월의 마지막 날짜 (23:59:59)
  */
 export const getMonthEndDate = (year: number, month: number): Date => {
-  // 다음 달의 첫 번째 날에서 하루를 빼면 현재 달의 마지막 날
-  const nextMonth = month === 12 ? 1 : month + 1;
-  const nextYear = month === 12 ? year + 1 : year;
-  const nextMonthStart = createLocalDate(nextYear, nextMonth, 1);
-  return new Date(nextMonthStart.getTime() - 24 * 60 * 60 * 1000);
+  // 해당 월의 마지막 날을 23:59:59로 설정
+  const lastDay = new Date(year, month, 0).getDate(); // 해당 월의 마지막 날
+  return new Date(year, month - 1, lastDay, 23, 59, 59);
 };
 
 /**

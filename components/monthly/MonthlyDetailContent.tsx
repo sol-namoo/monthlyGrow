@@ -521,7 +521,9 @@ export function MonthlyDetailContent({
           {/* Key Results 진행률 */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Key Results 진행률</span>
+              <span className="text-sm font-medium">
+                {translate("monthly.currentMonthly.keyResultsProgress")}
+              </span>
               <span className="text-sm font-bold">{keyResultProgress}%</span>
             </div>
             <Progress value={keyResultProgress} className="h-3" />

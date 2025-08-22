@@ -49,7 +49,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { Progress } from "@/components/ui/progress";
-import { formatDate, getMonthlyStatus } from "@/lib/utils";
+import {
+  formatDate,
+  getMonthlyStatus,
+  getMonthStartDate,
+  getMonthEndDate,
+} from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase/index";
@@ -240,6 +245,8 @@ export default function EditMonthlyPage({
         objectiveDescription,
         reward,
         keyResults,
+        startDate: getMonthStartDate(selectedYear, selectedMonth),
+        endDate: getMonthEndDate(selectedYear, selectedMonth),
         quickAccessProjects: selectedProjects.map((p) => p.projectId),
         focusAreas: selectedFocusAreas,
       };
@@ -426,9 +433,19 @@ export default function EditMonthlyPage({
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
                 <Clock className="h-4 w-4" />
-                <span>{formatDate(monthly?.startDate, "ko")}</span>
+                <span>
+                  {formatDate(
+                    getMonthStartDate(selectedYear, selectedMonth),
+                    "ko"
+                  )}
+                </span>
                 <span>-</span>
-                <span>{formatDate(monthly?.endDate, "ko")}</span>
+                <span>
+                  {formatDate(
+                    getMonthEndDate(selectedYear, selectedMonth),
+                    "ko"
+                  )}
+                </span>
               </div>
             </div>
 
@@ -480,7 +497,7 @@ export default function EditMonthlyPage({
           {/* Key Results 진행률 */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Key Results 진행률</span>
+              <span className="text-sm font-medium">{translate("monthly.currentMonthly.keyResultsTitle")} 진행률</span>
               <span className="text-sm font-bold">{keyResultsProgress}%</span>
             </div>
             <Progress value={keyResultsProgress} className="h-3" />

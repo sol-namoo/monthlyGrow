@@ -39,6 +39,7 @@ export const monthly = {
     manualAddProject: "Add Project Manually",
     areaSuffix: "Area",
     keyResultsTitle: "Key Metrics",
+    keyResultsProgress: "Key Results Progress",
     keyResultsCount: "Key Metrics ({completed}/{total})",
     noKeyResults: "No Key Metrics Set",
     keyResultCompleted: "Completed",

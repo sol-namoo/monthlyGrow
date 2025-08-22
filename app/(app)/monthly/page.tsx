@@ -62,6 +62,7 @@ import {
   createMonthly,
   updateMonthly,
   deleteMonthlyById,
+  fetchProjectsByMonthlyId,
 } from "@/lib/firebase/index";
 import { formatDate, getMonthlyStatus } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -111,11 +112,30 @@ function MonthlyPageContent() {
       queryKey: ["current-monthly", user?.uid],
       queryFn: async () => {
         const allMonthlies = await fetchAllMonthliesByUserId(user?.uid || "");
-        return (
-          allMonthlies.find(
-            (monthly) => getMonthlyStatus(monthly) === "in_progress"
-          ) || null
+        const monthly = allMonthlies.find(
+          (monthly) => getMonthlyStatus(monthly) === "in_progress"
         );
+
+        if (monthly) {
+          // 연결된 프로젝트 가져오기
+          try {
+            const connectedProjects = await fetchProjectsByMonthlyId(
+              monthly.id
+            );
+            return {
+              ...monthly,
+              connectedProjects,
+            };
+          } catch (error) {
+            console.warn("연결된 프로젝트 조회 실패:", error);
+            return {
+              ...monthly,
+              connectedProjects: [],
+            };
+          }
+        }
+
+        return null;
       },
       enabled: !!user?.uid && currentTab === "current",
       staleTime: 2 * 60 * 1000, // 2분간 캐시 유지

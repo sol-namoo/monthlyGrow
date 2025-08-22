@@ -46,9 +46,9 @@ export function MonthlyCard({
               variant="outline"
               className="text-xs font-medium w-12 flex-shrink-0 bg-background/80 dark:bg-background/60"
             >
-              {monthly.startDate instanceof Date
-                ? monthly.startDate.getMonth() + 1
-                : (monthly.startDate as any).toDate().getMonth() + 1}
+              {monthly.endDate instanceof Date
+                ? monthly.endDate.getMonth() + 1
+                : (monthly.endDate as any).toDate().getMonth() + 1}
               월
             </Badge>
             <h3 className="text-lg font-semibold">{monthly.objective}</h3>

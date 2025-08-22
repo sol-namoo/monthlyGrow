@@ -30,7 +30,7 @@ import {
   fetchUnifiedArchiveCountByUserId,
 } from "@/lib/firebase/unified-archives";
 import { UnifiedArchive } from "@/lib/types";
-import { generateNoteTitle } from "@/lib/utils";
+import { generateNoteTitle, formatDate } from "@/lib/utils";
 
 export default function UnifiedArchivesTab() {
   const { translate } = useLanguage();
@@ -308,7 +308,7 @@ export default function UnifiedArchivesTab() {
                         </div>
                       )}
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span>{archive.createdAt.toLocaleDateString()}</span>
+                      <span>{formatDate(archive.createdAt, "ko")}</span>
                     </div>
                   </div>
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />

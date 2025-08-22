@@ -39,6 +39,7 @@ export const monthly = {
     manualAddProject: "수동으로 프로젝트 추가",
     areaSuffix: "영역",
     keyResultsTitle: "핵심 지표",
+    keyResultsProgress: "핵심 지표 진행률",
     keyResultsCount: "핵심 지표 ({completed}/{total})",
     noKeyResults: "핵심 지표가 설정되지 않았습니다",
     keyResultCompleted: "완료",

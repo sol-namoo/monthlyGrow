@@ -119,7 +119,7 @@ export function MonthlyDetailHeader({
           <Card className="p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium">
-                {translate("monthlyDetail.keyResults.progress")}
+                {translate("monthly.currentMonthly.keyResultsProgress")}
               </span>
               <span className="text-sm text-muted-foreground">
                 {keyResultsCompleted}/{keyResultsTotal}
@@ -189,7 +189,11 @@ export function MonthlyDetailHeader({
             </Button>
           )}
           {onOpenRetrospectiveModal && (
-            <Button variant="outline" size="sm" onClick={onOpenRetrospectiveModal}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenRetrospectiveModal}
+            >
               <Plus className="mr-2 h-4 w-4" />
               {translate("monthlyDetail.writeRetrospective")}
             </Button>
@@ -201,7 +205,11 @@ export function MonthlyDetailHeader({
             </Button>
           )}
           {onOpenProjectConnectionDialog && (
-            <Button variant="outline" size="sm" onClick={onOpenProjectConnectionDialog}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenProjectConnectionDialog}
+            >
               <FolderOpen className="mr-2 h-4 w-4" />
               {translate("monthlyDetail.connectProjects")}
             </Button>
@@ -216,4 +224,4 @@ export function MonthlyDetailHeader({
       )}
     </div>
   );
-} 
+}

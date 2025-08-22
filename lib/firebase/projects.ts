@@ -19,6 +19,7 @@ import {
   updateTimestamp,
   filterUndefinedValues,
 } from "./utils";
+import { formatDateForInput } from "../utils";
 import { Project } from "../types";
 
 // Projects
@@ -111,10 +112,10 @@ export const fetchProjectsOverlappingWithMonthly = async (
     const monthlyEnd = new Date(monthlyEndDate);
 
     // 로컬 시간대 기준으로 날짜 문자열 생성 (YYYY-MM-DD)
-    const projectStartStr = projectStart.toLocaleDateString("en-CA"); // YYYY-MM-DD 형식
-    const projectEndStr = projectEnd.toLocaleDateString("en-CA");
-    const monthlyStartStr = monthlyStart.toLocaleDateString("en-CA");
-    const monthlyEndStr = monthlyEnd.toLocaleDateString("en-CA");
+    const projectStartStr = formatDateForInput(projectStart);
+    const projectEndStr = formatDateForInput(projectEnd);
+    const monthlyStartStr = formatDateForInput(monthlyStart);
+    const monthlyEndStr = formatDateForInput(monthlyEnd);
 
     // 문자열 비교로 날짜 비교 (더 안전함)
     const overlaps =
@@ -475,7 +476,7 @@ export const updateProjectConnectedMonthlies = async (
     } else {
       // monthly ID 제거
       updatedConnectedMonthlies = currentConnectedMonthlies.filter(
-        (id) => id !== monthlyId
+        (id: string) => id !== monthlyId
       );
     }
 

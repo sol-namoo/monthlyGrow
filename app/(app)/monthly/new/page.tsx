@@ -61,7 +61,7 @@ import { Monthly, KeyResult } from "@/lib/types";
 import Loading from "@/components/feedback/Loading";
 import { useLanguage } from "@/hooks/useLanguage";
 import { ProjectConnectionDialog } from "@/components/monthly/ProjectConnectionDialog";
-import { getMonthStartDate, getMonthEndDate } from "@/lib/utils";
+import { getMonthStartDate, getMonthEndDate, formatDate } from "@/lib/utils";
 
 type MonthlyFormData = {
   objective: string;
@@ -411,9 +411,9 @@ function NewMonthlyPageContent() {
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
                 <Clock className="h-4 w-4" />
-                <span>{defaultStartDate.toLocaleDateString("ko-KR")}</span>
+                <span>{formatDate(defaultStartDate, "ko")}</span>
                 <span>-</span>
-                <span>{defaultEndDate.toLocaleDateString("ko-KR")}</span>
+                <span>{formatDate(defaultEndDate, "ko")}</span>
               </div>
             </div>
 

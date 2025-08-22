@@ -20,7 +20,7 @@ import { auth } from "../lib/firebase";
 import { useLanguage } from "../hooks/useLanguage";
 import { fetchAllMonthliesByUserId } from "../lib/firebase/index";
 import { useQuery } from "@tanstack/react-query";
-import { calculateMonthlyWeeks } from "../lib/utils";
+import { calculateMonthlyWeeks, formatDate } from "../lib/utils";
 import { Button } from "./ui/button";
 import { generateConstraintsGuide } from "../functions/src/constraints-guide";
 import {
@@ -500,8 +500,8 @@ export default function PlanGenerator() {
               <option value="">Monthly를 선택하세요</option>
               {monthlies.map((monthly: any) => (
                 <option key={monthly.id} value={monthly.id}>
-                  {monthly.objective} ({monthly.startDate.toLocaleDateString()}{" "}
-                  ~ {monthly.endDate.toLocaleDateString()})
+                  {monthly.objective} ({formatDate(monthly.startDate, "ko")} ~{" "}
+                  {formatDate(monthly.endDate, "ko")})
                 </option>
               ))}
             </select>
@@ -1380,10 +1380,7 @@ function PlanPreview({
                                     taskDate.setTime(projectEndDate.getTime());
                                   }
 
-                                  return taskDate.toLocaleDateString("ko-KR", {
-                                    month: "short",
-                                    day: "numeric",
-                                  });
+                                  return formatDate(taskDate, "ko");
                                 })()}
                               </span>
                               <span className="flex items-center gap-1">
