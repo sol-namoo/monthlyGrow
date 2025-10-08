@@ -7,6 +7,17 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Date 객체 변환 유틸리티 함수
+ * 문자열이나 Date 객체를 안전하게 Date 객체로 변환
+ */
+export const createValidDate = (dateInput: string | Date): Date => {
+  if (dateInput instanceof Date) {
+    return dateInput;
+  }
+  return new Date(dateInput);
+};
+
+/**
  * 브라우저의 실제 로케일을 감지
  */
 export const getBrowserLocale = (): string => {

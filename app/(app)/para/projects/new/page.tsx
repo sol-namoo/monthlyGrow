@@ -60,7 +60,12 @@ import {
   addTaskToProject,
 } from "@/lib/firebase/index";
 
-import { getMonthlyStatus, formatDate, formatDateForInput } from "@/lib/utils";
+import {
+  getMonthlyStatus,
+  formatDate,
+  formatDateForInput,
+  createValidDate,
+} from "@/lib/utils";
 import { useLanguage } from "@/hooks/useLanguage";
 import { MonthlyConnectionDialog } from "@/components/ui/monthly-connection-dialog";
 import {
@@ -741,8 +746,6 @@ function NewProjectPageContent() {
         targetCount: data.targetCount,
         completedTasks: 0,
         connectedMonthlies, // 선택된 월간 ID 배열
-        notes: [], // 초기에는 빈 배열
-        tasks,
         userId: user!.uid,
       };
 

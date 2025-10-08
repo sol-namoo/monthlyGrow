@@ -63,6 +63,7 @@ import {
   fetchMonthlyById,
   updateMonthly,
   fetchAllAreasByUserId,
+  fetchAllProjectsByUserId,
   createUnifiedArchive,
   updateUnifiedArchive,
   fetchSingleArchive,
@@ -404,7 +405,7 @@ export default function EditMonthlyPage({
                     setSelectedYear(year);
                     setSelectedMonth(month);
                   }}
-                  disabled={status === "ended"}
+                  disabled={status === "ended" || status === "in_progress"}
                 >
                   <SelectTrigger className="flex-1">
                     <SelectValue
@@ -497,7 +498,9 @@ export default function EditMonthlyPage({
           {/* Key Results 진행률 */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">{translate("monthly.currentMonthly.keyResultsTitle")} 진행률</span>
+              <span className="text-sm font-medium">
+                {translate("monthly.currentMonthly.keyResultsTitle")} 진행률
+              </span>
               <span className="text-sm font-bold">{keyResultsProgress}%</span>
             </div>
             <Progress value={keyResultsProgress} className="h-3" />
@@ -628,7 +631,7 @@ export default function EditMonthlyPage({
           <div className="space-y-2">
             {selectedProjects.map((selectedProject) => {
               const projectInfo = allProjects.find(
-                (p) => p.id === selectedProject.projectId
+                (p: any) => p.id === selectedProject.projectId
               );
               return (
                 <Link

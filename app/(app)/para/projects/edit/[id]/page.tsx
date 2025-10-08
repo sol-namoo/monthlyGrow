@@ -42,7 +42,12 @@ import { RecommendationBadge } from "@/components/ui/recommendation-badge";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { getProjectStatus, formatDate, formatDateForInput } from "@/lib/utils";
+import {
+  getProjectStatus,
+  formatDate,
+  formatDateForInput,
+  createValidDate,
+} from "@/lib/utils";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -585,8 +590,8 @@ export default function EditProjectPage({
           title: data.title,
           description: data.description,
           category: data.category,
-          startDate: new Date(data.startDate),
-          endDate: new Date(data.endDate),
+          startDate: createValidDate(data.startDate),
+          endDate: createValidDate(data.endDate),
           target: data.target,
           targetCount: data.targetCount,
           connectedMonthlies,
