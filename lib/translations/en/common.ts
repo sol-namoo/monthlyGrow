@@ -16,6 +16,10 @@ export const common = {
   loading: "Loading...",
   loadingData: "Loading data...",
   loadingChart: "Preparing chart...",
+  loginRequired: "Login required.",
+  authError: "An error occurred while checking authentication status.",
+  refresh: "Refresh",
+  goToLogin: "Go to Login",
   errors: {
     loginRequired: "Login required.",
     unexpectedResponse: "Unexpected response from server.",

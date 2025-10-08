@@ -25,6 +25,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchAllAreasByUserId, auth } from "@/lib/firebase/index";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { PageLoading } from "@/components/ui/page-loading";
 import { useLanguage } from "@/hooks/useLanguage";
 
 type ResourceFormData = {
@@ -106,16 +107,7 @@ export default function NewResourcePage() {
 
   if (userLoading || areasLoading) {
     return (
-      <div
-        className={`container max-w-md px-4 py-6 relative ${
-          isSubmitting ? "pointer-events-none" : ""
-        }`}
-      >
-        {/* 로딩 오버레이 */}
-        <LoadingOverlay
-          isVisible={isSubmitting}
-          message={translate("para.resources.add.loading")}
-        />
+      <div className="container max-w-md px-4 py-6">
         <div className="mb-6 flex items-center">
           <Button
             variant="ghost"
@@ -129,28 +121,30 @@ export default function NewResourcePage() {
             {translate("para.resources.add.title")}
           </h1>
         </div>
-        <div className="text-center text-muted-foreground">
-          {translate("settings.loading.loading")}
-        </div>
+        <PageLoading message={translate("common.loadingData")} />
       </div>
     );
   }
 
   return (
-    <div className="container max-w-md px-4 py-6">
-      <div className="mb-6 flex items-center">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => window.history.back()}
-          className="mr-2"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </Button>
-        <h1 className="text-2xl font-bold">
-          {translate("para.resources.add.title")}
-        </h1>
-      </div>
+    <div className="container max-w-md px-4 py-6 relative">
+      <LoadingOverlay 
+        isLoading={isSubmitting} 
+        message={translate("common.loading")}
+      >
+        <div className="mb-6 flex items-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => window.history.back()}
+            className="mr-2"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-2xl font-bold">
+            {translate("para.resources.add.title")}
+          </h1>
+        </div>
 
       <div className="mb-6 text-center">
         <div className="mb-4 flex justify-center">
@@ -262,6 +256,7 @@ export default function NewResourcePage() {
           </Button>
         </div>
       </form>
+      </LoadingOverlay>
     </div>
   );
 }

@@ -16,6 +16,10 @@ export const common = {
   loading: "로딩 중...",
   loadingData: "데이터를 불러오는 중...",
   loadingChart: "차트를 준비하는 중...",
+  loginRequired: "로그인이 필요합니다.",
+  authError: "인증 상태를 확인하는 중 오류가 발생했습니다.",
+  refresh: "새로고침",
+  goToLogin: "로그인 페이지로",
   errors: {
     loginRequired: "로그인이 필요합니다.",
     unexpectedResponse: "서버에서 예상치 못한 응답을 받았습니다.",

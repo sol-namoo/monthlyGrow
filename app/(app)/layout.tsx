@@ -8,9 +8,11 @@ import { TimeZoneInitializer } from "@/components/TimeZoneInitializer";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, error, isRedirecting } = useAuth(true); // 인증 필요
+  const { translate } = useLanguage();
 
   // 로딩 중일 때 로딩 화면 표시
   if (loading) {
@@ -25,7 +27,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="mt-2">
             <div className="space-y-4">
-              <p>인증 상태를 확인하는 중 오류가 발생했습니다.</p>
+              <p>{translate("common.authError")}</p>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
@@ -33,14 +35,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   onClick={() => window.location.reload()}
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
-                  새로고침
+                  {translate("common.refresh")}
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => (window.location.href = "/login")}
                 >
-                  로그인 페이지로
+                  {translate("common.goToLogin")}
                 </Button>
               </div>
             </div>

@@ -12,10 +12,13 @@ import {
   migrateTasksToSubcollections,
   checkMigrationStatus,
 } from "@/lib/firebase/migration-utils";
+import { PageLoading } from "@/components/ui/page-loading";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export default function MigrateTasksPage() {
   const [user, loading] = useAuthState(auth);
   const { toast } = useToast();
+  const { translate } = useLanguage();
   const [isChecking, setIsChecking] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationStatus, setMigrationStatus] = useState<{
@@ -96,8 +99,8 @@ export default function MigrateTasksPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="container mx-auto p-6 max-w-2xl">
+        <PageLoading message={translate("common.loading")} />
       </div>
     );
   }
@@ -107,7 +110,9 @@ export default function MigrateTasksPage() {
       <div className="container mx-auto p-6">
         <Alert>
           <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>로그인이 필요합니다.</AlertDescription>
+          <AlertDescription>
+            {translate("common.loginRequired")}
+          </AlertDescription>
         </Alert>
       </div>
     );
