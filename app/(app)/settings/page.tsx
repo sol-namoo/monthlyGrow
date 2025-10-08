@@ -33,7 +33,6 @@ import Image from "next/image";
 const settingsFormSchema = z.object({
   defaultReward: z.string().optional(),
   defaultRewardEnabled: z.boolean(),
-  carryOver: z.boolean(),
   aiRecommendations: z.boolean(),
   notifications: z.boolean(),
   theme: z.enum(["light", "dark", "system"]),
@@ -84,8 +83,6 @@ export default function SettingsPage() {
     defaultRewardPlaceholder: translate("settings.defaultRewardPlaceholder"),
     defaultRewardEnabled: translate("settings.defaultRewardEnabled"),
     defaultRewardDisabled: translate("settings.defaultRewardDisabled"),
-    carryOver: translate("settings.carryOver"),
-    carryOverDescription: translate("settings.carryOverDescription"),
 
     // 테마 설정 섹션
     themeSettings: translate("settings.themeSettings"),
@@ -497,7 +494,7 @@ export default function SettingsPage() {
         <section>
           <h2 className="mb-4 text-xl font-bold">{texts.monthlySettings}</h2>
           <Card className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
-            <div className="mb-6">
+            <div>
               <div className="flex items-center justify-between mb-2">
                 <Label htmlFor="defaultRewardEnabled">
                   {texts.defaultReward}
@@ -579,28 +576,6 @@ export default function SettingsPage() {
                   ? texts.defaultRewardEnabled
                   : texts.defaultRewardDisabled}
               </p>
-            </div>
-
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <Label htmlFor="carryOver">{texts.carryOver}</Label>
-                <p className="text-xs text-muted-foreground">
-                  {texts.carryOverDescription}
-                </p>
-              </div>
-              <Switch
-                id="carryOver"
-                checked={form.watch("carryOver")}
-                onCheckedChange={async (checked) => {
-                  form.setValue("carryOver", checked);
-                  await saveSetting(
-                    "carryOver",
-                    checked,
-                    texts.carryOver + " " + texts.saveSuccess
-                  );
-                }}
-                disabled={savingStates["carryOver"]}
-              />
             </div>
           </Card>
         </section>

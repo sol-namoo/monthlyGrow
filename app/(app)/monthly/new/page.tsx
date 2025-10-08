@@ -60,6 +60,7 @@ import {
 import { Monthly, KeyResult } from "@/lib/types";
 import Loading from "@/components/feedback/Loading";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useSettings } from "@/hooks/useSettings";
 import { ProjectConnectionDialog } from "@/components/monthly/ProjectConnectionDialog";
 import { getMonthStartDate, getMonthEndDate, formatDate } from "@/lib/utils";
 
@@ -102,6 +103,7 @@ function NewMonthlyPageContent() {
   const searchParams = useSearchParams();
   const [user, userLoading] = useAuthState(auth);
   const { translate, currentLanguage } = useLanguage();
+  const { settings } = useSettings();
 
   // 프로젝트 연결 상태
   const [showProjectConnectionDialog, setShowProjectConnectionDialog] =
@@ -154,9 +156,13 @@ function NewMonthlyPageContent() {
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
 
-  // 선택 가능한 월 옵션 생성 (현재 월부터 6개월)
+  // URL 파라미터에서 monthOffset 가져오기
+  const monthOffset = parseInt(searchParams.get("monthOffset") || "0");
+  const startMonth = currentMonth + monthOffset;
+
+  // 선택 가능한 월 옵션 생성 (monthOffset에 따라 시작 월 조정)
   const monthOptions = Array.from({ length: 6 }, (_, i) => {
-    const targetMonth = currentMonth + i;
+    const targetMonth = startMonth + i;
     const targetYear = currentYear + Math.floor((targetMonth - 1) / 12);
     const normalizedMonth = ((targetMonth - 1) % 12) + 1;
     return {
@@ -166,12 +172,17 @@ function NewMonthlyPageContent() {
     };
   });
 
-  // URL 파라미터에서 년/월 가져오기 (기본값은 현재 월)
+  // URL 파라미터에서 년/월 가져오기 (기본값은 startMonth)
   const [selectedYear, setSelectedYear] = useState(
-    parseInt(searchParams.get("year") || currentYear.toString())
+    parseInt(
+      searchParams.get("year") ||
+        (currentYear + Math.floor((startMonth - 1) / 12)).toString()
+    )
   );
   const [selectedMonth, setSelectedMonth] = useState(
-    parseInt(searchParams.get("month") || currentMonth.toString())
+    parseInt(
+      searchParams.get("month") || (((startMonth - 1) % 12) + 1).toString()
+    )
   );
 
   // 폼 초기값 설정 (타임존 안전한 날짜 계산)
@@ -190,12 +201,22 @@ function NewMonthlyPageContent() {
     defaultValues: {
       objective: `${selectedYear}년 ${selectedMonth}월`,
       objectiveDescription: "",
-      reward: "",
+      reward:
+        settings.defaultRewardEnabled && settings.defaultReward
+          ? settings.defaultReward
+          : "",
       keyResults: [{ title: "", description: "" }],
     },
   });
 
   const watchedKeyResults = watch("keyResults");
+
+  // 기본 보상 설정이 변경될 때 폼 업데이트
+  useEffect(() => {
+    if (settings.defaultRewardEnabled && settings.defaultReward) {
+      setValue("reward", settings.defaultReward);
+    }
+  }, [settings.defaultRewardEnabled, settings.defaultReward, setValue]);
 
   // 기존 먼슬리 확인 (개선된 중복 검증)
   const { data: existingMonthly } = useQuery({

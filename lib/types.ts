@@ -275,7 +275,6 @@ export interface UserProfile {
 export interface UserSettings {
   defaultReward?: string;
   defaultRewardEnabled: boolean;
-  carryOver: boolean;
   aiRecommendations: boolean;
   notifications: boolean;
   theme: "light" | "dark" | "system";

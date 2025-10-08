@@ -13,8 +13,6 @@ export const settings = {
   defaultRewardEnabled: "새 먼슬리 생성 시 기본으로 설정될 보상입니다.",
   defaultRewardDisabled:
     "기본 보상 설정이 비활성화되어 있습니다. 활성화하면 새 먼슬리 생성 시 자동으로 보상이 채워집니다.",
-  carryOver: "미완료 항목 이월",
-  carryOverDescription: "완료하지 못한 항목을 다음 먼슬리로 이월합니다.",
   themeSettings: "테마 설정",
   theme: "테마",
   language: "언어",

@@ -14,8 +14,6 @@ export const settings = {
     "This will be the default reward set when creating new monthlies.",
   defaultRewardDisabled:
     "Default reward setting is disabled. Enable to automatically fill rewards when creating new monthlies.",
-  carryOver: "Carry Over Incomplete Items",
-  carryOverDescription: "Carry over incomplete items to the next monthly.",
   themeSettings: "Theme Settings",
   theme: "Theme",
   language: "Language",

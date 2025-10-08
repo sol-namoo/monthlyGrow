@@ -10,7 +10,6 @@ import { Language } from "@/lib/translations";
 const defaultSettings: UserSettings = {
   defaultReward: "",
   defaultRewardEnabled: false,
-  carryOver: true, // 기본적으로 true로 설정
   aiRecommendations: true,
   notifications: true,
   theme: "system",
