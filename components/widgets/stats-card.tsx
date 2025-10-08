@@ -1,5 +1,6 @@
 import type React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
 
@@ -9,6 +10,7 @@ interface StatsCardProps {
   description?: string | ReactNode;
   icon?: React.ReactNode;
   className?: string;
+  isLoading?: boolean;
 }
 
 export function StatsCard({
@@ -17,6 +19,7 @@ export function StatsCard({
   description,
   icon,
   className,
+  isLoading = false,
 }: StatsCardProps) {
   return (
     <Card
@@ -30,9 +33,15 @@ export function StatsCard({
         {icon}
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+        {isLoading ? (
+          <Skeleton className="h-8 w-16 mb-2" />
+        ) : (
+          <div className="text-2xl font-bold">{value}</div>
+        )}
         {description && (
-          <div className="text-xs text-muted-foreground">{description}</div>
+          <div className="text-xs text-muted-foreground">
+            {isLoading ? <Skeleton className="h-3 w-24" /> : description}
+          </div>
         )}
       </CardContent>
     </Card>

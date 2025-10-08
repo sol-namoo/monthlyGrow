@@ -8,6 +8,7 @@ import { AreaActivityChart } from "@/components/widgets/area-activity-chart";
 import { MonthlyComparisonChart } from "@/components/widgets/chapter-comparison-chart";
 import { Card } from "@/components/ui/card";
 import { useLanguage } from "@/hooks/useLanguage";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import {
   fetchAllMonthliesByUserId,
   fetchYearlyActivityStats,
@@ -90,28 +91,8 @@ export default function YearlyDashboard() {
     };
   });
 
-  if (yearlyStatsLoading || monthliesLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="rounded-lg border bg-muted/20 dark:bg-muted/10 p-4 mb-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
-          <div className="animate-pulse">
-            <div className="h-6 bg-muted rounded mb-2"></div>
-            <div className="h-4 bg-muted rounded w-3/4"></div>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="h-24 bg-muted rounded animate-pulse"></div>
-          <div className="h-24 bg-muted rounded animate-pulse"></div>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="h-24 bg-muted rounded animate-pulse"></div>
-          <div className="h-24 bg-muted rounded animate-pulse"></div>
-        </div>
-        <div className="h-64 bg-muted rounded animate-pulse"></div>
-        <div className="h-64 bg-muted rounded animate-pulse"></div>
-      </div>
-    );
-  }
+  // 로딩 상태일 때는 LoadingOverlay를 사용하지 않고 기존 스켈레톤을 유지
+  // (전체 페이지가 로딩 중일 때는 스켈레톤이 더 적절함)
 
   return (
     <div className="space-y-6">
@@ -135,6 +116,7 @@ export default function YearlyDashboard() {
           }
           description="올해 완료한 태스크 기준"
           icon={<Clock className="h-4 w-4 text-muted-foreground" />}
+          isLoading={yearlyStatsLoading}
         />
         <StatsCard
           title={texts.completionRate}
@@ -145,6 +127,7 @@ export default function YearlyDashboard() {
           }
           description="올해 완료된 먼슬리 평균"
           icon={<BookOpen className="h-4 w-4 text-muted-foreground" />}
+          isLoading={yearlyStatsLoading}
         />
       </div>
 
@@ -154,12 +137,14 @@ export default function YearlyDashboard() {
           value={yearlyStats?.completedMonthlies || 0}
           description={texts.completedMonthliesDescription}
           icon={<BookOpen className="h-4 w-4 text-muted-foreground" />}
+          isLoading={yearlyStatsLoading}
         />
         <StatsCard
           title={texts.totalRewards}
           value={yearlyStats?.totalRewards || 0}
           description={texts.totalRewardsDescription}
           icon={<Award className="h-4 w-4 text-muted-foreground" />}
+          isLoading={yearlyStatsLoading}
         />
       </div>
 

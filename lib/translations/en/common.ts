@@ -13,6 +13,9 @@ export const common = {
   uncategorized: "Uncategorized",
   monthlyGoal: "This Monthly Goal",
   projectProgress: "Overall Progress",
+  loading: "Loading...",
+  loadingData: "Loading data...",
+  loadingChart: "Preparing chart...",
   errors: {
     loginRequired: "Login required.",
     unexpectedResponse: "Unexpected response from server.",

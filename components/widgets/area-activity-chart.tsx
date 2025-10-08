@@ -9,15 +9,20 @@ import {
   Tooltip,
 } from "recharts";
 import { useLanguage } from "@/hooks/useLanguage";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface AreaActivityChartProps {
   data: {
     name: string;
     value: number;
   }[];
+  isLoading?: boolean;
 }
 
-export function AreaActivityChart({ data }: AreaActivityChartProps) {
+export function AreaActivityChart({
+  data,
+  isLoading = false,
+}: AreaActivityChartProps) {
   const { translate } = useLanguage();
   const COLORS = [
     "#8b5cf6",
@@ -82,6 +87,31 @@ export function AreaActivityChart({ data }: AreaActivityChartProps) {
       </ul>
     );
   };
+
+  // 로딩 상태일 때 스켈레톤 UI 표시
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full space-y-4">
+        {/* 원형 차트 스켈레톤 */}
+        <div className="relative">
+          <Skeleton className="w-40 h-40 rounded-full" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Skeleton className="w-20 h-20 rounded-full" />
+          </div>
+        </div>
+
+        {/* 범례 스켈레톤 */}
+        <div className="flex flex-wrap justify-center gap-2 mt-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="flex items-center gap-1">
+              <Skeleton className="w-3 h-3 rounded-full" />
+              <Skeleton className="h-4 w-16" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <ResponsiveContainer width="100%" height="100%">

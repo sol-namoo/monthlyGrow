@@ -13,6 +13,9 @@ export const common = {
   uncategorized: "미분류",
   monthlyGoal: "이번 먼슬리 목표",
   projectProgress: "전체 진행률",
+  loading: "로딩 중...",
+  loadingData: "데이터를 불러오는 중...",
+  loadingChart: "차트를 준비하는 중...",
   errors: {
     loginRequired: "로그인이 필요합니다.",
     unexpectedResponse: "서버에서 예상치 못한 응답을 받았습니다.",
