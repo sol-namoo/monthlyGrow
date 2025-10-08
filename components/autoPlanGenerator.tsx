@@ -86,8 +86,8 @@ function processConstraints(
 
   // 프로젝트 기간이 설정되지 않았으면 기본 최대값 설정
   if (!processed.projectWeeks) {
-    // Monthly 기간과 관계없이 최대 6개월까지 허용 (1주일부터 가능)
-    processed.maxProjectWeeks = 24; // 최대 6개월
+    // Monthly 기간을 고려한 최대값 설정
+    processed.maxProjectWeeks = Math.min(monthlyWeeks || 24, 24); // Monthly 기간과 6개월 중 작은 값
   }
 
   if (processed.dailyTimeSlots) {
@@ -179,6 +179,9 @@ export default function PlanGenerator() {
     ? calculateMonthlyWeeks(selectedMonthly)
     : 0;
 
+  // 계획 생성 버튼 disabled 상태 (생성 중일 때만)
+  const isGenerateDisabled = isGenerating;
+
   const handleGenerate = async () => {
     // 입력 타입에 따른 유효성 검사
     if (inputType === "manual" && !userGoal.trim()) {
@@ -265,7 +268,12 @@ export default function PlanGenerator() {
                 };
               } else {
                 // 새로운 영역인 경우 - 기존 영역과 이름이 중복되지 않는 경우만
-                if (!existingAreaNames.includes(area.name)) {
+                const isDuplicate = existingAreaNames.some(
+                  (existingName) =>
+                    existingName.toLowerCase() === area.name.toLowerCase()
+                );
+
+                if (!isDuplicate) {
                   matchingChoices[area.name] = {
                     useExisting: false,
                     newName: area.name,
@@ -273,13 +281,14 @@ export default function PlanGenerator() {
                 } else {
                   // 기존 영역과 이름이 중복되는 경우, 해당 기존 영역을 사용
                   const existingArea = existingAreas.find(
-                    (existing) => existing.name === area.name
+                    (existing) =>
+                      existing.name.toLowerCase() === area.name.toLowerCase()
                   );
                   if (existingArea) {
                     matchingChoices[area.name] = {
                       useExisting: true,
                       existingId: existingArea.id,
-                      newName: area.name,
+                      newName: existingArea.name, // 기존 영역 이름 사용
                     };
                   }
                 }
@@ -378,7 +387,7 @@ export default function PlanGenerator() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto p-6 pb-24">
       <h1 className="text-2xl font-bold mb-2">
         {translate("aiPlanGenerator.title")}
       </h1>
@@ -443,6 +452,7 @@ export default function PlanGenerator() {
               onChange={(e) =>
                 setInputType(e.target.value as "manual" | "monthly")
               }
+              disabled={isGenerateDisabled}
               className="mr-2"
             />
             {translate("aiPlanGenerator.form.manualInput")}
@@ -455,6 +465,7 @@ export default function PlanGenerator() {
               onChange={(e) =>
                 setInputType(e.target.value as "manual" | "monthly")
               }
+              disabled={isGenerateDisabled}
               className="mr-2"
             />
             {translate("aiPlanGenerator.form.monthlyBased")}
@@ -472,7 +483,8 @@ export default function PlanGenerator() {
             value={userGoal}
             onChange={(e) => setUserGoal(e.target.value)}
             placeholder={translate("aiPlanGenerator.form.goalPlaceholder")}
-            className="w-full p-3 border rounded-lg h-24 resize-none"
+            disabled={isGenerateDisabled}
+            className="w-full p-3 border rounded-lg h-24 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
             maxLength={200}
           />
           <div className="text-sm text-gray-500 mt-1">
@@ -495,7 +507,8 @@ export default function PlanGenerator() {
             <select
               value={selectedMonthlyId}
               onChange={(e) => setSelectedMonthlyId(e.target.value)}
-              className="w-full p-3 border rounded-lg"
+              disabled={isGenerateDisabled}
+              className="w-full p-3 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">Monthly를 선택하세요</option>
               {monthlies.map((monthly: any) => (
@@ -594,7 +607,8 @@ export default function PlanGenerator() {
                     : undefined,
                 })
               }
-              className="w-full p-2 border rounded"
+              disabled={isGenerateDisabled}
+              className="w-full p-2 border rounded disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">AI가 자동 설정</option>
               <option value="1">1주</option>
@@ -633,7 +647,8 @@ export default function PlanGenerator() {
                   },
                 })
               }
-              className="w-full p-2 border rounded"
+              disabled={isGenerateDisabled}
+              className="w-full p-2 border rounded disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">AI가 자동 설정</option>
               <option value="1">격주 1일</option>
@@ -665,7 +680,8 @@ export default function PlanGenerator() {
                   },
                 })
               }
-              className="w-full p-2 border rounded"
+              disabled={isGenerateDisabled}
+              className="w-full p-2 border rounded disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">AI가 자동 설정</option>
               <option value="30">30분</option>
@@ -697,7 +713,8 @@ export default function PlanGenerator() {
                   difficulty: e.target.value as any,
                 })
               }
-              className="w-full p-2 border rounded"
+              disabled={isGenerateDisabled}
+              className="w-full p-2 border rounded disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">AI가 자동 판단</option>
               <option value="beginner">초급자 (기초 개념, 단계별 학습)</option>
@@ -722,7 +739,8 @@ export default function PlanGenerator() {
                   focusIntensity: e.target.value as any,
                 })
               }
-              className="w-full p-2 border rounded"
+              disabled={isGenerateDisabled}
+              className="w-full p-2 border rounded disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">AI가 자동 설정</option>
               <option value="light">가볍게 (여유롭게)</option>
@@ -745,7 +763,8 @@ export default function PlanGenerator() {
                   preferredActivityStyle: e.target.value as any,
                 })
               }
-              className="w-full p-2 border rounded"
+              disabled={isGenerateDisabled}
+              className="w-full p-2 border rounded disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">AI가 자동 선택</option>
               <option value="visual">시각적 (이미지, 차트, 영상)</option>
@@ -1097,71 +1116,99 @@ function PlanPreview({
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   {translate("aiPlanGenerator.areaMatching.createNew")}
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {Object.entries(areaMatchingChoices).map(
-                    ([areaName, choice]) => {
-                      const isSelected =
-                        !choice.useExisting && choice.newName === areaName;
 
-                      return (
-                        <div
-                          key={areaName}
-                          className={`p-2 rounded border cursor-pointer transition-colors ${
-                            isSelected
-                              ? "bg-green-50 border-green-300"
-                              : "bg-gray-50 border-gray-200 hover:bg-gray-100"
-                          }`}
-                          onClick={() => {
-                            const updatedChoices = Object.keys(
-                              areaMatchingChoices
-                            ).reduce(
-                              (acc, key) => ({
-                                ...acc,
-                                [key]: {
-                                  useExisting: false,
-                                  newName: key === areaName ? key : undefined,
-                                },
-                              }),
-                              {}
-                            );
-                            onAreaMatchingUpdate(updatedChoices);
+                {/* 새로 만들 영역이 있는지 확인 */}
+                {(() => {
+                  const newAreas = Object.entries(areaMatchingChoices).filter(
+                    ([_, choice]) => !choice.useExisting
+                  );
 
-                            // 모든 프로젝트를 새 영역에 연결
-                            const updatedPlan = {
-                              ...editedPlan,
-                              projects: editedPlan.projects.map((project) => ({
-                                ...project,
-                                areaName: areaName,
-                              })),
-                              areas: [
-                                {
-                                  name: areaName,
-                                  description: "",
-                                  icon: "compass",
-                                  color: "#6b7280",
-                                },
-                              ],
-                            };
-                            setEditedPlan(updatedPlan);
-                          }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-green-800">
-                              🆕 {areaName}
-                            </span>
-                            {isSelected && (
-                              <span className="text-green-600 text-xs">
-                                {translate(
-                                  "aiPlanGenerator.areaMatching.selected"
+                  if (newAreas.length === 0) {
+                    return (
+                      <div className="text-center py-4 px-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {translate("aiPlanGenerator.areaMatching.noNewAreas")}
+                        </p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                          {translate(
+                            "aiPlanGenerator.areaMatching.noNewAreasDescription"
+                          )}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {Object.entries(areaMatchingChoices).map(
+                        ([areaName, choice]) => {
+                          const isSelected =
+                            !choice.useExisting && choice.newName === areaName;
+
+                          return (
+                            <div
+                              key={areaName}
+                              className={`p-2 rounded border cursor-pointer transition-colors ${
+                                isSelected
+                                  ? "bg-green-50 border-green-300"
+                                  : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                              }`}
+                              onClick={() => {
+                                const updatedChoices = Object.keys(
+                                  areaMatchingChoices
+                                ).reduce(
+                                  (acc, key) => ({
+                                    ...acc,
+                                    [key]: {
+                                      useExisting: false,
+                                      newName:
+                                        key === areaName ? key : undefined,
+                                    },
+                                  }),
+                                  {}
+                                );
+                                onAreaMatchingUpdate(updatedChoices);
+
+                                // 모든 프로젝트를 새 영역에 연결
+                                const updatedPlan = {
+                                  ...editedPlan,
+                                  projects: editedPlan.projects.map(
+                                    (project) => ({
+                                      ...project,
+                                      areaName: areaName,
+                                    })
+                                  ),
+                                  areas: [
+                                    {
+                                      name: areaName,
+                                      description: "",
+                                      icon: "compass",
+                                      color: "#6b7280",
+                                    },
+                                  ],
+                                };
+                                setEditedPlan(updatedPlan);
+                              }}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-green-800">
+                                  🆕 {areaName}
+                                </span>
+                                {isSelected && (
+                                  <span className="text-green-600 text-xs">
+                                    {translate(
+                                      "aiPlanGenerator.areaMatching.selected"
+                                    )}
+                                  </span>
                                 )}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    }
-                  )}
-                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>

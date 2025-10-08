@@ -277,23 +277,38 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
       );
     }
 
-    // 4. 기존 Areas와 매칭하여 existingId 추가
+    // 4. 기존 Areas와 매칭하여 existingId 추가 및 중복 제거
     if (existingAreas.length > 0 && parsedPlan.areas) {
-      parsedPlan.areas = parsedPlan.areas.map((aiArea: any) => {
+      const processedAreas: any[] = [];
+      const usedExistingIds = new Set<string>();
+
+      for (const aiArea of parsedPlan.areas) {
         const matchingArea = existingAreas.find(
           (existing) =>
-            existing.name.toLowerCase().includes(aiArea.name.toLowerCase()) ||
-            aiArea.name.toLowerCase().includes(existing.name.toLowerCase())
+            !usedExistingIds.has(existing.id) &&
+            (existing.name.toLowerCase().includes(aiArea.name.toLowerCase()) ||
+              aiArea.name.toLowerCase().includes(existing.name.toLowerCase()) ||
+              existing.name.toLowerCase() === aiArea.name.toLowerCase())
         );
 
         if (matchingArea) {
-          return {
+          // 기존 영역과 매칭된 경우, 기존 영역 정보로 대체
+          processedAreas.push({
             ...aiArea,
+            name: matchingArea.name, // 기존 영역 이름 사용
+            description: matchingArea.description,
+            icon: matchingArea.icon,
+            color: matchingArea.color,
             existingId: matchingArea.id,
-          };
+          });
+          usedExistingIds.add(matchingArea.id);
+        } else {
+          // 새로운 영역인 경우만 추가
+          processedAreas.push(aiArea);
         }
-        return aiArea;
-      });
+      }
+
+      parsedPlan.areas = processedAreas;
     }
 
     // 5. areaName 검증 및 수정

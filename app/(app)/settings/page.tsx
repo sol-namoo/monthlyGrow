@@ -342,7 +342,10 @@ export default function SettingsPage() {
   if (isLoading || userLoading) {
     return (
       <div className="container max-w-md px-4 py-6 pb-20">
-        <div className="text-center">{texts.loading}</div>
+        <div className="flex flex-col items-center justify-center space-y-4 py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">{texts.loading}</p>
+        </div>
       </div>
     );
   }

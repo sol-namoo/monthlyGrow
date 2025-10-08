@@ -157,6 +157,8 @@ export const aiPlanGenerator = {
     selectExisting: "기존 영역 중 선택:",
     createNew: "새 영역으로 생성:",
     selected: "✓ 선택됨",
+    noNewAreas: "새로 생성할 영역이 없습니다",
+    noNewAreasDescription: "모든 영역이 기존 영역과 매칭되었습니다",
   },
 
   // 프로젝트 타입

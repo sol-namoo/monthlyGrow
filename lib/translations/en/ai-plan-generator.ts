@@ -161,6 +161,8 @@ export const aiPlanGenerator = {
     selectExisting: "Select from existing areas:",
     createNew: "Create as new areas:",
     selected: "✓ Selected",
+    noNewAreas: "No new areas to create",
+    noNewAreasDescription: "All areas have been matched with existing ones",
   },
 
   // 프로젝트 타입
