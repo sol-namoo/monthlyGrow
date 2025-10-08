@@ -21,64 +21,84 @@ import { Resource } from "../types";
 export const fetchAllResourcesByUserId = async (
   userId: string
 ): Promise<Resource[]> => {
-  const q = query(collection(db, "resources"), where("userId", "==", userId));
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      createdAt: data.createdAt.toDate(),
-      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-    } as Resource;
-  });
+  try {
+    const q = query(collection(db, "resources"), where("userId", "==", userId));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt.toDate(),
+        updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      } as Resource;
+    });
+  } catch (error) {
+    console.error("리소스 조회 실패:", error);
+    throw new Error("resourceLoadFailed");
+  }
 };
 
 export const fetchActiveResourcesByUserId = async (
   userId: string
 ): Promise<Resource[]> => {
-  const q = query(
-    collection(db, "resources"),
-    where("userId", "==", userId),
-    where("status", "==", "active")
-  );
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Resource[];
+  try {
+    const q = query(
+      collection(db, "resources"),
+      where("userId", "==", userId),
+      where("status", "==", "active")
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Resource[];
+  } catch (error) {
+    console.error("활성 리소스 조회 실패:", error);
+    throw new Error("activeResourceLoadFailed");
+  }
 };
 
 export const fetchArchivedResourcesByUserId = async (
   userId: string
 ): Promise<Resource[]> => {
-  const q = query(
-    collection(db, "resources"),
-    where("userId", "==", userId),
-    where("status", "==", "archived")
-  );
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Resource[];
+  try {
+    const q = query(
+      collection(db, "resources"),
+      where("userId", "==", userId),
+      where("status", "==", "archived")
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Resource[];
+  } catch (error) {
+    console.error("아카이브된 리소스 조회 실패:", error);
+    throw new Error("archivedResourceLoadFailed");
+  }
 };
 
 export const fetchResourceById = async (
   resourceId: string
 ): Promise<Resource> => {
-  const docRef = doc(db, "resources", resourceId);
-  const docSnap = await getDoc(docRef);
-  if (docSnap.exists()) {
-    const data = docSnap.data();
-    return {
-      id: docSnap.id,
-      ...data,
-      createdAt: data.createdAt.toDate(),
-      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-    } as Resource;
-  } else {
-    throw new Error("Resource not found");
+  try {
+    const docRef = doc(db, "resources", resourceId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        ...data,
+        createdAt: data.createdAt.toDate(),
+        updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      } as Resource;
+    } else {
+      throw new Error("Resource not found");
+    }
+  } catch (error) {
+    console.error("리소스 조회 실패:", error);
+    throw new Error("resourceLoadFailed");
   }
 };
 
@@ -123,37 +143,42 @@ export const fetchResourceWithAreaById = async (
 export const fetchUncategorizedResourcesByUserId = async (
   userId: string
 ): Promise<Resource[]> => {
-  // 먼저 미분류 영역을 찾습니다
-  const areasQuery = query(
-    collection(db, "areas"),
-    where("userId", "==", userId),
-    where("name", "==", "미분류")
-  );
-  const areasSnapshot = await getDocs(areasQuery);
+  try {
+    // 먼저 미분류 영역을 찾습니다
+    const areasQuery = query(
+      collection(db, "areas"),
+      where("userId", "==", userId),
+      where("name", "==", "미분류")
+    );
+    const areasSnapshot = await getDocs(areasQuery);
 
-  if (areasSnapshot.empty) {
-    return []; // 미분류 영역이 없으면 빈 배열 반환
+    if (areasSnapshot.empty) {
+      return []; // 미분류 영역이 없으면 빈 배열 반환
+    }
+
+    const uncategorizedAreaId = areasSnapshot.docs[0].id;
+
+    // 미분류 영역에 속한 리소스들만 가져옵니다
+    const resourcesQuery = query(
+      collection(db, "resources"),
+      where("userId", "==", userId),
+      where("areaId", "==", uncategorizedAreaId)
+    );
+
+    const querySnapshot = await getDocs(resourcesQuery);
+    return querySnapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt.toDate(),
+        updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      } as Resource;
+    });
+  } catch (error) {
+    console.error("미분류 리소스 조회 실패:", error);
+    throw new Error("uncategorizedResourceLoadFailed");
   }
-
-  const uncategorizedAreaId = areasSnapshot.docs[0].id;
-
-  // 미분류 영역에 속한 리소스들만 가져옵니다
-  const resourcesQuery = query(
-    collection(db, "resources"),
-    where("userId", "==", userId),
-    where("areaId", "==", uncategorizedAreaId)
-  );
-
-  const querySnapshot = await getDocs(resourcesQuery);
-  return querySnapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      createdAt: data.createdAt.toDate(),
-      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-    } as Resource;
-  });
 };
 
 export const createResource = async (
@@ -188,9 +213,9 @@ export const createResource = async (
   } catch (error) {
     console.error("❌ 리소스 생성 실패:", error);
     if (error instanceof Error) {
-      throw new Error(`리소스 생성에 실패했습니다: ${error.message}`);
+      throw new Error(`resourceCreateFailed: ${error.message}`);
     }
-    throw new Error("리소스 생성에 실패했습니다.");
+    throw new Error("resourceCreateFailed");
   }
 };
 
@@ -207,7 +232,7 @@ export const updateResource = async (
     await updateDoc(doc(db, "resources", resourceId), filteredData);
   } catch (error) {
     console.error(`❌ 리소스 업데이트 실패 - ID: ${resourceId}`, error);
-    throw new Error("리소스 업데이트에 실패했습니다.");
+    throw new Error("resourceUpdateFailed");
   }
 };
 
@@ -216,6 +241,6 @@ export const deleteResourceById = async (resourceId: string): Promise<void> => {
     await deleteDoc(doc(db, "resources", resourceId));
   } catch (error) {
     console.error(`❌ 리소스 삭제 실패 - ID: ${resourceId}`, error);
-    throw new Error("리소스 삭제에 실패했습니다.");
+    throw new Error("resourceDeleteFailed");
   }
 };

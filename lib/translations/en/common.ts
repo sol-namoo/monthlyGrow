@@ -17,6 +17,24 @@ export const common = {
     loginRequired: "Login required.",
     unexpectedResponse: "Unexpected response from server.",
     serviceError: "Service error occurred.",
+    // Firebase related error messages
+    firebaseAuthPersistenceFailed: "Firebase Auth persistence configuration failed",
+    // Data loading error messages
+    resourceLoadFailed: "An error occurred while loading resource information.",
+    activeResourceLoadFailed: "An error occurred while loading active resource information.",
+    archivedResourceLoadFailed: "An error occurred while loading archived resource information.",
+    uncategorizedResourceLoadFailed: "An error occurred while loading uncategorized resource information.",
+    areaLoadFailed: "An error occurred while loading area information.",
+    activeAreaLoadFailed: "An error occurred while loading active area information.",
+    archivedAreaLoadFailed: "An error occurred while loading archived area information.",
+    // Data creation/update/delete error messages
+    resourceCreateFailed: "Failed to create resource.",
+    resourceUpdateFailed: "Failed to update resource.",
+    resourceDeleteFailed: "Failed to delete resource.",
+    areaCreateFailed: "Failed to create area.",
+    areaUpdateFailed: "Failed to update area.",
+    areaDeleteFailed: "Failed to delete area.",
+    uncategorizedAreaLoadFailed: "Failed to load/create uncategorized area",
   },
 } as const;
 

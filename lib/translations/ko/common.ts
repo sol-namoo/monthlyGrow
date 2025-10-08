@@ -17,6 +17,24 @@ export const common = {
     loginRequired: "로그인이 필요합니다.",
     unexpectedResponse: "서버에서 예상치 못한 응답을 받았습니다.",
     serviceError: "서비스 오류가 발생했습니다.",
+    // Firebase 관련 에러 메시지
+    firebaseAuthPersistenceFailed: "Firebase 인증 설정 실패",
+    // 데이터 조회 에러 메시지
+    resourceLoadFailed: "리소스 정보를 불러오는 중 오류가 발생했습니다.",
+    activeResourceLoadFailed: "활성 리소스 정보를 불러오는 중 오류가 발생했습니다.",
+    archivedResourceLoadFailed: "아카이브된 리소스 정보를 불러오는 중 오류가 발생했습니다.",
+    uncategorizedResourceLoadFailed: "미분류 리소스 정보를 불러오는 중 오류가 발생했습니다.",
+    areaLoadFailed: "영역 정보를 불러오는 중 오류가 발생했습니다.",
+    activeAreaLoadFailed: "활성 영역 정보를 불러오는 중 오류가 발생했습니다.",
+    archivedAreaLoadFailed: "아카이브된 영역 정보를 불러오는 중 오류가 발생했습니다.",
+    // 데이터 생성/수정/삭제 에러 메시지
+    resourceCreateFailed: "리소스 생성에 실패했습니다.",
+    resourceUpdateFailed: "리소스 업데이트에 실패했습니다.",
+    resourceDeleteFailed: "리소스 삭제에 실패했습니다.",
+    areaCreateFailed: "영역 생성에 실패했습니다.",
+    areaUpdateFailed: "영역 업데이트에 실패했습니다.",
+    areaDeleteFailed: "영역 삭제에 실패했습니다.",
+    uncategorizedAreaLoadFailed: "미분류 영역 조회/생성 실패",
   },
 } as const;
 

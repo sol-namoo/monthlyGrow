@@ -42,8 +42,8 @@ export default function MonthlySummaryPage() {
 
   // 최근 먼슬리 id 선택
   useEffect(() => {
-    if (monthlies && monthlies.length > 0) {
-      setSelectedMonthlyId(monthlies[0].id);
+    if (monthlies && Array.isArray(monthlies) && monthlies.length > 0) {
+      setSelectedMonthlyId(monthlies[0]?.id);
     }
   }, [monthlies]);
   const { monthly, projects, isLoading, error } = usePageData("monthlyDetail", {

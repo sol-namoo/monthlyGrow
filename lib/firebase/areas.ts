@@ -12,69 +12,93 @@ import {
   runTransaction,
 } from "firebase/firestore";
 import { db } from "./config";
-import { createBaseData, updateTimestamp, filterUndefinedValues } from "./utils";
+import {
+  createBaseData,
+  updateTimestamp,
+  filterUndefinedValues,
+} from "./utils";
 import { Area } from "../types";
 
 // Areas
 export const fetchAllAreasByUserId = async (
   userId: string
 ): Promise<Area[]> => {
-  const q = query(collection(db, "areas"), where("userId", "==", userId));
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      createdAt: data.createdAt.toDate(),
-      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-    } as Area;
-  });
+  try {
+    const q = query(collection(db, "areas"), where("userId", "==", userId));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt.toDate(),
+        updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      } as Area;
+    });
+  } catch (error) {
+    console.error("영역 조회 실패:", error);
+    throw new Error("areaLoadFailed");
+  }
 };
 
 export const fetchActiveAreasByUserId = async (
   userId: string
 ): Promise<Area[]> => {
-  const q = query(
-    collection(db, "areas"),
-    where("userId", "==", userId),
-    where("status", "==", "active")
-  );
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Area[];
+  try {
+    const q = query(
+      collection(db, "areas"),
+      where("userId", "==", userId),
+      where("status", "==", "active")
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Area[];
+  } catch (error) {
+    console.error("활성 영역 조회 실패:", error);
+    throw new Error("activeAreaLoadFailed");
+  }
 };
 
 export const fetchArchivedAreasByUserId = async (
   userId: string
 ): Promise<Area[]> => {
-  const q = query(
-    collection(db, "areas"),
-    where("userId", "==", userId),
-    where("status", "==", "archived")
-  );
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Area[];
+  try {
+    const q = query(
+      collection(db, "areas"),
+      where("userId", "==", userId),
+      where("status", "==", "archived")
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Area[];
+  } catch (error) {
+    console.error("아카이브된 영역 조회 실패:", error);
+    throw new Error("archivedAreaLoadFailed");
+  }
 };
 
 export const fetchAreaById = async (areaId: string): Promise<Area> => {
-  const docRef = doc(db, "areas", areaId);
-  const docSnap = await getDoc(docRef);
-  if (docSnap.exists()) {
-    const data = docSnap.data();
-    return {
-      id: docSnap.id,
-      ...data,
-      createdAt: data.createdAt.toDate(),
-      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-    } as Area;
-  } else {
-    throw new Error("Area not found");
+  try {
+    const docRef = doc(db, "areas", areaId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        ...data,
+        createdAt: data.createdAt.toDate(),
+        updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      } as Area;
+    } else {
+      throw new Error("Area not found");
+    }
+  } catch (error) {
+    console.error("영역 조회 실패:", error);
+    throw new Error("areaLoadFailed");
   }
 };
 
@@ -97,7 +121,6 @@ export const createArea = async (
 
     const docRef = await addDoc(collection(db, "areas"), newArea);
 
-
     return {
       id: docRef.id,
       userId: areaData.userId,
@@ -109,11 +132,11 @@ export const createArea = async (
       updatedAt: new Date(),
     } as Area;
   } catch (error) {
-
+    console.error("영역 생성 실패:", error);
     if (error instanceof Error) {
-      throw new Error(`영역 생성에 실패했습니다: ${error.message}`);
+      throw new Error(`areaCreateFailed: ${error.message}`);
     }
-    throw new Error("영역 생성에 실패했습니다.");
+    throw new Error("areaCreateFailed");
   }
 };
 
@@ -149,11 +172,10 @@ export const getOrCreateUncategorizedArea = async (
       status: "active",
     });
 
-
     return uncategorizedArea;
   } catch (error) {
-
-    throw error;
+    console.error("미분류 영역 조회/생성 실패:", error);
+    throw new Error("uncategorizedAreaLoadFailed");
   }
 };
 
@@ -168,10 +190,9 @@ export const updateArea = async (
     });
 
     await updateDoc(doc(db, "areas", areaId), filteredData);
-
   } catch (error) {
-
-    throw new Error("영역 업데이트에 실패했습니다.");
+    console.error("영역 업데이트 실패:", error);
+    throw new Error("areaUpdateFailed");
   }
 };
 
@@ -180,7 +201,7 @@ export const deleteAreaById = async (areaId: string): Promise<void> => {
     await runTransaction(db, async (transaction) => {
       const areaRef = doc(db, "areas", areaId);
       const areaDoc = await transaction.get(areaRef);
-      
+
       if (!areaDoc.exists()) {
         throw new Error("영역을 찾을 수 없습니다.");
       }
@@ -191,17 +212,17 @@ export const deleteAreaById = async (areaId: string): Promise<void> => {
         where("areaId", "==", areaId)
       );
       const projectsSnapshot = await getDocs(projectsQuery);
-      
+
       // 미분류 영역 찾기
       const uncategorizedQuery = query(
         collection(db, "areas"),
         where("name", "==", "미분류")
       );
       const uncategorizedSnapshot = await getDocs(uncategorizedQuery);
-      
+
       if (!uncategorizedSnapshot.empty) {
         const uncategorizedAreaId = uncategorizedSnapshot.docs[0].id;
-        
+
         // 프로젝트들을 미분류 영역으로 이동
         projectsSnapshot.docs.forEach((projectDoc) => {
           transaction.update(projectDoc.ref, {
@@ -217,10 +238,10 @@ export const deleteAreaById = async (areaId: string): Promise<void> => {
         where("areaId", "==", areaId)
       );
       const resourcesSnapshot = await getDocs(resourcesQuery);
-      
+
       if (!uncategorizedSnapshot.empty) {
         const uncategorizedAreaId = uncategorizedSnapshot.docs[0].id;
-        
+
         // 리소스들을 미분류 영역으로 이동
         resourcesSnapshot.docs.forEach((resourceDoc) => {
           transaction.update(resourceDoc.ref, {
@@ -233,13 +254,11 @@ export const deleteAreaById = async (areaId: string): Promise<void> => {
       // 영역 삭제
       transaction.delete(areaRef);
     });
-
-
   } catch (error) {
-
+    console.error("영역 삭제 실패:", error);
     if (error instanceof Error) {
-      throw new Error(`영역 삭제에 실패했습니다: ${error.message}`);
+      throw new Error(`areaDeleteFailed: ${error.message}`);
     }
-    throw new Error("영역 삭제에 실패했습니다.");
+    throw new Error("areaDeleteFailed");
   }
-}; 
+};
