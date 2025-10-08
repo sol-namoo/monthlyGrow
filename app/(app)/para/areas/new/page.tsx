@@ -122,22 +122,34 @@ function NewAreaPageContent() {
 
   // 아이콘 선택 옵션
   const iconOptions = [
-    { id: "compass", icon: Compass, name: "나침반" },
-    { id: "heart", icon: Heart, name: "하트" },
-    { id: "brain", icon: Brain, name: "뇌" },
-    { id: "briefcase", icon: Briefcase, name: "브리프케이스" },
-    { id: "dollarSign", icon: DollarSign, name: "달러" },
-    { id: "users", icon: Users, name: "사람들" },
-    { id: "gamepad2", icon: Gamepad2, name: "게임패드" },
-    { id: "dumbbell", icon: Dumbbell, name: "운동" },
-    { id: "bookOpen", icon: BookOpenIcon, name: "독서" },
-    { id: "home", icon: Home, name: "가정" },
-    { id: "car", icon: Car, name: "교통" },
-    { id: "plane", icon: Plane, name: "여행" },
-    { id: "camera", icon: Camera, name: "사진" },
-    { id: "music", icon: Music, name: "음악" },
-    { id: "palette", icon: Palette, name: "예술" },
-    { id: "utensils", icon: Utensils, name: "요리" },
+    { id: "compass", icon: Compass, name: translate("areas.icons.compass") },
+    { id: "heart", icon: Heart, name: translate("areas.icons.heart") },
+    { id: "brain", icon: Brain, name: translate("areas.icons.brain") },
+    {
+      id: "briefcase",
+      icon: Briefcase,
+      name: translate("areas.icons.briefcase"),
+    },
+    {
+      id: "dollarSign",
+      icon: DollarSign,
+      name: translate("areas.icons.dollarSign"),
+    },
+    { id: "users", icon: Users, name: translate("areas.icons.users") },
+    { id: "gamepad2", icon: Gamepad2, name: translate("areas.icons.gamepad2") },
+    { id: "dumbbell", icon: Dumbbell, name: translate("areas.icons.dumbbell") },
+    {
+      id: "bookOpen",
+      icon: BookOpenIcon,
+      name: translate("areas.icons.bookOpen"),
+    },
+    { id: "home", icon: Home, name: translate("areas.icons.home") },
+    { id: "car", icon: Car, name: translate("areas.icons.car") },
+    { id: "plane", icon: Plane, name: translate("areas.icons.plane") },
+    { id: "camera", icon: Camera, name: translate("areas.icons.camera") },
+    { id: "music", icon: Music, name: translate("areas.icons.music") },
+    { id: "palette", icon: Palette, name: translate("areas.icons.palette") },
+    { id: "utensils", icon: Utensils, name: translate("areas.icons.utensils") },
   ];
 
   const applyTemplate = (template: (typeof areaTemplates)[0]) => {

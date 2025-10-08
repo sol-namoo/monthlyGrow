@@ -8,6 +8,11 @@ export const monthly = {
     future: "Planned",
     past: "Past",
   },
+  status: {
+    planned: "Planned",
+    inProgress: "In Progress",
+    ended: "Completed",
+  },
   currentMonthly: {
     title: "Current Monthly Summary",
     status: {
@@ -433,6 +438,7 @@ export const monthlyNew = {
   focusAreas: {
     title: "Focus Areas",
     description: "Select areas to focus on in this monthly",
+    selected: "Selected Areas",
     noAreas: "No areas created yet",
     createArea: "Create Area",
     areaHint: "Creating areas helps you manage more systematically",
@@ -535,6 +541,54 @@ export const monthlyNew = {
   error: {
     title: "Monthly Creation Failed",
     description: "An error occurred while creating the monthly",
+  },
+  monthlyNew: {
+    title: "Create Monthly",
+    basicInfo: {
+      title: "Basic Information",
+      monthSelection: "Select Monthly Month",
+      monthPlaceholder: "Select a month",
+      monthSuffix: "",
+    },
+    form: {
+      objective: "Objective",
+      objectivePlaceholder: "Enter your goal for this month",
+      keyResultDescription: "Objective Description",
+      keyResultDescriptionPlaceholder:
+        "Enter a detailed description of your goal",
+      reward: "Reward",
+      rewardPlaceholder:
+        "Enter the reward you'll receive when you achieve your goal",
+      keyResults: "Key Results",
+      keyResultsDescription:
+        "Set specific and achievable metrics to measure goal achievement",
+      keyResultsGuide:
+        "💡 Setting 3-5 key results per month is appropriate. Too many can reduce focus.",
+      addKeyResult: "Add Key Result",
+      keyResultTitlePlaceholder:
+        "e.g., Exercise 30 minutes daily, Read 3 times a week, Blog post 2 times a week",
+    },
+    validation: {
+      objectiveRequired: "Please enter an objective",
+      keyResultRequired: "Please enter a key result title",
+      minKeyResults: "At least 1 key result is required",
+    },
+    existingMonthly: {
+      title: "A monthly already exists for this month",
+      description:
+        "A monthly already exists for this month. Please select a different month or edit the existing monthly.",
+    },
+    focusAreas: {
+      selected: "Selected Areas",
+    },
+    success: {
+      title: "Monthly Created Successfully",
+      description: "Your new monthly has been created successfully",
+    },
+    error: {
+      title: "Monthly Creation Failed",
+      description: "An error occurred while creating the monthly",
+    },
   },
   createMonthly: "Create Monthly",
 } as const;

@@ -8,6 +8,11 @@ export const monthly = {
     future: "예정",
     past: "과거",
   },
+  status: {
+    planned: "예정",
+    inProgress: "진행중",
+    ended: "완료",
+  },
   currentMonthly: {
     title: "현재 먼슬리 요약",
     status: {
@@ -357,6 +362,7 @@ export const monthlyNew = {
     title: "기본 정보",
     monthSelection: "월 선택",
     monthPlaceholder: "월을 선택하세요",
+    monthSuffix: "월",
   },
   form: {
     title: "제목",
@@ -481,5 +487,51 @@ export const monthlyEdit = {
   error: {
     title: "먼슬리 수정 실패",
     description: "먼슬리 수정 중 오류가 발생했습니다",
+  },
+  monthlyNew: {
+    title: "먼슬리 생성",
+    basicInfo: {
+      title: "기본 정보",
+      monthSelection: "월 선택",
+      monthPlaceholder: "월을 선택하세요",
+      monthSuffix: "월",
+    },
+    form: {
+      objective: "목표",
+      objectivePlaceholder: "이번 달의 목표를 입력하세요",
+      keyResultDescription: "목표 설명",
+      keyResultDescriptionPlaceholder: "목표에 대한 상세한 설명을 입력하세요",
+      reward: "보상",
+      rewardPlaceholder: "목표 달성 시 받을 보상을 입력하세요",
+      keyResults: "핵심 지표",
+      keyResultsDescription:
+        "목표 달성을 측정할 수 있는 구체적이고 실현 가능한 지표를 설정하세요",
+      keyResultsGuide:
+        "💡 한 달에 3-5개의 핵심 지표를 설정하는 것이 적절합니다. 너무 많으면 집중도가 떨어질 수 있어요.",
+      addKeyResult: "핵심 지표 추가",
+      keyResultTitlePlaceholder:
+        "예: 매일 30분 운동하기, 주 3회 독서하기, 주 2회 블로그 포스팅",
+    },
+    validation: {
+      objectiveRequired: "목표를 입력해주세요",
+      keyResultRequired: "핵심 지표 제목을 입력해주세요",
+      minKeyResults: "최소 1개의 핵심 지표가 필요합니다",
+    },
+    existingMonthly: {
+      title: "이미 해당 월에 먼슬리가 존재합니다",
+      description:
+        "해당 월에 이미 먼슬리가 있습니다. 다른 월을 선택하거나 기존 먼슬리를 수정해주세요.",
+    },
+    focusAreas: {
+      selected: "선택된 영역",
+    },
+    success: {
+      title: "먼슬리 생성 완료",
+      description: "새로운 먼슬리가 성공적으로 생성되었습니다",
+    },
+    error: {
+      title: "먼슬리 생성 실패",
+      description: "먼슬리 생성 중 오류가 발생했습니다",
+    },
   },
 } as const;

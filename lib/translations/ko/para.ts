@@ -16,6 +16,14 @@ export const para = {
       taskBased: "목표 할 일 수",
       repetitivePlaceholder: "목표 횟수 (예: 30)",
       taskBasedPlaceholder: "목표 할 일 수 (예: 10)",
+      unit: {
+        repetitive: "회",
+        taskBased: "개",
+      },
+      targetPlaceholder: {
+        repetitive: "목표 설명 (예: 주요 개념 정리)",
+        taskBased: "목표 설명 (예: 완성된 이력서 1부)",
+      },
       description: {
         repetitive:
           "반복형 프로젝트는 목표 횟수에 따라 할 일이 자동으로 생성됩니다",

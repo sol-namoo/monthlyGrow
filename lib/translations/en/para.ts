@@ -16,6 +16,14 @@ export const para = {
       taskBased: "Target Task Count",
       repetitivePlaceholder: "Target count (e.g., 30)",
       taskBasedPlaceholder: "Target task count (e.g., 10)",
+      unit: {
+        repetitive: "times",
+        taskBased: "tasks",
+      },
+      targetPlaceholder: {
+        repetitive: "Target description (e.g., Review key concepts)",
+        taskBased: "Target description (e.g., Complete resume)",
+      },
       description: {
         repetitive:
           "Repetitive projects automatically generate tasks based on target count",

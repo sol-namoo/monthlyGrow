@@ -405,7 +405,7 @@ export default function EditMonthlyPage({
                     setSelectedYear(year);
                     setSelectedMonth(month);
                   }}
-                  disabled={status === "ended" || status === "in_progress"}
+                  disabled={status !== "planned"}
                 >
                   <SelectTrigger className="flex-1">
                     <SelectValue
@@ -488,10 +488,10 @@ export default function EditMonthlyPage({
               }
             >
               {status === "planned"
-                ? "예정"
+                ? translate("monthly.status.planned")
                 : status === "ended"
-                ? "완료"
-                : "진행중"}
+                ? translate("monthly.status.ended")
+                : translate("monthly.status.inProgress")}
             </Badge>
           </div>
 

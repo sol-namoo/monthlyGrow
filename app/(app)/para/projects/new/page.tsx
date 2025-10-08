@@ -377,13 +377,15 @@ function NewProjectPageContent() {
 
   // 프로젝트 유형별 헬퍼 함수
   const getUnitLabel = (category: "repetitive" | "task_based") => {
-    return category === "repetitive" ? "회" : "개 작업";
+    return category === "repetitive"
+      ? translate("para.projects.targetCount.unit.repetitive")
+      : translate("para.projects.targetCount.unit.taskBased");
   };
 
   const getTargetPlaceholder = (category: "repetitive" | "task_based") => {
     return category === "repetitive"
-      ? "목표 설명 (예: 주요 개념 정리)"
-      : "목표 설명 (예: 완성된 이력서 1부)";
+      ? translate("para.projects.targetCount.targetPlaceholder.repetitive")
+      : translate("para.projects.targetCount.targetPlaceholder.taskBased");
   };
 
   const getTargetCountPlaceholder = (category: "repetitive" | "task_based") => {
@@ -1208,7 +1210,9 @@ function NewProjectPageContent() {
                   )}
                 />
                 <div className="text-xs text-muted-foreground">
-                  {form.watch("category") === "repetitive" ? "회" : "개"}
+                  {form.watch("category") === "repetitive"
+                    ? translate("para.projects.targetCount.unit.repetitive")
+                    : translate("para.projects.targetCount.unit.taskBased")}
                 </div>
               </div>
               {form.formState.errors.targetCount && (

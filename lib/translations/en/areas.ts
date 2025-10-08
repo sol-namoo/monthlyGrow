@@ -1,5 +1,67 @@
 export const areas = {
   description: "Manage areas of interest systematically",
+  icons: {
+    compass: "Compass",
+    heart: "Heart",
+    brain: "Brain",
+    briefcase: "Briefcase",
+    dollarSign: "Dollar",
+    users: "Users",
+    gamepad2: "Gamepad",
+    dumbbell: "Dumbbell",
+    bookOpen: "Book",
+    home: "Home",
+    settings: "Settings",
+    star: "Star",
+    target: "Target",
+    zap: "Lightning",
+    shield: "Shield",
+    globe: "Globe",
+    camera: "Camera",
+    music: "Music",
+    palette: "Palette",
+    car: "Transport",
+    plane: "Travel",
+    utensils: "Cooking",
+  },
+  templates: {
+    health: {
+      title: "Health",
+      description: "Exercise, diet, health management",
+    },
+    career: {
+      title: "Career",
+      description: "Work, growth, professional development",
+    },
+    personal: {
+      title: "Personal Growth",
+      description: "Learning, reading, self-improvement",
+    },
+    relationships: {
+      title: "Relationships",
+      description: "Family, friends, social network",
+    },
+    finance: {
+      title: "Finance",
+      description: "Savings, investment, financial management",
+    },
+    hobby: {
+      title: "Hobby",
+      description: "Games, art, leisure activities",
+    },
+  },
+  new: {
+    title: "Create New Area",
+    description: "Create a new area to manage systematically",
+  },
+  form: {
+    title: "Area Name",
+    titlePlaceholder: "e.g., Health Management, Career Development",
+    description: "Area Description",
+    descriptionPlaceholder: "Describe what you want to manage in this area",
+    color: "Color",
+    icon: "Icon",
+  },
   count: "Total {count} areas",
   newArea: "New Area",
   projectCount: "{count} projects",
@@ -34,37 +96,6 @@ export const areas = {
       deleteWithItems: "Area and all connected items have been deleted",
       deleteWithoutItems:
         "Area has been deleted. Connected projects and resources are maintained",
-    },
-  },
-  // Area create/edit page
-  form: {
-    title: "Create Area",
-    description: "Create a new area",
-    explanation:
-      "Areas are criteria for systematically categorizing and managing projects and resources. Create your own area",
-    name: "Area Name",
-    namePlaceholder: "Enter area name",
-    descriptionLabel: "Area Description",
-    descriptionPlaceholder: "Describe what you want to manage in this area",
-    color: "Color",
-    icon: "Icon",
-    template: {
-      title: "Area Name",
-      message: "Select frequently used area templates to set up quickly",
-    },
-    submit: "Create Area",
-    submitting: "Creating...",
-    success: {
-      title: "Area Created",
-      description: "{name} area has been created",
-    },
-    error: {
-      title: "Area Creation Failed",
-      description: "An error occurred while creating the area",
-    },
-    validation: {
-      nameRequired: "Please enter area name",
-      descriptionRequired: "Please enter area description",
     },
   },
 } as const;

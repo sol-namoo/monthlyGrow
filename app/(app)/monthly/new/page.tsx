@@ -134,19 +134,19 @@ function NewMonthlyPageContent() {
   const keyResultSchema = z.object({
     title: z
       .string()
-      .min(1, translate("monthlyNew.validation.keyResultRequired")),
+      .min(1, translate("monthly.monthlyNew.validation.keyResultRequired")),
     description: z.string().optional(),
   });
 
   const monthlyFormSchema = z.object({
     objective: z
       .string()
-      .min(1, translate("monthlyNew.validation.objectiveRequired")),
+      .min(1, translate("monthly.monthlyNew.validation.objectiveRequired")),
     objectiveDescription: z.string().optional(),
     reward: z.string().optional(),
     keyResults: z
       .array(keyResultSchema)
-      .min(1, translate("monthlyNew.validation.minKeyResults")),
+      .min(1, translate("monthly.monthlyNew.validation.minKeyResults")),
   });
 
   // 현재 날짜 기준으로 년/월 설정
@@ -229,7 +229,7 @@ function NewMonthlyPageContent() {
   const onSubmit = async (data: MonthlyFormData) => {
     if (!user?.uid) {
       toast({
-        title: "오류",
+        title: translate("common.error"),
         description: "로그인이 필요합니다.",
         variant: "destructive",
       });
@@ -404,16 +404,17 @@ function NewMonthlyPageContent() {
                 </Select>
                 <Badge
                   variant="outline"
-                  className="text-sm font-medium w-12 flex-shrink-0"
+                  className="text-sm font-medium min-w-12 flex-shrink-0 whitespace-nowrap"
                 >
-                  {selectedMonth}월
+                  {selectedMonth}
+                  {translate("monthlyNew.basicInfo.monthSuffix")}
                 </Badge>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
                 <Clock className="h-4 w-4" />
-                <span>{formatDate(defaultStartDate, "ko")}</span>
+                <span>{formatDate(defaultStartDate, currentLanguage)}</span>
                 <span>-</span>
-                <span>{formatDate(defaultEndDate, "ko")}</span>
+                <span>{formatDate(defaultEndDate, currentLanguage)}</span>
               </div>
             </div>
 
@@ -530,7 +531,7 @@ function NewMonthlyPageContent() {
           {selectedFocusAreas.length > 0 && (
             <div className="mt-3 p-2 bg-muted/30 rounded-lg">
               <p className="text-xs text-muted-foreground">
-                선택된 영역:{" "}
+                {translate("monthlyNew.focusAreas.selected")}:{" "}
                 {selectedFocusAreas
                   .map((id) => allAreas.find((a) => a.id === id)?.name)
                   .join(", ")}
@@ -586,7 +587,8 @@ function NewMonthlyPageContent() {
                             `프로젝트 ID: ${selectedProject.projectId}`}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {projectInfo?.area || "미분류"}
+                          {projectInfo?.area ||
+                            translate("monthly.uncategorized")}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
