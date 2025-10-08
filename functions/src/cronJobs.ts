@@ -3,10 +3,6 @@
 
 import * as functions from "firebase-functions";
 import { getFirestore } from "firebase-admin/firestore";
-import {
-  autoMigrateIncompleteProjects,
-  isCarryOverEnabled,
-} from "./firebase-utils";
 import { createAllSnapshotsForUser } from "./snapshot-utils";
 
 // Firebase Admin 초기화 (이미 index.ts에서 초기화됨)
@@ -14,14 +10,14 @@ const db = getFirestore();
 
 /**
  * 매월 1일 오전 4시에 실행되는 크론 작업
- * 완료된 먼슬리의 미완료 프로젝트를 자동으로 다음 먼슬리로 이관
+ * 완료된 먼슬리의 스냅샷을 자동으로 생성
  */
 export const checkCompletedMonthlies = functions
   .region("asia-northeast3") // 서울 리전
   .pubsub.schedule("0 4 1 * *") // 매월 1일 오전 4시 (KST)
   .timeZone("Asia/Seoul")
   .onRun(async (context: functions.EventContext) => {
-    console.log("Starting monthly monthly completion check...");
+    console.log("Starting monthly snapshot creation...");
 
     try {
       // 지난 달 완료된 먼슬리 찾기 (매월 1일 실행이므로 지난 달 먼슬리들)
@@ -42,53 +38,28 @@ export const checkCompletedMonthlies = functions
         .get();
 
       const processedUsers = new Set<string>();
-      let totalMigrations = 0;
+      let totalSnapshots = 0;
 
       for (const monthlyDoc of monthliesSnapshot.docs) {
         const monthlyData = monthlyDoc.data();
         const userId = monthlyData.userId;
-        const monthlyId = monthlyDoc.id;
 
         // 이미 처리된 사용자는 건너뛰기 (한 사용자당 한 번만 처리)
         if (processedUsers.has(userId)) {
           continue;
         }
 
-        console.log(
-          `Processing incomplete projects for user ${userId}, monthly ${monthlyId}`
-        );
+        console.log(`Creating snapshots for user ${userId}`);
 
         try {
-          // 이월 설정 확인
-          const carryOverEnabled = await isCarryOverEnabled(userId);
-
-          if (carryOverEnabled) {
-            // 미완료 프로젝트 자동 이관
-            await autoMigrateIncompleteProjects(userId, monthlyId);
-            console.log(
-              `Carry over enabled for user ${userId}. Migration processed.`
-            );
-          } else {
-            console.log(
-              `Carry over disabled for user ${userId}. Skipping migration.`
-            );
-          }
-
-          // 활동 스냅샷 생성 (이월 설정과 관계없이 항상 실행)
-          if (!processedUsers.has(userId)) {
-            try {
-              await createAllSnapshotsForUser(userId);
-              console.log(`Successfully created snapshots for user ${userId}`);
-            } catch (snapshotError) {
-              console.error(
-                `Failed to create snapshots for user ${userId}:`,
-                snapshotError
-              );
-            }
-          }
+          // 스냅샷 생성
+          const snapshots = await createAllSnapshotsForUser(userId);
+          console.log(
+            `Successfully created ${snapshots.length} snapshots for user ${userId}`
+          );
 
           processedUsers.add(userId);
-          totalMigrations++;
+          totalSnapshots += snapshots.length;
 
           console.log(`Successfully processed user ${userId}`);
         } catch (error) {
@@ -97,20 +68,24 @@ export const checkCompletedMonthlies = functions
       }
 
       console.log(
-        `Monthly monthly check completed. Processed ${totalMigrations} users.`
+        `Monthly snapshot creation completed. Processed ${processedUsers.size} users, created ${totalSnapshots} snapshots.`
       );
-      return { success: true, processedUsers: totalMigrations };
+      return {
+        success: true,
+        processedUsers: processedUsers.size,
+        totalSnapshots,
+      };
     } catch (error) {
-      console.error("Error in monthly monthly check:", error);
+      console.error("Error in monthly snapshot creation:", error);
       throw error;
     }
   });
 
 /**
  * 테스트용 HTTP 함수 (개발 중에만 사용)
- * https://your-project.cloudfunctions.net/testProjectMigration?userId=YOUR_USER_ID&monthlyId=YOUR_CHAPTER_ID
+ * https://your-project.cloudfunctions.net/testSnapshotCreation?userId=YOUR_USER_ID
  */
-export const testProjectMigration = functions
+export const testSnapshotCreation = functions
   .region("asia-northeast3")
   .https.onRequest(
     async (req: functions.https.Request, res: functions.Response) => {
@@ -119,34 +94,27 @@ export const testProjectMigration = functions
         return;
       }
 
-      const { userId, monthlyId } = req.query;
+      const { userId } = req.query;
 
-      if (!userId || !monthlyId) {
-        res.status(400).send("Missing userId or monthlyId parameter");
+      if (!userId) {
+        res.status(400).send("Missing userId parameter");
         return;
       }
 
       try {
-        // 이월 설정 확인
-        const carryOverEnabled = await isCarryOverEnabled(userId as string);
-
-        if (carryOverEnabled) {
-          await autoMigrateIncompleteProjects(
-            userId as string,
-            monthlyId as string
-          );
-          res.json({
-            success: true,
-            message: `Migration completed for user ${userId}, monthly ${monthlyId}`,
-          });
-        } else {
-          res.json({
-            success: true,
-            message: `Carry over is disabled for user ${userId}. Migration skipped.`,
-          });
-        }
+        const snapshots = await createAllSnapshotsForUser(userId as string);
+        res.json({
+          success: true,
+          message: `Snapshot creation completed for user ${userId}`,
+          snapshotsCreated: snapshots.length,
+          snapshots: snapshots.map((s) => ({
+            id: s.id,
+            yearMonth: s.yearMonth,
+            statistics: s.statistics,
+          })),
+        });
       } catch (error) {
-        console.error("Test migration failed:", error);
+        console.error("Test snapshot creation failed:", error);
         res.status(500).json({
           success: false,
           error: error instanceof Error ? error.message : "Unknown error",
@@ -173,4 +141,9 @@ export const testProjectMigration = functions
  * - Firebase Console > Functions 탭에서 실행 로그 확인
  * - Cloud Logging에서 상세 로그 확인
  * - 실행 실패 시 이메일 알림 설정 가능
+ *
+ * 주요 변경사항:
+ * - 프로젝트 이관 로직 제거 (현재 구조에서는 불필요)
+ * - 스냅샷 생성만 수행 (새로운 MonthlySnapshot 구조 사용)
+ * - 실패 패턴 분석 데이터 포함
  */
