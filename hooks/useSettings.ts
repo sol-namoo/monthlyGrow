@@ -22,15 +22,17 @@ export function useSettings() {
   const [user, userLoading] = useAuthState(auth);
   const { setTheme, resolvedTheme } = useTheme();
   const [isInitialized, setIsInitialized] = useState(false);
+  const [languageInitialized, setLanguageInitialized] = useState(false);
 
-  // 클라이언트에서만 언어 감지 및 설정
+  // 클라이언트에서만 언어 감지 및 설정 (한 번만 실행)
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || languageInitialized) return;
 
     // 로그인 전 언어 설정이 있으면 우선 사용
     const preLoginLang = localStorage.getItem("preLoginLanguage") as Language;
     if (preLoginLang && preLoginLang !== settings.language) {
       setSettings((prev) => ({ ...prev, language: preLoginLang }));
+      setLanguageInitialized(true);
       return;
     }
 
@@ -41,7 +43,9 @@ export function useSettings() {
         setSettings((prev) => ({ ...prev, language: detectedLang }));
       }
     }
-  }, [settings.language]);
+    
+    setLanguageInitialized(true);
+  }, [languageInitialized]);
 
   // Firestore에서 사용자 설정 불러오기
   useEffect(() => {
@@ -56,22 +60,25 @@ export function useSettings() {
         const userData = await fetchUserById(user.uid);
         const userSettings = userData.settings || defaultSettings;
 
-        // 언어 설정이 없는 경우 브라우저 언어 감지
-        if (!userSettings.language) {
-          userSettings.language = detectBrowserLanguage();
-        }
+        // 현재 언어 설정을 유지하고, Firestore에서 가져온 설정과 병합
+        const currentLanguage = settings.language;
+        const mergedSettings = {
+          ...userSettings,
+          language: userSettings.language || currentLanguage || detectBrowserLanguage()
+        };
 
-        setSettings(userSettings);
+        setSettings(mergedSettings);
 
         // 사용자 설정의 테마가 있고 현재 테마와 다르면 업데이트
-        if (userSettings.theme && userSettings.theme !== resolvedTheme) {
-          setTheme(userSettings.theme);
+        if (mergedSettings.theme && mergedSettings.theme !== resolvedTheme) {
+          setTheme(mergedSettings.theme);
         }
         setIsInitialized(true);
       } catch (error) {
         console.error("설정 불러오기 실패:", error);
-        const detectedLang = detectBrowserLanguage();
-        setSettings({ ...defaultSettings, language: detectedLang });
+        // 현재 언어 설정을 유지
+        const currentLanguage = settings.language;
+        setSettings({ ...defaultSettings, language: currentLanguage || detectBrowserLanguage() });
         if (!isInitialized) {
           setTheme(defaultSettings.theme);
         }

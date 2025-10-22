@@ -32,8 +32,10 @@ export function ThemeToggle() {
   const handleLanguageChange = async (newLanguage: "ko" | "en") => {
     try {
       await updateSettings({ language: newLanguage });
-      // 언어 변경 후 페이지 새로고침
-      window.location.reload();
+      // 언어 변경 후 부드러운 전환을 위해 약간의 지연 후 새로고침
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
     } catch (error) {
       console.error("언어 설정 저장 실패:", error);
     }

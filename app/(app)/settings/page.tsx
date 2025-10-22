@@ -194,8 +194,10 @@ export default function SettingsPage() {
       // 언어 변경 시 타임존 캐시 초기화
       resetTimeZoneCache();
 
-      // 언어 변경 후 페이지 새로고침
-      window.location.reload();
+      // 언어 변경 후 부드러운 전환을 위해 약간의 지연 후 새로고침
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
     }
   };
 
