@@ -103,13 +103,19 @@ export function MonthlyDetailHeader({
           {status === "in_progress" && daysLeft > 0 && (
             <div className="flex items-center gap-1 text-orange-600">
               <Clock className="h-4 w-4" />
-              <span>{daysLeft}일 남음</span>
+              <span>
+                {daysLeft}
+                {translate("monthlyDetail.daysLeft")}
+              </span>
             </div>
           )}
           {status === "planned" && daysUntilStart > 0 && (
             <div className="flex items-center gap-1 text-blue-600">
               <Clock className="h-4 w-4" />
-              <span>{daysUntilStart}일 후 시작</span>
+              <span>
+                {daysUntilStart}
+                {translate("monthlyDetail.daysUntilStart")}
+              </span>
             </div>
           )}
         </div>
@@ -127,7 +133,7 @@ export function MonthlyDetailHeader({
             </div>
             <Progress value={keyResultProgress} className="mb-2" />
             <div className="text-center text-sm text-muted-foreground">
-              {keyResultProgress}% 완료
+              {keyResultProgress}% {translate("monthlyDetail.completedShort")}
             </div>
           </Card>
         )}

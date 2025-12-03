@@ -240,20 +240,21 @@ export interface UnifiedArchive {
   unexpectedObstacles?: string;
   nextMonthlyApplication?: string;
   // Key Results 관련 데이터
-  keyResultsReview?: string; // Key Results 리뷰 텍스트
-  completedKeyResults?: string[]; // 완료된 Key Results ID 목록
-  failedKeyResults?: {
-    keyResultId: string;
-    keyResultTitle: string; // Key Result 제목 (조회 시 편의용)
-    reason:
-      | "unrealisticGoal"
-      | "timeManagement"
-      | "priorityMismatch"
-      | "externalFactors"
-      | "motivation"
-      | "other";
-    customReason?: string; // "other" 선택 시 사용자 입력 이유
-  }[];
+  keyResultsReview?: {
+    completedKeyResults?: string[]; // 완료된 Key Results ID 목록
+    failedKeyResults?: {
+      keyResultId: string;
+      keyResultTitle: string; // Key Result 제목 (조회 시 편의용)
+      reason:
+        | "unrealisticGoal"
+        | "timeManagement"
+        | "priorityMismatch"
+        | "externalFactors"
+        | "motivation"
+        | "other";
+      customReason?: string; // "other" 선택 시 사용자 입력 이유
+    }[];
+  };
   // 프로젝트 회고 필드들
   goalAchieved?: boolean;
   memorableTask?: string;

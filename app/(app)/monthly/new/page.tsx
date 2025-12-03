@@ -496,7 +496,7 @@ function NewMonthlyPageContent() {
           <div className="mb-4">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Target className="h-5 w-5" />
-              중점 영역 선택
+              {translate("monthlyNew.focusAreas.title")}
               <Badge variant="secondary" className="text-xs">
                 선택사항
               </Badge>
@@ -638,7 +638,7 @@ function NewMonthlyPageContent() {
           ) : (
             <div className="p-4 bg-muted/20 rounded-lg text-center">
               <p className="text-sm text-muted-foreground">
-                연결된 프로젝트가 없습니다
+                {translate("monthlyDetail.noConnectedProjects")}
               </p>
             </div>
           )}

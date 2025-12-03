@@ -50,14 +50,14 @@ PARA 시스템을 활용해 목표를 실행하며 성장해 나가는 **게임�
 
 ## 💻 기술 스택
 
-| 영역         | 기술                                                                                                       |
-| ------------ | ---------------------------------------------------------------------------------------------------------- |
-| Framework    | [Next.js 15 (App Router)](https://nextjs.org/blog/next-15)                                                 |
-| UI           | [React 19](https://react.dev), [Tailwind CSS](https://tailwindcss.com), [shadcn/ui](https://ui.shadcn.com) |
-| Auth         | Firebase Auth (Google OAuth)                                                                               |
-| DB           | Firebase Firestore                                                                                         |
-| I18n         | react-i18next                                                                                              |
-| AI 연동 예정 | GPT API + Model Context Protocol (MCP)                                                                     |
+| 영역                 | 기술                                                                                                                                                                                                          |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Frontend**         | [Next.js 15 (App Router)](https://nextjs.org/blog/next-15), [React 19](https://react.dev), [TypeScript 5](https://www.typescriptlang.org/)                                                                    |
+| **Styling**          | [Tailwind CSS](https://tailwindcss.com), [shadcn/ui](https://ui.shadcn.com) (Radix UI 기반)                                                                                                                   |
+| **State Management** | [Jotai](https://jotai.org/) (클라이언트 상태), [TanStack React Query](https://tanstack.com/query) (서버 상태), [React Hook Form](https://react-hook-form.com/) (폼 상태)                                      |
+| **Firebase**         | [Firestore](https://firebase.google.com/docs/firestore) (데이터베이스), [Auth](https://firebase.google.com/docs/auth) (Google OAuth), [Functions](https://firebase.google.com/docs/functions) (서버리스 함수) |
+| **I18n**             | react-i18next                                                                                                                                                                                                 |
+| **AI 연동 예정**     | GPT API + Model Context Protocol (MCP)                                                                                                                                                                        |
 
 ---
 

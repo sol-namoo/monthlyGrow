@@ -501,19 +501,21 @@ export function MonthlyDetailContent({
               }
             >
               {status === "planned"
-                ? "예정"
+                ? translate("monthly.status.planned")
                 : status === "ended"
-                ? "완료"
-                : "진행중"}
+                ? translate("monthly.status.ended")
+                : translate("monthly.status.inProgress")}
             </Badge>
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <Clock className="h-4 w-4" />
               <span>
                 {status === "planned"
-                  ? `${daysUntilStart}일 후 시작`
+                  ? `${daysUntilStart}${translate(
+                      "monthlyDetail.daysUntilStart"
+                    )}`
                   : status === "ended"
-                  ? "완료됨"
-                  : `${daysLeft}일 남음`}
+                  ? translate("monthlyDetail.completed")
+                  : `${daysLeft}${translate("monthlyDetail.daysLeft")}`}
               </span>
             </div>
           </div>
@@ -528,7 +530,8 @@ export function MonthlyDetailContent({
             </div>
             <Progress value={keyResultProgress} className="h-3" />
             <p className="text-xs text-muted-foreground">
-              {keyResultsCompleted}/{keyResultsTotal} 완료
+              {keyResultsCompleted}/{keyResultsTotal}{" "}
+              {translate("monthlyDetail.completedShort")}
             </p>
           </div>
 
@@ -538,7 +541,7 @@ export function MonthlyDetailContent({
               <div className="flex items-center gap-2 mb-1">
                 <Trophy className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                 <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                  목표 달성 보상
+                  {translate("monthlyDetail.reward.title")}
                 </span>
               </div>
               <p className="text-sm text-yellow-700 dark:text-yellow-300">
@@ -556,7 +559,9 @@ export function MonthlyDetailContent({
           <div>
             <div className="flex items-center gap-2 mb-2">
               <Target className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <span className="text-sm font-medium">중점 영역</span>
+              <span className="text-sm font-medium">
+                {translate("monthlyDetail.focusAreas")}
+              </span>
             </div>
             {(() => {
               const validAreas = monthly.focusAreas
@@ -597,7 +602,7 @@ export function MonthlyDetailContent({
               ) : (
                 <div className="text-center py-2">
                   <p className="text-xs text-muted-foreground">
-                    중점 영역이 없습니다
+                    {translate("monthlyDetail.noFocusAreasShort")}
                   </p>
                 </div>
               );
@@ -629,7 +634,7 @@ export function MonthlyDetailContent({
             ) : (
               <div className="text-center py-2">
                 <p className="text-xs text-muted-foreground">
-                  연결된 프로젝트가 없습니다
+                  {translate("monthlyDetail.noConnectedProjects")}
                 </p>
               </div>
             )}
@@ -836,7 +841,10 @@ export function MonthlyDetailContent({
                             </div>
                             <div className="flex items-center gap-2">
                               <Badge variant="secondary" className="text-xs">
-                                {projectData.tasks.length}개
+                                {projectData.tasks.length}
+                                {translate(
+                                  "monthlyDetail.completedTasks.count"
+                                )}
                               </Badge>
                               <Link href={`/para/projects/${projectId}`}>
                                 <Button variant="ghost" size="sm">
@@ -874,7 +882,9 @@ export function MonthlyDetailContent({
 
                           <div className="mt-3 pt-3 border-t border-border/50">
                             <p className="text-xs text-muted-foreground text-center">
-                              총 {projectData.tasks.length}개 태스크 완료
+                              {translate("monthlyDetail.completedTasks.total", {
+                                count: projectData.tasks.length,
+                              })}
                             </p>
                           </div>
                         </CollapsibleContent>
@@ -884,7 +894,9 @@ export function MonthlyDetailContent({
                 })}
 
                 <div className="text-center text-sm text-muted-foreground">
-                  총 {completedTasks.length}개 태스크 완료
+                  {translate("monthlyDetail.completedTasks.total", {
+                    count: completedTasks.length,
+                  })}
                 </div>
               </div>
             ) : (
@@ -921,7 +933,7 @@ export function MonthlyDetailContent({
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
                 <p className="text-sm text-muted-foreground mt-2">
-                  회고 데이터를 불러오는 중...
+                  {translate("monthlyDetail.retrospective.loading")}
                 </p>
               </div>
             ) : status === "planned" ? (
@@ -975,9 +987,11 @@ export function MonthlyDetailContent({
               <Card className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
                 <div className="flex items-center gap-2 mb-3">
                   <MessageSquare className="h-4 w-4" />
-                  <h3 className="font-bold">노트</h3>
+                  <h3 className="font-bold">
+                    {translate("monthlyDetail.note.title")}
+                  </h3>
                   <span className="text-xs text-muted-foreground">
-                    마지막 업데이트:{" "}
+                    {translate("monthlyDetail.note.lastUpdated")}{" "}
                     {monthlyNote.updatedAt
                       ? formatDate(monthlyNote.updatedAt, "ko")
                       : "없음"}

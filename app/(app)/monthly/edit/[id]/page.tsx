@@ -514,7 +514,7 @@ export default function EditMonthlyPage({
             <div className="flex items-center gap-2 mb-1">
               <Trophy className="h-4 w-4 text-yellow-600" />
               <span className="text-sm font-medium text-yellow-800">
-                목표 달성 보상
+                {translate("monthlyDetail.reward.title")}
               </span>
             </div>
             <Input
@@ -536,7 +536,7 @@ export default function EditMonthlyPage({
         <div className="mb-4">
           <h3 className="font-bold text-sm flex items-center gap-2">
             <Target className="h-4 w-4" />
-            중점 영역 선택
+            {translate("monthlyNew.focusAreas.title")}
             <Badge variant="secondary" className="text-xs">
               선택사항
             </Badge>
@@ -663,7 +663,7 @@ export default function EditMonthlyPage({
         ) : (
           <div className="p-4 bg-muted/20 rounded-lg text-center">
             <p className="text-sm text-muted-foreground">
-              연결된 프로젝트가 없습니다
+              {translate("monthlyDetail.noConnectedProjects")}
             </p>
           </div>
         )}

@@ -144,7 +144,25 @@ export const monthlyDetail = {
     "Cannot measure completion rate without connected projects",
   connectProjectsHint: 'Use the "Edit" button at the top to connect projects',
   noFocusAreas: "No focus areas have been set.",
+  noFocusAreasShort: "No focus areas",
   connectedProjects: "Connected Projects",
+  daysLeft: "days left",
+  daysUntilStart: "days until start",
+  completed: "Completed",
+  completedShort: "Completed",
+  reward: {
+    title: "Achievement Reward",
+  },
+  completedTasks: {
+    total: "Total {count} tasks completed",
+    count: "",
+  },
+  retrospective: {
+    loading: "Loading retrospective data...",
+  },
+  note: {
+    lastUpdated: "Last updated:",
+  },
   quickAccess: {
     title: "Project Connection",
     description: "Projects connected to this monthly",
@@ -446,6 +464,7 @@ export const monthlyNew = {
     recommendation:
       "Recommendation: Focusing on 2 areas can increase monthly effectiveness",
     warning: "Selecting too many areas can reduce focus",
+    select: "Select Focus Areas",
   },
   projects: {
     title: "Connect Projects",
@@ -579,6 +598,7 @@ export const monthlyNew = {
         "A monthly already exists for this month. Please select a different month or edit the existing monthly.",
     },
     focusAreas: {
+      title: "Focus Areas",
       selected: "Selected Areas",
     },
     success: {

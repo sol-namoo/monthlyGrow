@@ -144,7 +144,25 @@ export const monthlyDetail = {
   connectProjectsHint:
     '프로젝트를 연결하려면 상단의 "먼슬리 수정" 버튼을 사용하세요',
   noFocusAreas: "중점 영역이 설정되지 않았습니다.",
+  noFocusAreasShort: "중점 영역이 없습니다",
   connectedProjects: "연결된 프로젝트",
+  daysLeft: "일 남음",
+  daysUntilStart: "일 후 시작",
+  completed: "완료됨",
+  completedShort: "완료",
+  reward: {
+    title: "목표 달성 보상",
+  },
+  completedTasks: {
+    total: "총 {count}개 태스크 완료",
+    count: "개",
+  },
+  retrospective: {
+    loading: "회고 데이터를 불러오는 중...",
+  },
+  note: {
+    lastUpdated: "마지막 업데이트:",
+  },
   quickAccess: {
     title: "프로젝트 연결",
     description: "이 먼슬리와 연결된 프로젝트들",
@@ -523,6 +541,7 @@ export const monthlyEdit = {
         "해당 월에 이미 먼슬리가 있습니다. 다른 월을 선택하거나 기존 먼슬리를 수정해주세요.",
     },
     focusAreas: {
+      title: "중점 영역 선택",
       selected: "선택된 영역",
     },
     success: {

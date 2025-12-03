@@ -7,7 +7,7 @@ export function useLanguage() {
   const currentLanguage = settings.language || "en";
 
   const translate = useCallback(
-    (key: string): string => {
+    (key: string, params?: Record<string, string | number>): string => {
       const keys = key.split(".");
       let value: any = translations[currentLanguage as Language];
 
@@ -19,7 +19,18 @@ export function useLanguage() {
         }
       }
 
-      return typeof value === "string" ? value : key;
+      if (typeof value !== "string") {
+        return key;
+      }
+
+      // 변수 치환
+      if (params) {
+        return value.replace(/\{(\w+)\}/g, (match, paramKey) => {
+          return params[paramKey]?.toString() || match;
+        });
+      }
+
+      return value;
     },
     [currentLanguage]
   );
