@@ -8,6 +8,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  runTransaction,
 } from "firebase/firestore";
 import { db } from "./config";
 import {
@@ -198,10 +199,37 @@ export const createResource = async (
       ...baseData,
     };
 
-    const docRef = await addDoc(collection(db, "resources"), newResource);
+    // 트랜잭션으로 리소스 생성과 Area counts 업데이트를 함께 처리
+    const result = await runTransaction(db, async (transaction) => {
+      const resourceRef = doc(collection(db, "resources"));
+      transaction.set(resourceRef, newResource);
+
+      // Area가 지정된 경우 Area의 resourceCount 증가
+      if (resourceData.areaId) {
+        const areaRef = doc(db, "areas", resourceData.areaId);
+        const areaSnap = await transaction.get(areaRef);
+
+        if (areaSnap.exists()) {
+          const areaData = areaSnap.data();
+          const currentCounts = areaData.counts || {
+            projectCount: 0,
+            resourceCount: 0,
+          };
+          transaction.update(areaRef, {
+            counts: {
+              projectCount: currentCounts.projectCount,
+              resourceCount: currentCounts.resourceCount + 1,
+            },
+            updatedAt: updateTimestamp(),
+          });
+        }
+      }
+
+      return resourceRef.id;
+    });
 
     return {
-      id: docRef.id,
+      id: result,
       userId: resourceData.userId,
       name: resourceData.name,
       description: resourceData.description || "",
@@ -224,12 +252,78 @@ export const updateResource = async (
   updateData: Partial<Omit<Resource, "id" | "userId" | "createdAt">>
 ): Promise<void> => {
   try {
-    const filteredData = filterUndefinedValues({
-      ...updateData,
-      updatedAt: updateTimestamp(),
-    });
+    // areaId가 변경되는 경우 Area counts 업데이트 필요
+    if (updateData.areaId !== undefined) {
+      await runTransaction(db, async (transaction) => {
+        const resourceRef = doc(db, "resources", resourceId);
+        const resourceSnap = await transaction.get(resourceRef);
 
-    await updateDoc(doc(db, "resources", resourceId), filteredData);
+        if (!resourceSnap.exists()) {
+          throw new Error("리소스를 찾을 수 없습니다.");
+        }
+
+        const resourceData = resourceSnap.data();
+        const oldAreaId = resourceData.areaId;
+        const newAreaId = updateData.areaId;
+
+        // 이전 Area의 resourceCount 감소
+        if (oldAreaId) {
+          const oldAreaRef = doc(db, "areas", oldAreaId);
+          const oldAreaSnap = await transaction.get(oldAreaRef);
+
+          if (oldAreaSnap.exists()) {
+            const oldAreaData = oldAreaSnap.data();
+            const oldCounts = oldAreaData.counts || {
+              projectCount: 0,
+              resourceCount: 0,
+            };
+            transaction.update(oldAreaRef, {
+              counts: {
+                projectCount: oldCounts.projectCount,
+                resourceCount: Math.max(0, oldCounts.resourceCount - 1),
+              },
+              updatedAt: updateTimestamp(),
+            });
+          }
+        }
+
+        // 새 Area의 resourceCount 증가
+        if (newAreaId && newAreaId !== oldAreaId) {
+          const newAreaRef = doc(db, "areas", newAreaId);
+          const newAreaSnap = await transaction.get(newAreaRef);
+
+          if (newAreaSnap.exists()) {
+            const newAreaData = newAreaSnap.data();
+            const newCounts = newAreaData.counts || {
+              projectCount: 0,
+              resourceCount: 0,
+            };
+            transaction.update(newAreaRef, {
+              counts: {
+                projectCount: newCounts.projectCount,
+                resourceCount: newCounts.resourceCount + 1,
+              },
+              updatedAt: updateTimestamp(),
+            });
+          }
+        }
+
+        // 리소스 업데이트
+        const filteredData = filterUndefinedValues({
+          ...updateData,
+          updatedAt: updateTimestamp(),
+        });
+        transaction.update(resourceRef, filteredData);
+      });
+    } else {
+      // areaId가 변경되지 않는 경우 일반 업데이트
+      const filteredData = filterUndefinedValues({
+        ...updateData,
+        updatedAt: updateTimestamp(),
+      });
+
+      await updateDoc(doc(db, "resources", resourceId), filteredData);
+    }
   } catch (error) {
     console.error(`❌ 리소스 업데이트 실패 - ID: ${resourceId}`, error);
     throw new Error("resourceUpdateFailed");
@@ -238,7 +332,42 @@ export const updateResource = async (
 
 export const deleteResourceById = async (resourceId: string): Promise<void> => {
   try {
-    await deleteDoc(doc(db, "resources", resourceId));
+    // 트랜잭션으로 리소스 삭제와 Area counts 업데이트를 함께 처리
+    await runTransaction(db, async (transaction) => {
+      const resourceRef = doc(db, "resources", resourceId);
+      const resourceSnap = await transaction.get(resourceRef);
+
+      if (!resourceSnap.exists()) {
+        throw new Error("리소스를 찾을 수 없습니다.");
+      }
+
+      const resourceData = resourceSnap.data();
+      const areaId = resourceData.areaId;
+
+      // Area의 resourceCount 감소
+      if (areaId) {
+        const areaRef = doc(db, "areas", areaId);
+        const areaSnap = await transaction.get(areaRef);
+
+        if (areaSnap.exists()) {
+          const areaData = areaSnap.data();
+          const currentCounts = areaData.counts || {
+            projectCount: 0,
+            resourceCount: 0,
+          };
+          transaction.update(areaRef, {
+            counts: {
+              projectCount: currentCounts.projectCount,
+              resourceCount: Math.max(0, currentCounts.resourceCount - 1),
+            },
+            updatedAt: updateTimestamp(),
+          });
+        }
+      }
+
+      // 리소스 삭제
+      transaction.delete(resourceRef);
+    });
   } catch (error) {
     console.error(`❌ 리소스 삭제 실패 - ID: ${resourceId}`, error);
     throw new Error("resourceDeleteFailed");

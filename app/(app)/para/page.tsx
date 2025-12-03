@@ -72,7 +72,6 @@ import {
   fetchArchiveCountByUserId,
   fetchProjectsByUserIdWithPaging,
   fetchResourcesWithAreasByUserIdWithPaging,
-  getTaskCountsForMultipleProjects,
 } from "@/lib/firebase/index";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatDateShort } from "@/lib/utils";
@@ -129,17 +128,17 @@ function ParaPageContent() {
   const [projectSortBy, setProjectSortBy] = useState("latest");
   const [resourceSortBy, setResourceSortBy] = useState("latest");
 
-  // Areas는 한 번에 가져오기 (개수가 많지 않을 것으로 예상)
+  // Areas는 areas 탭이 활성화되었을 때만 가져오기
   const { data: areas = [], isLoading: areasLoading } = useQuery({
     queryKey: ["areas", user?.uid],
     queryFn: async () => {
       const areasData = await fetchAllAreasByUserId(user?.uid || "");
       return areasData;
     },
-    enabled: !!user?.uid,
+    enabled: !!user?.uid && activeTab === "areas",
   });
 
-  // 영역별 개수 가져오기
+  // 영역별 개수는 areas 탭이 활성화되었을 때만 가져오기
   const { data: areaCounts = {}, isLoading: areaCountsLoading } = useQuery({
     queryKey: ["areaCounts", user?.uid],
     queryFn: async () => {
@@ -147,10 +146,11 @@ function ParaPageContent() {
 
       return counts;
     },
-    enabled: !!user?.uid,
+    enabled: !!user?.uid && activeTab === "areas",
   });
 
-  // 전체 프로젝트 개수 가져오기 (DB에서 실제 개수)
+  // 전체 프로젝트 개수 가져오기 (DB에서 실제 개수) - 필요시에만 사용
+  // 현재는 사용되지 않으므로 비활성화
   const { data: totalProjectCount = 0, isLoading: totalProjectCountLoading } =
     useQuery({
       queryKey: ["totalProjectCount", user?.uid],
@@ -159,10 +159,11 @@ function ParaPageContent() {
 
         return count;
       },
-      enabled: !!user?.uid,
+      enabled: false, // 사용되지 않으므로 비활성화
     });
 
-  // 전체 리소스 개수 가져오기 (DB에서 실제 개수)
+  // 전체 리소스 개수 가져오기 (DB에서 실제 개수) - 필요시에만 사용
+  // 현재는 사용되지 않으므로 비활성화
   const { data: totalResourceCount = 0, isLoading: totalResourceCountLoading } =
     useQuery({
       queryKey: ["totalResourceCount", user?.uid],
@@ -171,10 +172,11 @@ function ParaPageContent() {
 
         return count;
       },
-      enabled: !!user?.uid,
+      enabled: false, // 사용되지 않으므로 비활성화
     });
 
-  // 전체 아카이브 개수 가져오기 (DB에서 실제 개수)
+  // 전체 아카이브 개수 가져오기 (DB에서 실제 개수) - 필요시에만 사용
+  // 현재는 사용되지 않으므로 비활성화
   const { data: totalArchiveCount = 0, isLoading: totalArchiveCountLoading } =
     useQuery({
       queryKey: ["totalArchiveCount", user?.uid],
@@ -183,10 +185,10 @@ function ParaPageContent() {
 
         return count;
       },
-      enabled: !!user?.uid,
+      enabled: false, // 사용되지 않으므로 비활성화
     });
 
-  // 프로젝트 무한 쿼리
+  // 프로젝트 무한 쿼리 - projects 탭이 활성화되었을 때만 로드
   const {
     data: projectsData,
     fetchNextPage: fetchNextProjects,
@@ -203,13 +205,13 @@ function ParaPageContent() {
         pageParam?.lastDoc,
         projectSortBy
       ),
-    enabled: !!user?.uid,
+    enabled: !!user?.uid && activeTab === "projects",
     getNextPageParam: (lastPage) =>
       lastPage.hasMore ? { lastDoc: lastPage.lastDoc } : undefined,
     initialPageParam: { lastDoc: undefined },
   });
 
-  // 리소스 무한 쿼리
+  // 리소스 무한 쿼리 - resources 탭이 활성화되었을 때만 로드
   const {
     data: resourcesData,
     fetchNextPage: fetchNextResources,
@@ -226,7 +228,7 @@ function ParaPageContent() {
         pageParam?.lastDoc,
         resourceSortBy
       ),
-    enabled: !!user?.uid,
+    enabled: !!user?.uid && activeTab === "resources",
     getNextPageParam: (lastPage) =>
       lastPage.hasMore ? { lastDoc: lastPage.lastDoc } : undefined,
     initialPageParam: { lastDoc: undefined },
@@ -251,30 +253,16 @@ function ParaPageContent() {
   const allResources =
     resourcesData?.pages.flatMap((page) => page.resources) || [];
 
-  // 프로젝트별 태스크 개수 가져오기 (배치 최적화)
-  const { data: projectTaskCounts = {}, isLoading: taskCountsLoading } =
-    useQuery({
-      queryKey: ["projectTaskCounts", user?.uid, allProjects.length],
-      queryFn: async () => {
-        if (!user?.uid || allProjects.length === 0) return {};
-        const projectIds = allProjects.map((project) => project.id);
-        try {
-          return await getTaskCountsForMultipleProjects(projectIds);
-        } catch (error) {
-          console.error("Failed to get batch task counts:", error);
-          return {};
-        }
-      },
-      enabled: !!user?.uid && allProjects.length > 0,
-    });
+  // 프로젝트별 태스크 개수는 이제 프로젝트 데이터에 denormalized 필드로 포함되어 있음
+  // 별도 쿼리 불필요 - project.taskCounts 사용
 
-  // 로딩 상태 - 프로젝트와 태스크 개수가 모두 로드될 때까지 스켈레톤 표시
-  if (
-    userLoading ||
-    areasLoading ||
-    areaCountsLoading ||
-    (allProjects.length > 0 && taskCountsLoading)
-  ) {
+  // 로딩 상태 - 활성 탭의 데이터가 로드될 때까지 스켈레톤 표시
+  const isTabLoading =
+    (activeTab === "projects" && projectsLoading) ||
+    (activeTab === "areas" && (areasLoading || areaCountsLoading)) ||
+    (activeTab === "resources" && resourcesLoading);
+
+  if (userLoading || isTabLoading) {
     return (
       <div className="container max-w-md px-4 py-6 pb-20">
         <div className="mb-6">
@@ -467,8 +455,7 @@ function ParaPageContent() {
           </div>
 
           <div className="space-y-4">
-            {projectsLoading ||
-            (allProjects.length > 0 && taskCountsLoading) ? (
+            {projectsLoading ? (
               <div className="space-y-4">
                 <Skeleton className="h-32 w-full" />
                 <Skeleton className="h-32 w-full" />
@@ -497,17 +484,20 @@ function ParaPageContent() {
             ) : (
               <>
                 {filteredProjects.map((project) => {
-                  const taskCounts = projectTaskCounts[project.id];
+                  // 프로젝트 데이터에 denormalized taskCounts가 포함되어 있음
+                  const taskCounts = project.taskCounts
+                    ? {
+                        totalTasks: project.taskCounts.total || 0,
+                        completedTasks: project.taskCounts.completed || 0,
+                      }
+                    : undefined; // ProjectCard가 fallback으로 project.completedTasks 사용
 
                   return (
                     <ProjectCard
                       key={project.id}
                       project={project}
                       mode="project"
-                      taskCounts={{
-                        totalTasks: taskCounts?.total || 0,
-                        completedTasks: taskCounts?.completed || 0,
-                      }}
+                      taskCounts={taskCounts}
                       onClick={() =>
                         router.push(`/para/projects/${project.id}`)
                       }

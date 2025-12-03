@@ -11,6 +11,7 @@ import {
   deleteDoc,
   orderBy,
   Timestamp,
+  runTransaction,
 } from "firebase/firestore";
 import { db } from "./config";
 import {
@@ -24,6 +25,120 @@ import {
   fetchProjectsByMonthlyId,
 } from "./monthlies";
 import { getMonthlyStatus } from "../utils";
+
+// 프로젝트의 태스크 통계를 증분 방식으로 업데이트하는 헬퍼 함수 (트랜잭션 내 사용)
+const updateProjectTaskCountsIncrement = (
+  transaction: any,
+  projectRef: any,
+  projectData: any,
+  operation: "create" | "delete" | "toggle",
+  taskDone: boolean,
+  taskDuration: number = 0,
+  oldTaskDone?: boolean
+): void => {
+  const currentCounts = projectData.taskCounts || {
+    total: 0,
+    completed: 0,
+    pending: 0,
+  };
+  const currentTimeStats = projectData.timeStats || {
+    completedTime: 0,
+    remainingTime: 0,
+  };
+
+  let newTotal = currentCounts.total;
+  let newCompleted = currentCounts.completed;
+  let newPending = currentCounts.pending;
+  let newCompletedTime = currentTimeStats.completedTime;
+  let newRemainingTime = currentTimeStats.remainingTime;
+
+  if (operation === "create") {
+    newTotal += 1;
+    if (taskDone) {
+      newCompleted += 1;
+      newCompletedTime += taskDuration;
+    } else {
+      newPending += 1;
+      newRemainingTime += taskDuration;
+    }
+  } else if (operation === "delete") {
+    newTotal -= 1;
+    if (taskDone) {
+      newCompleted -= 1;
+      newCompletedTime -= taskDuration;
+    } else {
+      newPending -= 1;
+      newRemainingTime -= taskDuration;
+    }
+  } else if (operation === "toggle") {
+    // oldTaskDone에서 newTaskDone으로 변경
+    if (oldTaskDone === false && taskDone === true) {
+      // 미완료 -> 완료
+      newCompleted += 1;
+      newPending -= 1;
+      newCompletedTime += taskDuration;
+      newRemainingTime -= taskDuration;
+    } else if (oldTaskDone === true && taskDone === false) {
+      // 완료 -> 미완료
+      newCompleted -= 1;
+      newPending += 1;
+      newCompletedTime -= taskDuration;
+      newRemainingTime += taskDuration;
+    }
+  }
+
+  transaction.update(projectRef, {
+    taskCounts: {
+      total: Math.max(0, newTotal),
+      completed: Math.max(0, newCompleted),
+      pending: Math.max(0, newPending),
+    },
+    timeStats: {
+      completedTime: Math.max(0, newCompletedTime),
+      remainingTime: Math.max(0, newRemainingTime),
+    },
+    updatedAt: updateTimestamp(),
+  });
+};
+
+// 프로젝트의 태스크 통계를 재계산하여 업데이트하는 함수 (트랜잭션 외부 사용)
+export const recalculateProjectTaskCounts = async (
+  projectId: string
+): Promise<void> => {
+  try {
+    const tasksQuery = query(collection(db, "projects", projectId, "tasks"));
+    const tasksSnapshot = await getDocs(tasksQuery);
+
+    const tasks = tasksSnapshot.docs.map((doc) => doc.data());
+    const total = tasks.length;
+    const completed = tasks.filter((task) => task.done).length;
+    const pending = total - completed;
+
+    const completedTime = tasks
+      .filter((task) => task.done && task.duration)
+      .reduce((sum, task) => sum + (task.duration || 0), 0);
+
+    const remainingTime = tasks
+      .filter((task) => !task.done && task.duration)
+      .reduce((sum, task) => sum + (task.duration || 0), 0);
+
+    const projectRef = doc(db, "projects", projectId);
+    await updateDoc(projectRef, {
+      taskCounts: {
+        total,
+        completed,
+        pending,
+      },
+      timeStats: {
+        completedTime,
+        remainingTime,
+      },
+      updatedAt: updateTimestamp(),
+    });
+  } catch (error) {
+    console.error(`프로젝트 ${projectId}의 태스크 통계 재계산 실패:`, error);
+  }
+};
 
 // Tasks
 export const fetchAllTasksByUserId = async (
@@ -127,30 +242,70 @@ export const getTaskCountsForMultipleProjects = async (
     return {};
   }
 
-  const results: Record<
+  // 프로젝트 문서에서 denormalized taskCounts 가져오기 (서브컬렉션 조회 불필요)
+  const projectRefs = projectIds.map((id) => doc(db, "projects", id));
+  const projectSnaps = await Promise.all(projectRefs.map((ref) => getDoc(ref)));
+
+  const resultMap: Record<
     string,
     { total: number; completed: number; pending: number }
   > = {};
 
-  // 각 프로젝트의 서브컬렉션에서 태스크 조회
-  for (const projectId of projectIds) {
-    try {
-      const q = query(collection(db, "projects", projectId, "tasks"));
-      const querySnapshot = await getDocs(q);
+  // denormalized 필드가 없는 프로젝트들을 수집하여 fallback 계산
+  const projectsNeedingCalculation: string[] = [];
 
-      const tasks = querySnapshot.docs.map((doc) => doc.data());
-      const total = tasks.length;
-      const completed = tasks.filter((task) => task.done).length;
-      const pending = total - completed;
-
-      results[projectId] = { total, completed, pending };
-    } catch (error) {
-      console.error(`프로젝트 ${projectId}의 태스크 카운트 조회 실패:`, error);
-      results[projectId] = { total: 0, completed: 0, pending: 0 };
+  projectSnaps.forEach((projectSnap, index) => {
+    const projectId = projectIds[index];
+    if (projectSnap.exists()) {
+      const projectData = projectSnap.data();
+      const taskCounts = projectData.taskCounts;
+      if (taskCounts) {
+        // denormalized 필드 사용
+        resultMap[projectId] = {
+          total: taskCounts.total || 0,
+          completed: taskCounts.completed || 0,
+          pending: taskCounts.pending || 0,
+        };
+      } else {
+        // denormalized 필드가 없는 경우 fallback 계산 필요
+        projectsNeedingCalculation.push(projectId);
+      }
+    } else {
+      resultMap[projectId] = { total: 0, completed: 0, pending: 0 };
     }
+  });
+
+  // denormalized 필드가 없는 프로젝트들은 서브컬렉션에서 계산 (하위호환성)
+  if (projectsNeedingCalculation.length > 0) {
+    const fallbackCounts = await Promise.all(
+      projectsNeedingCalculation.map(async (projectId) => {
+        try {
+          const q = query(collection(db, "projects", projectId, "tasks"));
+          const querySnapshot = await getDocs(q);
+          const tasks = querySnapshot.docs.map((doc) => doc.data());
+          const total = tasks.length;
+          const completed = tasks.filter((task) => task.done).length;
+          const pending = total - completed;
+          return { projectId, counts: { total, completed, pending } };
+        } catch (error) {
+          console.error(
+            `프로젝트 ${projectId}의 태스크 카운트 조회 실패:`,
+            error
+          );
+          return {
+            projectId,
+            counts: { total: 0, completed: 0, pending: 0 },
+          };
+        }
+      })
+    );
+
+    fallbackCounts.forEach(({ projectId, counts }) => {
+      resultMap[projectId] = counts;
+    });
   }
 
-  return results;
+  return resultMap;
 };
 
 export const getTaskTimeStatsByProjectId = async (
@@ -223,17 +378,39 @@ export const createTask = async (
       ...baseData,
     };
 
-    // 서브컬렉션에 저장
-    const subcollectionRef = collection(
-      db,
-      "projects",
-      taskData.projectId,
-      "tasks"
-    );
-    const docRef = await addDoc(subcollectionRef, newTask);
+    // 트랜잭션으로 태스크 생성과 프로젝트 통계 업데이트를 함께 처리
+    const result = await runTransaction(db, async (transaction) => {
+      const projectRef = doc(db, "projects", taskData.projectId);
+      const projectSnap = await transaction.get(projectRef);
+
+      if (!projectSnap.exists()) {
+        throw new Error("프로젝트를 찾을 수 없습니다.");
+      }
+
+      const subcollectionRef = collection(
+        db,
+        "projects",
+        taskData.projectId,
+        "tasks"
+      );
+      const docRef = doc(subcollectionRef);
+      transaction.set(docRef, newTask);
+
+      // 프로젝트의 태스크 통계 증분 업데이트
+      updateProjectTaskCountsIncrement(
+        transaction,
+        projectRef,
+        projectSnap.data(),
+        "create",
+        taskData.done || false,
+        taskData.duration || 0
+      );
+
+      return docRef.id;
+    });
 
     return {
-      id: docRef.id,
+      id: result,
       userId: taskData.userId,
       projectId: taskData.projectId,
       title: taskData.title,
@@ -295,12 +472,34 @@ export const addTaskToProject = async (
       ...baseData,
     };
 
-    // 서브컬렉션에 저장
-    const subcollectionRef = collection(db, "projects", projectId, "tasks");
-    const docRef = await addDoc(subcollectionRef, newTask);
+    // 트랜잭션으로 태스크 생성과 프로젝트 통계 업데이트를 함께 처리
+    const result = await runTransaction(db, async (transaction) => {
+      const projectRef = doc(db, "projects", projectId);
+      const projectSnap = await transaction.get(projectRef);
+
+      if (!projectSnap.exists()) {
+        throw new Error("프로젝트를 찾을 수 없습니다.");
+      }
+
+      const subcollectionRef = collection(db, "projects", projectId, "tasks");
+      const docRef = doc(subcollectionRef);
+      transaction.set(docRef, newTask);
+
+      // 프로젝트의 태스크 통계 증분 업데이트
+      updateProjectTaskCountsIncrement(
+        transaction,
+        projectRef,
+        projectSnap.data(),
+        "create",
+        taskData.done || false,
+        taskData.duration || 0
+      );
+
+      return docRef.id;
+    });
 
     return {
-      id: docRef.id,
+      id: result,
       userId: taskData.userId,
       projectId,
       title: taskData.title,
@@ -349,8 +548,36 @@ export const deleteTaskFromProject = async (
   taskId: string
 ): Promise<void> => {
   try {
-    // 서브컬렉션에서 삭제
-    await deleteDoc(doc(db, "projects", projectId, "tasks", taskId));
+    // 트랜잭션으로 태스크 삭제와 프로젝트 통계 업데이트를 함께 처리
+    await runTransaction(db, async (transaction) => {
+      const taskRef = doc(db, "projects", projectId, "tasks", taskId);
+      const taskSnap = await transaction.get(taskRef);
+
+      if (!taskSnap.exists()) {
+        throw new Error("태스크를 찾을 수 없습니다.");
+      }
+
+      const taskData = taskSnap.data();
+      const projectRef = doc(db, "projects", projectId);
+      const projectSnap = await transaction.get(projectRef);
+
+      if (!projectSnap.exists()) {
+        throw new Error("프로젝트를 찾을 수 없습니다.");
+      }
+
+      // 태스크 삭제
+      transaction.delete(taskRef);
+
+      // 프로젝트의 태스크 통계 증분 업데이트
+      updateProjectTaskCountsIncrement(
+        transaction,
+        projectRef,
+        projectSnap.data(),
+        "delete",
+        taskData.done || false,
+        taskData.duration || 0
+      );
+    });
   } catch (error) {
     console.error(
       `❌ 서브컬렉션 태스크 삭제 실패 - Project: ${projectId}, Task: ${taskId}`,
@@ -401,29 +628,127 @@ export const toggleTaskCompletionInSubcollection = async (
   taskId: string
 ): Promise<void> => {
   try {
-    const taskRef = doc(db, "projects", projectId, "tasks", taskId);
-    const taskSnap = await getDoc(taskRef);
+    // 트랜잭션으로 태스크 완료 토글과 프로젝트 통계 업데이트를 함께 처리
+    await runTransaction(db, async (transaction) => {
+      const taskRef = doc(db, "projects", projectId, "tasks", taskId);
+      const taskSnap = await transaction.get(taskRef);
 
-    if (!taskSnap.exists()) {
-      throw new Error("Task not found");
+      if (!taskSnap.exists()) {
+        throw new Error("Task not found");
+      }
+
+      const taskData = taskSnap.data();
+      const oldDone = taskData.done || false;
+      const newDone = !oldDone;
+
+      const updateData: any = {
+        done: newDone,
+        updatedAt: updateTimestamp(),
+      };
+
+      // 완료 상태가 true로 변경되면 completedAt 설정, false로 변경되면 제거
+      if (newDone) {
+        updateData.completedAt = updateTimestamp();
+      } else {
+        updateData.completedAt = null;
+      }
+
+      transaction.update(taskRef, updateData);
+
+      // 프로젝트의 태스크 통계 업데이트
+      const projectRef = doc(db, "projects", projectId);
+      const projectSnap = await transaction.get(projectRef);
+
+      if (!projectSnap.exists()) {
+        throw new Error("프로젝트를 찾을 수 없습니다.");
+      }
+
+      updateProjectTaskCountsIncrement(
+        transaction,
+        projectRef,
+        projectSnap.data(),
+        "toggle",
+        newDone,
+        taskData.duration || 0,
+        oldDone
+      );
+    });
+
+    // 트랜잭션 후 프로젝트의 currentMonthlyProgress 업데이트
+    // 태스크 완료 상태 변경 정보를 가져오기 위해 다시 조회
+    const taskRefAfter = doc(db, "projects", projectId, "tasks", taskId);
+    const taskSnapAfter = await getDoc(taskRefAfter);
+    if (!taskSnapAfter.exists()) {
+      return;
     }
 
-    const taskData = taskSnap.data();
-    const newDone = !taskData.done;
+    const taskDataAfter = taskSnapAfter.data();
+    const newDone = taskDataAfter.done || false;
+    const oldDone = !newDone; // 토글이므로 반대
 
-    const updateData: any = {
-      done: newDone,
-      updatedAt: updateTimestamp(),
-    };
+    const projectRef = doc(db, "projects", projectId);
+    const projectSnap = await getDoc(projectRef);
+    if (projectSnap.exists()) {
+      const projectData = projectSnap.data();
+      const currentMonthlyProgress = projectData.currentMonthlyProgress;
 
-    // 완료 상태가 true로 변경되면 completedAt 설정, false로 변경되면 제거
-    if (newDone) {
-      updateData.completedAt = updateTimestamp();
-    } else {
-      updateData.completedAt = null;
+      if (currentMonthlyProgress && currentMonthlyProgress.monthlyId) {
+        // Monthly의 connectedProjects에서 monthlyDoneCount 업데이트
+        const monthlyRef = doc(
+          db,
+          "monthlies",
+          currentMonthlyProgress.monthlyId
+        );
+        const monthlySnap = await getDoc(monthlyRef);
+        if (monthlySnap.exists()) {
+          const monthlyData = monthlySnap.data();
+          const connectedProjects = monthlyData.connectedProjects || [];
+          const projectConnectionIndex = connectedProjects.findIndex(
+            (cp: any) =>
+              (typeof cp === "string" ? cp : cp.projectId) === projectId
+          );
+
+          if (projectConnectionIndex !== -1) {
+            const projectConnection = connectedProjects[projectConnectionIndex];
+            // 완료되면 +1, 완료 취소하면 -1
+            const delta = newDone ? 1 : -1;
+            const newMonthlyDoneCount = Math.max(
+              0,
+              (projectConnection.monthlyDoneCount || 0) + delta
+            );
+
+            // Monthly의 connectedProjects 업데이트
+            const updatedConnectedProjects = [...connectedProjects];
+            updatedConnectedProjects[projectConnectionIndex] = {
+              ...projectConnection,
+              monthlyDoneCount: newMonthlyDoneCount,
+            };
+
+            await updateDoc(monthlyRef, {
+              connectedProjects: updatedConnectedProjects,
+              updatedAt: updateTimestamp(),
+            });
+
+            // 프로젝트의 currentMonthlyProgress도 업데이트
+            const progressRate =
+              currentMonthlyProgress.monthlyTargetCount > 0
+                ? (newMonthlyDoneCount /
+                    currentMonthlyProgress.monthlyTargetCount) *
+                  100
+                : 0;
+
+            await updateDoc(projectRef, {
+              currentMonthlyProgress: {
+                ...currentMonthlyProgress,
+                monthlyDoneCount: newMonthlyDoneCount,
+                progressRate,
+              },
+              updatedAt: updateTimestamp(),
+            });
+          }
+        }
+      }
     }
-
-    await updateDoc(taskRef, updateData);
   } catch (error) {
     console.error(
       `❌ Task completion toggle in subcollection failed - Project: ${projectId}, Task: ${taskId}`,

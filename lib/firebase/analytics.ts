@@ -363,17 +363,12 @@ export const fetchProjectsByUserIdWithPaging = async (
     }
 
     const querySnapshot = await getDocs(q);
-    const projects = querySnapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        startDate: data.startDate.toDate(),
-        endDate: data.endDate.toDate(),
-        createdAt: data.createdAt.toDate(),
-        updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-      } as any;
-    });
+
+    // mapProjectData를 사용하여 denormalized 필드 포함
+    const { mapProjectData } = await import("./projects");
+    const projects = querySnapshot.docs.map((doc) =>
+      mapProjectData(doc as any)
+    );
 
     const lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1];
     const hasMore = querySnapshot.docs.length === pageSize;
@@ -524,8 +519,7 @@ export const fetchAreaCountsByUserId = async (
   userId: string
 ): Promise<Record<string, { projectCount: number; resourceCount: number }>> => {
   try {
-    // status 필터 제거: 기존 데이터에 status 필드가 없을 수 있음
-    // 필요시 클라이언트 측에서 status로 필터링
+    // Area 문서에서 denormalized counts 가져오기 (추가 쿼리 불필요)
     const q = query(collection(db, "areas"), where("userId", "==", userId));
     const querySnapshot = await getDocs(q);
 
@@ -534,30 +528,64 @@ export const fetchAreaCountsByUserId = async (
       { projectCount: number; resourceCount: number }
     > = {};
 
-    // 각 영역별 프로젝트와 리소스 수 계산
+    // denormalized 필드가 없는 Area들을 수집하여 fallback 계산
+    const areasNeedingCalculation: Array<{ areaId: string; userId: string }> =
+      [];
+
     for (const areaDoc of querySnapshot.docs) {
       const areaId = areaDoc.id;
+      const areaData = areaDoc.data();
+      const counts = areaData.counts;
 
-      // 프로젝트 수 계산
-      const projectsQuery = query(
-        collection(db, "projects"),
-        where("userId", "==", userId),
-        where("areaId", "==", areaId)
+      if (counts) {
+        // denormalized 필드 사용
+        areaCounts[areaId] = {
+          projectCount: counts.projectCount || 0,
+          resourceCount: counts.resourceCount || 0,
+        };
+      } else {
+        // denormalized 필드가 없는 경우 fallback 계산 필요
+        areasNeedingCalculation.push({
+          areaId,
+          userId: areaData.userId,
+        });
+      }
+    }
+
+    // denormalized 필드가 없는 Area들은 실제 쿼리로 계산 (하위호환성)
+    if (areasNeedingCalculation.length > 0) {
+      await Promise.all(
+        areasNeedingCalculation.map(async ({ areaId, userId }) => {
+          try {
+            // 프로젝트 수 계산
+            const projectsQuery = query(
+              collection(db, "projects"),
+              where("userId", "==", userId),
+              where("areaId", "==", areaId)
+            );
+            const projectsSnapshot = await getDocs(projectsQuery);
+
+            // 리소스 수 계산
+            const resourcesQuery = query(
+              collection(db, "resources"),
+              where("userId", "==", userId),
+              where("areaId", "==", areaId)
+            );
+            const resourcesSnapshot = await getDocs(resourcesQuery);
+
+            areaCounts[areaId] = {
+              projectCount: projectsSnapshot.size,
+              resourceCount: resourcesSnapshot.size,
+            };
+          } catch (error) {
+            console.error(`Area ${areaId} 카운트 계산 실패:`, error);
+            areaCounts[areaId] = {
+              projectCount: 0,
+              resourceCount: 0,
+            };
+          }
+        })
       );
-      const projectsSnapshot = await getDocs(projectsQuery);
-
-      // 리소스 수 계산
-      const resourcesQuery = query(
-        collection(db, "resources"),
-        where("userId", "==", userId),
-        where("areaId", "==", areaId)
-      );
-      const resourcesSnapshot = await getDocs(resourcesQuery);
-
-      areaCounts[areaId] = {
-        projectCount: projectsSnapshot.size,
-        resourceCount: resourcesSnapshot.size,
-      };
     }
 
     return areaCounts;
@@ -638,7 +666,8 @@ export const fetchArchivesByUserIdWithPaging = async (
 
     const archivesSnapshot = await getDocs(archivesQuery);
 
-    // 각 아카이브에 대해 해당하는 먼슬리/프로젝트 정보도 가져오기
+    // denormalized 필드에서 parent 정보 가져오기
+    // denormalized 필드가 없는 경우 fallback으로 parent 문서 조회
     const archives = await Promise.all(
       archivesSnapshot.docs.map(async (archiveDoc) => {
         const archiveData = archiveDoc.data();
@@ -648,58 +677,113 @@ export const fetchArchivesByUserIdWithPaging = async (
           archiveData.type === "monthly_retrospective" ||
           archiveData.type === "monthly_note"
         ) {
-          const monthlyRef = docRef(db, "monthlies", archiveData.parentId);
-          const monthlySnap = await getDoc(monthlyRef);
-
-          if (!monthlySnap.exists()) {
+          // denormalized 필드가 있으면 사용
+          if (archiveData.parentTitle) {
+            return {
+              id: archiveDoc.id,
+              type:
+                archiveData.type === "monthly_retrospective"
+                  ? "monthly"
+                  : "note",
+              title: archiveData.parentTitle,
+              summary: archiveData.content || "",
+              userRating: archiveData.userRating || 0,
+              bookmarked: archiveData.bookmarked || false,
+              monthlyId: archiveData.parentId,
+              startDate: archiveData.parentStartDate?.toDate(),
+              endDate: archiveData.parentEndDate?.toDate(),
+              createdAt: archiveData.createdAt.toDate(),
+              updatedAt: archiveData.updatedAt.toDate(),
+            } as any;
+          } else {
+            // fallback: Monthly 문서 조회 (하위호환성)
+            try {
+              const monthlyRef = docRef(db, "monthlies", archiveData.parentId);
+              const monthlySnap = await getDoc(monthlyRef);
+              if (monthlySnap.exists()) {
+                const monthlyData = monthlySnap.data();
+                return {
+                  id: archiveDoc.id,
+                  type:
+                    archiveData.type === "monthly_retrospective"
+                      ? "monthly"
+                      : "note",
+                  title:
+                    monthlyData.objective || monthlyData.objectiveDescription,
+                  summary: archiveData.content || "",
+                  userRating: archiveData.userRating || 0,
+                  bookmarked: archiveData.bookmarked || false,
+                  monthlyId: archiveData.parentId,
+                  startDate: monthlyData.startDate.toDate(),
+                  endDate: monthlyData.endDate.toDate(),
+                  createdAt: archiveData.createdAt.toDate(),
+                  updatedAt: archiveData.updatedAt.toDate(),
+                } as any;
+              }
+            } catch (error) {
+              console.error(
+                `Monthly ${archiveData.parentId} 조회 실패:`,
+                error
+              );
+            }
             return null;
           }
-
-          const monthlyData = monthlySnap.data();
-
-          return {
-            id: archiveDoc.id,
-            type:
-              archiveData.type === "monthly_retrospective" ? "monthly" : "note",
-            title: monthlyData.objective || monthlyData.objectiveDescription,
-            summary: archiveData.content || "",
-            userRating: archiveData.userRating || 0,
-            bookmarked: archiveData.bookmarked || false,
-            monthlyId: archiveData.parentId,
-            startDate: monthlyData.startDate.toDate(),
-            endDate: monthlyData.endDate.toDate(),
-            createdAt: archiveData.createdAt.toDate(),
-            updatedAt: archiveData.updatedAt.toDate(),
-          } as any;
         }
         // 프로젝트 관련 아카이브인 경우
         else if (
           archiveData.type === "project_retrospective" ||
           archiveData.type === "project_note"
         ) {
-          const projectRef = docRef(db, "projects", archiveData.parentId);
-          const projectSnap = await getDoc(projectRef);
-
-          if (!projectSnap.exists()) {
+          // denormalized 필드가 있으면 사용
+          if (archiveData.parentTitle) {
+            return {
+              id: archiveDoc.id,
+              type:
+                archiveData.type === "project_retrospective"
+                  ? "project"
+                  : "note",
+              title: archiveData.parentTitle,
+              summary: archiveData.content || "",
+              userRating: archiveData.userRating || 0,
+              bookmarked: archiveData.bookmarked || false,
+              projectId: archiveData.parentId,
+              startDate: archiveData.parentStartDate?.toDate(),
+              endDate: archiveData.parentEndDate?.toDate(),
+              createdAt: archiveData.createdAt.toDate(),
+              updatedAt: archiveData.updatedAt.toDate(),
+            } as any;
+          } else {
+            // fallback: Project 문서 조회 (하위호환성)
+            try {
+              const projectRef = docRef(db, "projects", archiveData.parentId);
+              const projectSnap = await getDoc(projectRef);
+              if (projectSnap.exists()) {
+                const projectData = projectSnap.data();
+                return {
+                  id: archiveDoc.id,
+                  type:
+                    archiveData.type === "project_retrospective"
+                      ? "project"
+                      : "note",
+                  title: projectData.title || "",
+                  summary: archiveData.content || "",
+                  userRating: archiveData.userRating || 0,
+                  bookmarked: archiveData.bookmarked || false,
+                  projectId: archiveData.parentId,
+                  startDate: projectData.startDate.toDate(),
+                  endDate: projectData.endDate.toDate(),
+                  createdAt: archiveData.createdAt.toDate(),
+                  updatedAt: archiveData.updatedAt.toDate(),
+                } as any;
+              }
+            } catch (error) {
+              console.error(
+                `Project ${archiveData.parentId} 조회 실패:`,
+                error
+              );
+            }
             return null;
           }
-
-          const projectData = projectSnap.data();
-
-          return {
-            id: archiveDoc.id,
-            type:
-              archiveData.type === "project_retrospective" ? "project" : "note",
-            title: projectData.title || "",
-            summary: archiveData.content || "",
-            userRating: archiveData.userRating || 0,
-            bookmarked: archiveData.bookmarked || false,
-            projectId: archiveData.parentId,
-            startDate: projectData.startDate.toDate(),
-            endDate: projectData.endDate.toDate(),
-            createdAt: archiveData.createdAt.toDate(),
-            updatedAt: archiveData.updatedAt.toDate(),
-          } as any;
         }
 
         return null;

@@ -76,8 +76,13 @@ export const fetchUnifiedArchivesWithPaging = async (
         userId: data.userId,
         type: data.type,
         parentId: data.parentId,
+        parentType: data.parentType,
         title: data.title,
         content: data.content,
+        parentTitle: data.parentTitle,
+        parentStartDate: data.parentStartDate?.toDate(),
+        parentEndDate: data.parentEndDate?.toDate(),
+        parentAreaName: data.parentAreaName,
         createdAt: data.createdAt.toDate(),
         updatedAt: data.updatedAt.toDate(),
         userRating: data.userRating,
@@ -86,6 +91,7 @@ export const fetchUnifiedArchivesWithPaging = async (
         routineAdherence: data.routineAdherence,
         unexpectedObstacles: data.unexpectedObstacles,
         nextMonthlyApplication: data.nextMonthlyApplication,
+        keyResultsReview: data.keyResultsReview,
         goalAchieved: data.goalAchieved,
         memorableTask: data.memorableTask,
         stuckPoints: data.stuckPoints,
@@ -157,8 +163,39 @@ export const createUnifiedArchive = async (
   archiveData: Omit<UnifiedArchive, "id" | "createdAt" | "updatedAt">
 ): Promise<UnifiedArchive> => {
   try {
+    // Parent 정보 denormalize
+    let parentTitle: string | undefined;
+    let parentStartDate: Date | undefined;
+    let parentEndDate: Date | undefined;
+    let parentAreaName: string | undefined;
+
+    if (archiveData.parentType === "monthly") {
+      const monthlyRef = doc(db, "monthlies", archiveData.parentId);
+      const monthlySnap = await getDoc(monthlyRef);
+      if (monthlySnap.exists()) {
+        const monthlyData = monthlySnap.data();
+        parentTitle = monthlyData.objective || monthlyData.objectiveDescription;
+        parentStartDate = monthlyData.startDate?.toDate();
+        parentEndDate = monthlyData.endDate?.toDate();
+      }
+    } else if (archiveData.parentType === "project") {
+      const projectRef = doc(db, "projects", archiveData.parentId);
+      const projectSnap = await getDoc(projectRef);
+      if (projectSnap.exists()) {
+        const projectData = projectSnap.data();
+        parentTitle = projectData.title;
+        parentStartDate = projectData.startDate?.toDate();
+        parentEndDate = projectData.endDate?.toDate();
+        parentAreaName = projectData.area;
+      }
+    }
+
     const newArchive = {
       ...archiveData,
+      parentTitle,
+      parentStartDate,
+      parentEndDate,
+      parentAreaName,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -223,8 +260,13 @@ export const fetchUnifiedArchiveById = async (
         userId: data.userId,
         type: data.type,
         parentId: data.parentId,
+        parentType: data.parentType,
         title: data.title,
         content: data.content,
+        parentTitle: data.parentTitle,
+        parentStartDate: data.parentStartDate?.toDate(),
+        parentEndDate: data.parentEndDate?.toDate(),
+        parentAreaName: data.parentAreaName,
         createdAt: data.createdAt.toDate(),
         updatedAt: data.updatedAt.toDate(),
         userRating: data.userRating,
@@ -288,8 +330,13 @@ export const fetchSingleArchive = async (
       userId: data.userId,
       type: data.type,
       parentId: data.parentId,
+      parentType: data.parentType,
       title: data.title,
       content: data.content,
+      parentTitle: data.parentTitle,
+      parentStartDate: data.parentStartDate?.toDate(),
+      parentEndDate: data.parentEndDate?.toDate(),
+      parentAreaName: data.parentAreaName,
       createdAt: data.createdAt.toDate(),
       updatedAt: data.updatedAt.toDate(),
       userRating: data.userRating,
@@ -299,8 +346,6 @@ export const fetchSingleArchive = async (
       unexpectedObstacles: data.unexpectedObstacles,
       nextMonthlyApplication: data.nextMonthlyApplication,
       keyResultsReview: data.keyResultsReview,
-      completedKeyResults: data.completedKeyResults,
-      failedKeyResults: data.failedKeyResults,
       goalAchieved: data.goalAchieved,
       memorableTask: data.memorableTask,
       stuckPoints: data.stuckPoints,

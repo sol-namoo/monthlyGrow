@@ -20,7 +20,48 @@ import {
   filterUndefinedValues,
 } from "./utils";
 import { formatDateForInput } from "../utils";
-import { Project } from "../types";
+import { Project, Monthly } from "../types";
+import { getMonthlyStatus } from "../utils";
+
+// 프로젝트 데이터 변환 헬퍼 함수 (denormalized 필드 포함)
+export const mapProjectData = (doc: any): Project => {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    userId: data.userId,
+    title: data.title,
+    description: data.description,
+    category: data.category,
+    areaId: data.areaId,
+    area: data.area,
+    completedTasks: data.completedTasks || 0,
+    startDate: data.startDate.toDate(),
+    endDate: data.endDate.toDate(),
+    createdAt: data.createdAt.toDate(),
+    updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+    connectedMonthlies: data.connectedMonthlies || [],
+    target: data.target,
+    targetCount: data.targetCount,
+    isCarriedOver: data.isCarriedOver,
+    originalMonthlyId: data.originalMonthlyId,
+    carriedOverAt: data.carriedOverAt ? data.carriedOverAt.toDate() : undefined,
+    migrationStatus: data.migrationStatus,
+    notes: data.notes || [],
+    taskCounts: data.taskCounts,
+    timeStats: data.timeStats,
+    currentMonthlyProgress: data.currentMonthlyProgress
+      ? {
+          ...data.currentMonthlyProgress,
+          progressRate:
+            data.currentMonthlyProgress.monthlyTargetCount > 0
+              ? (data.currentMonthlyProgress.monthlyDoneCount /
+                  data.currentMonthlyProgress.monthlyTargetCount) *
+                100
+              : 0,
+        }
+      : undefined,
+  } as Project;
+};
 
 // Projects
 export const fetchAllProjectsByUserId = async (
@@ -33,33 +74,7 @@ export const fetchAllProjectsByUserId = async (
   );
   const querySnapshot = await getDocs(q);
 
-  return querySnapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      userId: data.userId,
-      title: data.title,
-      description: data.description,
-      category: data.category,
-      areaId: data.areaId,
-      area: data.area,
-      completedTasks: data.completedTasks || 0,
-      startDate: data.startDate.toDate(),
-      endDate: data.endDate.toDate(),
-      createdAt: data.createdAt.toDate(),
-      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-      connectedMonthlies: data.connectedMonthlies || [],
-      target: data.target,
-      targetCount: data.targetCount,
-      isCarriedOver: data.isCarriedOver,
-      originalMonthlyId: data.originalMonthlyId,
-      carriedOverAt: data.carriedOverAt
-        ? data.carriedOverAt.toDate()
-        : undefined,
-      migrationStatus: data.migrationStatus,
-      notes: data.notes || [],
-    } as Project;
-  });
+  return querySnapshot.docs.map(mapProjectData);
 };
 
 export const fetchProjectsOverlappingWithMonthly = async (
@@ -74,33 +89,7 @@ export const fetchProjectsOverlappingWithMonthly = async (
     orderBy("endDate", "desc")
   );
   const querySnapshot = await getDocs(q);
-  const allProjects = querySnapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      userId: data.userId,
-      title: data.title,
-      description: data.description,
-      category: data.category,
-      areaId: data.areaId,
-      area: data.area,
-      completedTasks: data.completedTasks || 0,
-      startDate: data.startDate.toDate(),
-      endDate: data.endDate.toDate(),
-      createdAt: data.createdAt.toDate(),
-      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-      connectedMonthlies: data.connectedMonthlies || [],
-      target: data.target,
-      targetCount: data.targetCount,
-      isCarriedOver: data.isCarriedOver,
-      originalMonthlyId: data.originalMonthlyId,
-      carriedOverAt: data.carriedOverAt
-        ? data.carriedOverAt.toDate()
-        : undefined,
-      migrationStatus: data.migrationStatus,
-      notes: data.notes || [],
-    } as Project;
-  });
+  const allProjects = querySnapshot.docs.map(mapProjectData);
 
   // 먼슬리 기간과 겹치는 프로젝트만 필터링
 
@@ -137,33 +126,7 @@ export const fetchActiveProjectsByUserId = async (
     orderBy("endDate", "desc")
   );
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      userId: data.userId,
-      title: data.title,
-      description: data.description,
-      category: data.category,
-      areaId: data.areaId,
-      area: data.area,
-      completedTasks: data.completedTasks || 0,
-      startDate: data.startDate.toDate(),
-      endDate: data.endDate.toDate(),
-      createdAt: data.createdAt.toDate(),
-      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-      connectedMonthlies: data.connectedMonthlies || [],
-      target: data.target,
-      targetCount: data.targetCount,
-      isCarriedOver: data.isCarriedOver,
-      originalMonthlyId: data.originalMonthlyId,
-      carriedOverAt: data.carriedOverAt
-        ? data.carriedOverAt.toDate()
-        : undefined,
-      migrationStatus: data.migrationStatus,
-      notes: data.notes || [],
-    } as Project;
-  });
+  return querySnapshot.docs.map(mapProjectData);
 };
 
 export const fetchArchivedProjectsByUserId = async (
@@ -176,64 +139,14 @@ export const fetchArchivedProjectsByUserId = async (
     orderBy("endDate", "desc")
   );
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      userId: data.userId,
-      title: data.title,
-      description: data.description,
-      category: data.category,
-      areaId: data.areaId,
-      area: data.area,
-      completedTasks: data.completedTasks || 0,
-      startDate: data.startDate.toDate(),
-      endDate: data.endDate.toDate(),
-      createdAt: data.createdAt.toDate(),
-      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-      connectedMonthlies: data.connectedMonthlies || [],
-      target: data.target,
-      targetCount: data.targetCount,
-      isCarriedOver: data.isCarriedOver,
-      originalMonthlyId: data.originalMonthlyId,
-      carriedOverAt: data.carriedOverAt
-        ? data.carriedOverAt.toDate()
-        : undefined,
-      migrationStatus: data.migrationStatus,
-      notes: data.notes || [],
-    } as Project;
-  });
+  return querySnapshot.docs.map(mapProjectData);
 };
 
 export const fetchProjectById = async (projectId: string): Promise<Project> => {
   const docRef = doc(db, "projects", projectId);
   const docSnap = await getDoc(docRef);
   if (docSnap.exists()) {
-    const data = docSnap.data();
-    return {
-      id: docSnap.id,
-      userId: data.userId,
-      title: data.title,
-      description: data.description,
-      category: data.category,
-      areaId: data.areaId,
-      area: data.area,
-      completedTasks: data.completedTasks || 0,
-      startDate: data.startDate.toDate(),
-      endDate: data.endDate.toDate(),
-      createdAt: data.createdAt.toDate(),
-      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-      connectedMonthlies: data.connectedMonthlies || [],
-      target: data.target,
-      targetCount: data.targetCount,
-      isCarriedOver: data.isCarriedOver,
-      originalMonthlyId: data.originalMonthlyId,
-      carriedOverAt: data.carriedOverAt
-        ? data.carriedOverAt.toDate()
-        : undefined,
-      migrationStatus: data.migrationStatus,
-      notes: data.notes || [],
-    } as Project;
+    return mapProjectData(docSnap);
   } else {
     throw new Error("Project not found");
   }
@@ -252,34 +165,7 @@ export const fetchProjectsByAreaId = async (
       orderBy("endDate", "desc")
     );
     const querySnapshot = await getDocs(q);
-    const projects = querySnapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        userId: data.userId,
-        title: data.title,
-        description: data.description,
-        category: data.category,
-        areaId: data.areaId,
-        area: data.area,
-        completedTasks: data.completedTasks || 0,
-        startDate: data.startDate.toDate(),
-        endDate: data.endDate.toDate(),
-        createdAt: data.createdAt.toDate(),
-        updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-        connectedMonthlies: data.connectedMonthlies || [],
-        target: data.target,
-        targetCount: data.targetCount,
-        isCarriedOver: data.isCarriedOver,
-        originalMonthlyId: data.originalMonthlyId,
-        carriedOverAt: data.carriedOverAt
-          ? data.carriedOverAt.toDate()
-          : undefined,
-        migrationStatus: data.migrationStatus,
-        notes: data.notes || [],
-      } as Project;
-    });
-    return projects;
+    return querySnapshot.docs.map(mapProjectData);
   } catch (error: any) {
     // 인덱스 에러인 경우 orderBy 없이 재시도
     if (
@@ -296,33 +182,7 @@ export const fetchProjectsByAreaId = async (
         where("areaId", "==", areaId)
       );
       const querySnapshot = await getDocs(qWithoutOrderBy);
-      const projects = querySnapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          userId: data.userId,
-          title: data.title,
-          description: data.description,
-          category: data.category,
-          areaId: data.areaId,
-          area: data.area,
-          completedTasks: data.completedTasks || 0,
-          startDate: data.startDate.toDate(),
-          endDate: data.endDate.toDate(),
-          createdAt: data.createdAt.toDate(),
-          updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-          connectedMonthlies: data.connectedMonthlies || [],
-          target: data.target,
-          targetCount: data.targetCount,
-          isCarriedOver: data.isCarriedOver,
-          originalMonthlyId: data.originalMonthlyId,
-          carriedOverAt: data.carriedOverAt
-            ? data.carriedOverAt.toDate()
-            : undefined,
-          migrationStatus: data.migrationStatus,
-          notes: data.notes || [],
-        } as Project;
-      });
+      const projects = querySnapshot.docs.map(mapProjectData);
       // 클라이언트 측에서 endDate 기준으로 정렬
       return projects.sort((a, b) => {
         if (!a.endDate || !b.endDate) return 0;
@@ -344,33 +204,7 @@ export const fetchProjectsByMonthlyId = async (
     orderBy("endDate", "desc")
   );
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      userId: data.userId,
-      title: data.title,
-      description: data.description,
-      category: data.category,
-      areaId: data.areaId,
-      area: data.area,
-      completedTasks: data.completedTasks || 0,
-      startDate: data.startDate.toDate(),
-      endDate: data.endDate.toDate(),
-      createdAt: data.createdAt.toDate(),
-      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-      connectedMonthlies: data.connectedMonthlies || [],
-      target: data.target,
-      targetCount: data.targetCount,
-      isCarriedOver: data.isCarriedOver,
-      originalMonthlyId: data.originalMonthlyId,
-      carriedOverAt: data.carriedOverAt
-        ? data.carriedOverAt.toDate()
-        : undefined,
-      migrationStatus: data.migrationStatus,
-      notes: data.notes || [],
-    } as Project;
-  });
+  return querySnapshot.docs.map(mapProjectData);
 };
 
 export const fetchCurrentMonthlyProjects = async (
@@ -384,33 +218,7 @@ export const fetchCurrentMonthlyProjects = async (
     orderBy("endDate", "desc")
   );
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      userId: data.userId,
-      title: data.title,
-      description: data.description,
-      category: data.category,
-      areaId: data.areaId,
-      area: data.area,
-      completedTasks: data.completedTasks || 0,
-      startDate: data.startDate.toDate(),
-      endDate: data.endDate.toDate(),
-      createdAt: data.createdAt.toDate(),
-      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-      connectedMonthlies: data.connectedMonthlies || [],
-      target: data.target,
-      targetCount: data.targetCount,
-      isCarriedOver: data.isCarriedOver,
-      originalMonthlyId: data.originalMonthlyId,
-      carriedOverAt: data.carriedOverAt
-        ? data.carriedOverAt.toDate()
-        : undefined,
-      migrationStatus: data.migrationStatus,
-      notes: data.notes || [],
-    } as Project;
-  });
+  return querySnapshot.docs.map(mapProjectData);
 };
 
 export const createProject = async (
@@ -430,10 +238,37 @@ export const createProject = async (
       ...baseData,
     };
 
-    const docRef = await addDoc(collection(db, "projects"), newProject);
+    // 트랜잭션으로 프로젝트 생성과 Area counts 업데이트를 함께 처리
+    const result = await runTransaction(db, async (transaction) => {
+      const projectRef = doc(collection(db, "projects"));
+      transaction.set(projectRef, newProject);
+
+      // Area가 지정된 경우 Area의 projectCount 증가
+      if (projectData.areaId) {
+        const areaRef = doc(db, "areas", projectData.areaId);
+        const areaSnap = await transaction.get(areaRef);
+
+        if (areaSnap.exists()) {
+          const areaData = areaSnap.data();
+          const currentCounts = areaData.counts || {
+            projectCount: 0,
+            resourceCount: 0,
+          };
+          transaction.update(areaRef, {
+            counts: {
+              projectCount: currentCounts.projectCount + 1,
+              resourceCount: currentCounts.resourceCount,
+            },
+            updatedAt: updateTimestamp(),
+          });
+        }
+      }
+
+      return projectRef.id;
+    });
 
     return {
-      id: docRef.id,
+      id: result,
       userId: projectData.userId,
       title: projectData.title,
       description: projectData.description || "",
@@ -467,12 +302,78 @@ export const updateProject = async (
   updateData: Partial<Omit<Project, "id" | "userId" | "createdAt">>
 ): Promise<void> => {
   try {
-    const filteredData = filterUndefinedValues({
-      ...updateData,
-      updatedAt: updateTimestamp(),
-    });
+    // areaId가 변경되는 경우 Area counts 업데이트 필요
+    if (updateData.areaId !== undefined) {
+      await runTransaction(db, async (transaction) => {
+        const projectRef = doc(db, "projects", projectId);
+        const projectSnap = await transaction.get(projectRef);
 
-    await updateDoc(doc(db, "projects", projectId), filteredData);
+        if (!projectSnap.exists()) {
+          throw new Error("프로젝트를 찾을 수 없습니다.");
+        }
+
+        const projectData = projectSnap.data();
+        const oldAreaId = projectData.areaId;
+        const newAreaId = updateData.areaId;
+
+        // 이전 Area의 projectCount 감소
+        if (oldAreaId) {
+          const oldAreaRef = doc(db, "areas", oldAreaId);
+          const oldAreaSnap = await transaction.get(oldAreaRef);
+
+          if (oldAreaSnap.exists()) {
+            const oldAreaData = oldAreaSnap.data();
+            const oldCounts = oldAreaData.counts || {
+              projectCount: 0,
+              resourceCount: 0,
+            };
+            transaction.update(oldAreaRef, {
+              counts: {
+                projectCount: Math.max(0, oldCounts.projectCount - 1),
+                resourceCount: oldCounts.resourceCount,
+              },
+              updatedAt: updateTimestamp(),
+            });
+          }
+        }
+
+        // 새 Area의 projectCount 증가
+        if (newAreaId && newAreaId !== oldAreaId) {
+          const newAreaRef = doc(db, "areas", newAreaId);
+          const newAreaSnap = await transaction.get(newAreaRef);
+
+          if (newAreaSnap.exists()) {
+            const newAreaData = newAreaSnap.data();
+            const newCounts = newAreaData.counts || {
+              projectCount: 0,
+              resourceCount: 0,
+            };
+            transaction.update(newAreaRef, {
+              counts: {
+                projectCount: newCounts.projectCount + 1,
+                resourceCount: newCounts.resourceCount,
+              },
+              updatedAt: updateTimestamp(),
+            });
+          }
+        }
+
+        // 프로젝트 업데이트
+        const filteredData = filterUndefinedValues({
+          ...updateData,
+          updatedAt: updateTimestamp(),
+        });
+        transaction.update(projectRef, filteredData);
+      });
+    } else {
+      // areaId가 변경되지 않는 경우 일반 업데이트
+      const filteredData = filterUndefinedValues({
+        ...updateData,
+        updatedAt: updateTimestamp(),
+      });
+
+      await updateDoc(doc(db, "projects", projectId), filteredData);
+    }
   } catch (error) {
     throw new Error("프로젝트 업데이트에 실패했습니다.");
   }
@@ -488,6 +389,9 @@ export const deleteProjectById = async (projectId: string): Promise<void> => {
         throw new Error("프로젝트를 찾을 수 없습니다.");
       }
 
+      const projectData = projectDoc.data();
+      const areaId = projectData.areaId;
+
       // 1. 프로젝트의 모든 태스크 서브컬렉션 삭제
       const tasksQuery = query(collection(db, "projects", projectId, "tasks"));
       const tasksSnapshot = await getDocs(tasksQuery);
@@ -497,12 +401,127 @@ export const deleteProjectById = async (projectId: string): Promise<void> => {
         transaction.delete(taskDoc.ref);
       });
 
-      // 2. 프로젝트 문서 삭제
+      // 2. Area의 projectCount 감소
+      if (areaId) {
+        const areaRef = doc(db, "areas", areaId);
+        const areaSnap = await transaction.get(areaRef);
+
+        if (areaSnap.exists()) {
+          const areaData = areaSnap.data();
+          const currentCounts = areaData.counts || {
+            projectCount: 0,
+            resourceCount: 0,
+          };
+          transaction.update(areaRef, {
+            counts: {
+              projectCount: Math.max(0, currentCounts.projectCount - 1),
+              resourceCount: currentCounts.resourceCount,
+            },
+            updatedAt: updateTimestamp(),
+          });
+        }
+      }
+
+      // 3. 프로젝트 문서 삭제
       transaction.delete(projectRef);
     });
   } catch (error) {
     console.error(`❌ 프로젝트 삭제 실패: ${projectId}`, error);
     throw new Error("프로젝트 삭제에 실패했습니다.");
+  }
+};
+
+// 프로젝트의 currentMonthlyProgress를 업데이트하는 헬퍼 함수
+const updateProjectCurrentMonthlyProgress = async (
+  projectId: string,
+  monthlyId: string | null
+): Promise<void> => {
+  try {
+    const projectRef = doc(db, "projects", projectId);
+    const projectSnap = await getDoc(projectRef);
+
+    if (!projectSnap.exists()) {
+      return; // 프로젝트가 없으면 무시
+    }
+
+    // monthlyId가 null이면 currentMonthlyProgress 제거
+    if (!monthlyId) {
+      await updateDoc(projectRef, {
+        currentMonthlyProgress: null,
+        updatedAt: updateTimestamp(),
+      });
+      return;
+    }
+
+    // Monthly 문서 조회
+    const monthlyRef = doc(db, "monthlies", monthlyId);
+    const monthlySnap = await getDoc(monthlyRef);
+
+    if (!monthlySnap.exists()) {
+      return; // Monthly가 없으면 무시
+    }
+
+    const monthlyData = monthlySnap.data();
+    const monthly: Monthly = {
+      id: monthlySnap.id,
+      ...monthlyData,
+      startDate: monthlyData.startDate.toDate(),
+      endDate: monthlyData.endDate.toDate(),
+      createdAt: monthlyData.createdAt.toDate(),
+      updatedAt:
+        monthlyData.updatedAt?.toDate() || monthlyData.createdAt.toDate(),
+    } as Monthly;
+
+    // Monthly가 활성 상태인지 확인
+    const status = getMonthlyStatus(monthly);
+    if (status !== "in_progress") {
+      // 활성 상태가 아니면 currentMonthlyProgress 제거
+      await updateDoc(projectRef, {
+        currentMonthlyProgress: null,
+        updatedAt: updateTimestamp(),
+      });
+      return;
+    }
+
+    // Monthly의 connectedProjects에서 해당 프로젝트 찾기
+    const connectedProjects = monthlyData.connectedProjects || [];
+    const projectConnection = connectedProjects.find(
+      (cp: any) => cp.projectId === projectId
+    );
+
+    if (!projectConnection) {
+      // connectedProjects에 없으면 currentMonthlyProgress 제거
+      await updateDoc(projectRef, {
+        currentMonthlyProgress: null,
+        updatedAt: updateTimestamp(),
+      });
+      return;
+    }
+
+    const monthlyTargetCount = projectConnection.monthlyTargetCount || 0;
+    const monthlyDoneCount = projectConnection.monthlyDoneCount || 0;
+    const progressRate =
+      monthlyTargetCount > 0
+        ? (monthlyDoneCount / monthlyTargetCount) * 100
+        : 0;
+
+    // currentMonthlyProgress 업데이트
+    await updateDoc(projectRef, {
+      currentMonthlyProgress: {
+        monthlyId: monthlyId,
+        monthlyTitle: monthlyData.objective || "",
+        monthlyTargetCount,
+        monthlyDoneCount,
+        progressRate,
+      },
+      updatedAt: updateTimestamp(),
+    });
+  } catch (error) {
+    console.error(
+      `프로젝트 ${projectId}의 currentMonthlyProgress 업데이트 실패:`,
+      error
+    );
+    // 에러가 발생해도 전체 프로세스를 중단하지 않음
   }
 };
 
@@ -512,36 +531,73 @@ export const updateProjectConnectedMonthlies = async (
   add: boolean
 ): Promise<void> => {
   try {
+    await runTransaction(db, async (transaction) => {
+      const projectRef = doc(db, "projects", projectId);
+      const projectSnap = await transaction.get(projectRef);
+
+      if (!projectSnap.exists()) {
+        throw new Error("프로젝트를 찾을 수 없습니다.");
+      }
+
+      const projectData = projectSnap.data();
+      const currentConnectedMonthlies = projectData.connectedMonthlies || [];
+
+      let updatedConnectedMonthlies: string[];
+
+      if (add) {
+        // monthly ID 추가 (중복 방지)
+        if (!currentConnectedMonthlies.includes(monthlyId)) {
+          updatedConnectedMonthlies = [...currentConnectedMonthlies, monthlyId];
+        } else {
+          updatedConnectedMonthlies = currentConnectedMonthlies;
+        }
+      } else {
+        // monthly ID 제거
+        updatedConnectedMonthlies = currentConnectedMonthlies.filter(
+          (id: string) => id !== monthlyId
+        );
+      }
+
+      transaction.update(projectRef, {
+        connectedMonthlies: updatedConnectedMonthlies,
+        updatedAt: updateTimestamp(),
+      });
+    });
+
+    // 트랜잭션 후 currentMonthlyProgress 업데이트
+    // 활성 Monthly 찾기 (가장 최근의 활성 Monthly)
     const projectRef = doc(db, "projects", projectId);
     const projectSnap = await getDoc(projectRef);
+    if (projectSnap.exists()) {
+      const projectData = projectSnap.data();
+      const connectedMonthlies = projectData.connectedMonthlies || [];
 
-    if (!projectSnap.exists()) {
-      throw new Error("프로젝트를 찾을 수 없습니다.");
-    }
-
-    const projectData = projectSnap.data();
-    const currentConnectedMonthlies = projectData.connectedMonthlies || [];
-
-    let updatedConnectedMonthlies: string[];
-
-    if (add) {
-      // monthly ID 추가 (중복 방지)
-      if (!currentConnectedMonthlies.includes(monthlyId)) {
-        updatedConnectedMonthlies = [...currentConnectedMonthlies, monthlyId];
+      if (connectedMonthlies.length === 0) {
+        // 연결된 Monthly가 없으면 currentMonthlyProgress 제거
+        await updateProjectCurrentMonthlyProgress(projectId, null);
       } else {
-        updatedConnectedMonthlies = currentConnectedMonthlies;
-      }
-    } else {
-      // monthly ID 제거
-      updatedConnectedMonthlies = currentConnectedMonthlies.filter(
-        (id: string) => id !== monthlyId
-      );
-    }
+        // 활성 Monthly 찾기
+        let activeMonthlyId: string | null = null;
+        const now = new Date();
 
-    await updateDoc(projectRef, {
-      connectedMonthlies: updatedConnectedMonthlies,
-      updatedAt: updateTimestamp(),
-    });
+        for (const mid of connectedMonthlies) {
+          const monthlyRef = doc(db, "monthlies", mid);
+          const monthlySnap = await getDoc(monthlyRef);
+          if (monthlySnap.exists()) {
+            const monthlyData = monthlySnap.data();
+            const startDate = monthlyData.startDate.toDate();
+            const endDate = monthlyData.endDate.toDate();
+
+            if (startDate <= now && now <= endDate) {
+              activeMonthlyId = mid;
+              break; // 첫 번째 활성 Monthly 사용
+            }
+          }
+        }
+
+        await updateProjectCurrentMonthlyProgress(projectId, activeMonthlyId);
+      }
+    }
   } catch (error) {
     throw new Error("프로젝트 연결 업데이트에 실패했습니다.");
   }

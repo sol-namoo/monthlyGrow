@@ -5,6 +5,10 @@ export interface Area {
   description: string;
   icon?: string; // 아이콘 ID
   color?: string; // 색상 코드
+  counts?: {
+    projectCount: number;
+    resourceCount: number;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -65,6 +69,26 @@ export interface Project {
   originalMonthlyId?: string;
   carriedOverAt?: Date;
   migrationStatus?: "pending" | "migrated";
+
+  // 태스크 통계 (denormalized)
+  taskCounts?: {
+    total: number;
+    completed: number;
+    pending: number;
+  };
+  timeStats?: {
+    completedTime: number; // 완료된 태스크들의 duration 합계
+    remainingTime: number; // 남은 태스크들의 duration 합계
+  };
+
+  // 현재 활성 Monthly 진행률 (denormalized)
+  currentMonthlyProgress?: {
+    monthlyId: string;
+    monthlyTitle: string;
+    monthlyTargetCount: number;
+    monthlyDoneCount: number;
+    progressRate: number; // 계산된 진행률
+  };
 
   // tasks는 서브컬렉션으로 관리: projects/{projectId}/tasks/{taskId}
 
@@ -226,8 +250,14 @@ export interface UnifiedArchive {
     | "project_retrospective"
     | "project_note";
   parentId: string; // monthlyId 또는 projectId
+  parentType: "monthly" | "project";
   title: string;
   content: string;
+  // Parent 정보 (denormalized)
+  parentTitle?: string; // Monthly objective 또는 Project title
+  parentStartDate?: Date; // Monthly/Project startDate
+  parentEndDate?: Date; // Monthly/Project endDate
+  parentAreaName?: string; // Project의 경우 area name
   createdAt: Date;
   updatedAt: Date;
   // 각 타입별 고유 필드들
