@@ -56,4 +56,8 @@ export const settings = {
     areaInfo: "Loading area information...",
     showMore: "Show More",
   },
+  helpAndGuide: "Help & Guide",
+  reviewAppUsage: "Review App Usage",
+  reviewAppUsageDescription: "Review the app usage guide",
+  start: "Start",
 } as const;

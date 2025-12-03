@@ -628,16 +628,18 @@ export default function SettingsPage() {
         </section>
 
         <section>
-          <h2 className="mb-4 text-xl font-bold">도움말 및 가이드</h2>
+          <h2 className="mb-4 text-xl font-bold">
+            {translate("settings.helpAndGuide")}
+          </h2>
           <Card className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <Label className="text-sm font-medium">
-                    앱 사용법 다시 보기
+                    {translate("settings.reviewAppUsage")}
                   </Label>
                   <p className="text-xs text-gray-500">
-                    앱 사용법을 다시 확인하세요
+                    {translate("settings.reviewAppUsageDescription")}
                   </p>
                 </div>
                 <Button
@@ -646,7 +648,7 @@ export default function SettingsPage() {
                   onClick={handleOnboardingRestart}
                 >
                   <BookOpen className="h-4 w-4 mr-1" />
-                  시작
+                  {translate("settings.start")}
                 </Button>
               </div>
             </div>

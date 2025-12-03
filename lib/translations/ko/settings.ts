@@ -55,4 +55,8 @@ export const settings = {
     areaInfo: "Area 정보 로딩 중...",
     showMore: "더보기",
   },
+  helpAndGuide: "도움말 및 가이드",
+  reviewAppUsage: "앱 사용법 다시 보기",
+  reviewAppUsageDescription: "앱 사용법을 다시 확인하세요",
+  start: "시작",
 } as const;

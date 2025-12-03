@@ -28,7 +28,7 @@ export default function RootLayout({
   // user info 없다면 remain
 
   return (
-    <html lang="ko" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <InitialTimeZoneDetector />
         <QueryClientProvider>

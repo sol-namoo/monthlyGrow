@@ -28,6 +28,18 @@ export function useSettings() {
   useEffect(() => {
     if (typeof window === "undefined" || languageInitialized) return;
 
+    // 로그인한 사용자의 경우 localStorage에서 언어 설정 확인 (이전 세션에서 저장된 값)
+    if (user?.uid) {
+      const savedLang = localStorage.getItem(
+        `userLanguage_${user.uid}`
+      ) as Language;
+      if (savedLang && (savedLang === "ko" || savedLang === "en")) {
+        setSettings((prev) => ({ ...prev, language: savedLang }));
+        setLanguageInitialized(true);
+        return;
+      }
+    }
+
     // 로그인 전 언어 설정이 있으면 우선 사용
     const preLoginLang = localStorage.getItem("preLoginLanguage") as Language;
     if (preLoginLang && preLoginLang !== settings.language) {
@@ -36,16 +48,10 @@ export function useSettings() {
       return;
     }
 
-    // 브라우저 언어 감지 (기본값이 영어가 아닌 경우에만)
-    if (settings.language === "en") {
-      const detectedLang = detectBrowserLanguage();
-      if (detectedLang !== "en") {
-        setSettings((prev) => ({ ...prev, language: detectedLang }));
-      }
-    }
-    
+    // 기본값은 영어로 유지 (브라우저 언어 감지 비활성화)
+    // 사용자가 명시적으로 언어를 변경할 때만 변경됨
     setLanguageInitialized(true);
-  }, [languageInitialized]);
+  }, [languageInitialized, user?.uid]);
 
   // Firestore에서 사용자 설정 불러오기
   useEffect(() => {
@@ -64,10 +70,19 @@ export function useSettings() {
         const currentLanguage = settings.language;
         const mergedSettings = {
           ...userSettings,
-          language: userSettings.language || currentLanguage || detectBrowserLanguage()
+          language:
+            userSettings.language || currentLanguage || detectBrowserLanguage(),
         };
 
         setSettings(mergedSettings);
+
+        // 사용자 언어 설정을 localStorage에 저장 (다음 로드 시 즉시 사용)
+        if (mergedSettings.language && user?.uid) {
+          localStorage.setItem(
+            `userLanguage_${user.uid}`,
+            mergedSettings.language
+          );
+        }
 
         // 사용자 설정의 테마가 있고 현재 테마와 다르면 업데이트
         if (mergedSettings.theme && mergedSettings.theme !== resolvedTheme) {
@@ -78,7 +93,10 @@ export function useSettings() {
         console.error("설정 불러오기 실패:", error);
         // 현재 언어 설정을 유지
         const currentLanguage = settings.language;
-        setSettings({ ...defaultSettings, language: currentLanguage || detectBrowserLanguage() });
+        setSettings({
+          ...defaultSettings,
+          language: currentLanguage || detectBrowserLanguage(),
+        });
         if (!isInitialized) {
           setTheme(defaultSettings.theme);
         }
