@@ -98,7 +98,7 @@ export function RetrospectiveForm({
           "monthlyDetail.retrospectiveForm.validation.unexpectedObstaclesRequired"
         )
       ),
-    keyResultsReview: z.string().optional(),
+    keyResultsReviewText: z.string().optional(),
     completedKeyResults: z.array(z.string()).optional(),
     failedKeyResults: z
       .array(
@@ -137,10 +137,17 @@ export function RetrospectiveForm({
     defaultValues: {
       bestMoment: existingData?.bestMoment || "",
       unexpectedObstacles: existingData?.unexpectedObstacles || "",
-      keyResultsReview: existingData?.keyResultsReview || "",
+      keyResultsReviewText:
+        existingData?.keyResultsReview?.text ||
+        (typeof existingData?.keyResultsReview === "string"
+          ? existingData.keyResultsReview
+          : ""),
       completedKeyResults:
-        existingData?.keyResultsReview?.completedKeyResults || [],
-      failedKeyResults: existingData?.keyResultsReview?.failedKeyResults || [],
+        existingData?.keyResultsReview?.completedKeyResults ||
+        (typeof existingData?.keyResultsReview === "string" ? [] : []),
+      failedKeyResults:
+        existingData?.keyResultsReview?.failedKeyResults ||
+        (typeof existingData?.keyResultsReview === "string" ? [] : []),
       nextMonthlyApplication: existingData?.nextMonthlyApplication || "",
       freeformContent: existingData?.content || "",
       userRating: existingData?.userRating || 1,
@@ -154,10 +161,17 @@ export function RetrospectiveForm({
       form.reset({
         bestMoment: existingData.bestMoment || "",
         unexpectedObstacles: existingData.unexpectedObstacles || "",
-        keyResultsReview: existingData.keyResultsReview || "",
+        keyResultsReviewText:
+          existingData.keyResultsReview?.text ||
+          (typeof existingData.keyResultsReview === "string"
+            ? existingData.keyResultsReview
+            : ""),
         completedKeyResults:
-          existingData.keyResultsReview?.completedKeyResults || [],
-        failedKeyResults: existingData.keyResultsReview?.failedKeyResults || [],
+          existingData.keyResultsReview?.completedKeyResults ||
+          (typeof existingData.keyResultsReview === "string" ? [] : []),
+        failedKeyResults:
+          existingData.keyResultsReview?.failedKeyResults ||
+          (typeof existingData.keyResultsReview === "string" ? [] : []),
         nextMonthlyApplication: existingData.nextMonthlyApplication || "",
         freeformContent: existingData.content || "",
         userRating: existingData.userRating || 1,
@@ -168,7 +182,39 @@ export function RetrospectiveForm({
 
   const handleSubmit = async (data: RetrospectiveFormData) => {
     try {
-      await onSave(data);
+      // 완료된 Key Results ID 자동 수집
+      const completedKeyResultsIds =
+        type === "monthly" && keyResults.length > 0
+          ? keyResults.filter((kr) => kr.isCompleted).map((kr) => kr.id)
+          : data.completedKeyResults || [];
+
+      // keyResultsReview 객체 구성
+      const keyResultsReview: any = {};
+
+      if (data.keyResultsReviewText && data.keyResultsReviewText.trim()) {
+        keyResultsReview.text = data.keyResultsReviewText.trim();
+      }
+
+      if (completedKeyResultsIds.length > 0) {
+        keyResultsReview.completedKeyResults = completedKeyResultsIds;
+      }
+
+      if (data.failedKeyResults && data.failedKeyResults.length > 0) {
+        keyResultsReview.failedKeyResults = data.failedKeyResults;
+      }
+
+      // 빈 객체가 되지 않도록 처리
+      const finalKeyResultsReview =
+        keyResultsReview.text ||
+        keyResultsReview.completedKeyResults ||
+        keyResultsReview.failedKeyResults
+          ? keyResultsReview
+          : undefined;
+
+      await onSave({
+        ...data,
+        keyResultsReview: finalKeyResultsReview,
+      });
       form.reset();
       onClose();
     } catch (error) {
@@ -273,14 +319,16 @@ export function RetrospectiveForm({
                 {translate("monthlyDetail.retrospectiveForm.keyResultsReview")}
               </label>
               <Textarea
-                {...form.register("keyResultsReview")}
-                placeholder="이번 먼슬리의 핵심 지표들을 전반적으로 평가해보세요"
+                {...form.register("keyResultsReviewText")}
+                placeholder={translate(
+                  "monthlyDetail.retrospectiveForm.keyResultsReviewPlaceholder"
+                )}
                 rows={3}
                 className="mb-4"
               />
-              {form.formState.errors.keyResultsReview && (
+              {form.formState.errors.keyResultsReviewText && (
                 <p className="text-sm text-red-500 mt-1 mb-4">
-                  {form.formState.errors.keyResultsReview.message}
+                  {form.formState.errors.keyResultsReviewText.message}
                 </p>
               )}
 

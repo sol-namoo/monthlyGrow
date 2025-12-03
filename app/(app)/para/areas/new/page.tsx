@@ -175,7 +175,6 @@ function NewAreaPageContent() {
         description: data.description,
         icon: data.icon,
         color: data.color,
-        status: "active",
       });
 
       toast({

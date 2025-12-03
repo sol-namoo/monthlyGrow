@@ -21,8 +21,6 @@ import { fetchUnifiedArchivesWithPaging } from "./unified-archives";
 // Area 관련 함수들
 export {
   fetchAllAreasByUserId,
-  fetchActiveAreasByUserId,
-  fetchArchivedAreasByUserId,
   fetchAreaById,
   createArea,
   getOrCreateUncategorizedArea,

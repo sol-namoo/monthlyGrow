@@ -524,11 +524,9 @@ export const fetchAreaCountsByUserId = async (
   userId: string
 ): Promise<Record<string, { projectCount: number; resourceCount: number }>> => {
   try {
-    const q = query(
-      collection(db, "areas"),
-      where("userId", "==", userId),
-      where("status", "==", "active")
-    );
+    // status 필터 제거: 기존 데이터에 status 필드가 없을 수 있음
+    // 필요시 클라이언트 측에서 status로 필터링
+    const q = query(collection(db, "areas"), where("userId", "==", userId));
     const querySnapshot = await getDocs(q);
 
     const areaCounts: Record<

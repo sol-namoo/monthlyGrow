@@ -11,10 +11,7 @@ import {
   GeneratePlanResponse,
   GeneratePlanRequest,
 } from "../lib/types";
-import {
-  fetchActiveAreasByUserId,
-  fetchAllAreasByUserId,
-} from "../lib/firebase";
+import { fetchAllAreasByUserId } from "../lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../lib/firebase";
 import { useLanguage } from "../hooks/useLanguage";
@@ -426,11 +423,6 @@ export default function PlanGenerator() {
                     />
                   </div>
                   <span className="text-xs">{area.name}</span>
-                  {area.status === "archived" && (
-                    <span className="text-xs text-gray-400 dark:text-gray-500">
-                      (보관됨)
-                    </span>
-                  )}
                 </div>
               );
             })}

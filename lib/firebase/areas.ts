@@ -41,46 +41,6 @@ export const fetchAllAreasByUserId = async (
   }
 };
 
-export const fetchActiveAreasByUserId = async (
-  userId: string
-): Promise<Area[]> => {
-  try {
-    const q = query(
-      collection(db, "areas"),
-      where("userId", "==", userId),
-      where("status", "==", "active")
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Area[];
-  } catch (error) {
-    console.error("활성 영역 조회 실패:", error);
-    throw new Error("activeAreaLoadFailed");
-  }
-};
-
-export const fetchArchivedAreasByUserId = async (
-  userId: string
-): Promise<Area[]> => {
-  try {
-    const q = query(
-      collection(db, "areas"),
-      where("userId", "==", userId),
-      where("status", "==", "archived")
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Area[];
-  } catch (error) {
-    console.error("아카이브된 영역 조회 실패:", error);
-    throw new Error("archivedAreaLoadFailed");
-  }
-};
-
 export const fetchAreaById = async (areaId: string): Promise<Area> => {
   try {
     const docRef = doc(db, "areas", areaId);
@@ -127,7 +87,6 @@ export const createArea = async (
       name: areaData.name,
       description: areaData.description || "",
       color: areaData.color || "#3B82F6",
-      status: areaData.status || "active",
       createdAt: new Date(),
       updatedAt: new Date(),
     } as Area;
@@ -169,7 +128,6 @@ export const getOrCreateUncategorizedArea = async (
       name: "미분류",
       description: "분류되지 않은 항목들을 위한 기본 영역입니다.",
       color: "#6B7280",
-      status: "active",
     });
 
     return uncategorizedArea;

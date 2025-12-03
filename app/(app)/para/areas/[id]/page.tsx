@@ -126,15 +126,22 @@ export default function AreaDetailPage({
   });
 
   // 연결된 프로젝트 가져오기
+  // 레이아웃에서 이미 인증 체크를 하므로 user?.uid는 항상 존재함
   const {
     data: projects,
     isLoading: isProjectsLoading,
     error: projectsError,
   } = useQuery({
-    queryKey: ["projects", "area", id],
-    queryFn: () => fetchProjectsByAreaId(id),
-    enabled: !!id,
+    queryKey: ["projects", "area", id, user?.uid],
+    queryFn: () => fetchProjectsByAreaId(id, user!.uid),
+    enabled: !!id && !!user?.uid,
+    retry: 1, // 재시도 1회만
   });
+
+  // 에러 디버깅을 위한 로그
+  if (projectsError) {
+    console.error("프로젝트 조회 에러:", projectsError);
+  }
 
   // 연결된 리소스 가져오기 (현재는 모든 리소스를 가져와서 필터링)
   const {

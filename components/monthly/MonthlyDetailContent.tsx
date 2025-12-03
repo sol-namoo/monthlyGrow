@@ -47,6 +47,7 @@ import Link from "next/link";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/hooks/useLanguage";
+import { translations } from "@/lib/translations";
 import {
   Tooltip,
   TooltipContent,
@@ -358,12 +359,37 @@ export function MonthlyDetailContent({
 
   const handleRetrospectiveSave = async (data: any) => {
     try {
-      // 먼슬리 회고 저장 로직
-      const retrospectiveData = {
-        userId: user?.uid || "",
-        monthlyId: monthly.id,
-        ...data,
-      };
+      // 완료된 Key Results ID 수집
+      const completedKeyResultsIds =
+        data.completedKeyResults ||
+        (monthly.keyResults || [])
+          .filter((kr) => kr.isCompleted)
+          .map((kr) => kr.id);
+
+      // keyResultsReview 객체 구성
+      const keyResultsReview: any = {};
+
+      if (data.keyResultsReviewText && data.keyResultsReviewText.trim()) {
+        keyResultsReview.text = data.keyResultsReviewText.trim();
+      }
+
+      if (completedKeyResultsIds.length > 0) {
+        keyResultsReview.completedKeyResults = completedKeyResultsIds;
+      }
+
+      if (data.failedKeyResults && data.failedKeyResults.length > 0) {
+        keyResultsReview.failedKeyResults = cleanFailedKeyResults(
+          data.failedKeyResults
+        );
+      }
+
+      // 빈 객체가 되지 않도록 처리
+      const finalKeyResultsReview =
+        keyResultsReview.text ||
+        keyResultsReview.completedKeyResults ||
+        keyResultsReview.failedKeyResults
+          ? keyResultsReview
+          : undefined;
 
       // 기존 회고가 있는지 확인
       const existingArchive = await fetchSingleArchive(
@@ -380,15 +406,12 @@ export function MonthlyDetailContent({
           userRating: data.userRating,
           bookmarked: data.bookmarked,
           bestMoment: data.bestMoment,
-          keyResultsReview: data.keyResultsReview,
-          completedKeyResults: data.completedKeyResults,
-          failedKeyResults: cleanFailedKeyResults(data.failedKeyResults),
+          keyResultsReview: finalKeyResultsReview,
           unexpectedObstacles: data.unexpectedObstacles,
           nextMonthlyApplication: data.nextMonthlyApplication,
         });
       } else {
         // 새 아카이브 생성
-
         const archiveData = {
           userId: user?.uid || "",
           type: "monthly_retrospective" as const,
@@ -398,9 +421,7 @@ export function MonthlyDetailContent({
           userRating: data.userRating,
           bookmarked: data.bookmarked,
           bestMoment: data.bestMoment,
-          keyResultsReview: data.keyResultsReview,
-          completedKeyResults: data.completedKeyResults,
-          failedKeyResults: cleanFailedKeyResults(data.failedKeyResults),
+          keyResultsReview: finalKeyResultsReview,
           unexpectedObstacles: data.unexpectedObstacles,
           nextMonthlyApplication: data.nextMonthlyApplication,
         };
@@ -477,10 +498,26 @@ export function MonthlyDetailContent({
                 variant="outline"
                 className="text-sm font-medium px-2 py-1 bg-background/80 dark:bg-background/60"
               >
-                {monthly.startDate instanceof Date
-                  ? monthly.startDate.getMonth() + 1
-                  : (monthly.startDate as any).toDate().getMonth() + 1}
-                월
+                {(() => {
+                  const monthNumber =
+                    monthly.startDate instanceof Date
+                      ? monthly.startDate.getMonth() + 1
+                      : (monthly.startDate as any).toDate().getMonth() + 1;
+
+                  const monthNames = (
+                    translations[currentLanguage as "ko" | "en"] as any
+                  )?.monthlyDetail?.monthNames as string[] | undefined;
+                  if (
+                    Array.isArray(monthNames) &&
+                    monthNames[monthNumber - 1]
+                  ) {
+                    return monthNames[monthNumber - 1];
+                  }
+                  // Fallback: 번역이 배열이 아닌 경우
+                  return `${monthNumber}${translate(
+                    "monthlyDetail.monthSuffix"
+                  )}`;
+                })()}
               </Badge>
               <h1 className="text-xl font-bold">{title}</h1>
             </div>
@@ -857,9 +894,15 @@ export function MonthlyDetailContent({
 
                         <CollapsibleContent>
                           <div className="space-y-2 mt-3 mb-0">
-                            {projectData.tasks.map((task) => (
+                            {projectData.tasks.map((task, taskIndex) => (
                               <div
-                                key={task.taskId}
+                                key={`${projectId}-${
+                                  task.taskId
+                                }-${taskIndex}-${
+                                  task.date?.getTime() ||
+                                  task.completedAt?.getTime() ||
+                                  ""
+                                }`}
                                 className="flex items-center justify-between p-2 bg-background/50 rounded-lg"
                               >
                                 <div className="flex-1">

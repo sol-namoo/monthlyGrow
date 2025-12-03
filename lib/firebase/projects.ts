@@ -240,41 +240,99 @@ export const fetchProjectById = async (projectId: string): Promise<Project> => {
 };
 
 export const fetchProjectsByAreaId = async (
-  areaId: string
+  areaId: string,
+  userId: string
 ): Promise<Project[]> => {
-  const q = query(
-    collection(db, "projects"),
-    where("areaId", "==", areaId),
-    orderBy("endDate", "desc")
-  );
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      userId: data.userId,
-      title: data.title,
-      description: data.description,
-      category: data.category,
-      areaId: data.areaId,
-      area: data.area,
-      completedTasks: data.completedTasks || 0,
-      startDate: data.startDate.toDate(),
-      endDate: data.endDate.toDate(),
-      createdAt: data.createdAt.toDate(),
-      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-      connectedMonthlies: data.connectedMonthlies || [],
-      target: data.target,
-      targetCount: data.targetCount,
-      isCarriedOver: data.isCarriedOver,
-      originalMonthlyId: data.originalMonthlyId,
-      carriedOverAt: data.carriedOverAt
-        ? data.carriedOverAt.toDate()
-        : undefined,
-      migrationStatus: data.migrationStatus,
-      notes: data.notes || [],
-    } as Project;
-  });
+  try {
+    // 인덱스가 아직 생성 중일 수 있으므로, orderBy 없이 먼저 시도
+    const q = query(
+      collection(db, "projects"),
+      where("userId", "==", userId),
+      where("areaId", "==", areaId),
+      orderBy("endDate", "desc")
+    );
+    const querySnapshot = await getDocs(q);
+    const projects = querySnapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        userId: data.userId,
+        title: data.title,
+        description: data.description,
+        category: data.category,
+        areaId: data.areaId,
+        area: data.area,
+        completedTasks: data.completedTasks || 0,
+        startDate: data.startDate.toDate(),
+        endDate: data.endDate.toDate(),
+        createdAt: data.createdAt.toDate(),
+        updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+        connectedMonthlies: data.connectedMonthlies || [],
+        target: data.target,
+        targetCount: data.targetCount,
+        isCarriedOver: data.isCarriedOver,
+        originalMonthlyId: data.originalMonthlyId,
+        carriedOverAt: data.carriedOverAt
+          ? data.carriedOverAt.toDate()
+          : undefined,
+        migrationStatus: data.migrationStatus,
+        notes: data.notes || [],
+      } as Project;
+    });
+    return projects;
+  } catch (error: any) {
+    // 인덱스 에러인 경우 orderBy 없이 재시도
+    if (
+      error?.code === "failed-precondition" ||
+      error?.message?.includes("index")
+    ) {
+      console.warn(
+        "인덱스가 아직 생성 중입니다. orderBy 없이 쿼리합니다:",
+        error
+      );
+      const qWithoutOrderBy = query(
+        collection(db, "projects"),
+        where("userId", "==", userId),
+        where("areaId", "==", areaId)
+      );
+      const querySnapshot = await getDocs(qWithoutOrderBy);
+      const projects = querySnapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          userId: data.userId,
+          title: data.title,
+          description: data.description,
+          category: data.category,
+          areaId: data.areaId,
+          area: data.area,
+          completedTasks: data.completedTasks || 0,
+          startDate: data.startDate.toDate(),
+          endDate: data.endDate.toDate(),
+          createdAt: data.createdAt.toDate(),
+          updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+          connectedMonthlies: data.connectedMonthlies || [],
+          target: data.target,
+          targetCount: data.targetCount,
+          isCarriedOver: data.isCarriedOver,
+          originalMonthlyId: data.originalMonthlyId,
+          carriedOverAt: data.carriedOverAt
+            ? data.carriedOverAt.toDate()
+            : undefined,
+          migrationStatus: data.migrationStatus,
+          notes: data.notes || [],
+        } as Project;
+      });
+      // 클라이언트 측에서 endDate 기준으로 정렬
+      return projects.sort((a, b) => {
+        if (!a.endDate || !b.endDate) return 0;
+        return b.endDate.getTime() - a.endDate.getTime();
+      });
+    }
+    // 다른 에러인 경우 로그를 남기고 재throw
+    console.error("fetchProjectsByAreaId 에러:", error);
+    throw error;
+  }
 };
 
 export const fetchProjectsByMonthlyId = async (

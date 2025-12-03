@@ -52,7 +52,6 @@ export async function savePlanToFirestore(options: SavePlanOptions) {
           transaction.set(areaRef, {
             ...area,
             userId,
-            status: "active",
             createdAt: now,
             updatedAt: now,
           });

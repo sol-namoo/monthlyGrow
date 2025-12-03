@@ -9,9 +9,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  experimental: {
-    optimizeFonts: true,
-  },
   webpack: (config) => {
     // @opentelemetry.js 모듈 문제 해결
     config.resolve.fallback = {

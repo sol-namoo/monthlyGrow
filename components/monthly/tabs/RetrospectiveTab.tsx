@@ -61,7 +61,7 @@ export function RetrospectiveTab({
       <div className="text-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
         <p className="text-sm text-muted-foreground mt-2">
-          회고 데이터를 불러오는 중...
+          {translate("monthlyDetail.retrospective.loading")}
         </p>
       </div>
     );
@@ -89,7 +89,9 @@ export function RetrospectiveTab({
       <Card className="p-6 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
         <div className="flex items-center gap-2 mb-4">
           <Target className="h-4 w-4" />
-          <h3 className="font-bold">핵심 지표 현황</h3>
+          <h3 className="font-bold">
+            {translate("monthlyDetail.retrospectiveTab.keyResultsStatus")}
+          </h3>
         </div>
 
         <div className="space-y-4">
@@ -98,8 +100,13 @@ export function RetrospectiveTab({
             <div>
               <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-600" />
-                달성한 핵심 지표 ({completedKeyResults.length}/
-                {monthly.keyResults.length})
+                {translate(
+                  "monthlyDetail.retrospectiveTab.completedKeyResults",
+                  {
+                    completed: completedKeyResults.length,
+                    total: monthly.keyResults.length,
+                  }
+                )}
               </h4>
               <div className="space-y-2">
                 {completedKeyResults.map((kr) => (
@@ -117,7 +124,13 @@ export function RetrospectiveTab({
                     )}
                     {kr.targetCount && kr.completedCount && (
                       <p className="text-xs text-green-600 dark:text-green-300 mt-1">
-                        목표: {kr.targetCount}회 → 달성: {kr.completedCount}회
+                        {translate(
+                          "monthlyDetail.retrospectiveTab.keyResultProgress",
+                          {
+                            target: kr.targetCount,
+                            completed: kr.completedCount,
+                          }
+                        )}
                       </p>
                     )}
                   </div>
@@ -131,8 +144,10 @@ export function RetrospectiveTab({
             <div>
               <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
                 <XCircle className="h-4 w-4 text-red-600" />
-                달성하지 못한 핵심 지표 ({failedKeyResults.length}/
-                {monthly.keyResults.length})
+                {translate("monthlyDetail.retrospectiveTab.failedKeyResults", {
+                  failed: failedKeyResults.length,
+                  total: monthly.keyResults.length,
+                })}
               </h4>
               <div className="space-y-2">
                 {failedKeyResults.map((kr) => (
@@ -150,7 +165,13 @@ export function RetrospectiveTab({
                     )}
                     {kr.targetCount && kr.completedCount && (
                       <p className="text-xs text-red-600 dark:text-red-300 mt-1">
-                        목표: {kr.targetCount}회 → 달성: {kr.completedCount}회
+                        {translate(
+                          "monthlyDetail.retrospectiveTab.keyResultProgress",
+                          {
+                            target: kr.targetCount,
+                            completed: kr.completedCount,
+                          }
+                        )}
                       </p>
                     )}
                   </div>
@@ -163,7 +184,7 @@ export function RetrospectiveTab({
           {monthly.keyResults.length === 0 && (
             <div className="text-center py-4">
               <p className="text-sm text-muted-foreground">
-                설정된 핵심 지표가 없습니다.
+                {translate("monthlyDetail.retrospectiveTab.noKeyResults")}
               </p>
             </div>
           )}
@@ -177,7 +198,9 @@ export function RetrospectiveTab({
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4" />
-                <h3 className="font-bold">회고</h3>
+                <h3 className="font-bold">
+                  {translate("monthlyDetail.tabs.retrospective")}
+                </h3>
               </div>
               <div className="flex items-center gap-2">
                 <RatingDisplay
@@ -192,7 +215,7 @@ export function RetrospectiveTab({
               {monthlyRetrospective.bestMoment && (
                 <div>
                   <h4 className="font-semibold text-sm mb-2">
-                    가장 기억에 남는 순간
+                    {translate("monthlyDetail.retrospective.bestMoment.label")}
                   </h4>
                   <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
                     {monthlyRetrospective.bestMoment}
@@ -202,7 +225,11 @@ export function RetrospectiveTab({
 
               {monthlyRetrospective.routineAdherence && (
                 <div>
-                  <h4 className="font-semibold text-sm mb-2">루틴 준수율</h4>
+                  <h4 className="font-semibold text-sm mb-2">
+                    {translate(
+                      "monthlyDetail.retrospective.routineAdherence.label"
+                    )}
+                  </h4>
                   <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
                     {monthlyRetrospective.routineAdherence}
                   </p>
@@ -212,7 +239,9 @@ export function RetrospectiveTab({
               {monthlyRetrospective.unexpectedObstacles && (
                 <div>
                   <h4 className="font-semibold text-sm mb-2">
-                    예상치 못한 장애물
+                    {translate(
+                      "monthlyDetail.retrospective.unexpectedObstacles.label"
+                    )}
                   </h4>
                   <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
                     {monthlyRetrospective.unexpectedObstacles}
@@ -223,7 +252,9 @@ export function RetrospectiveTab({
               {monthlyRetrospective.nextMonthlyApplication && (
                 <div>
                   <h4 className="font-semibold text-sm mb-2">
-                    다음 달 적용 사항
+                    {translate(
+                      "monthlyDetail.retrospective.nextMonthlyApplication.label"
+                    )}
                   </h4>
                   <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
                     {monthlyRetrospective.nextMonthlyApplication}
@@ -233,7 +264,9 @@ export function RetrospectiveTab({
 
               {monthlyRetrospective.stuckPoints && (
                 <div>
-                  <h4 className="font-semibold text-sm mb-2">막힌 지점</h4>
+                  <h4 className="font-semibold text-sm mb-2">
+                    {translate("monthlyDetail.retrospectiveTab.stuckPoints")}
+                  </h4>
                   <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
                     {monthlyRetrospective.stuckPoints}
                   </p>
@@ -242,7 +275,9 @@ export function RetrospectiveTab({
 
               {monthlyRetrospective.newLearnings && (
                 <div>
-                  <h4 className="font-semibold text-sm mb-2">새로운 학습</h4>
+                  <h4 className="font-semibold text-sm mb-2">
+                    {translate("monthlyDetail.retrospectiveTab.newLearnings")}
+                  </h4>
                   <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
                     {monthlyRetrospective.newLearnings}
                   </p>
@@ -252,7 +287,9 @@ export function RetrospectiveTab({
               {monthlyRetrospective.nextProjectImprovements && (
                 <div>
                   <h4 className="font-semibold text-sm mb-2">
-                    다음 프로젝트 개선사항
+                    {translate(
+                      "monthlyDetail.retrospectiveForm.project.nextProjectImprovements"
+                    )}
                   </h4>
                   <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
                     {monthlyRetrospective.nextProjectImprovements}
@@ -263,7 +300,7 @@ export function RetrospectiveTab({
               {monthlyRetrospective.memorableTask && (
                 <div>
                   <h4 className="font-semibold text-sm mb-2">
-                    가장 기억에 남는 작업
+                    {translate("monthlyDetail.retrospectiveTab.memorableTask")}
                   </h4>
                   <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
                     {monthlyRetrospective.memorableTask}
@@ -277,7 +314,9 @@ export function RetrospectiveTab({
                   0 && (
                   <div>
                     <h4 className="font-semibold text-sm mb-2">
-                      핵심 지표 실패 이유 분석
+                      {translate(
+                        "monthlyDetail.retrospectiveTab.failedKeyResultsAnalysis"
+                      )}
                     </h4>
                     <div className="space-y-2">
                       {monthlyRetrospective.keyResultsReview.failedKeyResults.map(

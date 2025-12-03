@@ -1,184 +1,183 @@
-# Firestore 스키마 참조 문서
+# Firestore Schema Reference Document
 
-이 문서는 현재 Firebase Firestore에 사용 중인 데이터베이스 스키마 구조를 정의합니다. 모든
-컬렉션은 사용자 단위로 관리됩니다.
+This document defines the database schema structure currently used in Firebase Firestore. All collections are managed per user.
 
-## 📋 컬렉션별 스키마 정의
+## 📋 Schema Definition by Collection
 
-### 🔹 Users 컬렉션
+### 🔹 Users Collection
 
-사용자 프로필, 설정, 환경설정을 저장합니다.
+Stores user profile, settings, and preferences.
 
 ```typescript
 interface User {
-  id: string; // 문서 ID (Firebase Auth UID)
+  id: string; // Document ID (Firebase Auth UID)
 
   profile: {
-    displayName: string; // 사용자 표시 이름
-    email: string; // 이메일 주소
-    photoURL?: string; // 프로필 사진 URL
-    emailVerified: boolean; // 이메일 인증 여부
-    createdAt: Date; // 생성일시
-    updatedAt: Date; // 수정일시
+    displayName: string; // User display name
+    email: string; // Email address
+    photoURL?: string; // Profile photo URL
+    emailVerified: boolean; // Email verification status
+    createdAt: Date; // Creation date/time
+    updatedAt: Date; // Update date/time
   };
 
   settings: {
-    defaultReward?: string; // 기본 보상
-    defaultRewardEnabled: boolean; // 기본 보상 활성화 여부
-    carryOver: boolean; // 미완료 항목 이월 여부
-    aiRecommendations: boolean; // AI 추천 허용 여부
-    notifications: boolean; // 알림 허용 여부
-    theme: "light" | "dark" | "system"; // 테마 설정
-    language: "ko" | "en"; // 언어 설정
-    // Firebase Auth에서 제공하는 정보는 제외:
+    defaultReward?: string; // Default reward
+    defaultRewardEnabled: boolean; // Default reward enabled status
+    carryOver: boolean; // Carry over incomplete items
+    aiRecommendations: boolean; // Allow AI recommendations
+    notifications: boolean; // Allow notifications
+    theme: "light" | "dark" | "system"; // Theme setting
+    language: "ko" | "en"; // Language setting
+    // Information provided by Firebase Auth is excluded:
     // - email (user.email)
     // - displayName (user.displayName)
     // - photoURL (user.photoURL)
   };
 
   preferences: {
-    timezone: string; // 시간대 (예: "Asia/Seoul")
-    dateFormat: string; // 날짜 형식 (예: "ko-KR")
-    weeklyStartDay: "monday" | "sunday"; // 주 시작일
+    timezone: string; // Timezone (e.g., "Asia/Seoul")
+    dateFormat: string; // Date format (e.g., "ko-KR")
+    weeklyStartDay: "monday" | "sunday"; // Week start day
   };
 }
 ```
 
-**인덱스:**
+**Indexes:**
 
-- `id` (단일, Firebase Auth UID)
+- `id` (single, Firebase Auth UID)
 
 ---
 
-### 🔹 Areas 컬렉션
+### 🔹 Areas Collection
 
-사용자가 정의한 삶의 영역들을 저장합니다.
+Stores life areas defined by users.
 
 ```typescript
 interface Area {
-  id: string; // 문서 ID (자동 생성)
-  userId: string; // 사용자 ID (Firebase Auth UID)
-  name: string; // 영역 이름 (예: "건강", "자기계발")
-  description: string; // 영역 설명
-  icon?: string; // 아이콘 ID (Lucide React)
-  color?: string; // 색상 코드 (hex)
+  id: string; // Document ID (auto-generated)
+  userId: string; // User ID (Firebase Auth UID)
+  name: string; // Area name (e.g., "Health", "Self-development")
+  description: string; // Area description
+  icon?: string; // Icon ID (Lucide React)
+  color?: string; // Color code (hex)
 
-  createdAt: Date; // 생성일시
-  updatedAt: Date; // 수정일시
+  createdAt: Date; // Creation date/time
+  updatedAt: Date; // Update date/time
 }
 ```
 
-**인덱스:**
+**Indexes:**
 
-- `userId` (단일)
-- `userId` + `status` (복합)
-- `userId` + `createdAt` (복합)
+- `userId` (single)
+- `userId` + `status` (composite)
+- `userId` + `createdAt` (composite)
 
 ---
 
-### 🔹 Resources 컬렉션
+### 🔹 Resources Collection
 
-각 영역에 속한 참고 자료와 링크를 저장합니다.
+Stores reference materials and links belonging to each area.
 
 ```typescript
 interface Resource {
-  id: string; // 문서 ID (자동 생성)
-  userId: string; // 사용자 ID
-  name: string; // 리소스 제목
-  areaId?: string; // 소속 영역 ID
-  area?: string; // 영역 이름 (denormalized - DB에 저장되지 않고 쿼리 시 함께 제공)
-  areaColor?: string; // 영역 색상 (denormalized - DB에 저장되지 않고 쿼리 시 함께 제공)
-  description: string; // 리소스 설명
-  text?: string; // 텍스트 내용
-  link?: string; // 외부 링크 URL
-  createdAt: Date; // 생성일시
-  updatedAt: Date; // 수정일시
+  id: string; // Document ID (auto-generated)
+  userId: string; // User ID
+  name: string; // Resource title
+  areaId?: string; // Belonging area ID
+  area?: string; // Area name (denormalized - not stored in DB, provided together when querying)
+  areaColor?: string; // Area color (denormalized - not stored in DB, provided together when querying)
+  description: string; // Resource description
+  text?: string; // Text content
+  link?: string; // External link URL
+  createdAt: Date; // Creation date/time
+  updatedAt: Date; // Update date/time
 }
 ```
 
-**인덱스:**
+**Indexes:**
 
-- `userId` (단일)
-- `userId` + `areaId` (복합)
+- `userId` (single)
+- `userId` + `areaId` (composite)
 
 ---
 
-### 🔹 Projects 컬렉션
+### 🔹 Projects Collection
 
-구체적인 행동 단위인 프로젝트들을 저장합니다.
+Stores projects as specific action units.
 
 ```typescript
 interface Project {
-  id: string; // 문서 ID (자동 생성)
-  userId: string; // 사용자 ID
-  title: string; // 프로젝트 제목
-  description: string; // 프로젝트 설명
-  category?: "repetitive" | "task_based"; // 프로젝트 유형
-  areaId?: string; // 소속 영역 ID
-  area?: string; // 영역 이름 (denormalized - DB에 저장되지 않고 쿼리 시 함께 제공)
-  completedTasks: number; // 전체 실제 완료된 태스크 수
-  startDate: Date; // 시작일
-  endDate: Date; // 마감일
-  createdAt: Date; // 생성일시
-  updatedAt: Date; // 수정일시
-  // Unified Archives를 통해 회고와 노트 관리
-  // retrospective는 unified_archives 컬렉션에서 조회
-  // Unified Archives를 통해 노트 관리
-  // notes는 unified_archives 컬렉션에서 조회
+  id: string; // Document ID (auto-generated)
+  userId: string; // User ID
+  title: string; // Project title
+  description: string; // Project description
+  category?: "repetitive" | "task_based"; // Project type
+  areaId?: string; // Belonging area ID
+  area?: string; // Area name (denormalized - not stored in DB, provided together when querying)
+  completedTasks: number; // Total actual completed tasks
+  startDate: Date; // Start date
+  endDate: Date; // End date
+  createdAt: Date; // Creation date/time
+  updatedAt: Date; // Update date/time
+  // Retrospectives and notes managed through Unified Archives
+  // retrospective is queried from unified_archives collection
+  // Notes managed through Unified Archives
+  // notes are queried from unified_archives collection
 
-  // 프로젝트 상태는 동적으로 계산됨 (DB에 저장되지 않음)
-  // getProjectStatus() 함수를 사용하여 실시간 계산
+  // Project status is calculated dynamically (not stored in DB)
+  // Use getProjectStatus() function for real-time calculation
 }
 
-// 프로젝트 상태 계산 로직 (getProjectStatus 함수):
-// - scheduled: startDate > now (시작일이 미래)
+// Project status calculation logic (getProjectStatus function):
+// - scheduled: startDate > now (start date is in the future)
 // - in_progress: startDate <= now <= endDate && completionRate < 100%
 // - completed: completionRate >= 100%
 // - overdue: endDate < now && completionRate < 100%
 ```
 
-**서브컬렉션:**
+**Subcollections:**
 
-- `tasks`: 프로젝트의 세부 작업들 (projects/{projectId}/tasks/{taskId})
+- `tasks`: Detailed tasks in the project (projects/{projectId}/tasks/{taskId})
 
-**인덱스:**
+**Indexes:**
 
-- `userId` (단일)
-- `userId` + `areaId` (복합)
-- `userId` + `createdAt` (복합)
+- `userId` (single)
+- `userId` + `areaId` (composite)
+- `userId` + `createdAt` (composite)
 
 ---
 
-### 🔹 Monthlies 컬렉션
+### 🔹 Monthlies Collection
 
-각 먼슬리는 사용자가 한 달 동안 설정한 OKR 목표와 회고를 관리하는 단위입니다.
+Each monthly is a unit that manages OKR goals and retrospectives set by users for one month.
 
 ```typescript
-// Key Result 인터페이스
+// Key Result interface
 interface KeyResult {
   id: string;
-  title: string; // "운동 총 8회"
-  isCompleted: boolean; // 사용자가 OX 체크
-  targetCount?: number; // 목표 수치
-  completedCount?: number; // 완료 수치
+  title: string; // "Exercise 8 times total"
+  isCompleted: boolean; // User checks O/X
+  targetCount?: number; // Target count
+  completedCount?: number; // Completed count
 }
 
 interface Monthly {
   id: string;
   userId: string;
-  title: string; // 먼슬리 제목 (예: "8월: 이직 준비 완료")
-  startDate: Date; // 시작일 (보통 월초)
-  endDate: Date; // 종료일 (보통 월말)
-  focusAreas: string[]; // 중점 영역 ID 배열
-  objective: string; // 먼슬리 목표 (OKR Objective)
+  title: string; // Monthly title (e.g., "August: Complete job preparation")
+  startDate: Date; // Start date (usually beginning of month)
+  endDate: Date; // End date (usually end of month)
+  focusAreas: string[]; // Focus area ID array
+  objective: string; // Monthly objective (OKR Objective)
   keyResults: KeyResult[]; // Key Results
-  reward?: string; // 목표 달성 시 보상
+  reward?: string; // Reward upon goal achievement
   createdAt: Date;
   updatedAt: Date;
-  // Unified Archives를 통해 회고와 노트 관리
-  // retrospective와 note는 unified_archives 컬렉션에서 조회
+  // Retrospectives and notes managed through Unified Archives
+  // retrospective and note are queried from unified_archives collection
 
-  // 연결된 프로젝트들
+  // Connected projects
   connectedProjects?: Array<{
     projectId: string;
     target?: string;
@@ -186,103 +185,103 @@ interface Monthly {
     monthlyTargetCount?: number;
   }>;
 
-  // 프로젝트 바로가기 (사용자 편의용, 스냅샷에는 포함되지 않음)
+  // Project quick access (for user convenience, not included in snapshots)
   quickAccessProjects?: Array<{
     projectId: string;
     projectTitle: string;
     areaName: string;
   }>;
 
-  // 로컬 계산 필드 (DB에 저장되지 않음)
-  status?: "planned" | "in_progress" | "ended"; // startDate와 endDate를 기반으로 클라이언트에서 계산
+  // Local calculated fields (not stored in DB)
+  status?: "planned" | "in_progress" | "ended"; // Calculated on client based on startDate and endDate
 }
 ```
 
-**상태 계산 로직:**
+**Status Calculation Logic:**
 
-- `planned`: 현재 날짜 < 시작일
-- `in_progress`: 시작일 ≤ 현재 날짜 ≤ 종료일
-- `ended`: 현재 날짜 > 종료일
+- `planned`: Current date < start date
+- `in_progress`: Start date ≤ current date ≤ end date
+- `ended`: Current date > end date
 
-**먼슬리 목표 달성률:**
+**Monthly Goal Achievement Rate:**
 
-- Key Results 완료율 = 완료된 Key Results 수 / 전체 Key Results 수
-- 사용자가 완료된 태스크들을 보고 각 Key Result 달성 여부를 수동으로 평가
+- Key Results completion rate = completed Key Results count / total Key Results count
+- User manually evaluates each Key Result achievement by reviewing completed tasks
 
 ---
 
-### 🔹 Tasks 컬렉션
+### 🔹 Tasks Collection
 
-프로젝트 내 세부 작업들을 저장합니다.
+Stores detailed tasks within projects.
 
 ```typescript
 interface Task {
-  id: string; // 문서 ID (자동 생성)
-  userId: string; // 사용자 ID
-  projectId: string; // 소속 프로젝트 ID
-  title: string; // 작업 제목
-  date: Date; // 작업 날짜
-  duration: number; // 소요일수
-  done: boolean; // 완료 여부
-  createdAt: Date; // 생성일시
-  updatedAt: Date; // 수정일시
+  id: string; // Document ID (auto-generated)
+  userId: string; // User ID
+  projectId: string; // Belonging project ID
+  title: string; // Task title
+  date: Date; // Task date
+  duration: number; // Duration in days
+  done: boolean; // Completion status
+  createdAt: Date; // Creation date/time
+  updatedAt: Date; // Update date/time
 }
 ```
 
-**인덱스:**
+**Indexes:**
 
-- `userId` (단일)
-- `userId` + `projectId` (복합)
-- `userId` + `date` (복합)
+- `userId` (single)
+- `userId` + `projectId` (composite)
+- `userId` + `date` (composite)
 
-### 🔹 MonthlyCompletedTasks 컬렉션
+### 🔹 MonthlyCompletedTasks Collection
 
-월별 완료된 태스크들을 실시간으로 추적합니다.
+Tracks completed tasks per month in real-time.
 
 ```typescript
 interface MonthlyCompletedTasks {
-  id: string; // 문서 ID (자동 생성)
-  userId: string; // 사용자 ID
-  yearMonth: string; // "2024-08" 형태
+  id: string; // Document ID (auto-generated)
+  userId: string; // User ID
+  yearMonth: string; // Format: "2024-08"
   completedTasks: {
-    taskId: string; // 완료된 태스크 ID
-    projectId: string; // 소속 프로젝트 ID
-    completedAt: Date; // 완료 날짜
+    taskId: string; // Completed task ID
+    projectId: string; // Belonging project ID
+    completedAt: Date; // Completion date
   }[];
-  createdAt: Date; // 생성일시
-  updatedAt: Date; // 수정일시
+  createdAt: Date; // Creation date/time
+  updatedAt: Date; // Update date/time
 }
 ```
 
-**인덱스:**
+**Indexes:**
 
-- `userId` (단일)
-- `userId` + `yearMonth` (복합)
+- `userId` (single)
+- `userId` + `yearMonth` (composite)
 
 ---
 
-### 🔹 MonthlySnapshots 컬렉션
+### 🔹 MonthlySnapshots Collection
 
-월말에 자동 생성되는 월간 스냅샷을 저장합니다.
+Stores monthly snapshots automatically generated at the end of each month.
 
 ```typescript
-// Key Result 스냅샷 (월말 스냅샷용)
+// Key Result snapshot (for end-of-month snapshots)
 interface KeyResultSnapshot {
   id: string;
   title: string;
   isCompleted: boolean;
   targetCount?: number;
   completedCount?: number;
-  // 스냅샷 시점의 상태를 그대로 보존
+  // Preserves state at snapshot time
 }
 
 interface MonthlySnapshot {
-  id: string; // 문서 ID (자동 생성)
-  userId: string; // 사용자 ID
+  id: string; // Document ID (auto-generated)
+  userId: string; // User ID
   yearMonth: string; // "2024-08"
-  snapshotDate: Date; // 스냅샷 생성일
+  snapshotDate: Date; // Snapshot creation date
 
-  // 먼슬리 정보
+  // Monthly information
   monthly: {
     id: string;
     title: string;
@@ -290,7 +289,7 @@ interface MonthlySnapshot {
     keyResults: KeyResultSnapshot[];
   };
 
-  // 완료된 태스크들 (프로젝트별 그룹핑)
+  // Completed tasks (grouped by project)
   completedTasks: {
     projectId: string;
     projectTitle: string;
@@ -302,7 +301,7 @@ interface MonthlySnapshot {
     }[];
   }[];
 
-  // 통계 정보
+  // Statistics
   statistics: {
     totalCompletedTasks: number;
     totalProjects: number;
@@ -311,7 +310,7 @@ interface MonthlySnapshot {
     keyResultsTotal: number;
   };
 
-  // 실패 분석 데이터 (새로 추가)
+  // Failure analysis data (newly added)
   failureAnalysis?: {
     totalKeyResults: number;
     failedKeyResults: number;
@@ -332,52 +331,53 @@ interface MonthlySnapshot {
 }
 ```
 
-**인덱스:**
+**Indexes:**
 
-- `userId` (단일)
-- `userId` + `yearMonth` (복합)
-- `snapshotDate` (단일)
+- `userId` (single)
+- `userId` + `yearMonth` (composite)
+- `snapshotDate` (single)
 
 ---
 
-### 🔹 Unified Archives 컬렉션
+### 🔹 Unified Archives Collection
 
-모든 회고와 노트를 통합 관리하는 아카이브 시스템입니다.
+An archive system that manages all retrospectives and notes in a unified way.
 
 ```typescript
 interface UnifiedArchive {
-  id: string; // 문서 ID (자동 생성)
-  userId: string; // 사용자 ID (Firebase Auth UID)
+  id: string; // Document ID (auto-generated)
+  userId: string; // User ID (Firebase Auth UID)
   type:
     | "monthly_retrospective"
     | "project_retrospective"
     | "monthly_note"
-    | "project_note"; // 아카이브 타입
-  parentId: string; // 부모 문서 ID (Monthly ID 또는 Project ID)
-  parentType: "monthly" | "project"; // 부모 타입
+    | "project_note"; // Archive type
+  parentId: string; // Parent document ID (Monthly ID or Project ID)
+  parentType: "monthly" | "project"; // Parent type
 
-  // 공통 필드
-  title: string; // 제목 (자동 생성 또는 사용자 입력)
-  content: string; // 내용
-  userRating?: number; // 별점 (1-5)
-  bookmarked: boolean; // 북마크 여부
+  // Common fields
+  title: string; // Title (auto-generated or user input)
+  content: string; // Content
+  userRating?: number; // Star rating (1-5)
+  bookmarked: boolean; // Bookmark status
 
-  // 회고 전용 필드 (type이 "retrospective"인 경우)
-  bestMoment?: string; // 가장 좋았던 순간
-  routineAdherence?: string; // 루틴 준수율
-  unexpectedObstacles?: string; // 예상치 못한 장애물
-  nextMonthlyApplication?: string; // 다음 달 적용 사항
-  stuckPoints?: string; // 막힌 지점
-  newLearnings?: string; // 새로운 학습
-  nextProjectImprovements?: string; // 다음 프로젝트 개선사항
-  memorableTask?: string; // 가장 기억에 남는 작업
+  // Retrospective-specific fields (when type is "retrospective")
+  bestMoment?: string; // Best moment
+  routineAdherence?: string; // Routine adherence rate
+  unexpectedObstacles?: string; // Unexpected obstacles
+  nextMonthlyApplication?: string; // Next month application
+  stuckPoints?: string; // Stuck points
+  newLearnings?: string; // New learnings
+  nextProjectImprovements?: string; // Next project improvements
+  memorableTask?: string; // Most memorable task
 
-  // Key Results 실패 이유 데이터 (새로 추가)
+  // Key Results failure reason data (newly added)
   keyResultsReview?: {
-    completedKeyResults?: string[]; // 완료된 Key Results ID 목록
+    text?: string; // Overall text review of Key Results
+    completedKeyResults?: string[]; // Completed Key Results ID list
     failedKeyResults?: {
       keyResultId: string;
-      keyResultTitle: string; // Key Result 제목 (조회 시 편의용)
+      keyResultTitle: string; // Key Result title (for convenience when querying)
       reason:
         | "unrealisticGoal"
         | "timeManagement"
@@ -385,153 +385,153 @@ interface UnifiedArchive {
         | "externalFactors"
         | "motivation"
         | "other";
-      customReason?: string; // "other" 선택 시 사용자 입력 이유
+      customReason?: string; // User input reason when "other" is selected
     }[];
   };
 
-  createdAt: Date; // 생성일시
-  updatedAt: Date; // 수정일시
+  createdAt: Date; // Creation date/time
+  updatedAt: Date; // Update date/time
 }
 ```
 
-**인덱스:**
+**Indexes:**
 
-- `userId` (단일)
-- `userId` + `type` (복합)
-- `userId` + `parentType` (복합)
-- `userId` + `createdAt` (복합, 내림차순)
-- `userId` + `bookmarked` (복합)
-- `userId` + `type` + `createdAt` (복합, 내림차순)
-- `userId` + `parentType` + `createdAt` (복합, 내림차순)
+- `userId` (single)
+- `userId` + `type` (composite)
+- `userId` + `parentType` (composite)
+- `userId` + `createdAt` (composite, descending)
+- `userId` + `bookmarked` (composite)
+- `userId` + `type` + `createdAt` (composite, descending)
+- `userId` + `parentType` + `createdAt` (composite, descending)
 
 ---
 
-## 🔗 관계 정의
+## 🔗 Relationship Definitions
 
 ### 1. User → Areas (1:N)
 
-- 사용자 하나가 여러 영역을 가질 수 있음
-- `userId`로 연결
+- One user can have multiple areas
+- Connected via `userId`
 
 ### 2. Area → Resources (1:N)
 
-- 영역 하나가 여러 리소스를 가질 수 있음
-- `areaId`로 연결
+- One area can have multiple resources
+- Connected via `areaId`
 
 ### 3. Area → Projects (1:N)
 
-- 영역 하나가 여러 프로젝트를 가질 수 있음
-- `areaId`로 연결
+- One area can have multiple projects
+- Connected via `areaId`
 
 ### 4. Project → Tasks (1:N)
 
-- 프로젝트 하나가 여러 작업을 가질 수 있음
-- 서브컬렉션으로 관리: `projects/{projectId}/tasks/{taskId}`
-- `projectId`로 연결
+- One project can have multiple tasks
+- Managed as subcollection: `projects/{projectId}/tasks/{taskId}`
+- Connected via `projectId`
 
-### 5. Monthly → Projects (독립적)
+### 5. Monthly → Projects (Independent)
 
-- 먼슬리와 프로젝트는 독립적으로 관리
-- 프로젝트 연결 없음 (connectedProjects 제거)
-- 완료된 태스크들이 MonthlyCompletedTasks를 통해 자동 집계
-- 사용자가 완료된 태스크들을 보고 Key Results 달성 여부를 수동으로 평가
+- Monthlies and projects are managed independently
+- No project connection (connectedProjects removed)
+- Completed tasks are automatically aggregated through MonthlyCompletedTasks
+- User manually evaluates Key Results achievement by reviewing completed tasks
 
 ### 6. MonthlyCompletedTasks → Tasks (1:N)
 
-- 월별 완료된 태스크들을 실시간으로 추적
-- 태스크 완료 시 자동으로 해당 월의 MonthlyCompletedTasks에 추가
-- 프로젝트별 그룹핑으로 조회 가능
+- Tracks completed tasks per month in real-time
+- Automatically added to MonthlyCompletedTasks for that month when task is completed
+- Queryable grouped by project
 
 ### 7. MonthlySnapshot → Monthly (1:1)
 
-- 월말에 자동 생성되는 먼슬리 스냅샷
-- 해당 월의 모든 정보를 완전히 보존
-- 과거 데이터 조회 시 사용
+- Monthly snapshot automatically generated at end of month
+- Completely preserves all information for that month
+- Used when querying past data
 
-### 6. Unified Archives 시스템 (1:N)
+### 6. Unified Archives System (1:N)
 
-- 모든 회고와 노트를 `unified_archives` 컬렉션에서 통합 관리
-- `type` 필드로 구분: `"monthly_retrospective"`, `"project_retrospective"`, `"monthly_note"`, `"project_note"`
-- `parentId`로 Monthly 또는 Project와 연결
-- 별점(`userRating`)과 북마크(`bookmarked`) 기능 통합 제공
+- All retrospectives and notes managed in unified way in `unified_archives` collection
+- Distinguished by `type` field: `"monthly_retrospective"`, `"project_retrospective"`, `"monthly_note"`, `"project_note"`
+- Connected to Monthly or Project via `parentId`
+- Provides unified star rating (`userRating`) and bookmark (`bookmarked`) features
 
 ### 7. Monthly → Unified Archive (1:N)
 
-- 먼슬리 하나당 여러 아카이브 항목 가능 (회고, 노트)
-- `unified_archives` 컬렉션에서 `parentId`로 연결
+- Multiple archive items per monthly (retrospectives, notes)
+- Connected via `parentId` in `unified_archives` collection
 
 ### 8. Project → Unified Archive (1:N)
 
-- 프로젝트 하나당 여러 아카이브 항목 가능 (회고, 노트)
-- `unified_archives` 컬렉션에서 `parentId`로 연결
+- Multiple archive items per project (retrospectives, notes)
+- Connected via `parentId` in `unified_archives` collection
 
 ---
 
-## 📊 데이터 제약사항
+## 📊 Data Constraints
 
-### 1. 필수 필드
+### 1. Required Fields
 
-모든 문서에 다음 필드가 필수입니다:
+The following fields are required for all documents:
 
-- `id`: 문서 식별자
-- `userId`: 사용자 식별자
-- `createdAt`: 생성일시
-- `updatedAt`: 수정일시
+- `id`: Document identifier
+- `userId`: User identifier
+- `createdAt`: Creation date/time
+- `updatedAt`: Update date/time
 
-### 2. 상태 값 제약
+### 2. Status Value Constraints
 
-- `status`: 각 컬렉션별 정의된 값만 허용
-- `userRating`: 1-5 범위의 정수만 허용
-- `progress`, `total`: 0-100 범위의 정수만 허용
+- `status`: Only values defined per collection are allowed
+- `userRating`: Only integers in range 1-5 are allowed
+- `progress`, `total`: Only integers in range 0-100 are allowed
 
-### 3. 관계 제약
+### 3. Relationship Constraints
 
-- `areaId`: Areas 컬렉션에 존재하는 ID만 허용
-- `projectId`: Projects 컬렉션에 존재하는 ID만 허용
-- `monthlyId`: Monthlies 컬렉션에 존재하는 ID만 허용
+- `areaId`: Only IDs existing in Areas collection are allowed
+- `projectId`: Only IDs existing in Projects collection are allowed
+- `monthlyId`: Only IDs existing in Monthlies collection are allowed
 
-### 4. 배열 제약
+### 4. Array Constraints
 
-- `focusAreas`: 최대 4개 (권장 2개)
-- `connectedProjects`: 최대 5개 (권장 2-3개)
-- `connectedMonthlies`: 제한 없음
+- `focusAreas`: Maximum 4 (recommended 2)
+- `connectedProjects`: Maximum 5 (recommended 2-3)
+- `connectedMonthlies`: No limit
 
-### 5. 먼슬리별 목표치 제약
+### 5. Monthly Target Constraints
 
-- `monthlyTargetCount`: 0 이상의 정수
-- `monthlyDoneCount`: 0 이상의 정수, monthlyTargetCount 이하
-- `connectedProjects`: 중복된 projectId 불허용
+- `monthlyTargetCount`: Integer >= 0
+- `monthlyDoneCount`: Integer >= 0, <= monthlyTargetCount
+- `connectedProjects`: Duplicate projectId not allowed
 
 ---
 
-## 🔒 보안 규칙
+## 🔒 Security Rules
 
-### 기본 규칙
+### Basic Rules
 
 ```javascript
-// 모든 컬렉션에 적용
+// Applied to all collections
 match /{document=**} {
   allow read, write: if request.auth != null &&
     request.auth.uid == resource.data.userId;
 }
 ```
 
-### 컬렉션별 세부 규칙
+### Collection-Specific Rules
 
 ```javascript
-// Areas 컬렉션
+// Areas collection
 match /areas/{areaId} {
   allow read, write: if request.auth != null &&
     request.auth.uid == resource.data.userId;
 }
 
-// Projects 컬렉션
+// Projects collection
 match /projects/{projectId} {
   allow read, write: if request.auth != null &&
     request.auth.uid == resource.data.userId;
 }
 
-// Monthlies 컬렉션
+// Monthlies collection
 match /monthlies/{monthlyId} {
   allow read, write: if request.auth != null &&
     request.auth.uid == resource.data.userId;
@@ -540,70 +540,70 @@ match /monthlies/{monthlyId} {
 
 ---
 
-## 📈 성능 최적화
+## 📈 Performance Optimization
 
-### 1. Denormalization 전략
+### 1. Denormalization Strategy
 
-- **Area 정보**: Project, Resource에 `area`, `areaColor` 저장
-- **Monthly 정보**: Project에 `connectedMonthlies[]` 배열로 저장
-- **이유**: 조인 없이 UI 렌더링 가능
+- **Area information**: Store `area`, `areaColor` in Project, Resource
+- **Monthly information**: Store as `connectedMonthlies[]` array in Project
+- **Reason**: Enable UI rendering without joins
 
-### 2. 인덱싱 전략
+### 2. Indexing Strategy
 
-- **사용자별 조회**: `userId` 단일 인덱스
-- **상태별 조회**: `userId` + `status` 복합 인덱스
-- **날짜별 조회**: `userId` + `createdAt` 복합 인덱스
+- **Per-user queries**: `userId` single index
+- **Status-based queries**: `userId` + `status` composite index
+- **Date-based queries**: `userId` + `createdAt` composite index
 
-### 3. 먼슬리별 목표치 관리
+### 3. Monthly Target Management
 
-- **먼슬리 생성/수정**: `connectedProjects[*].monthlyTargetCount` 입력/갱신
-- **태스크 완료**: 해당 프로젝트가 활성 먼슬리와 연결된 경우 `monthlyDoneCount` 업데이트
-- **조회**: 먼슬리별 진행률 = `monthlyDoneCount / monthlyTargetCount`
-
----
-
-## 🔄 데이터 마이그레이션
-
-### 기존 데이터 호환성
-
-- 기존 Monthly의 `doneCount`, `targetCount` 필드는 legacy로 유지
-- 새로운 `connectedProjects` 배열이 우선적으로 사용됨
-- 마이그레이션 시 기존 데이터를 `connectedProjects`로 변환하는 로직 필요
-
-### 마이그레이션 규칙
-
-1. **먼슬리 생성 시**: `connectedProjects` 배열 초기화
-2. **프로젝트 연결 시**: `ConnectedProjectGoal` 객체 생성
-3. **태스크 완료 시**: 프로젝트 전체 진행률과 먼슬리별 진행률 동시 업데이트
-4. **먼슬리 완료 시**: 스냅샷에 먼슬리별 목표치 정보 포함
+- **Monthly creation/modification**: Input/update `connectedProjects[*].monthlyTargetCount`
+- **Task completion**: Update `monthlyDoneCount` if the project is connected to an active monthly
+- **Query**: Monthly progress rate = `monthlyDoneCount / monthlyTargetCount`
 
 ---
 
-## 📝 쓰기 규칙
+## 🔄 Data Migration
 
-### 생성/수정
+### Legacy Data Compatibility
 
-- 먼슬리 생성/편집 시 `connectedProjects[*].monthlyTargetCount`를 입력/갱신
-- 동일 트랜잭션/배치로 각 프로젝트의 `connectedMonthlies`에 표시용 메타를 동기화
+- Keep existing Monthly's `doneCount`, `targetCount` fields as legacy
+- New `connectedProjects` array is used preferentially
+- Migration logic needed to convert existing data to `connectedProjects`
 
-### 태스크 완료 이벤트
+### Migration Rules
 
-- 해당 태스크의 `projectId`가 활성 사이클의 `connectedProjects`에 있으면 그 항목의 `monthlyDoneCount++`
-- 프로젝트의 전체 진행률 갱신은 기존 로직대로
+1. **When creating monthly**: Initialize `connectedProjects` array
+2. **When connecting project**: Create `ConnectedProjectGoal` object
+3. **When completing task**: Update both project overall progress and monthly-specific progress simultaneously
+4. **When completing monthly**: Include monthly-specific target information in snapshot
 
-### 삭제/해제
+---
 
-- 먼슬리에서 프로젝트 연결 해제 ⇒ `connectedProjects`에서 제거
-- Project의 `connectedMonthlies`에서도 해당 먼슬리 메타 제거
+## 📝 Write Rules
 
-### 조회 패턴
+### Create/Modify
 
-- 루프 상세: `connectedProjects`만으로 이번 달 달성률 계산/표시
-- 프로젝트 상세: "이번 달 진행"은 활성 루프를 찾아 `connectedProjects`에서 매칭해 읽어옴
-- 히스토리: 과거 루프의 `connectedProjects`를 그대로 읽으면 그 달 목표/실적 복원 가능
+- When creating/editing monthly, input/update `connectedProjects[*].monthlyTargetCount`
+- Synchronize display metadata in each project's `connectedMonthlies` in the same transaction/batch
 
-### 인덱스 & 무결성
+### Task Completion Event
 
-- 인덱스: `monthlies(userId, startDate)`, `projects(userId, createdAt)` 등 기본 + 필요 복합
-- 무결성: "목표 수치는 먼슬리만 편집"을 UI/서버 규칙으로 고정
-- 동기화는 배치/트랜잭션으로 (먼슬리와 프로젝트 메타 동시 업데이트 시)
+- If the task's `projectId` exists in the active cycle's `connectedProjects`, increment that item's `monthlyDoneCount++`
+- Project overall progress update follows existing logic
+
+### Delete/Disconnect
+
+- Disconnect project from monthly ⇒ Remove from `connectedProjects`
+- Also remove that monthly metadata from Project's `connectedMonthlies`
+
+### Query Patterns
+
+- Loop detail: Calculate/display this month's achievement rate using only `connectedProjects`
+- Project detail: "This month's progress" is read by finding active loop and matching in `connectedProjects`
+- History: Reading past loop's `connectedProjects` as-is restores that month's goals/actuals
+
+### Index & Integrity
+
+- Index: `monthlies(userId, startDate)`, `projects(userId, createdAt)` etc. basic + necessary composite
+- Integrity: Fix "target count is editable only in monthly" as UI/server rule
+- Synchronization via batch/transaction (when updating monthly and project metadata simultaneously)

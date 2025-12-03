@@ -59,7 +59,9 @@ export function RetrospectiveContent({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4" />
-            <h3 className="font-bold">회고</h3>
+            <h3 className="font-bold">
+              {translate("monthlyDetail.tabs.retrospective")}
+            </h3>
           </div>
           <div className="flex items-center gap-2">
             <RatingDisplay
@@ -74,7 +76,7 @@ export function RetrospectiveContent({
           {retrospective.bestMoment && (
             <div>
               <h4 className="font-semibold text-sm mb-2">
-                가장 기억에 남는 순간
+                {translate("monthlyDetail.retrospective.bestMoment.label")}
               </h4>
               <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
                 {retrospective.bestMoment}
@@ -108,13 +110,13 @@ export function RetrospectiveContent({
             </div>
           )}
 
-          {retrospective.keyResultsReview && (
+          {retrospective.keyResultsReview?.text && (
             <div>
               <h4 className="font-semibold text-sm mb-2">
                 {translate("monthlyDetail.retrospectiveForm.keyResultsReview")}
               </h4>
               <p className="text-sm text-muted-foreground bg-muted/40 dark:bg-muted/30 p-3 rounded-lg">
-                {retrospective.keyResultsReview}
+                {retrospective.keyResultsReview.text}
               </p>
             </div>
           )}
@@ -151,8 +153,8 @@ export function RetrospectiveContent({
           )}
 
           {/* Key Results 실패 이유 표시 */}
-          {retrospective.failedKeyResults &&
-            retrospective.failedKeyResults.length > 0 && (
+          {retrospective.keyResultsReview?.failedKeyResults &&
+            retrospective.keyResultsReview.failedKeyResults.length > 0 && (
               <div>
                 <h4 className="font-semibold text-sm mb-2 text-red-700 dark:text-red-300">
                   {translate(
@@ -161,7 +163,7 @@ export function RetrospectiveContent({
                   분석
                 </h4>
                 <div className="space-y-2">
-                  {retrospective.failedKeyResults.map(
+                  {retrospective.keyResultsReview.failedKeyResults.map(
                     (failedKr: any, index: number) => (
                       <div
                         key={index}

@@ -5,7 +5,6 @@ export interface Area {
   description: string;
   icon?: string; // 아이콘 ID
   color?: string; // 색상 코드
-  status: "active" | "archived";
   createdAt: Date;
   updatedAt: Date;
 }
@@ -241,6 +240,7 @@ export interface UnifiedArchive {
   nextMonthlyApplication?: string;
   // Key Results 관련 데이터
   keyResultsReview?: {
+    text?: string; // Key Results 전반적인 텍스트 리뷰
     completedKeyResults?: string[]; // 완료된 Key Results ID 목록
     failedKeyResults?: {
       keyResultId: string;

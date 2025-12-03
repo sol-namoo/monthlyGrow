@@ -233,9 +233,14 @@ export const fetchUnifiedArchiveById = async (
         routineAdherence: data.routineAdherence,
         unexpectedObstacles: data.unexpectedObstacles,
         nextMonthlyApplication: data.nextMonthlyApplication,
-        keyResultsReview: data.keyResultsReview,
-        completedKeyResults: data.completedKeyResults,
-        failedKeyResults: data.failedKeyResults,
+        keyResultsReview: data.keyResultsReview
+          ? data.keyResultsReview
+          : data.completedKeyResults || data.failedKeyResults
+          ? {
+              completedKeyResults: data.completedKeyResults,
+              failedKeyResults: data.failedKeyResults,
+            }
+          : undefined,
         goalAchieved: data.goalAchieved,
         memorableTask: data.memorableTask,
         stuckPoints: data.stuckPoints,
