@@ -389,7 +389,8 @@ export default function LoginPage() {
                   </span>
                 </div>
                 <div className="space-y-2">
-                  <Button
+                  {/* 국문 샘플 유저 버튼 - 주석 처리 (사용자에게 노출되지 않음) */}
+                  {/* <Button
                     variant="ghost"
                     size="sm"
                     className="w-full text-sm border border-dashed border-muted-foreground/30 hover:border-muted-foreground/50 hover:bg-muted/50"
@@ -397,7 +398,7 @@ export default function LoginPage() {
                     disabled={isLoading}
                   >
                     {translate("login.sampleUserKorean")}
-                  </Button>
+                  </Button> */}
                   <Button
                     variant="ghost"
                     size="sm"
