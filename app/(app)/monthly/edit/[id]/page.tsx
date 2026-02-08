@@ -157,6 +157,7 @@ export default function EditMonthlyPage({
     Array<{
       projectId: string;
       monthlyTargetCount?: number;
+      monthlyDoneCount?: number;
     }>
   >([]);
   const [selectedFocusAreas, setSelectedFocusAreas] = useState<string[]>([]);
@@ -219,10 +220,12 @@ export default function EditMonthlyPage({
       setSelectedYear(startDateObj.getFullYear());
       setSelectedMonth(startDateObj.getMonth() + 1);
       setKeyResults(monthly.keyResults || []);
+      const source = monthly.connectedProjects || [];
       setSelectedProjects(
-        (monthly.quickAccessProjects || []).map((projectId) => ({
-          projectId,
-          monthlyTargetCount: 1,
+        source.map((cp: { projectId: string; monthlyTargetCount?: number; monthlyDoneCount?: number }) => ({
+          projectId: cp.projectId,
+          monthlyTargetCount: cp.monthlyTargetCount ?? 1,
+          monthlyDoneCount: cp.monthlyDoneCount ?? 0,
         }))
       );
       setSelectedFocusAreas(monthly.focusAreas || []);
@@ -265,7 +268,11 @@ export default function EditMonthlyPage({
         keyResults,
         startDate: getMonthStartDate(selectedYear, selectedMonth),
         endDate: getMonthEndDate(selectedYear, selectedMonth),
-        quickAccessProjects: selectedProjects.map((p) => p.projectId),
+        connectedProjects: selectedProjects.map((p) => ({
+          projectId: p.projectId,
+          monthlyTargetCount: p.monthlyTargetCount ?? 1,
+          monthlyDoneCount: p.monthlyDoneCount ?? 0,
+        })),
         focusAreas: selectedFocusAreas,
       };
 
@@ -807,6 +814,7 @@ export default function EditMonthlyPage({
                 await createUnifiedArchive({
                   userId: user?.uid || "",
                   type: "monthly_retrospective",
+                  parentType: "monthly",
                   parentId: monthly?.id || "",
                   title: data.title || monthly?.objective || "",
                   content: data.content || "",

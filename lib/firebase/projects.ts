@@ -391,8 +391,33 @@ export const deleteProjectById = async (projectId: string): Promise<void> => {
 
       const projectData = projectDoc.data();
       const areaId = projectData.areaId;
+      const connectedMonthlies: string[] = projectData.connectedMonthlies || [];
 
-      // 1. 프로젝트의 모든 태스크 서브컬렉션 삭제
+      // 1. 연결된 모든 먼슬리의 connectedProjects에서 이 프로젝트 제거 (SSOT 동기화)
+      for (const monthlyId of connectedMonthlies) {
+        const monthlyRef = doc(db, "monthlies", monthlyId);
+        const monthlySnap = await transaction.get(monthlyRef);
+        if (monthlySnap.exists()) {
+          const monthlyData = monthlySnap.data();
+          const list = monthlyData.connectedProjects || [];
+          const normalized = list.map((c: any) =>
+            typeof c === "string"
+              ? { projectId: c, monthlyTargetCount: 1, monthlyDoneCount: 0 }
+              : {
+                  projectId: c.projectId,
+                  monthlyTargetCount: c.monthlyTargetCount ?? 1,
+                  monthlyDoneCount: c.monthlyDoneCount ?? 0,
+                }
+          );
+          const next = normalized.filter((c) => c.projectId !== projectId);
+          transaction.update(monthlyRef, {
+            connectedProjects: next,
+            updatedAt: updateTimestamp(),
+          });
+        }
+      }
+
+      // 2. 프로젝트의 모든 태스크 서브컬렉션 삭제
       const tasksQuery = query(collection(db, "projects", projectId, "tasks"));
       const tasksSnapshot = await getDocs(tasksQuery);
 
@@ -401,7 +426,7 @@ export const deleteProjectById = async (projectId: string): Promise<void> => {
         transaction.delete(taskDoc.ref);
       });
 
-      // 2. Area의 projectCount 감소
+      // 3. Area의 projectCount 감소
       if (areaId) {
         const areaRef = doc(db, "areas", areaId);
         const areaSnap = await transaction.get(areaRef);
@@ -422,7 +447,7 @@ export const deleteProjectById = async (projectId: string): Promise<void> => {
         }
       }
 
-      // 3. 프로젝트 문서 삭제
+      // 4. 프로젝트 문서 삭제
       transaction.delete(projectRef);
     });
   } catch (error) {

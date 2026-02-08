@@ -1,8 +1,19 @@
 import { Card } from "@/components/ui/card";
-import { CheckCircle2, Circle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { CheckCircle2, Circle, Target } from "lucide-react";
+import Link from "next/link";
 import { useLanguage } from "@/hooks/useLanguage";
-import { formatDate } from "@/lib/utils";
+import { formatDate, getMonthlyStatus } from "@/lib/utils";
 import { Project, Task, Area } from "@/lib/types";
+
+/** 연결된 먼슬리 한 건 (id, objective, startDate, endDate, connectedProjects) */
+type ConnectedMonthlyItem = {
+  id: string;
+  objective?: string;
+  startDate: Date;
+  endDate: Date;
+  connectedProjects?: { projectId: string; monthlyTargetCount?: number; monthlyDoneCount?: number }[];
+};
 
 interface OverviewTabProps {
   project: Project;
@@ -11,6 +22,8 @@ interface OverviewTabProps {
   completedTasks: number;
   totalTasks: number;
   area?: Area | null;
+  /** 연결된 먼슬리 목록 (상세 표시용) */
+  connectedMonthlies?: ConnectedMonthlyItem[];
 }
 
 export function OverviewTab({
@@ -20,8 +33,27 @@ export function OverviewTab({
   completedTasks,
   totalTasks,
   area,
+  connectedMonthlies = [],
 }: OverviewTabProps) {
   const { translate, currentLanguage } = useLanguage();
+
+  const getProjectGoalInMonthly = (monthly: ConnectedMonthlyItem) => {
+    const list = monthly.connectedProjects || [];
+    const cp = list.find(
+      (c: any) => (typeof c === "string" ? c : c.projectId) === project.id
+    );
+    if (!cp || typeof cp === "string")
+      return { target: 0, done: 0 };
+    return {
+      target: (cp as any).monthlyTargetCount ?? 0,
+      done: (cp as any).monthlyDoneCount ?? 0,
+    };
+  };
+
+  const formatMonthlyPeriod = (m: ConnectedMonthlyItem) => {
+    const s = new Date(m.startDate);
+    return `${s.getFullYear()}년 ${s.getMonth() + 1}월`;
+  };
 
   // 반복형 프로젝트의 경우 targetCount 사용, 작업형의 경우 tasks 개수 사용
   const targetCount =
@@ -192,6 +224,55 @@ export function OverviewTab({
           </div>
         </div>
       </Card>
+
+      {/* 연결된 먼슬리 목록 + 목표/진행 */}
+      {connectedMonthlies.length > 0 && (
+        <Card className="p-4">
+          <h3 className="font-semibold mb-3 flex items-center gap-2">
+            <Target className="h-4 w-4" />
+            {translate("paraProjectDetail.connectedMonthlies")}
+          </h3>
+          <div className="space-y-3">
+            {connectedMonthlies.map((monthly) => {
+              const status = getMonthlyStatus(monthly);
+              const isActive = status === "in_progress";
+              const { target, done } = getProjectGoalInMonthly(monthly);
+              const progressText =
+                target > 0
+                  ? `목표 ${target}개 중 ${done}개 완료${isActive ? ` (${Math.round((done / target) * 100)}%)` : ""}`
+                  : "목표 미설정";
+              return (
+                <Link
+                  key={monthly.id}
+                  href={`/monthly/${monthly.id}`}
+                  className="block p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm truncate">
+                          {monthly.objective || "제목 없음"}
+                        </span>
+                        {isActive && (
+                          <Badge variant="default" className="text-xs shrink-0">
+                            이번 달
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {formatMonthlyPeriod(monthly)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {progressText}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

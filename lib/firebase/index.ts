@@ -80,8 +80,6 @@ export {
   fetchPastMonthliesByUserIdWithPaging,
   fetchMonthlyById,
   findMonthlyByMonth,
-  findIncompleteProjectsInMonthly,
-  moveProjectToMonthly,
   createMonthly,
   updateMonthly,
   checkMonthlyExists,

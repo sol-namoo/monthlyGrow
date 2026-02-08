@@ -58,6 +58,7 @@ import {
   fetchAllMonthliesByUserId,
   fetchMonthlyById,
   addTaskToProject,
+  updateMonthly,
 } from "@/lib/firebase/index";
 
 import {
@@ -753,6 +754,33 @@ function NewProjectPageContent() {
 
       const newProject = await createProject(projectData);
 
+      // Monthly.connectedProjects에 새 프로젝트 추가 (연결된 먼슬리 + monthlyTargetCount)
+      for (const monthlyId of connectedMonthlies) {
+        const monthly =
+          selectedMonthlies.find((m) => m.id === monthlyId) ||
+          (await fetchMonthlyById(monthlyId));
+        const existing = (monthly.connectedProjects || []).map((c: any) =>
+          typeof c === "string"
+            ? { projectId: c, monthlyTargetCount: 1, monthlyDoneCount: 0 }
+            : {
+                projectId: c.projectId,
+                monthlyTargetCount: c.monthlyTargetCount ?? 1,
+                monthlyDoneCount: c.monthlyDoneCount ?? 0,
+              }
+        );
+        const targetCount =
+          monthlyTargetCounts[monthlyId] ?? getDefaultTargetCount(monthly);
+        const newConnectedProjects = [
+          ...existing,
+          {
+            projectId: newProject.id,
+            monthlyTargetCount: targetCount,
+            monthlyDoneCount: 0,
+          },
+        ];
+        await updateMonthly(monthlyId, { connectedProjects: newConnectedProjects });
+      }
+
       // 태스크가 있으면 Firebase에 저장
       if (tasks.length > 0) {
         try {
@@ -905,7 +933,7 @@ function NewProjectPageContent() {
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             현재 먼슬리에 추가된 프로젝트:{" "}
-            {currentMonthly.quickAccessProjects?.length || 0}개
+            {currentMonthly.connectedProjects?.length || 0}개
           </p>
         </Card>
       )}

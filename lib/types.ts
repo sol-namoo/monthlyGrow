@@ -133,6 +133,13 @@ export interface KeyResult {
   completedCount?: number; // 완료 수치
 }
 
+/** 먼슬리 연결 프로젝트 (SSOT: Monthly.connectedProjects) */
+export interface ConnectedProjectGoal {
+  projectId: string;
+  monthlyTargetCount?: number;
+  monthlyDoneCount?: number;
+}
+
 export interface Monthly {
   id: string;
   userId: string;
@@ -154,7 +161,10 @@ export interface Monthly {
     [key: string]: any;
   }; // 먼슬리 회고
   note?: string; // 먼슬리 노트 (선택)
-  quickAccessProjects?: string[]; // 프로젝트 바로가기 ID 배열
+  /** 연결된 프로젝트 (SSOT). 목표치·진행률 포함 */
+  connectedProjects?: ConnectedProjectGoal[];
+  /** @deprecated connectedProjects로 통일. 읽기 호환용 */
+  quickAccessProjects?: string[];
 
   // 로컬 계산 필드 (DB에 저장되지 않음)
   status?: "planned" | "in_progress" | "ended"; // startDate와 endDate를 기반으로 클라이언트에서 계산

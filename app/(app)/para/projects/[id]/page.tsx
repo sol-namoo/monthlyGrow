@@ -446,6 +446,7 @@ export default function ProjectDetailPage({
               completedTasks={completedTasks}
               totalTasks={totalTasks}
               area={area}
+              connectedMonthlies={connectedMonthlies}
             />
           </Suspense>
         </TabsContent>

@@ -62,6 +62,7 @@ import {
   fetchAllProjectsByUserId,
   fetchAllTasksByProjectId,
   fetchAllMonthliesByUserId,
+  fetchMonthlyById,
   deleteTaskFromProject,
   addTaskToProject,
   updateTaskInProject,
@@ -431,14 +432,24 @@ export default function EditProjectPage({
         setSelectedMonthlyIds(project.connectedMonthlies);
       }
 
-      // 기존 월간별 태스크 개수 정보 로드
+      // 기존 월간별 태스크 개수: Monthly.connectedProjects에서 로드
       if (
         project.connectedMonthlies &&
         project.connectedMonthlies.length > 0 &&
         allMonthlies.length > 0
       ) {
-        // connectedProjects가 제거되었으므로 이 로직은 더 이상 필요하지 않음
-        setMonthlyTargetCounts({});
+        const counts: Record<string, number> = {};
+        for (const monthlyId of project.connectedMonthlies) {
+          const monthly = allMonthlies.find((m: any) => m.id === monthlyId);
+          if (!monthly?.connectedProjects?.length) continue;
+          const cp = monthly.connectedProjects.find(
+            (c: any) => (typeof c === "string" ? c : c.projectId) === project.id
+          );
+          if (cp && typeof cp === "object" && cp.monthlyTargetCount != null) {
+            counts[monthlyId] = cp.monthlyTargetCount;
+          }
+        }
+        setMonthlyTargetCounts((prev) => ({ ...prev, ...counts }));
       }
     }
   }, [project, form, areas, allMonthlies, projectId]);
@@ -604,7 +615,52 @@ export default function EditProjectPage({
 
       await updateProject(project.id, updateData);
 
-      // 2. 삭제된 태스크들 처리
+      // 2. Monthly.connectedProjects 동기화 (연결된 먼슬리 + monthlyTargetCount)
+      const prevMonthlyIds = project.connectedMonthlies || [];
+      const nextMonthlyIds = selectedMonthlyIds;
+      const toRemove = prevMonthlyIds.filter((id) => !nextMonthlyIds.includes(id));
+
+      for (const monthlyId of nextMonthlyIds) {
+        const monthly = await fetchMonthlyById(monthlyId);
+        const existing = (monthly.connectedProjects || []).map((c: any) =>
+          typeof c === "string"
+            ? { projectId: c, monthlyTargetCount: 1, monthlyDoneCount: 0 }
+            : {
+                projectId: c.projectId,
+                monthlyTargetCount: c.monthlyTargetCount ?? 1,
+                monthlyDoneCount: c.monthlyDoneCount ?? 0,
+              }
+        );
+        const withoutThis = existing.filter((c) => c.projectId !== project.id);
+        const current = existing.find((c) => c.projectId === project.id);
+        const targetCount = monthlyTargetCounts[monthlyId] ?? getDefaultTargetCount(monthly);
+        const newConnectedProjects = [
+          ...withoutThis,
+          {
+            projectId: project.id,
+            monthlyTargetCount: targetCount,
+            monthlyDoneCount: current?.monthlyDoneCount ?? 0,
+          },
+        ];
+        await updateMonthly(monthlyId, { connectedProjects: newConnectedProjects });
+      }
+
+      for (const monthlyId of toRemove) {
+        const monthly = await fetchMonthlyById(monthlyId);
+        const existing = (monthly.connectedProjects || []).map((c: any) =>
+          typeof c === "string"
+            ? { projectId: c, monthlyTargetCount: 1, monthlyDoneCount: 0 }
+            : {
+                projectId: c.projectId,
+                monthlyTargetCount: c.monthlyTargetCount ?? 1,
+                monthlyDoneCount: c.monthlyDoneCount ?? 0,
+              }
+        );
+        const newConnectedProjects = existing.filter((c) => c.projectId !== project.id);
+        await updateMonthly(monthlyId, { connectedProjects: newConnectedProjects });
+      }
+
+      // 3. 삭제된 태스크들 처리
       if (deletedTaskIds.length > 0) {
         for (const taskId of deletedTaskIds) {
           try {
@@ -615,7 +671,7 @@ export default function EditProjectPage({
         }
       }
 
-      // 3. 폼의 태스크들 처리
+      // 4. 폼의 태스크들 처리
       const formTasks = data.tasks.map((task) => ({
         ...task,
         title: task.title.trim() || "태스크",
@@ -669,6 +725,7 @@ export default function EditProjectPage({
         queryClient.invalidateQueries({ queryKey: ["projects", user?.uid] }),
         queryClient.invalidateQueries({ queryKey: ["tasks", projectId] }),
         queryClient.invalidateQueries({ queryKey: ["taskCounts", projectId] }),
+        queryClient.invalidateQueries({ queryKey: ["connectedMonthlies", projectId] }),
       ]);
 
       // connectedProjects가 제거되었으므로 월간 연결 기능은 더 이상 사용하지 않음
@@ -764,8 +821,7 @@ export default function EditProjectPage({
       }`}
     >
       {/* 로딩 오버레이 */}
-      <LoadingOverlay isVisible={isSubmitting} message="프로젝트 저장 중..." />
-
+      <LoadingOverlay isLoading={isSubmitting} message="프로젝트 저장 중...">
       <div className="mb-6 flex items-center">
         <Button
           variant="ghost"
@@ -1488,6 +1544,7 @@ export default function EditProjectPage({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </LoadingOverlay>
     </div>
   );
 }

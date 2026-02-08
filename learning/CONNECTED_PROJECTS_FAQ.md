@@ -163,3 +163,62 @@ NoSQL(Firestore)에서는 “연결 전용 컬렉션”을 따로 두지 않고,
      를 **한 번의 배치/트랜잭션**으로 처리하면, 상세와 수정이 항상 같은 목록을 보게 됩니다.
 
 이렇게 하면 “Single source of truth를 지키면서, NoSQL 조회 패턴에 맞게 두 문서를 같이 갱신하는 구조”로 정리할 수 있고, 트랜잭션 오류를 피하려면 “쓰기 시 두 군데를 같은 트랜잭션/배치로 갱신”만 꼭 지키면 됩니다.
+
+---
+
+## 6. currentMonthlyProgress를 null로 두면 지난 먼슬리 목록/상세에 문제가 있나요?
+
+**없습니다.** 지난 먼슬리 목록·상세의 "핵심 지표", "달성률"은 **Monthly 문서**에서만 계산합니다.
+
+- **목록/상세에서 쓰는 데이터**
+  - `calculateMonthlyProgressInfo(monthly)` → `monthly.keyResults` 기준으로 target/done 계산 (Key Result 완료 개수).
+  - 즉 **Project.currentMonthlyProgress**를 전혀 사용하지 않습니다.
+- **currentMonthlyProgress의 역할**
+  - **프로젝트** 문서에 "지금 이 프로젝트가 어떤 **활성** 먼슬리와 연결돼 있고, 그 달 목표 대비 진행률이 얼마인지"를 캐시해 두는 필드입니다.
+  - 프로젝트 대시/카드 등에서 "이번 달 진행률"을 빠르게 보여줄 때 사용합니다.
+
+**null로 두는 시점 (코드 기준)**
+
+- `updateProjectConnectedMonthlies(projectId, null)` 처럼 **monthlyId가 null**로 호출될 때
+- 해당 Monthly가 **활성(in_progress)이 아닐 때** (해당 달이 지나서 ended가 된 경우)
+- 해당 프로젝트가 그 Monthly의 **connectedProjects에 없을 때**
+
+해당 달이 지나면 "그 달 기준 진행률"은 더 이상 갱신하지 않고, `currentMonthlyProgress`를 null로 두거나 다른 활성 먼슬리로 바꿉니다. **과거 먼슬리의 진행률은 Monthly.keyResults에 이미 반영되어 있으므로**, Project.currentMonthlyProgress가 null이어도 지난 먼슬리 목록·상세에는 영향이 없습니다.
+
+---
+
+## 7. 삭제 시 동기화는 어떻게 하나요?
+
+**먼슬리 삭제** (`deleteMonthlyById`)
+
+- 해당 먼슬리 ID를 `connectedMonthlies`에 포함한 **모든 프로젝트**를 쿼리한 뒤,
+- 각 프로젝트의 `connectedMonthlies` 배열에서 해당 monthlyId를 **제거**합니다.
+- 이후 먼슬리 문서를 삭제합니다. (트랜잭션 내 처리)
+
+**프로젝트 삭제** (`deleteProjectById`)
+
+- 삭제할 프로젝트의 `connectedMonthlies`(연결된 먼슬리 ID 목록)를 읽은 뒤,
+- 각 먼슬리 문서의 **connectedProjects**에서 해당 projectId 항목을 **제거**합니다.
+- 이후 태스크·Area 카운트 처리 후 프로젝트 문서를 삭제합니다. (트랜잭션 내 처리)
+
+이렇게 하면 먼슬리 삭제/프로젝트 삭제 후에도 SSOT(Monthly.connectedProjects)와 복제(Project.connectedMonthlies)가 서로 맞는 상태로 유지됩니다.
+
+---
+
+## 8. 예전 데이터(quickAccessProjects) 마이그레이션은 어떻게 하나요?
+
+**스크립트**는 `scripts/` 폴더에 두었습니다.
+
+1. **migrate-quickAccess-to-connectedProjects.ts**  
+   - Monthly 문서에서 `quickAccessProjects`(문자열 배열)를 **connectedProjects**(객체 배열) 형태로 변환하고,  
+   - `quickAccessProjects` 필드를 제거합니다.  
+   - `--dry-run`으로 적용 대상만 확인할 수 있습니다.
+
+2. **sync-monthly-project-bidirectional.ts**  
+   - **Monthly 기준**으로, 각 먼슬리의 `connectedProjects`에 있는 projectId에 대해  
+     해당 프로젝트의 `connectedMonthlies`에 이 monthlyId가 없으면 **추가**합니다.  
+   - 1번 스크립트 실행 후에 실행합니다.  
+   - `--dry-run`으로 적용 대상만 확인할 수 있습니다.
+
+실행 방법은 `scripts/README.md`를 참고하면 됩니다.  
+마이그레이션이 정상적으로 끝났다면, 앱/코드에서 **quickAccessProjects를 읽거나 connectedProjects로 넣는 fallback 로직은 제거**해도 됩니다. (이미 제거된 상태입니다.)

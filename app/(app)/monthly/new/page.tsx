@@ -121,6 +121,7 @@ function NewMonthlyPageContent() {
     Array<{
       projectId: string;
       monthlyTargetCount?: number;
+      monthlyDoneCount?: number;
     }>
   >([]);
 
@@ -299,7 +300,11 @@ function NewMonthlyPageContent() {
         focusAreas: selectedFocusAreas, // 선택된 Area ID 배열
         reward: data.reward || "",
         keyResults,
-        quickAccessProjects: selectedProjects.map((p) => p.projectId),
+        connectedProjects: selectedProjects.map((p) => ({
+          projectId: p.projectId,
+          monthlyTargetCount: p.monthlyTargetCount ?? 1,
+          monthlyDoneCount: 0,
+        })),
       };
 
       await createMonthly(monthlyData);
