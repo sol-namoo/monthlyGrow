@@ -345,28 +345,33 @@ export default function ProjectDetailPage({
               {translate("paraProjectDetail.status")}
             </span>
             <div className="flex items-center gap-2">
-              <Badge
-                variant={
-                  getProjectStatus(project) === "scheduled"
-                    ? "secondary"
-                    : getProjectStatus(project) === "in_progress"
-                    ? "default"
-                    : "outline"
-                }
-              >
-                {getProjectStatus(project) === "scheduled"
-                  ? translate("paraProjectDetail.statusLabels.planned")
-                  : getProjectStatus(project) === "in_progress"
-                  ? translate("paraProjectDetail.statusLabels.inProgress")
-                  : getProjectStatus(project) === "completed"
-                  ? translate("paraProjectDetail.statusLabels.completed")
-                  : translate("paraProjectDetail.statusLabels.overdue")}
-              </Badge>
-              {getProjectStatus(project) === "overdue" && (
-                <Badge variant="destructive" className="text-xs">
-                  {translate("paraProjectDetail.overdue")}
-                </Badge>
-              )}
+              {(() => {
+                const status = getProjectStatus(project, {
+                  completedTasks,
+                  totalTasks,
+                });
+                return (
+                  <Badge
+                    variant={
+                      status === "scheduled"
+                        ? "secondary"
+                        : status === "in_progress"
+                        ? "default"
+                        : status === "overdue"
+                        ? "destructive"
+                        : "outline"
+                    }
+                  >
+                    {status === "scheduled"
+                      ? translate("paraProjectDetail.statusLabels.planned")
+                      : status === "in_progress"
+                      ? translate("paraProjectDetail.statusLabels.inProgress")
+                      : status === "completed"
+                      ? translate("paraProjectDetail.statusLabels.completed")
+                      : translate("paraProjectDetail.statusLabels.overdue")}
+                  </Badge>
+                );
+              })()}
             </div>
           </div>
 

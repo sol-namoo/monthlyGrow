@@ -32,7 +32,6 @@ import {
   FileText,
   Link as LinkIcon,
   ExternalLink,
-  AlertCircle,
   ArrowUpDown,
   Loader2,
 } from "lucide-react";
@@ -72,6 +71,7 @@ import {
   fetchArchiveCountByUserId,
   fetchProjectsByUserIdWithPaging,
   fetchResourcesWithAreasByUserIdWithPaging,
+  getTaskCountsForMultipleProjects,
 } from "@/lib/firebase/index";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatDateShort } from "@/lib/utils";
@@ -198,13 +198,22 @@ function ParaPageContent() {
     refetch: refetchProjects,
   } = useInfiniteQuery({
     queryKey: ["projects", user?.uid, projectSortBy],
-    queryFn: ({ pageParam }) =>
-      fetchProjectsByUserIdWithPaging(
+    queryFn: async ({ pageParam }) => {
+      const page = await fetchProjectsByUserIdWithPaging(
         user?.uid || "",
         10,
         pageParam?.lastDoc,
         projectSortBy
-      ),
+      );
+      if (page.projects.length === 0) return page;
+      const ids = page.projects.map((p) => p.id);
+      const counts = await getTaskCountsForMultipleProjects(ids);
+      const projectsWithCounts = page.projects.map((p) => ({
+        ...p,
+        taskCounts: p.taskCounts ?? (counts[p.id] ? { total: counts[p.id].total, completed: counts[p.id].completed, pending: counts[p.id].pending } : undefined),
+      }));
+      return { ...page, projects: projectsWithCounts };
+    },
     enabled: !!user?.uid && activeTab === "projects",
     getNextPageParam: (lastPage) =>
       lastPage.hasMore ? { lastDoc: lastPage.lastDoc } : undefined,
@@ -307,41 +316,6 @@ function ParaPageContent() {
         ))}
       </div>
     );
-  };
-
-  const isOverdue = (endDate: Date | any | null | undefined) => {
-    if (!endDate) return false;
-
-    let date: Date;
-
-    // Timestamp 객체인 경우
-    if (endDate && typeof endDate.toDate === "function") {
-      date = endDate.toDate();
-    } else if (endDate instanceof Date) {
-      date = endDate;
-    } else {
-      return false;
-    }
-
-    // Invalid Date 체크
-    if (isNaN(date.getTime())) {
-      return false;
-    }
-
-    // 날짜만 비교 (시간 제외)
-    const today = new Date();
-    const todayDateOnly = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate()
-    );
-    const endDateOnly = new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate()
-    );
-
-    return endDateOnly < todayDateOnly;
   };
 
   return (
@@ -501,14 +475,7 @@ function ParaPageContent() {
                       onClick={() =>
                         router.push(`/para/projects/${project.id}`)
                       }
-                    >
-                      {/* 기한 초과 아이콘 - 진행 중이고 완료되지 않은 프로젝트만 */}
-                      {project.endDate && isOverdue(project.endDate) && (
-                        <div className="flex justify-end">
-                          <AlertCircle className="h-3 w-3 text-red-500" />
-                        </div>
-                      )}
-                    </ProjectCard>
+                    />
                   );
                 })}
 

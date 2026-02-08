@@ -9,7 +9,6 @@ export const paraProjectDetail = {
     completed: "완료",
     overdue: "기한 지남",
   },
-  overdue: "기한 초과",
   target: "목표",
   targetLabels: {
     count: "횟수",

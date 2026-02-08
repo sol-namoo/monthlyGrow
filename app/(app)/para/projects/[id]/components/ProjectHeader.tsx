@@ -9,6 +9,9 @@ import { Project, Area } from "@/lib/types";
 interface ProjectHeaderProps {
   project: Project;
   area?: Area;
+  /** 완료/전체 태스크 수. 있으면 목표(targetCount) 달성 여부로 상태 계산 */
+  completedTasks?: number;
+  totalTasks?: number;
   onEdit: () => void;
   onDelete: () => void;
 }
@@ -16,9 +19,17 @@ interface ProjectHeaderProps {
 export function ProjectHeader({
   project,
   area,
+  completedTasks,
+  totalTasks,
   onEdit,
   onDelete,
 }: ProjectHeaderProps) {
+  const status = getProjectStatus(
+    project,
+    completedTasks != null && totalTasks != null
+      ? { completedTasks, totalTasks }
+      : undefined
+  );
   const { translate, currentLanguage } = useLanguage();
 
   return (
@@ -62,26 +73,23 @@ export function ProjectHeader({
           <div className="flex items-center gap-2">
             <Badge
               variant={
-                getProjectStatus(project) === "scheduled"
+                status === "scheduled"
                   ? "secondary"
-                  : getProjectStatus(project) === "in_progress"
+                  : status === "in_progress"
                   ? "default"
+                  : status === "overdue"
+                  ? "destructive"
                   : "outline"
               }
             >
-              {getProjectStatus(project) === "scheduled"
+              {status === "scheduled"
                 ? translate("paraProjectDetail.statusLabels.planned")
-                : getProjectStatus(project) === "in_progress"
+                : status === "in_progress"
                 ? translate("paraProjectDetail.statusLabels.inProgress")
-                : getProjectStatus(project) === "completed"
+                : status === "completed"
                 ? translate("paraProjectDetail.statusLabels.completed")
                 : translate("paraProjectDetail.statusLabels.overdue")}
             </Badge>
-            {getProjectStatus(project) === "overdue" && (
-              <Badge variant="destructive" className="text-xs">
-                {translate("paraProjectDetail.overdue")}
-              </Badge>
-            )}
           </div>
         </div>
 

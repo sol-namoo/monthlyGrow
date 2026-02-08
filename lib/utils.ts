@@ -260,34 +260,40 @@ export const formatDateNumeric = (
 
 // === 기존 프로젝트 상태 관련 함수들 ===
 
-export function getProjectStatus(project: {
-  startDate: Date;
-  endDate: Date;
-  completedTasks?: number;
-  targetCount?: number;
-}): "scheduled" | "in_progress" | "completed" | "overdue" {
+/**
+ * 프로젝트 상태 계산. 목록·상세 공통으로 "목표(targetCount) 달성 여부" 기준.
+ * - 목표 달성(completedTasks >= 목표)이면 기한 전이어도 완료.
+ * - 기한 지났는데 미달이면 기한 지남.
+ * - 목표 = project.targetCount ?? totalTasks. targetCount가 없으면 100% 달성 시 완료.
+ * @param options.completedTasks, options.totalTasks - 실제 카운트(목록/상세에서 taskCounts 등으로 전달)
+ */
+export function getProjectStatus(
+  project: {
+    startDate: Date;
+    endDate: Date;
+    completedTasks?: number;
+    targetCount?: number;
+  },
+  options?: { completedTasks?: number; totalTasks?: number }
+): "scheduled" | "in_progress" | "completed" | "overdue" {
   const now = new Date();
   const startDate = new Date(project.startDate);
   const endDate = new Date(project.endDate);
 
-  // 시작일이 미래인 경우
   if (startDate > now) {
     return "scheduled";
   }
 
-  // 종료일이 지났지만 완료되지 않은 경우 (overdue)
-  if (endDate < now) {
-    // targetCount가 있고 completedTasks가 targetCount보다 작으면 overdue
-    if (project.targetCount && project.completedTasks !== undefined) {
-      if (project.completedTasks < project.targetCount) {
-        return "overdue";
-      }
-    }
-    // targetCount가 없거나 completedTasks가 targetCount 이상이면 completed
+  const completed = options?.completedTasks ?? project.completedTasks ?? 0;
+  const goal = project.targetCount ?? options?.totalTasks ?? 0;
+  if (goal > 0 && completed >= goal) {
     return "completed";
   }
 
-  // 진행 중인 경우
+  if (endDate < now) {
+    return "overdue";
+  }
+
   return "in_progress";
 }
 

@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Project } from "@/lib/types";
-import { AlertCircle } from "lucide-react";
 
 interface ProjectCardProps {
   project: Project;
@@ -116,56 +115,60 @@ export function ProjectCard({
 
   const progressInfo = getProgressInfo();
 
-  // 프로젝트 상태 계산
-  const getProjectStatus = () => {
+  // 프로젝트 상태 계산 (목표 targetCount 달성 여부 기준. 상세와 동일). Badge는 상세와 동일한 variant 사용.
+  const getProjectStatus = (): {
+    statusKey: "scheduled" | "in_progress" | "completed" | "overdue" | "undefined";
+    label: string;
+  } => {
     const now = new Date();
     const startDate = project.startDate ? new Date(project.startDate) : null;
     const endDate = project.endDate ? new Date(project.endDate) : null;
 
     if (!startDate || !endDate) {
       return {
-        status: translate("para.projects.status.undefined"),
-        color: "text-gray-500 dark:text-gray-400",
-        bgColor: "bg-gray-100 dark:bg-gray-800/50",
+        statusKey: "undefined",
+        label: translate("para.projects.status.undefined"),
       };
     }
 
-    // 완료된 경우 (진행률 100% 이상)
-    if (progressInfo.percentage >= 100) {
-      return {
-        status: translate("para.projects.status.completed"),
-        color: "text-green-600 dark:text-green-400",
-        bgColor: "bg-green-100 dark:bg-green-900/30",
-      };
-    }
+    const goal = project.targetCount ?? progressInfo.total;
+    const goalReached = goal > 0 && progressInfo.done >= goal;
 
-    // 시작일이 미래인 경우
     if (now < startDate) {
       return {
-        status: translate("para.projects.status.planned"),
-        color: "text-blue-600 dark:text-blue-400",
-        bgColor: "bg-blue-100 dark:bg-blue-900/30",
+        statusKey: "scheduled",
+        label: translate("para.projects.status.planned"),
       };
     }
-
-    // 종료일이 지났지만 완료되지 않은 경우
-    if (now > endDate && progressInfo.percentage < 100) {
+    if (goalReached) {
       return {
-        status: translate("para.projects.status.overdue"),
-        color: "text-red-600 dark:text-red-400",
-        bgColor: "bg-red-100 dark:bg-red-900/30",
+        statusKey: "completed",
+        label: translate("para.projects.status.completed"),
       };
     }
-
-    // 진행 중인 경우
+    if (now > endDate) {
+      return {
+        statusKey: "overdue",
+        label: translate("para.projects.status.overdue"),
+      };
+    }
     return {
-      status: translate("para.projects.status.inProgress"),
-      color: "text-green-600 dark:text-green-400",
-      bgColor: "bg-green-100 dark:bg-green-900/30",
+      statusKey: "in_progress",
+      label: translate("para.projects.status.inProgress"),
     };
   };
 
   const projectStatus = getProjectStatus();
+  const statusVariant: Record<
+    "scheduled" | "in_progress" | "completed" | "overdue" | "undefined",
+    "secondary" | "default" | "destructive" | "outline"
+  > = {
+    scheduled: "secondary",
+    in_progress: "default",
+    completed: "outline",
+    overdue: "destructive",
+    undefined: "secondary",
+  };
 
   return (
     <Card
@@ -181,16 +184,12 @@ export function ProjectCard({
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <span className="font-medium truncate">{project.title}</span>
-            {projectStatus.status ===
-              translate("para.projects.status.overdue") && (
-              <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
-            )}
           </div>
           <Badge
-            variant="outline"
-            className={`text-xs flex-shrink-0 ${projectStatus.color} ${projectStatus.bgColor}`}
+            variant={statusVariant[projectStatus.statusKey]}
+            className="text-xs flex-shrink-0"
           >
-            {projectStatus.status}
+            {projectStatus.label}
           </Badge>
         </div>
 

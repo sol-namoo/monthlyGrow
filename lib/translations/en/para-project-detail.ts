@@ -9,7 +9,6 @@ export const paraProjectDetail = {
     completed: "Completed",
     overdue: "Overdue",
   },
-  overdue: "Overdue",
   target: "Target",
   targetLabels: {
     count: "Count",
