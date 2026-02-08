@@ -81,15 +81,6 @@ export interface Project {
     remainingTime: number; // 남은 태스크들의 duration 합계
   };
 
-  // 현재 활성 Monthly 진행률 (denormalized)
-  currentMonthlyProgress?: {
-    monthlyId: string;
-    monthlyTitle: string;
-    monthlyTargetCount: number;
-    monthlyDoneCount: number;
-    progressRate: number; // 계산된 진행률
-  };
-
   // tasks는 서브컬렉션으로 관리: projects/{projectId}/tasks/{taskId}
 
   // 프로젝트 상태는 동적으로 계산됨 (DB에 저장되지 않음)

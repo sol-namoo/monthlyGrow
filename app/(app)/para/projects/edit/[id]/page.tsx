@@ -174,9 +174,6 @@ export default function EditProjectPage({
   const [showMonthlyConnectionDialog, setShowMonthlyConnectionDialog] =
     useState(false);
   const [selectedMonthlyIds, setSelectedMonthlyIds] = useState<string[]>([]);
-  const [monthlyTargetCounts, setMonthlyTargetCounts] = useState<
-    Record<string, number>
-  >({});
 
   // 카테고리 변경 다이얼로그 상태
   const [showCategoryChangeDialog, setShowCategoryChangeDialog] =
@@ -291,65 +288,13 @@ export default function EditProjectPage({
 
   const availableMonthliesForConnection = getAvailableMonthliesForConnection();
 
-  // 월간별 기본 태스크 개수 계산 (프로젝트 기간과 월간 기간을 고려)
-  const getDefaultTargetCount = (monthly: any) => {
-    const projectStartDate = new Date(form.watch("startDate"));
-    const projectEndDate = new Date(form.watch("endDate"));
-    const monthlyStartDate = new Date(monthly.startDate);
-    const monthlyEndDate = new Date(monthly.endDate);
-
-    // 프로젝트와 월간의 겹치는 기간 계산
-    const overlapStart = new Date(
-      Math.max(projectStartDate.getTime(), monthlyStartDate.getTime())
-    );
-    const overlapEnd = new Date(
-      Math.min(projectEndDate.getTime(), monthlyEndDate.getTime())
-    );
-
-    if (overlapEnd <= overlapStart) return 1;
-
-    const overlapDays = Math.ceil(
-      (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    const totalProjectDays = Math.ceil(
-      (projectEndDate.getTime() - projectStartDate.getTime()) /
-        (1000 * 60 * 60 * 24)
-    );
-    const targetCount = form.watch("targetCount") || 1;
-
-    // 겹치는 기간 비율에 따라 태스크 개수 계산
-    return Math.max(
-      1,
-      Math.round((overlapDays / totalProjectDays) * targetCount)
-    );
-  };
-
-  // 월간별 태스크 개수 업데이트 핸들러
-  const updateMonthlyTargetCount = (monthlyId: string, count: number) => {
-    setMonthlyTargetCounts((prev) => ({
-      ...prev,
-      [monthlyId]: Math.max(1, count), // 최소 1개
-    }));
-  };
-
   // 월간 선택/해제 핸들러
   const toggleMonthlySelection = (monthlyId: string) => {
-    setSelectedMonthlyIds((prev) => {
-      const newSelection = prev.includes(monthlyId)
+    setSelectedMonthlyIds((prev) =>
+      prev.includes(monthlyId)
         ? prev.filter((id) => id !== monthlyId)
-        : [...prev, monthlyId];
-
-      // 월간이 해제되면 해당 월간의 태스크 개수도 제거
-      if (!newSelection.includes(monthlyId)) {
-        setMonthlyTargetCounts((prev) => {
-          const newCounts = { ...prev };
-          delete newCounts[monthlyId];
-          return newCounts;
-        });
-      }
-
-      return newSelection;
-    });
+        : [...prev, monthlyId]
+    );
   };
 
   // 카테고리 변경 핸들러
@@ -430,26 +375,6 @@ export default function EditProjectPage({
       // 현재 연결된 월간들을 selectedMonthlyIds에 설정
       if (project.connectedMonthlies) {
         setSelectedMonthlyIds(project.connectedMonthlies);
-      }
-
-      // 기존 월간별 태스크 개수: Monthly.connectedProjects에서 로드
-      if (
-        project.connectedMonthlies &&
-        project.connectedMonthlies.length > 0 &&
-        allMonthlies.length > 0
-      ) {
-        const counts: Record<string, number> = {};
-        for (const monthlyId of project.connectedMonthlies) {
-          const monthly = allMonthlies.find((m: any) => m.id === monthlyId);
-          if (!monthly?.connectedProjects?.length) continue;
-          const cp = monthly.connectedProjects.find(
-            (c: any) => (typeof c === "string" ? c : c.projectId) === project.id
-          );
-          if (cp && typeof cp === "object" && cp.monthlyTargetCount != null) {
-            counts[monthlyId] = cp.monthlyTargetCount;
-          }
-        }
-        setMonthlyTargetCounts((prev) => ({ ...prev, ...counts }));
       }
     }
   }, [project, form, areas, allMonthlies, projectId]);
@@ -615,75 +540,116 @@ export default function EditProjectPage({
 
       await updateProject(project.id, updateData);
 
-      // 2. Monthly.connectedProjects 동기화 (연결된 먼슬리 + monthlyTargetCount)
+      // 2. Monthly.connectedProjects 동기화 (병렬: fetch 후 병렬 update)
       const prevMonthlyIds = project.connectedMonthlies || [];
       const nextMonthlyIds = selectedMonthlyIds;
       const toRemove = prevMonthlyIds.filter((id) => !nextMonthlyIds.includes(id));
 
-      for (const monthlyId of nextMonthlyIds) {
-        const monthly = await fetchMonthlyById(monthlyId);
-        const existing = (monthly.connectedProjects || []).map((c: any) =>
-          typeof c === "string"
-            ? { projectId: c, monthlyTargetCount: 1, monthlyDoneCount: 0 }
-            : {
-                projectId: c.projectId,
-                monthlyTargetCount: c.monthlyTargetCount ?? 1,
-                monthlyDoneCount: c.monthlyDoneCount ?? 0,
-              }
-        );
-        const withoutThis = existing.filter((c) => c.projectId !== project.id);
-        const current = existing.find((c) => c.projectId === project.id);
-        const targetCount = monthlyTargetCounts[monthlyId] ?? getDefaultTargetCount(monthly);
-        const newConnectedProjects = [
-          ...withoutThis,
-          {
-            projectId: project.id,
-            monthlyTargetCount: targetCount,
-            monthlyDoneCount: current?.monthlyDoneCount ?? 0,
-          },
-        ];
-        await updateMonthly(monthlyId, { connectedProjects: newConnectedProjects });
-      }
+      const monthliesToAdd = await Promise.all(
+        nextMonthlyIds.map((monthlyId) => fetchMonthlyById(monthlyId))
+      );
+      await Promise.all(
+        nextMonthlyIds.map(async (monthlyId, i) => {
+          const monthly = monthliesToAdd[i];
+          const existing = (monthly.connectedProjects || []).map((c: any) =>
+            typeof c === "string"
+              ? { projectId: c, monthlyTargetCount: 1, monthlyDoneCount: 0 }
+              : {
+                  projectId: c.projectId,
+                  monthlyTargetCount: c.monthlyTargetCount ?? 1,
+                  monthlyDoneCount: c.monthlyDoneCount ?? 0,
+                }
+          );
+          const withoutThis = existing.filter((c) => c.projectId !== project.id);
+          const current = existing.find((c) => c.projectId === project.id);
+          const newConnectedProjects = [
+            ...withoutThis,
+            {
+              projectId: project.id,
+              monthlyTargetCount: 1,
+              monthlyDoneCount: current?.monthlyDoneCount ?? 0,
+            },
+          ];
+          const prevIds = (monthly.connectedProjects || []).map((c: any) =>
+            typeof c === "string" ? c : c.projectId
+          );
+          await updateMonthly(
+            monthlyId,
+            { connectedProjects: newConnectedProjects },
+            {
+              prevConnectedProjectIds: prevIds,
+              skipProjectConnectedMonthliesSync: true,
+              updatedMonthlyForProgress: {
+                id: monthly.id,
+                objective: monthly.objective,
+                startDate: monthly.startDate,
+                endDate: monthly.endDate,
+                connectedProjects: newConnectedProjects,
+              },
+            }
+          );
+        })
+      );
 
-      for (const monthlyId of toRemove) {
-        const monthly = await fetchMonthlyById(monthlyId);
-        const existing = (monthly.connectedProjects || []).map((c: any) =>
-          typeof c === "string"
-            ? { projectId: c, monthlyTargetCount: 1, monthlyDoneCount: 0 }
-            : {
-                projectId: c.projectId,
-                monthlyTargetCount: c.monthlyTargetCount ?? 1,
-                monthlyDoneCount: c.monthlyDoneCount ?? 0,
-              }
-        );
-        const newConnectedProjects = existing.filter((c) => c.projectId !== project.id);
-        await updateMonthly(monthlyId, { connectedProjects: newConnectedProjects });
-      }
+      const monthliesToRemove = await Promise.all(
+        toRemove.map((monthlyId) => fetchMonthlyById(monthlyId))
+      );
+      await Promise.all(
+        toRemove.map(async (monthlyId, i) => {
+          const monthly = monthliesToRemove[i];
+          const existing = (monthly.connectedProjects || []).map((c: any) =>
+            typeof c === "string"
+              ? { projectId: c, monthlyTargetCount: 1, monthlyDoneCount: 0 }
+              : {
+                  projectId: c.projectId,
+                  monthlyTargetCount: c.monthlyTargetCount ?? 1,
+                  monthlyDoneCount: c.monthlyDoneCount ?? 0,
+                }
+          );
+          const newConnectedProjects = existing.filter(
+            (c) => c.projectId !== project.id
+          );
+          const prevIds = (monthly.connectedProjects || []).map((c: any) =>
+            typeof c === "string" ? c : c.projectId
+          );
+          await updateMonthly(
+            monthlyId,
+            { connectedProjects: newConnectedProjects },
+            {
+              prevConnectedProjectIds: prevIds,
+              skipProjectConnectedMonthliesSync: true,
+              updatedMonthlyForProgress: {
+                id: monthly.id,
+                objective: monthly.objective,
+                startDate: monthly.startDate,
+                endDate: monthly.endDate,
+                connectedProjects: newConnectedProjects,
+              },
+            }
+          );
+        })
+      );
 
-      // 3. 삭제된 태스크들 처리
+      // 3. 삭제된 태스크들 처리 (병렬)
       if (deletedTaskIds.length > 0) {
-        for (const taskId of deletedTaskIds) {
-          try {
-            await deleteTaskFromProject(project.id, taskId);
-          } catch (error) {
-            // 태스크 삭제 실패
-          }
-        }
+        await Promise.all(
+          deletedTaskIds.map((taskId) =>
+            deleteTaskFromProject(project.id, taskId).catch(() => {})
+          )
+        );
       }
 
-      // 4. 폼의 태스크들 처리
+      // 4. 폼의 태스크들 처리 (병렬)
       const formTasks = data.tasks.map((task) => ({
         ...task,
         title: task.title.trim() || "태스크",
       }));
 
-      for (const task of formTasks) {
-        const isNewTask = task.id.startsWith("temp_");
-        const isExistingTask = tasks.some((t) => t.id === task.id);
-
-        try {
+      const taskResults = await Promise.allSettled(
+        formTasks.map(async (task) => {
+          const isNewTask = task.id.startsWith("temp_");
+          const isExistingTask = tasks.some((t) => t.id === task.id);
           if (isNewTask) {
-            // 새 태스크 생성
             await addTaskToProject(project.id, {
               title: task.title,
               date: new Date(task.date),
@@ -693,19 +659,20 @@ export default function EditProjectPage({
               projectId: project.id,
             });
           } else if (isExistingTask) {
-            // 기존 태스크 수정
             await updateTaskInProject(project.id, task.id, {
               title: task.title,
               date: new Date(task.date),
               duration: task.duration,
               done: task.done,
             });
-          } else {
-            // 알 수 없는 태스크
           }
-        } catch (error) {
-          throw new Error(`태스크 저장 실패: ${task.title}`);
-        }
+        })
+      );
+      const taskFailure = taskResults.find((r) => r.status === "rejected");
+      if (taskFailure && taskFailure.status === "rejected") {
+        throw new Error(
+          `태스크 저장 실패: ${taskFailure.reason?.message ?? ""}`
+        );
       }
 
       // 성공 메시지
@@ -719,16 +686,19 @@ export default function EditProjectPage({
         description: successMessage,
       });
 
-      // 4. 캐시 무효화 후 페이지 이동
+      // 4. 캐시 무효화 후 페이지 이동 (연결된 먼슬리 쪽도 무효화해 상세/수정에서 최신 반영)
+      const updatedMonthlyIds = [...new Set([...nextMonthlyIds, ...toRemove])];
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
         queryClient.invalidateQueries({ queryKey: ["projects", user?.uid] }),
         queryClient.invalidateQueries({ queryKey: ["tasks", projectId] }),
         queryClient.invalidateQueries({ queryKey: ["taskCounts", projectId] }),
         queryClient.invalidateQueries({ queryKey: ["connectedMonthlies", projectId] }),
+        ...updatedMonthlyIds.map((mid) =>
+          queryClient.invalidateQueries({ queryKey: ["monthly", mid] })
+        ),
+        queryClient.invalidateQueries({ queryKey: ["monthlies"] }),
       ]);
-
-      // connectedProjects가 제거되었으므로 월간 연결 기능은 더 이상 사용하지 않음
 
       router.replace(`/para/projects/${project.id}`);
     } catch (error) {
@@ -1378,78 +1348,13 @@ export default function EditProjectPage({
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                              // 월간 연결 해제
                               setSelectedMonthlyIds((prev) =>
                                 prev.filter((id) => id !== monthly.id)
                               );
-                              // 월간이 해제되면 해당 월간의 태스크 개수도 제거
-                              setMonthlyTargetCounts((prev) => {
-                                const newCounts = { ...prev };
-                                delete newCounts[monthly.id];
-                                return newCounts;
-                              });
                             }}
                           >
                             <X className="h-4 w-4" />
                           </Button>
-                        </div>
-
-                        {/* 기존 연결된 월간의 태스크 개수 표시 */}
-                        <div className="mt-3 pt-3 border-t border-border">
-                          <div className="flex items-center gap-2">
-                            <Label
-                              htmlFor={`target-${monthly.id}`}
-                              className="text-sm font-medium"
-                            >
-                              이 먼슬리에서 완성할 태스크 개수
-                            </Label>
-                            <Badge variant="secondary" className="text-xs">
-                              권장: {getDefaultTargetCount(monthly)}개
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Input
-                              id={`target-${monthly.id}`}
-                              type="number"
-                              min="1"
-                              max="100"
-                              value={
-                                monthlyTargetCounts[monthly.id] ||
-                                getDefaultTargetCount(monthly)
-                              }
-                              onChange={(e) => {
-                                const value = parseInt(e.target.value) || 1;
-                                updateMonthlyTargetCount(monthly.id, value);
-                              }}
-                              className="w-20"
-                            />
-                            <span className="text-sm text-muted-foreground">
-                              개
-                            </span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                updateMonthlyTargetCount(
-                                  monthly.id,
-                                  getDefaultTargetCount(monthly)
-                                );
-                              }}
-                              className="text-xs"
-                            >
-                              권장값 적용
-                            </Button>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            프로젝트 기간과 먼슬리 기간을 고려한 권장
-                            개수입니다.
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            (프로젝트 정보: 미완료 태스크{" "}
-                            {form.watch("targetCount") || 0}개 / 총 태스크{" "}
-                            {form.watch("targetCount") || 0}개)
-                          </p>
                         </div>
                       </div>
                     ))}

@@ -21,7 +21,7 @@ import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   fetchMonthlyById,
-  fetchProjectsByMonthlyId,
+  fetchProjectsByIds,
   deleteMonthlyById,
   fetchAllAreasByUserId,
 } from "@/lib/firebase/index";
@@ -35,6 +35,7 @@ import { useRouter } from "next/navigation";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
 import { MonthlyDetailContent } from "@/components/monthly/MonthlyDetailContent";
+import type { Monthly, Project } from "@/lib/types";
 
 // 로딩 스켈레톤 컴포넌트
 function MonthlyDetailSkeleton() {
@@ -68,18 +69,22 @@ function MonthlyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { translate } = useLanguage();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  // 먼슬리 데이터 조회
+  // 먼슬리 데이터 조회 (SSOT: monthly.connectedProjects)
   const { data: monthly, isLoading: monthlyLoading } = useQuery({
     queryKey: ["monthly", id],
     queryFn: () => fetchMonthlyById(id),
     enabled: !!id,
   });
 
-  // 연결된 프로젝트 조회
-  const { data: connectedProjects, isLoading: projectsLoading } = useQuery({
-    queryKey: ["monthly-projects", id],
-    queryFn: () => fetchProjectsByMonthlyId(id),
-    enabled: !!id,
+  // 연결된 프로젝트: Monthly.connectedProjects 기준으로 프로젝트 문서 조회 (수정 화면과 동일 소스)
+  const projectIds =
+    (monthly?.connectedProjects ?? []).map((c: { projectId?: string } | string) =>
+      typeof c === "string" ? c : c.projectId!
+    );
+  const { data: connectedProjects = [], isLoading: projectsLoading } = useQuery({
+    queryKey: ["monthly-connected-projects", id, projectIds],
+    queryFn: () => fetchProjectsByIds(projectIds),
+    enabled: !!id && !!monthly,
   });
 
   // Area 정보 조회
@@ -173,10 +178,12 @@ function MonthlyDetailPage({ params }: { params: Promise<{ id: string }> }) {
 
       {/* MonthlyDetailContent: 상세 페이지에서는 상단 액션 비노출(헤더에서 처리) */}
       <MonthlyDetailContent
-        monthly={{
-          ...monthly,
-          connectedProjects: connectedProjects || [],
-        }}
+        monthly={
+          {
+            ...monthly,
+            connectedProjects: (connectedProjects || []) as Project[],
+          } as Monthly & { connectedProjects?: Project[] }
+        }
         allAreas={allAreas}
         showHeader={false}
         showActions={false}

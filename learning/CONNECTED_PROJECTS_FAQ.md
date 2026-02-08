@@ -166,24 +166,14 @@ NoSQL(Firestore)에서는 “연결 전용 컬렉션”을 따로 두지 않고,
 
 ---
 
-## 6. currentMonthlyProgress를 null로 두면 지난 먼슬리 목록/상세에 문제가 있나요?
+## 6. 지난 먼슬리 목록/상세의 지표는 어디서 오나요?
 
-**없습니다.** 지난 먼슬리 목록·상세의 "핵심 지표", "달성률"은 **Monthly 문서**에서만 계산합니다.
+**Monthly 문서만 사용합니다.** 지난 먼슬리 목록·상세의 "핵심 지표", "달성률"은 **Monthly 문서**에서만 계산합니다.
 
 - **목록/상세에서 쓰는 데이터**
   - `calculateMonthlyProgressInfo(monthly)` → `monthly.keyResults` 기준으로 target/done 계산 (Key Result 완료 개수).
-  - 즉 **Project.currentMonthlyProgress**를 전혀 사용하지 않습니다.
-- **currentMonthlyProgress의 역할**
-  - **프로젝트** 문서에 "지금 이 프로젝트가 어떤 **활성** 먼슬리와 연결돼 있고, 그 달 목표 대비 진행률이 얼마인지"를 캐시해 두는 필드입니다.
-  - 프로젝트 대시/카드 등에서 "이번 달 진행률"을 빠르게 보여줄 때 사용합니다.
-
-**null로 두는 시점 (코드 기준)**
-
-- `updateProjectConnectedMonthlies(projectId, null)` 처럼 **monthlyId가 null**로 호출될 때
-- 해당 Monthly가 **활성(in_progress)이 아닐 때** (해당 달이 지나서 ended가 된 경우)
-- 해당 프로젝트가 그 Monthly의 **connectedProjects에 없을 때**
-
-해당 달이 지나면 "그 달 기준 진행률"은 더 이상 갱신하지 않고, `currentMonthlyProgress`를 null로 두거나 다른 활성 먼슬리로 바꿉니다. **과거 먼슬리의 진행률은 Monthly.keyResults에 이미 반영되어 있으므로**, Project.currentMonthlyProgress가 null이어도 지난 먼슬리 목록·상세에는 영향이 없습니다.
+  - 프로젝트별 월간 목표/완료는 **Monthly.connectedProjects[]**의 `monthlyTargetCount` / `monthlyDoneCount` 사용.
+- **참고:** 과거에는 Project에 `currentMonthlyProgress`(현재 활성 먼슬리 캐시) 필드가 있었으나 제거되었습니다. 월별 진행률은 모두 Monthly 쪽 데이터로만 제공합니다.
 
 ---
 

@@ -159,9 +159,6 @@ function NewProjectPageContent() {
     "repetitive" | "task_based"
   >("repetitive");
   const [selectedMonthlyIds, setSelectedMonthlyIds] = useState<string[]>([]);
-  const [monthlyTargetCounts, setMonthlyTargetCounts] = useState<
-    Record<string, number>
-  >({});
 
   // 선택된 태스크들을 관리하는 상태
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
@@ -439,65 +436,13 @@ function NewProjectPageContent() {
     // 작업형으로 변경 시 기존 태스크 유지
   };
 
-  // 월간별 기본 태스크 개수 계산 (프로젝트 기간과 월간 기간을 고려)
-  const getDefaultTargetCount = (monthly: any) => {
-    const projectStartDate = new Date(form.watch("startDate"));
-    const projectEndDate = new Date(form.watch("dueDate"));
-    const monthlyStartDate = new Date(monthly.startDate);
-    const monthlyEndDate = new Date(monthly.endDate);
-
-    // 프로젝트와 월간의 겹치는 기간 계산
-    const overlapStart = new Date(
-      Math.max(projectStartDate.getTime(), monthlyStartDate.getTime())
-    );
-    const overlapEnd = new Date(
-      Math.min(projectEndDate.getTime(), monthlyEndDate.getTime())
-    );
-
-    if (overlapEnd <= overlapStart) return 1;
-
-    const overlapDays = Math.ceil(
-      (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    const totalProjectDays = Math.ceil(
-      (projectEndDate.getTime() - projectStartDate.getTime()) /
-        (1000 * 60 * 60 * 24)
-    );
-    const targetCount = form.watch("targetCount") || 1;
-
-    // 겹치는 기간 비율에 따라 태스크 개수 계산
-    return Math.max(
-      1,
-      Math.round((overlapDays / totalProjectDays) * targetCount)
-    );
-  };
-
-  // 월간별 태스크 개수 업데이트 핸들러
-  const updateMonthlyTargetCount = (monthlyId: string, count: number) => {
-    setMonthlyTargetCounts((prev) => ({
-      ...prev,
-      [monthlyId]: Math.max(1, count), // 최소 1개
-    }));
-  };
-
   // 월간 선택/해제 핸들러
   const toggleMonthlySelection = (monthlyId: string) => {
-    setSelectedMonthlyIds((prev) => {
-      const newSelection = prev.includes(monthlyId)
+    setSelectedMonthlyIds((prev) =>
+      prev.includes(monthlyId)
         ? prev.filter((id) => id !== monthlyId)
-        : [...prev, monthlyId];
-
-      // 월간이 해제되면 해당 월간의 태스크 개수도 제거
-      if (!newSelection.includes(monthlyId)) {
-        setMonthlyTargetCounts((prev) => {
-          const newCounts = { ...prev };
-          delete newCounts[monthlyId];
-          return newCounts;
-        });
-      }
-
-      return newSelection;
-    });
+        : [...prev, monthlyId]
+    );
   };
 
   // 반복형 프로젝트에서 목표 횟수에 따라 태스크 목록 동적 생성
@@ -754,7 +699,7 @@ function NewProjectPageContent() {
 
       const newProject = await createProject(projectData);
 
-      // Monthly.connectedProjects에 새 프로젝트 추가 (연결된 먼슬리 + monthlyTargetCount)
+      // Monthly.connectedProjects에 새 프로젝트 추가
       for (const monthlyId of connectedMonthlies) {
         const monthly =
           selectedMonthlies.find((m) => m.id === monthlyId) ||
@@ -768,13 +713,11 @@ function NewProjectPageContent() {
                 monthlyDoneCount: c.monthlyDoneCount ?? 0,
               }
         );
-        const targetCount =
-          monthlyTargetCounts[monthlyId] ?? getDefaultTargetCount(monthly);
         const newConnectedProjects = [
           ...existing,
           {
             projectId: newProject.id,
-            monthlyTargetCount: targetCount,
+            monthlyTargetCount: 1,
             monthlyDoneCount: 0,
           },
         ];
@@ -1600,16 +1543,9 @@ function NewProjectPageContent() {
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                              // 먼슬리 연결 해제
                               setSelectedMonthlyIds((prev) =>
                                 prev.filter((id) => id !== monthly.id)
                               );
-                              // 먼슬리가 해제되면 해당 먼슬리의 태스크 개수도 제거
-                              setMonthlyTargetCounts((prev) => {
-                                const newCounts = { ...prev };
-                                delete newCounts[monthly.id];
-                                return newCounts;
-                              });
                             }}
                           >
                             <X className="h-4 w-4" />

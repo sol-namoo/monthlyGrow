@@ -48,6 +48,7 @@ export {
   fetchActiveProjectsByUserId,
   fetchArchivedProjectsByUserId,
   fetchProjectById,
+  fetchProjectsByIds,
   fetchProjectsByAreaId,
   createProject,
   updateProject,

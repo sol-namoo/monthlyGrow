@@ -23,6 +23,7 @@ import {
   fetchAreaById,
   fetchMonthliesByIds,
   updateProject,
+  toggleTaskCompletionInSubcollection,
 } from "@/lib/firebase/index";
 import {
   fetchSingleArchive,
@@ -467,8 +468,51 @@ export default function ProjectDetailPage({
               totalTasks={totalTasks}
               progressPercentage={progressPercentage}
               onAddTask={() => setShowTaskDialog(true)}
-              onToggleTask={(taskId, currentStatus) => {
-                // 태스크 토글 로직 - 나중에 구현
+              onToggleTask={async (taskId, currentDone) => {
+                if (!projectId) return;
+                const newDone = !currentDone;
+                const delta = newDone ? 1 : -1;
+                try {
+                  await toggleTaskCompletionInSubcollection(projectId, taskId);
+                  // 낙관적 캐시 갱신만 하고 refetch 하지 않아 요청 수 최소화
+                  queryClient.setQueryData(
+                    ["tasks", "project", projectId],
+                    (old: any[] | undefined) => {
+                      if (!old) return old;
+                      return old.map((t) =>
+                        t.id === taskId ? { ...t, done: newDone } : t
+                      );
+                    }
+                  );
+                  queryClient.setQueryData(
+                    ["taskCounts", projectId],
+                    (old: { total?: number; completed?: number; pending?: number } | undefined) => {
+                      if (!old) return old;
+                      return {
+                        ...old,
+                        completed: (old.completed ?? 0) + delta,
+                        pending: Math.max(0, (old.pending ?? 0) - delta),
+                      };
+                    }
+                  );
+                  queryClient.setQueryData(
+                    ["project", projectId],
+                    (old: any) => {
+                      if (!old) return old;
+                      return {
+                        ...old,
+                        completedTasks: (old.completedTasks ?? 0) + delta,
+                      };
+                    }
+                  );
+                } catch (e) {
+                  console.error("태스크 완료 토글 실패:", e);
+                  toast({
+                    title: "오류",
+                    description: "완료 상태 변경에 실패했습니다.",
+                    variant: "destructive",
+                  });
+                }
               }}
             />
           </Suspense>

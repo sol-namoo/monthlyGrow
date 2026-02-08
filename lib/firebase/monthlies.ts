@@ -256,45 +256,6 @@ export const createMonthly = async (
       }
     }
 
-    // connectedProjects가 있고 Monthly가 활성 상태이면 관련 프로젝트들의 currentMonthlyProgress 업데이트
-    if (connectedProjects.length > 0) {
-      const { getMonthlyStatus } = await import("../utils");
-      const monthly: Monthly = {
-        id: docRef.id,
-        ...monthlyData,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as Monthly;
-      const status = getMonthlyStatus(monthly);
-      const isActive = status === "in_progress";
-
-      if (isActive) {
-        for (const cp of connectedProjects) {
-          const projectRef = doc(db, "projects", cp.projectId);
-          const projectSnap = await getDoc(projectRef);
-          if (projectSnap.exists()) {
-            const monthlyTargetCount = cp.monthlyTargetCount ?? 0;
-            const monthlyDoneCount = cp.monthlyDoneCount ?? 0;
-            const progressRate =
-              monthlyTargetCount > 0
-                ? (monthlyDoneCount / monthlyTargetCount) * 100
-                : 0;
-
-            await updateDoc(projectRef, {
-              currentMonthlyProgress: {
-                monthlyId: docRef.id,
-                monthlyTitle: monthlyData.objective || "",
-                monthlyTargetCount,
-                monthlyDoneCount,
-                progressRate,
-              },
-              updatedAt: updateTimestamp(),
-            });
-          }
-        }
-      }
-    }
-
     return {
       id: docRef.id,
       userId: monthlyData.userId,
@@ -320,21 +281,34 @@ function toProjectIds(connectedProjects: ConnectedProjectGoal[] | undefined): st
   return connectedProjects.map((cp) => cp.projectId);
 }
 
+export type UpdateMonthlyOptions = {
+  /** 호출자가 이미 알고 있으면 전달해 첫 getDoc(monthly) 생략 */
+  prevConnectedProjectIds?: string[];
+  /** true면 Project.connectedMonthlies 동기화 생략 (프로젝트 수정 저장 시 이미 반영된 경우) */
+  skipProjectConnectedMonthliesSync?: boolean;
+  /** 호출자가 이미 계산한 업데이트 후 먼슬리 데이터 전달 시 두 번째 getDoc(monthly) 생략 */
+  updatedMonthlyForProgress?: Pick<Monthly, "id" | "objective" | "startDate" | "endDate" | "connectedProjects">;
+};
+
 export const updateMonthly = async (
   monthlyId: string,
-  updateData: Partial<Omit<Monthly, "id" | "userId" | "createdAt">>
+  updateData: Partial<Omit<Monthly, "id" | "userId" | "createdAt">>,
+  options?: UpdateMonthlyOptions
 ): Promise<void> => {
   try {
     const monthlyRef = doc(db, "monthlies", monthlyId);
 
-    // connectedProjects 변경 시 Project.connectedMonthlies 동기화를 위해 이전 연결 목록 조회
     let prevProjectIds: string[] = [];
     if (updateData.connectedProjects !== undefined) {
-      const beforeSnap = await getDoc(monthlyRef);
-      if (beforeSnap.exists()) {
-        const data = beforeSnap.data();
-        const prevConnected = data.connectedProjects as ConnectedProjectGoal[] | undefined;
-        prevProjectIds = toProjectIds(prevConnected);
+      if (options?.prevConnectedProjectIds !== undefined) {
+        prevProjectIds = options.prevConnectedProjectIds;
+      } else {
+        const beforeSnap = await getDoc(monthlyRef);
+        if (beforeSnap.exists()) {
+          const data = beforeSnap.data();
+          const prevConnected = data.connectedProjects as ConnectedProjectGoal[] | undefined;
+          prevProjectIds = toProjectIds(prevConnected);
+        }
       }
     }
 
@@ -345,8 +319,10 @@ export const updateMonthly = async (
 
     await updateDoc(monthlyRef, filteredData);
 
-    // Project.connectedMonthlies 동기화 (추가/제거)
-    if (updateData.connectedProjects !== undefined) {
+    if (
+      updateData.connectedProjects !== undefined &&
+      !options?.skipProjectConnectedMonthliesSync
+    ) {
       const nextList = updateData.connectedProjects as (ConnectedProjectGoal | string)[];
       const nextProjectIds =
         nextList?.length
@@ -366,137 +342,6 @@ export const updateMonthly = async (
           await updateProjectConnectedMonthlies(projectId, monthlyId, false);
         } catch (e) {
           console.warn(`프로젝트 ${projectId} connectedMonthlies 제거 실패:`, e);
-        }
-      }
-    }
-
-    // connectedProjects가 변경된 경우 관련 프로젝트들의 currentMonthlyProgress 업데이트
-    if (updateData.connectedProjects !== undefined) {
-      const monthlySnap = await getDoc(monthlyRef);
-      if (monthlySnap.exists()) {
-        const monthlyData = monthlySnap.data();
-        const monthly: Monthly = {
-          id: monthlySnap.id,
-          ...monthlyData,
-          startDate: monthlyData.startDate.toDate(),
-          endDate: monthlyData.endDate.toDate(),
-          createdAt: monthlyData.createdAt.toDate(),
-          updatedAt:
-            monthlyData.updatedAt?.toDate() || monthlyData.createdAt.toDate(),
-        } as Monthly;
-
-        const { getMonthlyStatus } = await import("../utils");
-        const status = getMonthlyStatus(monthly);
-        const isActive = status === "in_progress";
-
-        const connectedProjects = monthlyData.connectedProjects || [];
-        const projectIds = connectedProjects.map((cp: any) =>
-          typeof cp === "string" ? cp : cp.projectId
-        );
-
-        // 관련 프로젝트들의 currentMonthlyProgress 업데이트
-        for (const projectId of projectIds) {
-          const projectRef = doc(db, "projects", projectId);
-          const projectSnap = await getDoc(projectRef);
-          if (projectSnap.exists()) {
-            const projectData = projectSnap.data();
-            const connectedMonthlies = projectData.connectedMonthlies || [];
-
-            if (connectedMonthlies.includes(monthlyId)) {
-              // 프로젝트가 이 Monthly에 연결되어 있으면 업데이트
-              if (isActive) {
-                const projectConnection = connectedProjects.find(
-                  (cp: any) =>
-                    (typeof cp === "string" ? cp : cp.projectId) === projectId
-                );
-                const monthlyTargetCount =
-                  projectConnection?.monthlyTargetCount || 0;
-                const monthlyDoneCount =
-                  projectConnection?.monthlyDoneCount || 0;
-                const progressRate =
-                  monthlyTargetCount > 0
-                    ? (monthlyDoneCount / monthlyTargetCount) * 100
-                    : 0;
-
-                await updateDoc(projectRef, {
-                  currentMonthlyProgress: {
-                    monthlyId: monthlyId,
-                    monthlyTitle: monthlyData.objective || "",
-                    monthlyTargetCount,
-                    monthlyDoneCount,
-                    progressRate,
-                  },
-                  updatedAt: updateTimestamp(),
-                });
-              } else {
-                // 활성 상태가 아니면 currentMonthlyProgress 제거 (다른 활성 Monthly가 있는지 확인)
-                const now = new Date();
-                let activeMonthlyId: string | null = null;
-
-                for (const mid of connectedMonthlies) {
-                  if (mid === monthlyId) continue;
-                  const otherMonthlyRef = doc(db, "monthlies", mid);
-                  const otherMonthlySnap = await getDoc(otherMonthlyRef);
-                  if (otherMonthlySnap.exists()) {
-                    const otherMonthlyData = otherMonthlySnap.data();
-                    const startDate = otherMonthlyData.startDate.toDate();
-                    const endDate = otherMonthlyData.endDate.toDate();
-
-                    if (startDate <= now && now <= endDate) {
-                      activeMonthlyId = mid;
-                      break;
-                    }
-                  }
-                }
-
-                if (activeMonthlyId) {
-                  // 다른 활성 Monthly가 있으면 그것으로 업데이트
-                  const activeMonthlyRef = doc(
-                    db,
-                    "monthlies",
-                    activeMonthlyId
-                  );
-                  const activeMonthlySnap = await getDoc(activeMonthlyRef);
-                  if (activeMonthlySnap.exists()) {
-                    const activeMonthlyData = activeMonthlySnap.data();
-                    const activeConnectedProjects =
-                      activeMonthlyData.connectedProjects || [];
-                    const activeProjectConnection =
-                      activeConnectedProjects.find(
-                        (cp: any) =>
-                          (typeof cp === "string" ? cp : cp.projectId) ===
-                          projectId
-                      );
-                    const monthlyTargetCount =
-                      activeProjectConnection?.monthlyTargetCount || 0;
-                    const monthlyDoneCount =
-                      activeProjectConnection?.monthlyDoneCount || 0;
-                    const progressRate =
-                      monthlyTargetCount > 0
-                        ? (monthlyDoneCount / monthlyTargetCount) * 100
-                        : 0;
-
-                    await updateDoc(projectRef, {
-                      currentMonthlyProgress: {
-                        monthlyId: activeMonthlyId,
-                        monthlyTitle: activeMonthlyData.objective || "",
-                        monthlyTargetCount,
-                        monthlyDoneCount,
-                        progressRate,
-                      },
-                      updatedAt: updateTimestamp(),
-                    });
-                  }
-                } else {
-                  // 활성 Monthly가 없으면 제거
-                  await updateDoc(projectRef, {
-                    currentMonthlyProgress: null,
-                    updatedAt: updateTimestamp(),
-                  });
-                }
-              }
-            }
-          }
         }
       }
     }

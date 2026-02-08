@@ -24,8 +24,8 @@ import {
   Clock,
   Trophy,
   FolderOpen,
-  ExternalLink,
   Edit,
+  Trash2,
   Compass,
   Heart,
   Brain,
@@ -49,6 +49,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { Progress } from "@/components/ui/progress";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import {
   formatDate,
   getMonthlyStatus,
@@ -392,8 +393,12 @@ export default function EditMonthlyPage({
   const status = getMonthlyStatus(monthly);
 
   return (
-    <div className="container max-w-md px-3 py-4 pb-20">
-      {/* Header */}
+    <LoadingOverlay
+      isLoading={updateMutation.isPending}
+      message={translate("monthlyEdit.saving") ?? "저장 중..."}
+    >
+      <div className="container max-w-md px-3 py-4 pb-20">
+        {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ChevronLeft className="h-5 w-5" />
@@ -658,29 +663,37 @@ export default function EditMonthlyPage({
                 (p: any) => p.id === selectedProject.projectId
               );
               return (
-                <Link
+                <div
                   key={selectedProject.projectId}
-                  href={`/para/projects/${selectedProject.projectId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg"
                 >
-                  <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
-                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">
-                        {projectInfo?.title ||
-                          `프로젝트 ID: ${selectedProject.projectId}`}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {projectInfo?.area ||
-                          translate("monthlyDetail.uncategorized")}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                    </div>
+                  <div className="w-3 h-3 rounded-full bg-blue-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm">
+                      {projectInfo?.title ||
+                        `프로젝트 ID: ${selectedProject.projectId}`}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {projectInfo?.area ||
+                        translate("monthlyDetail.uncategorized")}
+                    </p>
                   </div>
-                </Link>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                    title={translate("monthlyEdit.removeProject") ?? "연결 해제"}
+                    onClick={() =>
+                      setSelectedProjects((prev) =>
+                        prev.filter((p) => p.projectId !== selectedProject.projectId)
+                      )
+                    }
+                    disabled={status === "ended"}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               );
             })}
           </div>
@@ -765,9 +778,9 @@ export default function EditMonthlyPage({
             type="button"
             onClick={handleSubmit}
             className="w-full"
-            disabled={status === "ended"}
+            disabled={status === "ended" || updateMutation.isPending}
           >
-            완료
+            {updateMutation.isPending ? (translate("common.saving") ?? "저장 중...") : "완료"}
           </Button>
         </div>
       </div>
@@ -870,6 +883,7 @@ export default function EditMonthlyPage({
           monthlyEndDate={getMonthEndDate(selectedYear, selectedMonth)}
         />
       )}
-    </div>
+      </div>
+    </LoadingOverlay>
   );
 }

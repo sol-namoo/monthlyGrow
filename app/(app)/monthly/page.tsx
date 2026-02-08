@@ -62,7 +62,7 @@ import {
   createMonthly,
   updateMonthly,
   deleteMonthlyById,
-  fetchProjectsByMonthlyId,
+  fetchProjectsByIds,
 } from "@/lib/firebase/index";
 import { formatDate, getMonthlyStatus } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -117,11 +117,14 @@ function MonthlyPageContent() {
         );
 
         if (monthly) {
-          // 연결된 프로젝트 가져오기
+          // 연결된 프로젝트: SSOT인 monthly.connectedProjects 기준으로 조회
+          const projectIds = (monthly.connectedProjects ?? []).map(
+            (c: { projectId?: string } | string) =>
+              typeof c === "string" ? c : c.projectId!
+          );
           try {
-            const connectedProjects = await fetchProjectsByMonthlyId(
-              monthly.id
-            );
+            const connectedProjects =
+              projectIds.length > 0 ? await fetchProjectsByIds(projectIds) : [];
             return {
               ...monthly,
               connectedProjects,

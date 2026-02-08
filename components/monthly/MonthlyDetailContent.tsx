@@ -56,10 +56,11 @@ import {
 } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
-import { Monthly, Project } from "@/lib/types";
+import { KeyResult, Monthly, Project } from "@/lib/types";
 import {
   updateMonthly,
   deleteMonthlyById,
+  fetchMonthlyById,
   getCompletedTasksByMonthlyPeriod,
   fetchSingleArchive,
   createUnifiedArchive,
@@ -118,6 +119,14 @@ export function MonthlyDetailContent({
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState("key-results");
+
+  // 캐시를 직접 구독해 토글 후 UI가 즉시 갱신되도록 함
+  const { data: monthlyFromQuery } = useQuery({
+    queryKey: ["monthly", monthly.id],
+    queryFn: () => fetchMonthlyById(monthly.id),
+    enabled: !!monthly?.id,
+  });
+  const displayMonthly = monthlyFromQuery ?? monthly;
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showRetrospectiveModal, setShowRetrospectiveModal] = useState(false);
@@ -209,8 +218,8 @@ export function MonthlyDetailContent({
     )
   );
   const keyResultsCompleted =
-    monthly.keyResults?.filter((kr) => kr.isCompleted).length || 0;
-  const keyResultsTotal = monthly.keyResults?.length || 0;
+    displayMonthly.keyResults?.filter((kr) => kr.isCompleted).length || 0;
+  const keyResultsTotal = displayMonthly.keyResults?.length || 0;
   const keyResultProgress =
     keyResultsTotal > 0
       ? Math.round((keyResultsCompleted / keyResultsTotal) * 100)
@@ -225,11 +234,13 @@ export function MonthlyDetailContent({
     mutationFn: async ({
       keyResultIndex,
       isCompleted,
+      keyResults,
     }: {
       keyResultIndex: number;
       isCompleted: boolean;
+      keyResults: KeyResult[];
     }) => {
-      const updatedKeyResults = [...monthly.keyResults];
+      const updatedKeyResults = [...keyResults];
       updatedKeyResults[keyResultIndex] = {
         ...updatedKeyResults[keyResultIndex],
         isCompleted,
@@ -257,6 +268,11 @@ export function MonthlyDetailContent({
 
       return { previousMonthly };
     },
+    onSuccess: async () => {
+      // 서버 반영 후 캐시를 다시 가져와 UI가 확실히 갱신되도록
+      await queryClient.refetchQueries({ queryKey: ["monthly", monthly.id] });
+      queryClient.invalidateQueries({ queryKey: ["monthlies"] });
+    },
     onError: (error, variables, context) => {
       // 에러 발생 시 이전 상태로 롤백
       if (context?.previousMonthly) {
@@ -275,7 +291,7 @@ export function MonthlyDetailContent({
       });
     },
     onSettled: () => {
-      // 성공/실패 관계없이 쿼리 무효화하여 서버와 동기화
+      // 낙관적 업데이트 후 서버와 동기화
       queryClient.invalidateQueries({ queryKey: ["monthly", monthly.id] });
       queryClient.invalidateQueries({ queryKey: ["monthlies"] });
     },
@@ -308,10 +324,13 @@ export function MonthlyDetailContent({
       return;
     }
 
-    const keyResult = monthly.keyResults[keyResultIndex];
+    const keyResult = displayMonthly.keyResults?.[keyResultIndex];
+    if (!keyResult || !displayMonthly.keyResults) return;
+
     updateKeyResultMutation.mutate({
       keyResultIndex,
       isCompleted: !keyResult.isCompleted,
+      keyResults: displayMonthly.keyResults,
     });
   };
 
@@ -699,8 +718,8 @@ export function MonthlyDetailContent({
         {/* Key Results 탭 */}
         <TabsContent value="key-results" className="mt-0">
           <div className="space-y-3">
-            {monthly.keyResults && monthly.keyResults.length > 0 ? (
-              monthly.keyResults.map((keyResult, index) => (
+            {displayMonthly.keyResults && displayMonthly.keyResults.length > 0 ? (
+              displayMonthly.keyResults.map((keyResult, index) => (
                 <Card
                   key={keyResult.id}
                   className={`p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40 ${
@@ -1112,7 +1131,7 @@ export function MonthlyDetailContent({
         <RetrospectiveForm
           type="monthly"
           title={monthly.objective}
-          keyResults={monthly.keyResults || []}
+          keyResults={displayMonthly.keyResults || []}
           onClose={() => setShowRetrospectiveModal(false)}
           onSave={handleRetrospectiveSave}
         />
