@@ -454,7 +454,7 @@ export function MonthlyDetailContent({
 
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Header (current 탭 등 showHeader가 true일 때만 상단 수정/삭제 표시) */}
       {showHeader && (
         <div className="flex items-center justify-end">
           {showActions && (
@@ -792,23 +792,29 @@ export function MonthlyDetailContent({
                     "monthlyDetail.keyResults.noKeyResultsDescription"
                   )}
                 </p>
-                {!isPastMonthly && (
-                  <Button variant="outline" className="w-full bg-transparent">
-                    <Plus className="mr-2 h-4 w-4" />
-                    {translate("monthlyDetail.keyResults.addKeyResult")}
+                {/* 수정 화면에서 추가하도록 버튼 비노출 */}
+                {/* {!isPastMonthly && (
+                  <Button variant="outline" className="w-full bg-transparent" asChild>
+                    <Link href={`/monthly/edit/${monthly.id}`}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      {translate("monthlyDetail.keyResults.addKeyResult")}
+                    </Link>
                   </Button>
-                )}
+                )} */}
               </Card>
             )}
 
-            {monthly.keyResults &&
+            {/* 수정 화면에서 추가하도록 버튼 비노출 */}
+            {/* {monthly.keyResults &&
               monthly.keyResults.length > 0 &&
               !isPastMonthly && (
-                <Button variant="outline" className="w-full bg-transparent">
-                  <Plus className="mr-2 h-4 w-4" />
-                  {translate("monthlyDetail.keyResults.addKeyResult")}
+                <Button variant="outline" className="w-full bg-transparent" asChild>
+                  <Link href={`/monthly/edit/${monthly.id}`}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    {translate("monthlyDetail.keyResults.addKeyResult")}
+                  </Link>
                 </Button>
-              )}
+              )} */}
           </div>
         </TabsContent>
 

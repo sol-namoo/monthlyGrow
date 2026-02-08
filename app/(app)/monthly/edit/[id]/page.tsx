@@ -71,8 +71,25 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { KeyResult } from "@/lib/types";
 
-import { RetrospectiveForm } from "@/components/RetrospectiveForm";
-import { NoteForm } from "@/components/NoteForm";
+import dynamic from "next/dynamic";
+
+const ProjectConnectionDialog = dynamic(
+  () =>
+    import("@/components/monthly/ProjectConnectionDialog").then((m) => ({
+      default: m.ProjectConnectionDialog,
+    })),
+  { ssr: false, loading: () => null }
+);
+
+const RetrospectiveForm = dynamic(
+  () => import("@/components/RetrospectiveForm").then((m) => ({ default: m.RetrospectiveForm })),
+  { ssr: false, loading: () => null }
+);
+
+const NoteForm = dynamic(
+  () => import("@/components/NoteForm").then((m) => ({ default: m.NoteForm })),
+  { ssr: false, loading: () => null }
+);
 
 // 아이콘 컴포넌트 가져오기 함수
 const getIconComponent = (iconId: string) => {
@@ -831,6 +848,18 @@ export default function EditMonthlyPage({
               queryKey: ["monthly", monthly.id],
             });
           }}
+        />
+      )}
+
+      {/* 프로젝트 연결 다이얼로그 (지연 로딩) */}
+      {showProjectConnectionDialog && (
+        <ProjectConnectionDialog
+          open={showProjectConnectionDialog}
+          onOpenChange={setShowProjectConnectionDialog}
+          selectedProjects={selectedProjects}
+          onProjectsChange={setSelectedProjects}
+          monthlyStartDate={getMonthStartDate(selectedYear, selectedMonth)}
+          monthlyEndDate={getMonthEndDate(selectedYear, selectedMonth)}
         />
       )}
     </div>

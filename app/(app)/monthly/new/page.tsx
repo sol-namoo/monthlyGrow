@@ -48,7 +48,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   auth,
   findMonthlyByMonth,
@@ -58,11 +58,19 @@ import {
   fetchAllAreasByUserId,
 } from "@/lib/firebase/index";
 import { Monthly, KeyResult } from "@/lib/types";
+import dynamic from "next/dynamic";
 import Loading from "@/components/feedback/Loading";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useSettings } from "@/hooks/useSettings";
-import { ProjectConnectionDialog } from "@/components/monthly/ProjectConnectionDialog";
 import { getMonthStartDate, getMonthEndDate, formatDate } from "@/lib/utils";
+
+const ProjectConnectionDialog = dynamic(
+  () =>
+    import("@/components/monthly/ProjectConnectionDialog").then((m) => ({
+      default: m.ProjectConnectionDialog,
+    })),
+  { ssr: false, loading: () => null }
+);
 
 type MonthlyFormData = {
   objective: string;
@@ -101,6 +109,7 @@ function NewMonthlyPageContent() {
   const router = useRouter();
   const { toast } = useToast();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const [user, userLoading] = useAuthState(auth);
   const { translate, currentLanguage } = useLanguage();
   const { settings } = useSettings();
@@ -294,6 +303,16 @@ function NewMonthlyPageContent() {
       };
 
       await createMonthly(monthlyData);
+
+      // 예정된/현재 탭 목록이 바로 반영되도록 쿼리 무효화
+      if (user?.uid) {
+        queryClient.invalidateQueries({
+          queryKey: ["future-monthlies", user.uid],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["current-monthly", user.uid],
+        });
+      }
 
       toast({
         title: translate("monthlyNew.success.title"),
@@ -735,15 +754,17 @@ function NewMonthlyPageContent() {
         </div>
       </form>
 
-      {/* 프로젝트 연결 다이얼로그 */}
-      <ProjectConnectionDialog
-        open={showProjectConnectionDialog}
-        onOpenChange={setShowProjectConnectionDialog}
-        selectedProjects={selectedProjects}
-        onProjectsChange={setSelectedProjects}
-        monthlyStartDate={defaultStartDate}
-        monthlyEndDate={defaultEndDate}
-      />
+      {/* 프로젝트 연결 다이얼로그 (지연 로딩) */}
+      {showProjectConnectionDialog && (
+        <ProjectConnectionDialog
+          open={showProjectConnectionDialog}
+          onOpenChange={setShowProjectConnectionDialog}
+          selectedProjects={selectedProjects}
+          onProjectsChange={setSelectedProjects}
+          monthlyStartDate={defaultStartDate}
+          monthlyEndDate={defaultEndDate}
+        />
+      )}
     </div>
   );
 }

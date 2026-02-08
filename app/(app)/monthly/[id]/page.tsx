@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense, use } from "react";
+import { useState, Suspense, use } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,15 +15,6 @@ import {
   ChevronLeft,
   Edit,
   Trash2,
-  Plus,
-  Clock,
-  Trophy,
-  MessageSquare,
-  Target,
-  FolderOpen,
-  ExternalLink,
-  ChevronDown,
-  ChevronRight,
   AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
@@ -31,7 +22,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   fetchMonthlyById,
   fetchProjectsByMonthlyId,
-  updateMonthly,
   deleteMonthlyById,
   fetchAllAreasByUserId,
 } from "@/lib/firebase/index";
@@ -74,9 +64,9 @@ function MonthlyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { toast } = useToast();
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [user, userLoading] = useAuthState(auth);
-  const { translate, currentLanguage } = useLanguage();
+  const { translate } = useLanguage();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // 먼슬리 데이터 조회
   const { data: monthly, isLoading: monthlyLoading } = useQuery({
@@ -123,16 +113,65 @@ function MonthlyDetailPage({ params }: { params: Promise<{ id: string }> }) {
     );
   }
 
+  const status = getMonthlyStatus(monthly);
+  const isPastMonthly = status === "ended";
+
+  const handleDeleteConfirm = async () => {
+    try {
+      await deleteMonthlyById(id);
+      toast({
+        title: translate("monthlyDetail.delete.success"),
+        description: translate("monthlyDetail.delete.successDescription"),
+      });
+      router.push("/monthly");
+    } catch {
+      toast({
+        title: translate("monthlyDetail.delete.error.title"),
+        description: translate("monthlyDetail.delete.error.description"),
+        variant: "destructive",
+      });
+    }
+    setShowDeleteDialog(false);
+  };
+
   return (
     <div className="container max-w-md px-4 py-6 pb-20">
-      {/* 헤더 */}
+      {/* 헤더: 뒤로가기 + 수정/삭제 한 row (프로젝트 상세와 동일 패턴) */}
       <div className="flex items-center justify-between mb-6">
         <Button variant="ghost" size="sm" onClick={() => router.back()}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
+        <div className="flex gap-2">
+          {!isPastMonthly && (
+            <>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href={`/monthly/edit/${id}`}>
+                  <Edit className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* MonthlyDetailContent 컴포넌트 사용 */}
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title={translate("monthlyDetail.delete.title")}
+        description={translate("monthlyDetail.delete.description")}
+        onConfirm={handleDeleteConfirm}
+        destructive
+      />
+
+      {/* MonthlyDetailContent: 상세 페이지에서는 상단 액션 비노출(헤더에서 처리) */}
       <MonthlyDetailContent
         monthly={{
           ...monthly,
@@ -140,14 +179,8 @@ function MonthlyDetailPage({ params }: { params: Promise<{ id: string }> }) {
         }}
         allAreas={allAreas}
         showHeader={false}
-        showActions={true}
-        onDelete={() => {
-          toast({
-            title: translate("monthlyDetail.delete.success"),
-            description: translate("monthlyDetail.delete.successDescription"),
-          });
-          router.push("/monthly");
-        }}
+        showActions={false}
+        onDelete={() => {}}
       />
     </div>
   );
