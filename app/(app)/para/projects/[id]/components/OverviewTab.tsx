@@ -197,7 +197,7 @@ export function OverviewTab({
             <span className="text-muted-foreground">
               {translate("paraProjectDetail.connectedArea")}
             </span>
-            <span>{area?.title || project.area || "연결된 Area 없음"}</span>
+            <span>{area?.name || project.area || "연결된 Area 없음"}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">

@@ -18,7 +18,8 @@ import { formatDate, getMonthlyStatus } from "@/lib/utils";
 import { Monthly, Project } from "@/lib/types";
 
 interface MonthlyDetailHeaderProps {
-  monthly: Monthly & { connectedProjects?: Project[] };
+  monthly: Monthly;
+  connectedProjects?: Project[];
   allAreas?: any[];
   showActions?: boolean;
   onDelete?: () => void;
@@ -30,6 +31,7 @@ interface MonthlyDetailHeaderProps {
 
 export function MonthlyDetailHeader({
   monthly,
+  connectedProjects = [],
   allAreas = [],
   showActions = true,
   onDelete,
@@ -89,7 +91,7 @@ export function MonthlyDetailHeader({
           </Badge>
         </div>
 
-        <p className="text-muted-foreground">{monthly.description}</p>
+        <p className="text-muted-foreground">{monthly.objectiveDescription}</p>
 
         {/* 기간 정보 */}
         <div className="flex items-center gap-4 text-sm">
@@ -156,13 +158,13 @@ export function MonthlyDetailHeader({
         )}
 
         {/* 연결된 프로젝트 */}
-        {monthly.connectedProjects && monthly.connectedProjects.length > 0 && (
+        {connectedProjects.length > 0 && (
           <div>
             <h3 className="font-semibold mb-2">
               {translate("monthlyDetail.connectedProjects")}
             </h3>
             <div className="space-y-2">
-              {monthly.connectedProjects.map((project) => (
+              {connectedProjects.map((project) => (
                 <Card
                   key={project.id}
                   className="p-3 bg-muted/30 dark:bg-muted/20"
@@ -175,7 +177,7 @@ export function MonthlyDetailHeader({
                       </p>
                     </div>
                     <Badge variant="outline" className="text-xs">
-                      {project.areaName || "미분류"}
+                      {project.area || "미분류"}
                     </Badge>
                   </div>
                 </Card>

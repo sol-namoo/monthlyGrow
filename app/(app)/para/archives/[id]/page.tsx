@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { ChevronLeft, Star, Bookmark, Edit } from "lucide-react";
 import { RatingDisplay } from "@/components/ui/rating-display";
 import Link from "next/link";
-import type { Retrospective } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useQueryClient } from "@tanstack/react-query";

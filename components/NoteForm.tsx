@@ -70,6 +70,7 @@ export function NoteForm({ type, parent, onClose, onSave }: NoteFormProps) {
           await createUnifiedArchive({
             userId: parent.userId,
             type: "monthly_note",
+            parentType: "monthly",
             parentId: parent.id,
             title: parent.objective || "",
             content: data.note || "",
@@ -94,6 +95,7 @@ export function NoteForm({ type, parent, onClose, onSave }: NoteFormProps) {
           const newArchive = await createUnifiedArchive({
             userId: parent.userId,
             type: "project_note",
+            parentType: "project",
             parentId: parent.id,
             title: parent.title || "",
             content: data.note || "",

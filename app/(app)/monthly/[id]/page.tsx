@@ -35,7 +35,7 @@ import { useRouter } from "next/navigation";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
 import { MonthlyDetailContent } from "@/components/monthly/MonthlyDetailContent";
-import type { Monthly, Project } from "@/lib/types";
+import type { Monthly } from "@/lib/types";
 
 // 로딩 스켈레톤 컴포넌트
 function MonthlyDetailSkeleton() {
@@ -178,12 +178,8 @@ function MonthlyDetailPage({ params }: { params: Promise<{ id: string }> }) {
 
       {/* MonthlyDetailContent: 상세 페이지에서는 상단 액션 비노출(헤더에서 처리) */}
       <MonthlyDetailContent
-        monthly={
-          {
-            ...monthly,
-            connectedProjects: (connectedProjects || []) as Project[],
-          } as Monthly & { connectedProjects?: Project[] }
-        }
+        monthly={monthly}
+        connectedProjects={connectedProjects}
         allAreas={allAreas}
         showHeader={false}
         showActions={false}

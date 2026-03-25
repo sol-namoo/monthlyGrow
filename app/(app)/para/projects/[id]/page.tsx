@@ -612,6 +612,7 @@ export default function ProjectDetailPage({
                 await createUnifiedArchive({
                   userId: user?.uid || "",
                   type: "project_retrospective",
+                  parentType: "project",
                   parentId: projectId,
                   title: project?.title || "",
                   bestMoment: data.bestMoment,

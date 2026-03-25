@@ -4,15 +4,22 @@ import { Loader2 } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 
 interface LoadingOverlayProps {
-  isLoading: boolean;
+  isLoading?: boolean;
+  isVisible?: boolean;
   message?: string;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
-export function LoadingOverlay({ isLoading, message, children }: LoadingOverlayProps) {
+export function LoadingOverlay({
+  isLoading,
+  isVisible,
+  message,
+  children,
+}: LoadingOverlayProps) {
   const { translate } = useLanguage();
+  const visible = isLoading ?? isVisible ?? false;
 
-  if (!isLoading) {
+  if (!visible) {
     return <>{children}</>;
   }
 

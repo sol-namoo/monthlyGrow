@@ -123,17 +123,17 @@ function MonthlyPageContent() {
               typeof c === "string" ? c : c.projectId!
           );
           try {
-            const connectedProjects =
+            const connectedProjectDetails =
               projectIds.length > 0 ? await fetchProjectsByIds(projectIds) : [];
             return {
               ...monthly,
-              connectedProjects,
+              connectedProjectDetails,
             };
           } catch (error) {
             console.warn("연결된 프로젝트 조회 실패:", error);
             return {
               ...monthly,
-              connectedProjects: [],
+              connectedProjectDetails: [],
             };
           }
         }
@@ -252,6 +252,7 @@ function MonthlyPageContent() {
           {currentMonthly ? (
             <MonthlyDetailContent
               monthly={currentMonthly}
+              connectedProjects={currentMonthly.connectedProjectDetails}
               showHeader={true}
               showActions={true}
               onDelete={() => {

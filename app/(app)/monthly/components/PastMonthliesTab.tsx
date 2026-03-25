@@ -18,6 +18,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase/index";
 import { fetchPastMonthliesByUserIdWithPaging } from "@/lib/firebase/index";
+import { DocumentData, QueryDocumentSnapshot } from "firebase/firestore";
 
 interface PastMonthliesTabProps {
   projectCounts: Record<string, number>;
@@ -30,6 +31,13 @@ export default function PastMonthliesTab({
   projectCountsLoading,
   sortBy,
 }: PastMonthliesTabProps) {
+  type PastMonthliesPage = Awaited<
+    ReturnType<typeof fetchPastMonthliesByUserIdWithPaging>
+  >;
+  type PastMonthliesPageParam = {
+    lastDoc: QueryDocumentSnapshot<DocumentData> | null;
+  };
+
   const [user] = useAuthState(auth);
   const { translate, currentLanguage } = useLanguage();
 
@@ -42,21 +50,23 @@ export default function PastMonthliesTab({
     isLoading: monthliesLoading,
   } = useInfiniteQuery({
     queryKey: ["past-monthlies", user?.uid, sortBy],
-    queryFn: ({ pageParam }) =>
+    queryFn: ({ pageParam }: { pageParam: PastMonthliesPageParam }) =>
       fetchPastMonthliesByUserIdWithPaging(
         user?.uid || "",
         10,
-        pageParam?.lastDoc,
+        pageParam?.lastDoc ?? undefined,
         sortBy
       ),
     enabled: !!user?.uid,
-    getNextPageParam: (lastPage) =>
+    getNextPageParam: (lastPage: PastMonthliesPage) =>
       lastPage.hasMore ? { lastDoc: lastPage.lastDoc } : undefined,
-    initialPageParam: { lastDoc: undefined },
+    initialPageParam: { lastDoc: null as QueryDocumentSnapshot<DocumentData> | null },
   });
 
   // 모든 페이지의 먼슬리를 하나의 배열로 합치기
-  const allMonthlies = monthliesData?.pages.flatMap((page) => page.monthlies) || [];
+  const allMonthlies =
+    monthliesData?.pages.flatMap((page: PastMonthliesPage) => page.monthlies) ||
+    [];
   const getProjectCount = (monthly: Monthly) => {
     return projectCounts[monthly.id] || 0;
   };
@@ -155,7 +165,7 @@ export default function PastMonthliesTab({
                     <div className="flex items-center gap-4 mt-2">
                       <p className="text-xs text-muted-foreground">
                         {translate("monthly.pastMonthlies.keyResults")}:{" "}
-                        {monthly.keyResults?.filter((kr) => kr.isCompleted)
+                        {monthly.keyResults?.filter((kr: Monthly["keyResults"][number]) => kr.isCompleted)
                           .length || 0}
                         /{monthly.keyResults?.length || 0}
                       </p>

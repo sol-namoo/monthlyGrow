@@ -12,6 +12,7 @@ interface ProjectHeaderProps {
   /** 완료/전체 태스크 수. 있으면 목표(targetCount) 달성 여부로 상태 계산 */
   completedTasks?: number;
   totalTasks?: number;
+  progressPercentage?: number;
   onEdit: () => void;
   onDelete: () => void;
 }
@@ -21,6 +22,7 @@ export function ProjectHeader({
   area,
   completedTasks,
   totalTasks,
+  progressPercentage,
   onEdit,
   onDelete,
 }: ProjectHeaderProps) {
@@ -31,6 +33,15 @@ export function ProjectHeader({
       : undefined
   );
   const { translate, currentLanguage } = useLanguage();
+  const progress =
+    progressPercentage ??
+    (project.category === "repetitive"
+      ? project.targetCount && project.targetCount > 0
+        ? Math.round(((completedTasks ?? 0) / project.targetCount) * 100)
+        : 0
+      : (totalTasks ?? 0) > 0
+      ? Math.round(((completedTasks ?? 0) / (totalTasks ?? 0)) * 100)
+      : 0);
 
   return (
     <div className="mb-6">
@@ -122,7 +133,7 @@ export function ProjectHeader({
             {translate("paraProjectDetail.progress")}
           </span>
           <span className="text-sm text-muted-foreground">
-            {project.progressPercentage || 0}%
+            {progress}%
           </span>
         </div>
 
@@ -130,7 +141,7 @@ export function ProjectHeader({
           <div
             className="progress-value"
             style={{
-              width: `${project.progressPercentage || 0}%`,
+              width: `${progress}%`,
             }}
           ></div>
         </div>

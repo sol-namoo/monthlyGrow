@@ -99,7 +99,8 @@ const getIconComponent = (iconId: string) => {
 };
 
 interface MonthlyDetailContentProps {
-  monthly: Monthly & { connectedProjects?: Project[] };
+  monthly: Monthly;
+  connectedProjects?: Project[];
   allAreas?: any[];
   showHeader?: boolean;
   showActions?: boolean;
@@ -108,6 +109,7 @@ interface MonthlyDetailContentProps {
 
 export function MonthlyDetailContent({
   monthly,
+  connectedProjects = [],
   allAreas = [],
   showHeader = true,
   showActions = true,
@@ -445,7 +447,10 @@ export function MonthlyDetailContent({
           nextMonthlyApplication: data.nextMonthlyApplication,
         };
 
-        await createUnifiedArchive(archiveData);
+        await createUnifiedArchive({
+          ...archiveData,
+          parentType: "monthly",
+        });
       }
       // 회고 저장 후 아카이브 데이터 새로고침
       queryClient.invalidateQueries({
@@ -674,10 +679,9 @@ export function MonthlyDetailContent({
               </span>
             </div>
 
-            {monthly.connectedProjects &&
-            monthly.connectedProjects.length > 0 ? (
+            {connectedProjects.length > 0 ? (
               <div className="space-y-1">
-                {monthly.connectedProjects.map((project) => (
+                {connectedProjects.map((project) => (
                   <Link key={project.id} href={`/para/projects/${project.id}`}>
                     <div className="flex items-center gap-2 p-2 bg-muted/30 dark:bg-muted/20 rounded-md hover:bg-muted/50 dark:hover:bg-muted/40 transition-colors">
                       <div className="w-2 h-2 rounded-full bg-green-500"></div>
