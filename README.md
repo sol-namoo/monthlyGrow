@@ -56,7 +56,7 @@ PARA 시스템을 활용해 목표를 실행하며 성장해 나가는 **게임�
 | **Styling**          | [Tailwind CSS](https://tailwindcss.com), [shadcn/ui](https://ui.shadcn.com) (Radix UI 기반)                                                                                                                   |
 | **State Management** | [Jotai](https://jotai.org/) (클라이언트 상태), [TanStack React Query](https://tanstack.com/query) (서버 상태), [React Hook Form](https://react-hook-form.com/) (폼 상태)                                      |
 | **Firebase**         | [Firestore](https://firebase.google.com/docs/firestore) (데이터베이스), [Auth](https://firebase.google.com/docs/auth) (Google OAuth), [Functions](https://firebase.google.com/docs/functions) (서버리스 함수) |
-| **I18n**             | react-i18next                                                                                                                                                                                                 |
+| **I18n**             | Custom translation dictionaries + centralized settings store (Jotai)                                                                                                                                          |
 | **AI 연동 예정**     | GPT API + Model Context Protocol (MCP)                                                                                                                                                                        |
 
 ---

@@ -1,9 +1,10 @@
 import { useCallback } from "react";
-import { useSettings } from "./useSettings";
+import { useAtomValue } from "jotai";
 import { translations, Language } from "@/lib/translations";
+import { settingsAtom } from "@/store/settings";
 
 export function useLanguage() {
-  const { settings } = useSettings();
+  const settings = useAtomValue(settingsAtom);
   const currentLanguage = settings.language || "en";
 
   const translate = useCallback(

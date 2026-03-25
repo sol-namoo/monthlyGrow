@@ -5,6 +5,7 @@ import "./globals.css";
 import QueryClientProvider from "@/components/QueryClientProvider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { InitialTimeZoneDetector } from "@/components/InitialTimeZoneDetector";
+import { SettingsProvider } from "@/components/settings-provider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -38,7 +39,7 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            {children}
+            <SettingsProvider>{children}</SettingsProvider>
           </ThemeProvider>
         </QueryClientProvider>
       </body>
