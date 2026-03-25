@@ -1,6 +1,7 @@
-import { auth } from "@/lib/firebase";
 import { Language } from "@/lib/translations";
 import { UserSettings } from "@/lib/types";
+
+export const LANGUAGE_COOKIE_NAME = "language";
 
 export const defaultSettings: UserSettings = {
   defaultReward: "",
@@ -15,39 +16,29 @@ export function isLanguage(value: unknown): value is Language {
   return value === "ko" || value === "en";
 }
 
-export function getStoredLanguage(userId?: string | null): Language | null {
-  if (typeof window === "undefined") {
+export function getLanguageCookieValue(): Language | null {
+  if (typeof document === "undefined") {
     return null;
   }
 
-  const currentUserId = userId ?? auth.currentUser?.uid;
+  const cookie = document.cookie
+    .split("; ")
+    .find((entry) => entry.startsWith(`${LANGUAGE_COOKIE_NAME}=`));
 
-  if (currentUserId) {
-    const savedUserLanguage = localStorage.getItem(`userLanguage_${currentUserId}`);
-    if (isLanguage(savedUserLanguage)) {
-      return savedUserLanguage;
-    }
+  if (!cookie) {
+    return null;
   }
 
-  const preLoginLanguage = localStorage.getItem("preLoginLanguage");
-  if (isLanguage(preLoginLanguage)) {
-    return preLoginLanguage;
-  }
-
-  return null;
+  const value = decodeURIComponent(cookie.split("=")[1] ?? "");
+  return isLanguage(value) ? value : null;
 }
 
-export function getInitialSettingsSnapshot(): UserSettings {
-  const storedLanguage = getStoredLanguage();
-
-  if (!storedLanguage) {
-    return defaultSettings;
+export function persistLanguageSelection(language: Language) {
+  if (typeof document === "undefined") {
+    return;
   }
 
-  return {
-    ...defaultSettings,
-    language: storedLanguage,
-  };
+  document.cookie = `${LANGUAGE_COOKIE_NAME}=${encodeURIComponent(language)}; Path=/; Max-Age=31536000; SameSite=Lax`;
 }
 
 export function mergeUserSettings(

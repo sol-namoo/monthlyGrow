@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect } from "react";
 import { Provider, useAtom, useSetAtom } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
 import { useAuthState } from "react-firebase-hooks/auth";
@@ -9,12 +9,12 @@ import { auth } from "@/lib/firebase";
 import { fetchUserById } from "@/lib/firebase";
 import {
   defaultSettings,
-  getInitialSettingsSnapshot,
-  getStoredLanguage,
   mergeUserSettings,
+  persistLanguageSelection,
 } from "@/lib/settings";
 import { settingsAtom, settingsLoadingAtom } from "@/store/settings";
 import { UserSettings } from "@/lib/types";
+import { Language } from "@/lib/translations";
 
 function HydrateSettingsAtoms({
   children,
@@ -32,17 +32,6 @@ function SettingsBootstrap({ children }: { children: ReactNode }) {
   const { setTheme } = useTheme();
   const [settings, setSettings] = useAtom(settingsAtom);
   const setSettingsLoading = useSetAtom(settingsLoadingAtom);
-
-  useEffect(() => {
-    const storedLanguage = getStoredLanguage(user?.uid);
-
-    if (storedLanguage && storedLanguage !== settings.language) {
-      setSettings((prev) => ({
-        ...prev,
-        language: storedLanguage,
-      }));
-    }
-  }, [settings.language, setSettings, user?.uid]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -66,13 +55,10 @@ function SettingsBootstrap({ children }: { children: ReactNode }) {
           return;
         }
 
-        const mergedSettings = mergeUserSettings(
-          userData.settings,
-          getStoredLanguage(user.uid)
-        );
+        const mergedSettings = mergeUserSettings(userData.settings, settings.language);
 
         setSettings(mergedSettings);
-        localStorage.setItem(`userLanguage_${user.uid}`, mergedSettings.language);
+        persistLanguageSelection(mergedSettings.language);
         setTheme(mergedSettings.theme);
       } catch (error) {
         console.error("설정 불러오기 실패:", error);
@@ -81,9 +67,7 @@ function SettingsBootstrap({ children }: { children: ReactNode }) {
           return;
         }
 
-        setSettings((prev) =>
-          mergeUserSettings(prev, getStoredLanguage(user?.uid))
-        );
+        setSettings((prev) => mergeUserSettings(prev, settings.language));
         setTheme(defaultSettings.theme);
       } finally {
         if (!isCancelled) {
@@ -97,13 +81,29 @@ function SettingsBootstrap({ children }: { children: ReactNode }) {
     return () => {
       isCancelled = true;
     };
-  }, [setSettings, setSettingsLoading, setTheme, user?.uid, userLoading]);
+  }, [
+    setSettings,
+    setSettingsLoading,
+    setTheme,
+    settings.language,
+    user?.uid,
+    userLoading,
+  ]);
 
   return <>{children}</>;
 }
 
-export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [initialSettings] = useState(() => getInitialSettingsSnapshot());
+export function SettingsProvider({
+  children,
+  initialLanguage,
+}: {
+  children: ReactNode;
+  initialLanguage: Language;
+}) {
+  const initialSettings: UserSettings = {
+    ...defaultSettings,
+    language: initialLanguage,
+  };
 
   return (
     <Provider>

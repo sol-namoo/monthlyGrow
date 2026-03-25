@@ -5,6 +5,7 @@ import { auth } from "@/lib/firebase";
 import { updateUserSettings } from "@/lib/firebase";
 import { useTheme } from "next-themes";
 import { settingsAtom, settingsLoadingAtom } from "@/store/settings";
+import { persistLanguageSelection } from "@/lib/settings";
 
 export function useSettings() {
   const [user, userLoading] = useAuthState(auth);
@@ -23,7 +24,7 @@ export function useSettings() {
         setSettings((prev) => ({ ...prev, ...updates }));
 
         if (updates.language) {
-          localStorage.setItem(`userLanguage_${user.uid}`, updates.language);
+          persistLanguageSelection(updates.language);
         }
 
         if (updates.theme) {

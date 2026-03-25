@@ -119,6 +119,16 @@ export const monthlyDetail = {
     loading: "An error occurred while loading the monthly. Please try again.",
     notFound: "Monthly not found.",
   },
+  loading: {
+    title: "Loading monthly",
+    description: "Fetching monthly details.",
+  },
+  notFound: {
+    title: "Monthly not found",
+    description:
+      "The requested monthly does not exist or has been deleted.",
+    backToList: "Back to Monthly List",
+  },
   noConnectedProjects: "No projects connected to this monthly",
   keyResults: {
     noKeyResults: "No Key Results",
@@ -207,6 +217,8 @@ export const monthlyDetail = {
         "Important retrospectives can be bookmarked for easy access later",
     },
     save: "Save Retrospective",
+    saveSuccess: "Retrospective saved successfully",
+    saveSuccessDescription: "Your retrospective has been saved.",
     noRetrospective: "No retrospective written yet",
     noRetrospectiveDescription: "Write a retrospective for this monthly",
     writeRetrospective: "Write Retrospective",
@@ -228,10 +240,13 @@ export const monthlyDetail = {
     lastUpdated: "Last updated:",
     title: "Monthly Notes",
     edit: "Edit Note",
+    editNote: "Edit Note",
     add: "Add Note",
     noNote: "No notes written yet",
+    noNoteDescription: "Write a note for this monthly",
     description: "Record your thoughts and learnings from this monthly",
     addButton: "Write Note",
+    writeNote: "Write Note",
     placeholder: "Write today's note...",
     save: "Save",
     editTitle: "Edit Monthly Note",
@@ -367,18 +382,40 @@ export const monthlyDetail = {
       description: "An error occurred while deleting the monthly.",
     },
   },
+  actions: {
+    edit: "Edit",
+    delete: "Delete",
+    back: "Back",
+    editTooltip: "Edit monthly",
+    deleteTooltip: "Delete monthly",
+  },
+  keyResultUpdate: {
+    success: {
+      title: "Key result updated",
+      description: "The key result has been updated successfully.",
+    },
+    error: {
+      title: "Key result update failed",
+      description: "An error occurred while updating the key result.",
+    },
+  },
 } as const;
 
 export const monthlyEdit = {
   title: "Edit Monthly",
+  description: "Update monthly information",
   validation: {
     title: "Validation Error",
     titleRequired: "Please enter a monthly title",
     objectiveRequired: "Please enter an objective.",
+    startDateRequired: "Please enter a start date",
+    endDateRequired: "Please enter an end date",
     minKeyResults: "Please add at least 1 Key Result.",
     keyResultRequired: "Please enter titles for all Key Results.",
   },
   error: {
+    title: "Monthly Edit Failed",
+    description: "An error occurred while updating the monthly.",
     loading: "An error occurred while loading monthly information",
     notFound: "Monthly not found",
     notFoundDescription:
@@ -393,6 +430,8 @@ export const monthlyEdit = {
   },
   basicInfo: {
     title: "Basic Information",
+    monthSelection: "Select Monthly Month",
+    monthPlaceholder: "Select the month for your monthly",
     monthlyTitle: "Monthly Title",
     monthlyTitlePlaceholder: "e.g., January Health Monthly",
     reward: "Achievement Reward",
@@ -405,12 +444,40 @@ export const monthlyEdit = {
     recommendation:
       "Monthly title, reward, and focus areas can be modified at any time",
   },
+  form: {
+    title: "Title",
+    titlePlaceholder: "e.g., August 2024",
+    objective: "Objective",
+    objectivePlaceholder: "e.g., Significantly improve customer satisfaction",
+    startDate: "Start Date",
+    endDate: "End Date",
+    reward: "Reward (Optional)",
+    rewardPlaceholder: "Reward you'll receive upon achieving the goal",
+    keyResults: "Key Results",
+    keyResultsDescription:
+      "Set specific and achievable metrics to measure goal achievement",
+    keyResultTitle: "Key Result Title",
+    keyResultTitlePlaceholder:
+      "e.g., Exercise 30 minutes daily, Read 3 times a week, Blog post 2 times a week",
+    keyResultDescription: "Detailed Description (Optional)",
+    keyResultDescriptionPlaceholder:
+      "Enter a detailed description of the goal",
+    addKeyResult: "Add Key Result",
+    removeKeyResult: "Remove Key Result",
+    keyResultsGuide:
+      "💡 Setting 3-5 key results per month is appropriate. Too many can reduce focus.",
+  },
   focusAreas: {
     title: "Focus Areas",
     description: "Select areas to focus on in this monthly",
+    selected: "Selected Areas",
     noAreas: "No areas created yet",
     createArea: "Create Area",
     areaHint: "Creating areas helps you manage more systematically",
+  },
+  quickAccess: {
+    title: "Project Connection",
+    description: "Projects connected to this monthly",
   },
   projects: {
     title: "Connect Projects",
@@ -443,12 +510,69 @@ export const monthlyEdit = {
   },
   save: "Save Changes",
   saving: "Saving...",
+  monthlyNew: {
+    title: "Create Monthly",
+    basicInfo: {
+      title: "Basic Information",
+      monthSelection: "Select Monthly Month",
+      monthPlaceholder: "Select the month for your monthly",
+      monthSuffix: "",
+    },
+    form: {
+      objective: "Objective",
+      objectivePlaceholder: "Enter your goal for this month",
+      keyResultDescription: "Objective Description",
+      keyResultDescriptionPlaceholder:
+        "Enter a detailed description of your goal",
+      reward: "Reward",
+      rewardPlaceholder:
+        "Enter the reward you'll receive when you achieve your goal",
+      keyResults: "Key Results",
+      keyResultsDescription:
+        "Set specific and achievable metrics to measure goal achievement",
+      keyResultsGuide:
+        "💡 Setting 3-5 key results per month is appropriate. Too many can reduce focus.",
+      addKeyResult: "Add Key Result",
+      keyResultTitlePlaceholder:
+        "e.g., Exercise 30 minutes daily, Read 3 times a week, Blog post 2 times a week",
+    },
+    validation: {
+      objectiveRequired: "Please enter an objective",
+      keyResultRequired: "Please enter titles for all Key Results.",
+      minKeyResults: "At least one key result is required.",
+    },
+    existingMonthly: {
+      title: "A monthly already exists for this month",
+      description:
+        "A monthly already exists for this month. Please select a different month or edit the existing monthly.",
+    },
+    focusAreas: {
+      title: "Focus Areas",
+      selected: "Selected Areas",
+    },
+    success: {
+      title: "Monthly Creation Complete",
+      description: "A new monthly has been created successfully",
+    },
+    error: {
+      title: "Monthly Creation Failed",
+      description: "An error occurred while creating the monthly",
+    },
+  },
 } as const;
 
 export const monthlyNew = {
   title: "Create Monthly",
+  description: "Create a new monthly to set and achieve your goals.",
   validation: {
+    title: "Validation Error",
     titleRequired: "Please enter a monthly title",
+    objectiveRequired: "Please enter an objective",
+    keyResultRequired: "Please enter titles for all Key Results.",
+    duplicateTitle: "Duplicate Monthly",
+    duplicateDescription:
+      "A monthly already exists for the selected month. Please select a different month or edit the existing monthly.",
+    minKeyResults: "Please add at least 1 Key Result.",
     rewardRequired: "Please enter a reward",
     monthRequired: "Please select a month",
     startDateRequired: "Please enter a start date",
@@ -459,10 +583,18 @@ export const monthlyNew = {
     title: "Login Required",
     description: "You need to log in to create a monthly",
   },
+  delete: {
+    confirm: "Delete the existing monthly?",
+    success: "Deleted",
+    successDescription: "The existing monthly has been deleted.",
+    error: "Deletion Failed",
+    errorDescription: "Failed to delete the monthly.",
+  },
   basicInfo: {
     title: "Basic Information",
     monthSelection: "Select Monthly Month",
     monthPlaceholder: "Select the month for your monthly",
+    monthSuffix: "",
     monthlyTitle: "Monthly Title",
     monthlyTitlePlaceholder: "e.g., January Health Monthly",
     reward: "Achievement Reward",
@@ -473,6 +605,33 @@ export const monthlyNew = {
     endDate: "End Date",
     dateHint: "Monthlies are set on a monthly basis",
     endDateHint: "Until the last day of the month",
+  },
+  form: {
+    title: "Title",
+    titlePlaceholder: "e.g., January 2024",
+    objective: "Objective",
+    objectivePlaceholder: "Enter your goal for this month",
+    startDate: "Start Date",
+    endDate: "End Date",
+    reward: "Reward",
+    rewardPlaceholder:
+      "Enter the reward you'll receive when you achieve your goal",
+    rewardExample:
+      "e.g., Buy a new game, enjoy a great meal, or take a day trip",
+    keyResults: "Key Results",
+    keyResultsDescription:
+      "Set specific and achievable metrics to measure goal achievement",
+    keyResult: "Key Result",
+    keyResultTitle: "Key Result Title",
+    keyResultTitlePlaceholder:
+      "e.g., Exercise 30 minutes daily, Read 3 times a week, Blog post 2 times a week",
+    keyResultDescription: "Objective Description",
+    keyResultDescriptionPlaceholder:
+      "Enter a detailed description of your goal",
+    addKeyResult: "Add Key Result",
+    removeKeyResult: "Remove Key Result",
+    keyResultsGuide:
+      "💡 Setting 3-5 key results per month is appropriate. Too many can reduce focus.",
   },
   focusAreas: {
     title: "Focus Areas",
@@ -486,6 +645,19 @@ export const monthlyNew = {
       "Recommendation: Focusing on 2 areas can increase monthly effectiveness",
     warning: "Selecting too many areas can reduce focus",
     select: "Select Focus Areas",
+  },
+  quickAccess: {
+    title: "Project Shortcuts",
+    description: "Select projects to focus on this month",
+    addProject: "Add Project",
+    noProjects: "No projects added",
+  },
+  existingMonthly: {
+    title: "Existing Monthly Found",
+    description:
+      "A monthly already exists for the selected month. Would you like to replace the existing monthly with a new one?",
+    replace: "Replace Existing Monthly",
+    cancel: "Cancel",
   },
   projects: {
     title: "Connect Projects",
@@ -582,12 +754,13 @@ export const monthlyNew = {
     title: "Monthly Creation Failed",
     description: "An error occurred while creating the monthly",
   },
+  createMonthly: "Create Monthly",
   monthlyNew: {
     title: "Create Monthly",
     basicInfo: {
       title: "Basic Information",
       monthSelection: "Select Monthly Month",
-      monthPlaceholder: "Select a month",
+      monthPlaceholder: "Select the month for your monthly",
       monthSuffix: "",
     },
     form: {
@@ -610,8 +783,8 @@ export const monthlyNew = {
     },
     validation: {
       objectiveRequired: "Please enter an objective",
-      keyResultRequired: "Please enter a key result title",
-      minKeyResults: "At least 1 key result is required",
+      keyResultRequired: "Please enter titles for all Key Results.",
+      minKeyResults: "At least one key result is required.",
     },
     existingMonthly: {
       title: "A monthly already exists for this month",
@@ -623,13 +796,12 @@ export const monthlyNew = {
       selected: "Selected Areas",
     },
     success: {
-      title: "Monthly Created Successfully",
-      description: "Your new monthly has been created successfully",
+      title: "Monthly Creation Complete",
+      description: "A new monthly has been created successfully",
     },
     error: {
       title: "Monthly Creation Failed",
       description: "An error occurred while creating the monthly",
     },
   },
-  createMonthly: "Create Monthly",
 } as const;

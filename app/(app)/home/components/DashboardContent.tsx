@@ -11,9 +11,8 @@ import {
   fetchAllMonthliesByUserId,
   fetchYearlyActivityStats,
 } from "@/lib/firebase/index";
-import { getMonthlyStatus, formatDate } from "@/lib/utils";
-import { TrendingUp, Clock, BookOpen, Award, BarChart3 } from "lucide-react";
-import { useLanguage } from "@/hooks/useLanguage";
+import { getMonthlyStatus } from "@/lib/utils";
+import { TrendingUp, BookOpen, Award, BarChart3 } from "lucide-react";
 
 interface DashboardContentProps {
   userId: string;
@@ -26,7 +25,6 @@ export default function DashboardContent({
   texts,
   currentLanguage,
 }: DashboardContentProps) {
-  const { translate } = useLanguage();
   // 연간 통계 데이터 (대시보드 탭에서만 로드)
   const { data: yearlyStats, isLoading: yearlyStatsLoading } = useQuery({
     queryKey: ["yearlyStats", userId],
@@ -145,7 +143,7 @@ export default function DashboardContent({
               <MonthlyComparisonChart data={monthlyComparisonData} />
             ) : (
               <div className="h-full flex items-center justify-center text-muted-foreground">
-                <p>완료된 월간 데이터가 없습니다</p>
+                <p>{texts.noCompletedMonthlyData}</p>
               </div>
             )}
           </div>

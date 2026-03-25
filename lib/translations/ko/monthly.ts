@@ -397,11 +397,22 @@ export const monthlyDetail = {
 export const monthlyNew = {
   title: "새 먼슬리 만들기",
   description: "새로운 먼슬리를 생성하여 목표를 설정하고 달성해보세요",
+  createMonthly: "먼슬리 생성하기",
   basicInfo: {
     title: "기본 정보",
     monthSelection: "월 선택",
     monthPlaceholder: "월을 선택하세요",
     monthSuffix: "월",
+    monthlyTitle: "먼슬리 제목",
+    monthlyTitlePlaceholder: "예: 1월 건강 먼슬리",
+    reward: "달성 보상",
+    rewardPlaceholder: "예: 새 운동화 사기",
+    rewardHint:
+      "💡 기본 보상 설정이 꺼져 있습니다. 설정에서 활성화하면 새 먼슬리 생성 시 보상이 자동으로 입력됩니다",
+    startDate: "시작일",
+    endDate: "종료일",
+    dateHint: "먼슬리는 월 단위로 생성됩니다",
+    endDateHint: "해당 월의 마지막 날까지",
   },
   form: {
     title: "제목",
@@ -412,9 +423,11 @@ export const monthlyNew = {
     endDate: "종료일",
     reward: "보상 (선택사항)",
     rewardPlaceholder: "목표 달성 시 받을 보상",
+    rewardExample: "예: 🎮 새로운 게임 구매하기, 🍕 맛있는 음식 먹기",
     keyResults: "핵심 지표",
     keyResultsDescription:
       "목표 달성을 측정할 수 있는 구체적이고 실현 가능한 지표를 설정하세요",
+    keyResult: "핵심 지표",
     keyResultTitle: "핵심 지표 제목",
     keyResultTitlePlaceholder:
       "예: 매일 30분 운동하기, 주 3회 독서하기, 주 2회 블로그 포스팅",
@@ -424,19 +437,113 @@ export const monthlyNew = {
     removeKeyResult: "핵심 지표 제거",
     keyResultsGuide:
       "💡 한 달에 3-5개의 핵심 지표를 설정하는 것이 적절합니다. 너무 많으면 집중도가 떨어질 수 있어요.",
-    keyResult: "핵심 지표",
-    rewardExample: "예: 🎮 새로운 게임 구매하기, 🍕 맛있는 음식 먹기",
   },
   focusAreas: {
     title: "중점 영역 선택",
     description: "이번 달에 집중할 영역을 선택하세요",
     selected: "선택된 영역",
+    noAreas: "생성된 영역이 없습니다",
+    createArea: "영역 만들기",
+    areaHint: "영역을 만들면 더 체계적으로 관리할 수 있어요",
+    maxAreas: "원하는 만큼 선택할 수 있습니다",
+    recommendation:
+      "추천: 2개의 영역에 집중하면 먼슬리 효과를 높일 수 있어요",
+    warning: "너무 많은 영역을 선택하면 집중도가 떨어질 수 있어요",
+    select: "중점 영역 선택",
   },
   quickAccess: {
     title: "프로젝트 바로가기",
     description: "이번 달에 집중할 프로젝트들을 선택해보세요",
     addProject: "프로젝트 추가",
     noProjects: "추가된 프로젝트가 없습니다",
+  },
+  projects: {
+    title: "프로젝트 연결",
+    description:
+      "이 먼슬리에 연결할 프로젝트를 선택하거나 새 프로젝트를 만드세요. 프로젝트는 나중에도 추가할 수 있습니다",
+    selectExisting: "기존 프로젝트 선택",
+    createNew: "새 프로젝트 만들기",
+    connectedProjects: "연결된 프로젝트",
+    noConnectedProjects: "아직 연결된 프로젝트가 없습니다",
+    recommendation:
+      "추천: 2-3개의 프로젝트에 집중하면 먼슬리 효과를 높일 수 있어요",
+    warning: "너무 많은 프로젝트를 선택하면 집중도가 떨어질 수 있어요",
+    modal: {
+      title: "새 프로젝트 만들기",
+      description: "새 프로젝트를 만들어 이 먼슬리에 연결하시겠어요?",
+      createNew: "새 프로젝트 만들기",
+      createDescription:
+        "프로젝트 생성 페이지로 이동해 새 프로젝트를 만든 뒤, 이 먼슬리 페이지로 돌아와 연결하세요",
+      note: "안내",
+      noteDescription:
+        "현재 먼슬리 정보는 저장되므로 안전하게 이동할 수 있습니다",
+      cancel: "취소",
+      viewProjects: "기존 프로젝트 보기",
+    },
+    newProjectDialog: {
+      title: "새 프로젝트 만들기",
+      description: "새 프로젝트를 만들어 이 먼슬리에 연결하시겠어요?",
+      createNew: "새 프로젝트 만들기",
+      createDescription:
+        "프로젝트 생성 페이지로 이동해 새 프로젝트를 만든 뒤, 이 먼슬리 페이지로 돌아와 연결하세요",
+      note: "안내",
+      noteDescription:
+        "현재 먼슬리 정보는 저장되므로 안전하게 이동할 수 있습니다",
+      cancel: "취소",
+      viewProjects: "기존 프로젝트 보기",
+    },
+  },
+  existingMonthly: {
+    title: "기존 먼슬리가 있습니다",
+    description:
+      "선택한 월에 이미 먼슬리가 존재합니다. 기존 먼슬리를 대체하시겠습니까?",
+    replace: "기존 먼슬리 대체",
+    cancel: "취소",
+  },
+  duplicateMonthly: {
+    title: "기존 먼슬리를 찾았습니다",
+    description:
+      "선택한 월에 이미 먼슬리가 존재합니다. 기존 먼슬리를 새 먼슬리로 대체할까요?",
+    existingMonthlyInfo: "기존 먼슬리 정보",
+    titleLabel: "제목",
+    periodLabel: "기간",
+    connectedProjectsLabel: "연결된 프로젝트",
+    projectsCount: "0개 프로젝트",
+    tip:
+      "연결된 프로젝트 자체는 삭제되지 않고, 먼슬리 연결만 해제됩니다",
+    warning:
+      "'먼슬리 생성하기'를 누르면 기존 먼슬리가 삭제되고 새 먼슬리가 생성됩니다",
+    cancel: "취소",
+    replace: "기존 먼슬리 대체 후 계속",
+  },
+  monthLimit: "먼슬리는 최대 6개월 뒤까지만 생성할 수 있습니다",
+  monthSelection: {
+    current: "이번 달",
+    next: "다음 달",
+    hint: "💡 먼슬리는 최대 6개월 뒤까지만 생성할 수 있습니다",
+    limitTitle: "월 선택 제한",
+    limitDescription:
+      "이미 기존 먼슬리가 있어 이 월은 선택할 수 없습니다. 다른 월을 선택해주세요",
+  },
+  finalConfirm: {
+    title: "먼슬리 생성 확인",
+    description:
+      "선택한 월에 기존 먼슬리가 있거나 이전에 취소한 이력이 있습니다. 정말 생성하시겠습니까?",
+    warning:
+      "기존 먼슬리가 있으면 삭제된 뒤 새 먼슬리가 생성됩니다",
+    cancel: "취소",
+    confirm: "확인하고 생성하기",
+  },
+  noAreas: {
+    title: "등록된 활동 영역이 없습니다",
+    description:
+      "먼슬리를 만들려면 먼저 활동 영역(Areas)을 등록해야 합니다. 건강, 커리어, 자기계발 등 관심 있는 영역을 만들어보세요",
+    createArea: "영역 만들기",
+    viewPara: "PARA 시스템 보기",
+  },
+  loginRequired: {
+    title: "로그인이 필요합니다",
+    description: "먼슬리를 생성하려면 먼저 로그인해야 합니다",
   },
   delete: {
     confirm: "기존 먼슬리를 삭제하시겠습니까?",
@@ -446,8 +553,12 @@ export const monthlyNew = {
     errorDescription: "먼슬리 삭제에 실패했습니다.",
   },
   validation: {
+    title: "입력값을 확인해주세요",
     titleRequired: "제목을 입력해주세요",
     objectiveRequired: "목표를 입력해주세요",
+    rewardRequired: "보상을 입력해주세요",
+    monthRequired: "월을 선택해주세요",
+    areasRequired: "중점 영역을 선택해주세요",
     startDateRequired: "시작일을 선택해주세요",
     endDateRequired: "종료일을 선택해주세요",
     keyResultRequired: "핵심 지표 제목을 입력해주세요",
@@ -456,30 +567,92 @@ export const monthlyNew = {
       "해당 월에 이미 먼슬리가 존재합니다. 다른 월을 선택하거나 기존 먼슬리를 수정해주세요.",
     minKeyResults: "최소 1개의 핵심 지표를 추가해주세요",
   },
-  existingMonthly: {
-    title: "기존 먼슬리가 있습니다",
-    description:
-      "선택한 월에 이미 먼슬리가 존재합니다. 기존 먼슬리를 대체하시겠습니까?",
-    replace: "기존 먼슬리 대체",
-    cancel: "취소",
-  },
   success: {
     title: "먼슬리 생성 완료",
     description: "새로운 먼슬리가 성공적으로 생성되었습니다",
+    projectCreated: "프로젝트 생성 완료",
+    projectCreatedDescription:
+      "새로 만든 프로젝트가 목록에 추가되었습니다. 프로젝트 선택에서 확인해보세요",
+    existingMonthlyDeleted: {
+      title: "기존 먼슬리 대체 준비 완료",
+      description:
+        "'먼슬리 생성하기'를 누르면 기존 먼슬리를 삭제하고 새 먼슬리를 생성합니다",
+    },
+    existingMonthlyDeletedDescription: "{title}이(가) 삭제되었습니다",
   },
   error: {
     title: "먼슬리 생성 실패",
     description: "먼슬리 생성 중 오류가 발생했습니다",
+  },
+  monthlyNew: {
+    title: "먼슬리 생성",
+    basicInfo: {
+      title: "기본 정보",
+      monthSelection: "월 선택",
+      monthPlaceholder: "월을 선택하세요",
+      monthSuffix: "월",
+    },
+    form: {
+      objective: "목표",
+      objectivePlaceholder: "이번 달의 목표를 입력하세요",
+      keyResultDescription: "목표 설명",
+      keyResultDescriptionPlaceholder: "목표에 대한 상세한 설명을 입력하세요",
+      reward: "보상",
+      rewardPlaceholder: "목표 달성 시 받을 보상을 입력하세요",
+      keyResults: "핵심 지표",
+      keyResultsDescription:
+        "목표 달성을 측정할 수 있는 구체적이고 실현 가능한 지표를 설정하세요",
+      keyResultsGuide:
+        "💡 한 달에 3-5개의 핵심 지표를 설정하는 것이 적절합니다. 너무 많으면 집중도가 떨어질 수 있어요.",
+      addKeyResult: "핵심 지표 추가",
+      keyResultTitlePlaceholder:
+        "예: 매일 30분 운동하기, 주 3회 독서하기, 주 2회 블로그 포스팅",
+    },
+    validation: {
+      objectiveRequired: "목표를 입력해주세요",
+      keyResultRequired: "핵심 지표 제목을 입력해주세요",
+      minKeyResults: "최소 1개의 핵심 지표가 필요합니다",
+    },
+    existingMonthly: {
+      title: "이미 해당 월에 먼슬리가 존재합니다",
+      description:
+        "해당 월에 이미 먼슬리가 있습니다. 다른 월을 선택하거나 기존 먼슬리를 수정해주세요.",
+    },
+    focusAreas: {
+      title: "중점 영역 선택",
+      selected: "선택된 영역",
+    },
+    success: {
+      title: "먼슬리 생성 완료",
+      description: "새로운 먼슬리가 성공적으로 생성되었습니다",
+    },
+    error: {
+      title: "먼슬리 생성 실패",
+      description: "먼슬리 생성 중 오류가 발생했습니다",
+    },
   },
 } as const;
 
 export const monthlyEdit = {
   title: "먼슬리 수정",
   description: "먼슬리 정보를 수정하세요",
+  save: "변경사항 저장",
+  saving: "저장 중...",
   basicInfo: {
     title: "기본 정보",
     monthSelection: "월 선택",
     monthPlaceholder: "월을 선택하세요",
+    monthlyTitle: "먼슬리 제목",
+    monthlyTitlePlaceholder: "예: 1월 건강 먼슬리",
+    reward: "달성 보상",
+    rewardPlaceholder: "예: 새 운동화 사기",
+    rewardHint: "💡 먼슬리를 완료했을 때 스스로에게 줄 보상을 설정해보세요",
+    startDate: "시작일",
+    endDate: "종료일",
+    dateHint: "먼슬리 기간은 수정할 수 없습니다",
+    endDateHint: "해당 월의 마지막 날까지",
+    recommendation:
+      "먼슬리 제목, 보상, 중점 영역은 언제든지 수정할 수 있습니다",
   },
   form: {
     title: "제목",
@@ -507,17 +680,51 @@ export const monthlyEdit = {
     title: "중점 영역 선택",
     description: "이번 달에 집중할 영역을 선택하세요",
     selected: "선택된 영역",
+    noAreas: "생성된 영역이 없습니다",
+    createArea: "영역 만들기",
+    areaHint: "영역을 만들면 더 체계적으로 관리할 수 있어요",
   },
   quickAccess: {
     title: "프로젝트 연결",
     description: "이 먼슬리와 연결된 프로젝트들",
   },
+  projects: {
+    title: "프로젝트 연결",
+    description:
+      "이 먼슬리에 연결할 프로젝트를 선택하거나 새 프로젝트를 만드세요. 프로젝트는 나중에도 추가할 수 있습니다",
+    selectExisting: "기존 프로젝트 선택",
+    createNew: "새 프로젝트 만들기",
+    connectedProjects: "연결된 프로젝트",
+    noConnectedProjects: "아직 연결된 프로젝트가 없습니다",
+    recommendation:
+      "추천: 2-3개의 프로젝트에 집중하면 먼슬리 효과를 높일 수 있어요",
+    warning: "너무 많은 프로젝트를 선택하면 집중도가 떨어질 수 있어요",
+    modal: {
+      title: "프로젝트 추가/제거",
+      description:
+        "이 먼슬리에 연결할 프로젝트를 선택하세요. 최대 5개까지 연결할 수 있습니다",
+      search: "프로젝트 검색",
+      searchPlaceholder: "프로젝트 제목으로 검색...",
+      connected: "연결됨",
+      noDescription: "설명 없음",
+    },
+    newProject: {
+      title: "새 프로젝트 만들기",
+      description:
+        "프로젝트 생성 페이지로 이동해 새 프로젝트를 만든 뒤, 이 먼슬리 수정 페이지로 돌아와 연결하세요",
+      note: "안내",
+      noteDescription:
+        "현재 먼슬리 정보는 저장되므로 안전하게 이동할 수 있습니다",
+    },
+  },
   validation: {
+    title: "입력값을 확인해주세요",
     titleRequired: "제목을 입력해주세요",
     objectiveRequired: "목표를 입력해주세요",
     startDateRequired: "시작일을 선택해주세요",
     endDateRequired: "종료일을 선택해주세요",
     keyResultRequired: "핵심 지표 제목을 입력해주세요",
+    minKeyResults: "최소 1개의 핵심 지표를 추가해주세요",
   },
   success: {
     title: "먼슬리 수정 완료",
@@ -526,6 +733,13 @@ export const monthlyEdit = {
   error: {
     title: "먼슬리 수정 실패",
     description: "먼슬리 수정 중 오류가 발생했습니다",
+    loading: "먼슬리 정보를 불러오는 중 오류가 발생했습니다",
+    notFound: "먼슬리를 찾을 수 없습니다",
+    notFoundDescription:
+      "요청한 먼슬리가 존재하지 않거나 이미 삭제되었습니다.",
+    backToList: "먼슬리 목록으로 돌아가기",
+    completed:
+      "완료된 먼슬리는 수정할 수 없습니다. 새 먼슬리를 생성해주세요.",
   },
   monthlyNew: {
     title: "먼슬리 생성",

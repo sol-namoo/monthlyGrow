@@ -172,7 +172,9 @@ export default function HomePage() {
       yearlyStats: translate("home.yearlyStats"),
       yearlyStatsDescription: translate("home.yearlyStatsDescription"),
       focusTime: translate("home.focusTime"),
+      focusTimeDescription: translate("home.focusTimeDescription"),
       completionRate: translate("home.completionRate"),
+      completionRateDescription: translate("home.completionRateDescription"),
       completedMonthlies: translate("home.completedMonthlies"),
       completedMonthliesDescription: translate(
         "home.completedMonthliesDescription"
@@ -182,6 +184,7 @@ export default function HomePage() {
       hours: translate("home.hours"),
       areaActivity: translate("home.areaActivity"),
       monthlyComparison: translate("home.monthlyComparison"),
+      noCompletedMonthlyData: translate("home.noCompletedMonthlyData"),
       dashboardUpdate: translate("home.dashboardUpdate"),
 
       // 로그인

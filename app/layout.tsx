@@ -1,11 +1,17 @@
 import type React from "react";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import QueryClientProvider from "@/components/QueryClientProvider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { InitialTimeZoneDetector } from "@/components/InitialTimeZoneDetector";
 import { SettingsProvider } from "@/components/settings-provider";
+import {
+  defaultSettings,
+  isLanguage,
+  LANGUAGE_COOKIE_NAME,
+} from "@/lib/settings";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -19,17 +25,19 @@ export const metadata: Metadata = {
   generator: "v0.dev",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // localstorage에서 사용자 정보 저장 여부를 확인하여 user info 유무 확인
-  // user info 있다면 주요 정보 새로 페칭 후 jotai에 저장 -> home으로 이동
-  // user info 없다면 remain
+  const cookieStore = await cookies();
+  const cookieLanguage = cookieStore.get(LANGUAGE_COOKIE_NAME)?.value;
+  const initialLanguage = isLanguage(cookieLanguage)
+    ? cookieLanguage
+    : defaultSettings.language;
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={initialLanguage} suppressHydrationWarning>
       <body className={inter.className}>
         <InitialTimeZoneDetector />
         <QueryClientProvider>
@@ -39,7 +47,9 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <SettingsProvider>{children}</SettingsProvider>
+            <SettingsProvider initialLanguage={initialLanguage}>
+              {children}
+            </SettingsProvider>
           </ThemeProvider>
         </QueryClientProvider>
       </body>

@@ -34,12 +34,16 @@ import { createUser, updateUserSettings } from "@/lib/firebase/users";
 import Link from "next/link";
 import Loading from "@/components/feedback/Loading";
 import { useAuthState } from "react-firebase-hooks/auth";
+import { useSetAtom } from "jotai";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Language } from "@/lib/translations";
+import { getLanguageCookieValue, persistLanguageSelection } from "@/lib/settings";
+import { settingsAtom } from "@/store/settings";
 
 export default function LoginPage() {
   const router = useRouter();
   const { translate, currentLanguage } = useLanguage();
+  const setSettings = useSetAtom(settingsAtom);
   const [isLoading, setIsLoading] = useState(false);
 
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -106,6 +110,14 @@ export default function LoginPage() {
     );
   }
 
+  const applyLanguageSelection = (language: Language) => {
+    persistLanguageSelection(language);
+    setSettings((prev) => ({
+      ...prev,
+      language,
+    }));
+  };
+
   const handleLogin = async () => {
     setIsLoading(true);
     try {
@@ -117,17 +129,15 @@ export default function LoginPage() {
       if (!userDoc.exists()) {
         setShowTermsModal(true);
       } else {
-        // 기존 사용자의 경우 로그인 전 언어 설정을 Firestore에 반영
-        const preLoginLang = localStorage.getItem("preLoginLanguage");
-        if (preLoginLang) {
+        const selectedLanguage = getLanguageCookieValue();
+        if (selectedLanguage) {
           try {
             await updateUserSettings(user.uid, {
-              language: preLoginLang as Language,
+              language: selectedLanguage,
             });
-            localStorage.removeItem("preLoginLanguage"); // 사용 후 제거
-            // 언어 설정 업데이트 성공
+            persistLanguageSelection(selectedLanguage);
           } catch (error) {
-            // 언어 설정 업데이트 실패
+            console.error("로그인 언어 설정 동기화 실패:", error);
           }
         }
         router.push("/home");
@@ -166,8 +176,7 @@ export default function LoginPage() {
 
       const user = result.user;
 
-      // 언어 설정 저장
-      localStorage.setItem("preLoginLanguage", language);
+      applyLanguageSelection(language);
 
       router.push("/onboarding");
     } catch (error: any) {
@@ -183,8 +192,7 @@ export default function LoginPage() {
     try {
       const userRef = doc(db, "users", newUser.uid);
 
-      // 로그인 전 언어 설정 가져오기
-      const preLoginLang = localStorage.getItem("preLoginLanguage");
+      const selectedLanguage = getLanguageCookieValue();
 
       // createUser 함수를 사용하여 완전한 사용자 문서 생성
       await createUser({
@@ -195,16 +203,15 @@ export default function LoginPage() {
         emailVerified: newUser.emailVerified || false,
       });
 
-      // 언어 설정이 있으면 적용
-      if (preLoginLang) {
+      if (selectedLanguage) {
         try {
           await updateUserSettings(newUser.uid, {
-            language: preLoginLang as Language,
+            language: selectedLanguage,
           });
+          persistLanguageSelection(selectedLanguage);
         } catch (error) {
           console.error("Google 로그인 언어 설정 실패:", error);
         }
-        localStorage.removeItem("preLoginLanguage"); // 사용 후 제거
       }
     } finally {
       setIsLoading(false);
@@ -227,9 +234,6 @@ export default function LoginPage() {
       );
       const user = result.user;
       newUser = user;
-
-      // 새로 가입한 사용자는 preLoginLanguage를 유지하고 온보딩에서 처리
-      // (온보딩 페이지에서 createUser 시 언어 설정이 적용됨)
 
       // 새로 가입한 사용자는 항상 온보딩 페이지로 이동
       router.push("/onboarding");
@@ -299,8 +303,7 @@ export default function LoginPage() {
         <div className="flex items-center bg-card border rounded-lg p-1 shadow-sm">
           <button
             onClick={() => {
-              localStorage.setItem("preLoginLanguage", "ko");
-              window.location.reload();
+              applyLanguageSelection("ko");
             }}
             className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
               currentLanguage === "ko"
@@ -312,8 +315,7 @@ export default function LoginPage() {
           </button>
           <button
             onClick={() => {
-              localStorage.setItem("preLoginLanguage", "en");
-              window.location.reload();
+              applyLanguageSelection("en");
             }}
             className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
               currentLanguage === "en"

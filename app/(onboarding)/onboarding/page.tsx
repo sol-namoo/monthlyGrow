@@ -37,6 +37,7 @@ import { Language } from "@/lib/translations";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase/index";
+import { getLanguageCookieValue, persistLanguageSelection } from "@/lib/settings";
 
 interface OnboardingData {
   objective: string;
@@ -82,8 +83,7 @@ export default function OnboardingPage() {
         try {
           const userDoc = await getDoc(doc(db, "users", user.uid));
           if (!userDoc.exists()) {
-            // 로그인 전 언어 설정 확인
-            const preLoginLang = localStorage.getItem("preLoginLanguage");
+            const selectedLanguage = getLanguageCookieValue();
 
             await createUser({
               uid: user.uid,
@@ -93,13 +93,12 @@ export default function OnboardingPage() {
               emailVerified: user.emailVerified || false,
             });
 
-            // 언어 설정이 있으면 적용
-            if (preLoginLang) {
+            if (selectedLanguage) {
               try {
                 await updateUserSettings(user.uid, {
-                  language: preLoginLang as Language,
+                  language: selectedLanguage as Language,
                 });
-                localStorage.removeItem("preLoginLanguage");
+                persistLanguageSelection(selectedLanguage as Language);
               } catch (error) {
                 console.error("온보딩 중 언어 설정 실패:", error);
               }

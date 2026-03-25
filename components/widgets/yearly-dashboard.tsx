@@ -8,13 +8,12 @@ import { AreaActivityChart } from "@/components/widgets/area-activity-chart";
 import { MonthlyComparisonChart } from "@/components/widgets/chapter-comparison-chart";
 import { Card } from "@/components/ui/card";
 import { useLanguage } from "@/hooks/useLanguage";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import {
   fetchAllMonthliesByUserId,
   fetchYearlyActivityStats,
 } from "@/lib/firebase/index";
 import { getMonthlyStatus } from "@/lib/utils";
-import { BarChart3, Clock, BookOpen, Award, TrendingUp } from "lucide-react";
+import { BarChart3, Clock, BookOpen, Award } from "lucide-react";
 
 export default function YearlyDashboard() {
   const [user] = useAuthState(auth);
@@ -25,7 +24,9 @@ export default function YearlyDashboard() {
     yearlyStats: translate("home.yearlyStats"),
     yearlyStatsDescription: translate("home.yearlyStatsDescription"),
     focusTime: translate("home.focusTime"),
+    focusTimeDescription: translate("home.focusTimeDescription"),
     completionRate: translate("home.completionRate"),
+    completionRateDescription: translate("home.completionRateDescription"),
     completedMonthlies: translate("home.completedMonthlies"),
     completedMonthliesDescription: translate(
       "home.completedMonthliesDescription"
@@ -35,6 +36,7 @@ export default function YearlyDashboard() {
     hours: translate("home.hours"),
     areaActivity: translate("home.areaActivity"),
     monthlyComparison: translate("home.monthlyComparison"),
+    noCompletedMonthlyData: translate("home.noCompletedMonthlyData"),
     dashboardUpdate: translate("home.dashboardUpdate"),
   };
 
@@ -114,7 +116,7 @@ export default function YearlyDashboard() {
               ? `${Math.round(yearlyStats.totalFocusTime / 60)}${texts.hours}`
               : `0${texts.hours}`
           }
-          description="올해 완료한 태스크 기준"
+          description={texts.focusTimeDescription}
           icon={<Clock className="h-4 w-4 text-muted-foreground" />}
           isLoading={yearlyStatsLoading}
         />
@@ -125,7 +127,7 @@ export default function YearlyDashboard() {
               ? `${Math.round(yearlyStats.averageCompletionRate)}%`
               : "0%"
           }
-          description="올해 완료된 먼슬리 평균"
+          description={texts.completionRateDescription}
           icon={<BookOpen className="h-4 w-4 text-muted-foreground" />}
           isLoading={yearlyStatsLoading}
         />
@@ -175,7 +177,7 @@ export default function YearlyDashboard() {
             <MonthlyComparisonChart data={monthlyComparisonData} />
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground">
-              <p>완료된 월간 데이터가 없습니다</p>
+              <p>{texts.noCompletedMonthlyData}</p>
             </div>
           )}
         </div>
