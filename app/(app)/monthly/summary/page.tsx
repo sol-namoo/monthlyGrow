@@ -138,7 +138,7 @@ export default function MonthlySummaryPage() {
           <Textarea
             placeholder="이번 먼슬리에서 배운 점, 어려웠던 점, 다음 먼슬리에 적용할 점 등을 자유롭게 작성해보세요."
             className="min-h-32"
-            value={reflection || monthly.retrospective?.content || ""}
+            value={reflection}
             onChange={(e) => setReflection(e.target.value)}
           />
         </Card>

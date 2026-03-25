@@ -60,8 +60,8 @@
 
 ### 5. 레거시 UI / 미사용 경로
 
-- `components/para/ArchivesTab.tsx`는 오래된 archive 타입(`monthly`, `project`, `note`)에 맞춰 작성되어 있고, 현재 PARA 화면은 `UnifiedArchivesTab`을 쓰고 있다.
-- `api/data.ts`의 `getUnconnectedProjects()`는 “모든 프로젝트가 미연결”이라는 과거 구조 기준 comment를 유지한다.
+- `components/para/ArchivesTab.tsx`는 오래된 archive 타입(`monthly`, `project`, `note`)에 맞춰 작성되어 있고, 현재 PARA 화면은 `UnifiedArchivesTab`을 쓰고 있었다.
+- `api/data.ts`의 `getUnconnectedProjects()`는 “모든 프로젝트가 미연결”이라는 과거 구조 기준 comment를 유지하고 있었다.
 - `updateUserDisplayName`, `deleteProfilePicture`는 export는 남아 있지만 현재 UI에서 직접 쓰는 경로를 찾지 못했다.
 
 결론:
@@ -84,6 +84,8 @@
 - `functions/src/index.ts`의 깨진 export 제거
 - `api/data.ts#getArchive()`를 실제 unified archive 조회로 연결
 - `usePageData("monthlyDetail")`에서 live path에 필요 없는 snapshot query 제거
+- `components/para/ArchivesTab.tsx` 제거
+- `api/data.ts`에서 참조되지 않는 `getUnconnectedProjects()`, `getSnapshotsByMonthlyId()` 제거
 
 ## 테스트 전략
 
@@ -100,8 +102,4 @@
 
 ## 남은 냄새
 
-- `components/para/ArchivesTab.tsx`는 현재 구조와 맞지 않는 legacy candidate
-- `getUnconnectedProjects()`는 현재 관계 모델 설명과 맞지 않는 legacy adapter
-- `getSnapshotsByMonthlyId()`는 아직 실제 구현이 비어 있다
-- `components/monthly/MonthlyDetailContent.tsx`, `app/(app)/monthly/summary/page.tsx`에는 아직 `monthly.retrospective` 같은 구필드를 직접 읽는 레거시 참조가 남아 있다
 - `Project.notes[]`, `Monthly.note`, `Monthly.retrospective`, `Project.retrospective` 타입 필드는 읽기 호환용인지 완전 제거 대상인지 한 번 더 결정이 필요하다

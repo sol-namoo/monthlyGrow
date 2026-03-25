@@ -500,9 +500,9 @@ export function MonthlyDetailContent({
                   </Button>
                 </>
               ) : (
-                monthly.retrospective && (
+                monthlyRetrospective && (
                   <Button variant="ghost" size="icon" asChild>
-                    <Link href={`/para/archives/${monthly.retrospective.id}`}>
+                    <Link href={`/para/archives/${monthlyRetrospective.id}`}>
                       <FolderOpen className="h-5 w-5" />
                     </Link>
                   </Button>
