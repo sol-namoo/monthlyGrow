@@ -23,6 +23,7 @@ import {
 import { formatDateForInput } from "../utils";
 import { Project, Monthly } from "../types";
 import { getMonthlyStatus } from "../utils";
+import { getProjectCollectionState } from "./crud-helpers";
 
 // 프로젝트 데이터 변환 헬퍼 함수 (denormalized 필드 포함)
 export const mapProjectData = (doc: any): Project => {
@@ -109,27 +110,17 @@ export const fetchProjectsOverlappingWithMonthly = async (
 export const fetchActiveProjectsByUserId = async (
   userId: string
 ): Promise<Project[]> => {
-  const q = query(
-    collection(db, "projects"),
-    where("userId", "==", userId),
-    where("status", "==", "active"),
-    orderBy("endDate", "desc")
-  );
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(mapProjectData);
+  const projects = await fetchAllProjectsByUserId(userId);
+  return projects.filter((project) => getProjectCollectionState(project) === "active");
 };
 
 export const fetchArchivedProjectsByUserId = async (
   userId: string
 ): Promise<Project[]> => {
-  const q = query(
-    collection(db, "projects"),
-    where("userId", "==", userId),
-    where("status", "==", "archived"),
-    orderBy("endDate", "desc")
+  const projects = await fetchAllProjectsByUserId(userId);
+  return projects.filter(
+    (project) => getProjectCollectionState(project) === "archived"
   );
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(mapProjectData);
 };
 
 export const fetchProjectById = async (projectId: string): Promise<Project> => {
@@ -462,6 +453,18 @@ export const deleteProjectById = async (projectId: string): Promise<void> => {
       }
 
       // 4. 프로젝트 문서 삭제
+      const archivesQuery = query(
+        collection(db, "unified_archives"),
+        where("parentId", "==", projectId)
+      );
+      const archivesSnapshot = await getDocs(archivesQuery);
+      archivesSnapshot.docs.forEach((archiveDoc) => {
+        if (archiveDoc.data().parentType === "project") {
+          transaction.delete(archiveDoc.ref);
+        }
+      });
+
+      // 5. 프로젝트 문서 삭제
       transaction.delete(projectRef);
     });
   } catch (error) {

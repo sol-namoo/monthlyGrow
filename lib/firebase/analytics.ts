@@ -12,27 +12,31 @@ import {
 import { db } from "./config";
 import { getMonthlyStatus } from "../utils";
 import { Monthly } from "../types";
+import { getProjectCollectionState } from "./crud-helpers";
+
+const mapProjectDoc = (doc: any) => {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    ...data,
+    startDate: data.startDate.toDate(),
+    endDate: data.endDate.toDate(),
+    createdAt: data.createdAt.toDate(),
+    updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+  } as any;
+};
 
 // Analytics & Statistics
 export const fetchActiveProjects = async (userId: string): Promise<any[]> => {
   const q = query(
     collection(db, "projects"),
     where("userId", "==", userId),
-    where("status", "==", "active"),
     orderBy("createdAt", "desc")
   );
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      startDate: data.startDate.toDate(),
-      endDate: data.endDate.toDate(),
-      createdAt: data.createdAt.toDate(),
-      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-    } as any;
-  });
+  return querySnapshot.docs
+    .map(mapProjectDoc)
+    .filter((project) => getProjectCollectionState(project) === "active");
 };
 
 export const fetchCompletedProjects = async (
@@ -41,21 +45,12 @@ export const fetchCompletedProjects = async (
   const q = query(
     collection(db, "projects"),
     where("userId", "==", userId),
-    where("status", "==", "completed"),
     orderBy("createdAt", "desc")
   );
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      startDate: data.startDate.toDate(),
-      endDate: data.endDate.toDate(),
-      createdAt: data.createdAt.toDate(),
-      updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
-    } as any;
-  });
+  return querySnapshot.docs
+    .map(mapProjectDoc)
+    .filter((project) => getProjectCollectionState(project) === "archived");
 };
 
 export const getTodayDeadlineProjects = async (

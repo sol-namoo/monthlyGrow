@@ -414,6 +414,17 @@ export const deleteMonthlyById = async (monthlyId: string): Promise<void> => {
         });
       });
 
+      const archivesQuery = query(
+        collection(db, "unified_archives"),
+        where("parentId", "==", monthlyId)
+      );
+      const archivesSnapshot = await getDocs(archivesQuery);
+      archivesSnapshot.docs.forEach((archiveDoc) => {
+        if (archiveDoc.data().parentType === "monthly") {
+          transaction.delete(archiveDoc.ref);
+        }
+      });
+
       // 먼슬리 삭제
       transaction.delete(monthlyRef);
     });

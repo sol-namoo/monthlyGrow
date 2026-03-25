@@ -531,8 +531,8 @@ export default function ArchiveDetailPage({
               userId: archive.userId,
               objective: archive.title,
               title: archive.title,
-              note: archive.content,
             }}
+            existingContent={archive.content}
             onClose={() => setShowNoteForm(false)}
             onSave={() => {
               // 노트 저장 후 데이터 새로고침

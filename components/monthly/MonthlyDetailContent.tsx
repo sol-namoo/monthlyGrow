@@ -1146,6 +1146,7 @@ export function MonthlyDetailContent({
         <NoteForm
           type="monthly"
           parent={monthly}
+          existingContent={monthlyNote?.content}
           onClose={() => setShowNoteForm(false)}
           onSave={() => {
             // 노트 저장 후 데이터 새로고침

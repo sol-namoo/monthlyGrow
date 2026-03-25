@@ -10,7 +10,6 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
 import {
   updateMonthly,
-  updateProject,
   createUnifiedArchive,
   updateUnifiedArchive,
   fetchSingleArchive,
@@ -27,19 +26,34 @@ type NoteFormData = z.infer<typeof noteFormSchema>;
 interface NoteFormProps {
   type: "monthly" | "project";
   parent: Monthly | any; // Monthly 또는 Project 타입
+  existingContent?: string;
   onClose: () => void;
   onSave?: () => void;
 }
 
-export function NoteForm({ type, parent, onClose, onSave }: NoteFormProps) {
+export function NoteForm({
+  type,
+  parent,
+  existingContent,
+  onClose,
+  onSave,
+}: NoteFormProps) {
   const { translate } = useLanguage();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const initialNote =
+    existingContent ??
+    (typeof parent.note === "string"
+      ? parent.note
+      : Array.isArray(parent.notes) && parent.notes.length > 0
+      ? parent.notes[0]?.content || ""
+      : "");
+
   const form = useForm<NoteFormData>({
     resolver: zodResolver(noteFormSchema),
     defaultValues: {
-      note: typeof parent.note === "string" ? parent.note : "",
+      note: initialNote,
     },
   });
 
@@ -92,27 +106,13 @@ export function NoteForm({ type, parent, onClose, onSave }: NoteFormProps) {
           });
         } else {
           // 새 노트 생성
-          const newArchive = await createUnifiedArchive({
+          await createUnifiedArchive({
             userId: parent.userId,
             type: "project_note",
             parentType: "project",
             parentId: parent.id,
             title: parent.title || "",
             content: data.note || "",
-          });
-
-          // 프로젝트에 노트 연결 (아카이브 ID 사용)
-          await updateProject(parent.id, {
-            notes: [
-              {
-                id: newArchive.id,
-                userId: newArchive.userId,
-                title: parent.title || "",
-                content: data.note || "",
-                createdAt: newArchive.createdAt,
-                updatedAt: newArchive.updatedAt,
-              },
-            ],
           });
         }
       }
@@ -143,7 +143,7 @@ export function NoteForm({ type, parent, onClose, onSave }: NoteFormProps) {
     >
       <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[calc(100vh-120px)] overflow-y-auto">
         <h3 className="text-lg font-semibold mb-4">
-          {typeof parent.note === "string" && parent.note.trim() !== ""
+          {initialNote.trim() !== ""
             ? translate("monthlyDetail.note.editTitle")
             : translate("monthlyDetail.note.addTitle")}
         </h3>

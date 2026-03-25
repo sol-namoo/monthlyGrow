@@ -10,8 +10,9 @@ import {
   fetchResourceById,
   fetchAllProjectsByUserId,
   fetchAllMonthliesByUserId,
+  fetchUnifiedArchiveById,
 } from "../lib/firebase/index"; // lib/firebase/index.ts에서 기본 함수들을 import
-import { Area, Monthly, Project, Resource, Task } from "../lib/types";
+import { Area, Monthly, Project, Resource, Task, UnifiedArchive } from "../lib/types";
 
 // Monthlies
 export const getMonthly = async (monthlyId: string): Promise<Monthly> => {
@@ -85,8 +86,8 @@ export const getResource = async (resourceId: string): Promise<Resource> => {
 };
 
 // Archive
-export const getArchive = async (archiveId: string): Promise<any> => {
-  // TODO: Archive 타입으로 변경
-  // TODO: implement getArchive
-  return {};
+export const getArchive = async (
+  archiveId: string
+): Promise<UnifiedArchive | null> => {
+  return fetchUnifiedArchiveById(archiveId);
 };

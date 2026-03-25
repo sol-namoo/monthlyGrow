@@ -70,7 +70,6 @@ interface Area {
 **Indexes:**
 
 - `userId` (single)
-- `userId` + `status` (composite)
 - `userId` + `createdAt` (composite)
 
 ---
@@ -120,10 +119,12 @@ interface Project {
   endDate: Date; // End date
   createdAt: Date; // Creation date/time
   updatedAt: Date; // Update date/time
-  // Retrospectives and notes managed through Unified Archives
-  // retrospective is queried from unified_archives collection
-  // Notes managed through Unified Archives
-  // notes are queried from unified_archives collection
+  connectedMonthlies?: string[]; // Connected monthly ID array
+  target?: string; // Goal description
+  targetCount?: number; // Goal count
+
+  // Retrospectives and notes are managed through unified_archives.
+  // Any retrospective/notes fields remaining in older documents are compatibility-only.
 
   // Project status is calculated dynamically (not stored in DB)
   // Use getProjectStatus() function for real-time calculation
@@ -165,32 +166,27 @@ interface KeyResult {
 interface Monthly {
   id: string;
   userId: string;
-  title: string; // Monthly title (e.g., "August: Complete job preparation")
   startDate: Date; // Start date (usually beginning of month)
   endDate: Date; // End date (usually end of month)
   focusAreas: string[]; // Focus area ID array
   objective: string; // Monthly objective (OKR Objective)
+  objectiveDescription?: string;
   keyResults: KeyResult[]; // Key Results
   reward?: string; // Reward upon goal achievement
   createdAt: Date;
   updatedAt: Date;
-  // Retrospectives and notes managed through Unified Archives
-  // retrospective and note are queried from unified_archives collection
+  // Retrospectives and notes are managed through unified_archives.
+  // Any note/retrospective fields remaining in older documents are compatibility-only.
 
-  // Connected projects
+  // Connected projects (SSOT for monthly-project relation)
   connectedProjects?: Array<{
     projectId: string;
-    target?: string;
-    targetCount?: number;
     monthlyTargetCount?: number;
+    monthlyDoneCount?: number;
   }>;
 
   // Project quick access (for user convenience, not included in snapshots)
-  quickAccessProjects?: Array<{
-    projectId: string;
-    projectTitle: string;
-    areaName: string;
-  }>;
+  quickAccessProjects?: string[];
 
   // Local calculated fields (not stored in DB)
   status?: "planned" | "in_progress" | "ended"; // Calculated on client based on startDate and endDate
@@ -223,6 +219,7 @@ interface Task {
   date: Date; // Task date
   duration: number; // Duration in days
   done: boolean; // Completion status
+  completedAt?: Date;
   createdAt: Date; // Creation date/time
   updatedAt: Date; // Update date/time
 }
@@ -234,62 +231,82 @@ interface Task {
 - `userId` + `projectId` (composite)
 - `userId` + `date` (composite)
 
-### 🔹 MonthlyCompletedTasks Collection
+### 🔹 Unified Archives Collection
 
-Tracks completed tasks per month in real-time.
+This is the current source of truth for monthly/project notes and retrospectives.
 
 ```typescript
-interface MonthlyCompletedTasks {
-  id: string; // Document ID (auto-generated)
-  userId: string; // User ID
-  yearMonth: string; // Format: "2024-08"
-  completedTasks: {
-    taskId: string; // Completed task ID
-    projectId: string; // Belonging project ID
-    completedAt: Date; // Completion date
-  }[];
-  createdAt: Date; // Creation date/time
-  updatedAt: Date; // Update date/time
+interface UnifiedArchive {
+  id: string;
+  userId: string;
+  type:
+    | "monthly_retrospective"
+    | "monthly_note"
+    | "project_retrospective"
+    | "project_note";
+  parentId: string; // monthlyId or projectId
+  parentType: "monthly" | "project";
+  title: string;
+  content: string;
+  parentTitle?: string;
+  parentStartDate?: Date;
+  parentEndDate?: Date;
+  parentAreaName?: string;
+  userRating?: number;
+  bookmarked?: boolean;
+  bestMoment?: string;
+  routineAdherence?: number;
+  unexpectedObstacles?: string;
+  nextMonthlyApplication?: string;
+  keyResultsReview?: {
+    text?: string;
+    completedKeyResults?: string[];
+    failedKeyResults?: {
+      keyResultId: string;
+      keyResultTitle: string;
+      reason:
+        | "unrealisticGoal"
+        | "timeManagement"
+        | "priorityMismatch"
+        | "externalFactors"
+        | "motivation"
+        | "other";
+      customReason?: string;
+    }[];
+  };
+  goalAchieved?: boolean;
+  memorableTask?: string;
+  stuckPoints?: string;
+  newLearnings?: string;
+  nextProjectImprovements?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 ```
 
-**Indexes:**
+### 🔹 Monthly Snapshots Collection
 
-- `userId` (single)
-- `userId` + `yearMonth` (composite)
-
----
-
-### 🔹 MonthlySnapshots Collection
-
-Stores monthly snapshots automatically generated at the end of each month.
+Cloud Functions create monthly summary documents in `monthly_snapshots`.
 
 ```typescript
-// Key Result snapshot (for end-of-month snapshots)
-interface KeyResultSnapshot {
-  id: string;
-  title: string;
-  isCompleted: boolean;
-  targetCount?: number;
-  completedCount?: number;
-  // Preserves state at snapshot time
-}
-
 interface MonthlySnapshot {
-  id: string; // Document ID (auto-generated)
-  userId: string; // User ID
-  yearMonth: string; // "2024-08"
-  snapshotDate: Date; // Snapshot creation date
-
-  // Monthly information
+  id: string;
+  userId: string;
+  yearMonth: string; // "2026-03"
+  snapshotDate: Date;
   monthly: {
     id: string;
-    title: string;
     objective: string;
-    keyResults: KeyResultSnapshot[];
+    objectiveDescription?: string;
+    keyResults: {
+      id: string;
+      title: string;
+      description?: string;
+      isCompleted: boolean;
+      targetCount?: number;
+      completedCount?: number;
+    }[];
   };
-
-  // Completed tasks (grouped by project)
   completedTasks: {
     projectId: string;
     projectTitle: string;
@@ -300,8 +317,6 @@ interface MonthlySnapshot {
       completedAt: Date;
     }[];
   }[];
-
-  // Statistics
   statistics: {
     totalCompletedTasks: number;
     totalProjects: number;
@@ -309,8 +324,6 @@ interface MonthlySnapshot {
     keyResultsCompleted: number;
     keyResultsTotal: number;
   };
-
-  // Failure analysis data (newly added)
   failureAnalysis?: {
     totalKeyResults: number;
     failedKeyResults: number;
@@ -330,79 +343,6 @@ interface MonthlySnapshot {
   };
 }
 ```
-
-**Indexes:**
-
-- `userId` (single)
-- `userId` + `yearMonth` (composite)
-- `snapshotDate` (single)
-
----
-
-### 🔹 Unified Archives Collection
-
-An archive system that manages all retrospectives and notes in a unified way.
-
-```typescript
-interface UnifiedArchive {
-  id: string; // Document ID (auto-generated)
-  userId: string; // User ID (Firebase Auth UID)
-  type:
-    | "monthly_retrospective"
-    | "project_retrospective"
-    | "monthly_note"
-    | "project_note"; // Archive type
-  parentId: string; // Parent document ID (Monthly ID or Project ID)
-  parentType: "monthly" | "project"; // Parent type
-
-  // Common fields
-  title: string; // Title (auto-generated or user input)
-  content: string; // Content
-  userRating?: number; // Star rating (1-5)
-  bookmarked: boolean; // Bookmark status
-
-  // Retrospective-specific fields (when type is "retrospective")
-  bestMoment?: string; // Best moment
-  routineAdherence?: string; // Routine adherence rate
-  unexpectedObstacles?: string; // Unexpected obstacles
-  nextMonthlyApplication?: string; // Next month application
-  stuckPoints?: string; // Stuck points
-  newLearnings?: string; // New learnings
-  nextProjectImprovements?: string; // Next project improvements
-  memorableTask?: string; // Most memorable task
-
-  // Key Results failure reason data (newly added)
-  keyResultsReview?: {
-    text?: string; // Overall text review of Key Results
-    completedKeyResults?: string[]; // Completed Key Results ID list
-    failedKeyResults?: {
-      keyResultId: string;
-      keyResultTitle: string; // Key Result title (for convenience when querying)
-      reason:
-        | "unrealisticGoal"
-        | "timeManagement"
-        | "priorityMismatch"
-        | "externalFactors"
-        | "motivation"
-        | "other";
-      customReason?: string; // User input reason when "other" is selected
-    }[];
-  };
-
-  createdAt: Date; // Creation date/time
-  updatedAt: Date; // Update date/time
-}
-```
-
-**Indexes:**
-
-- `userId` (single)
-- `userId` + `type` (composite)
-- `userId` + `parentType` (composite)
-- `userId` + `createdAt` (composite, descending)
-- `userId` + `bookmarked` (composite)
-- `userId` + `type` + `createdAt` (composite, descending)
-- `userId` + `parentType` + `createdAt` (composite, descending)
 
 ---
 
@@ -429,38 +369,31 @@ interface UnifiedArchive {
 - Managed as subcollection: `projects/{projectId}/tasks/{taskId}`
 - Connected via `projectId`
 
-### 5. Monthly → Projects (Independent)
+### 5. Monthly ↔ Projects (N:N)
 
-- Monthlies and projects are managed independently
-- No project connection (connectedProjects removed)
-- Completed tasks are automatically aggregated through MonthlyCompletedTasks
-- User manually evaluates Key Results achievement by reviewing completed tasks
+- `Monthly.connectedProjects[]` is the source of truth for monthly-specific goals and progress
+- `Project.connectedMonthlies[]` is the reverse lookup used by project detail and queries
+- Both sides must stay synchronized when creating, editing, or deleting connections
 
-### 6. MonthlyCompletedTasks → Tasks (1:N)
-
-- Tracks completed tasks per month in real-time
-- Automatically added to MonthlyCompletedTasks for that month when task is completed
-- Queryable grouped by project
-
-### 7. MonthlySnapshot → Monthly (1:1)
+### 6. MonthlySnapshot → Monthly (1:1)
 
 - Monthly snapshot automatically generated at end of month
 - Completely preserves all information for that month
 - Used when querying past data
 
-### 6. Unified Archives System (1:N)
+### 7. Unified Archives System (1:N)
 
 - All retrospectives and notes managed in unified way in `unified_archives` collection
 - Distinguished by `type` field: `"monthly_retrospective"`, `"project_retrospective"`, `"monthly_note"`, `"project_note"`
 - Connected to Monthly or Project via `parentId`
 - Provides unified star rating (`userRating`) and bookmark (`bookmarked`) features
 
-### 7. Monthly → Unified Archive (1:N)
+### 8. Monthly → Unified Archive (1:N)
 
 - Multiple archive items per monthly (retrospectives, notes)
 - Connected via `parentId` in `unified_archives` collection
 
-### 8. Project → Unified Archive (1:N)
+### 9. Project → Unified Archive (1:N)
 
 - Multiple archive items per project (retrospectives, notes)
 - Connected via `parentId` in `unified_archives` collection
