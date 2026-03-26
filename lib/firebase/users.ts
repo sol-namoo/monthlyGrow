@@ -13,7 +13,6 @@ import {
   ref,
   uploadBytes,
   getDownloadURL,
-  deleteObject,
 } from "firebase/storage";
 import { updateProfile } from "firebase/auth";
 import { db, storage, auth } from "./config";
@@ -246,21 +245,6 @@ export const updateUserPreferences = async (
   }
 };
 
-export const updateUserDisplayName = async (
-  displayName: string
-): Promise<void> => {
-  try {
-    const user = auth.currentUser;
-    if (!user) {
-      throw new Error("로그인된 사용자가 없습니다.");
-    }
-
-    await updateProfile(user, { displayName });
-  } catch (error) {
-    throw new Error("사용자 표시명 업데이트에 실패했습니다.");
-  }
-};
-
 export const uploadProfilePicture = async (
   file: File,
   userId: string
@@ -273,18 +257,6 @@ export const uploadProfilePicture = async (
     return downloadURL;
   } catch (error) {
     throw new Error("프로필 사진 업로드에 실패했습니다.");
-  }
-};
-
-export const deleteProfilePicture = async (
-  userId: string,
-  fileName: string
-): Promise<void> => {
-  try {
-    const storageRef = ref(storage, `profile-pictures/${userId}/${fileName}`);
-    await deleteObject(storageRef);
-  } catch (error) {
-    throw new Error("프로필 사진 삭제에 실패했습니다.");
   }
 };
 

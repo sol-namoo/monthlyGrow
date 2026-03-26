@@ -604,7 +604,7 @@ export default function ProjectDetailPage({
           type="project"
           title={project?.title || ""}
           keyResults={[]}
-          existingData={project?.retrospective}
+          existingData={projectRetrospective}
           onClose={() => setShowRetrospectiveDialog(false)}
           onSave={async (data) => {
             try {

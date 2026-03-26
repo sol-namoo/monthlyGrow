@@ -113,8 +113,6 @@ export async function savePlanToFirestore(options: SavePlanOptions) {
           difficulty: project.difficulty || "intermediate", // 기본값 설정
           createdAt: now,
           updatedAt: now,
-          retrospective: null,
-          notes: [],
         });
 
         // 4. Tasks 서브컬렉션 저장

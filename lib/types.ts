@@ -40,22 +40,6 @@ export interface Project {
   endDate: Date;
   createdAt: Date;
   updatedAt: Date;
-  retrospective?: {
-    id: string;
-    userId: string;
-    projectId: string;
-    createdAt: Date;
-    updatedAt: Date;
-    [key: string]: any;
-  };
-  notes?: {
-    id: string;
-    userId: string;
-    title: string;
-    content: string;
-    createdAt: Date;
-    updatedAt: Date;
-  }[];
 
   // Monthly 연결 관련
   connectedMonthlies?: string[]; // 연결된 Monthly ID 배열
@@ -143,15 +127,6 @@ export interface Monthly {
   reward?: string;
   createdAt: Date;
   updatedAt: Date;
-  retrospective?: {
-    id: string;
-    userId: string;
-    monthlyId: string;
-    createdAt: Date;
-    updatedAt: Date;
-    [key: string]: any;
-  }; // 먼슬리 회고
-  note?: string; // 먼슬리 노트 (선택)
   /** 연결된 프로젝트 (SSOT). 목표치·진행률 포함 */
   connectedProjects?: ConnectedProjectGoal[];
   /** @deprecated connectedProjects로 통일. 읽기 호환용 */

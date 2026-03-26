@@ -48,7 +48,6 @@ export const mapProjectData = (doc: any): Project => {
     originalMonthlyId: data.originalMonthlyId,
     carriedOverAt: data.carriedOverAt ? data.carriedOverAt.toDate() : undefined,
     migrationStatus: data.migrationStatus,
-    notes: data.notes || [],
     taskCounts: data.taskCounts,
     timeStats: data.timeStats,
   } as Project;
@@ -290,7 +289,6 @@ export const createProject = async (
       originalMonthlyId: projectData.originalMonthlyId,
       carriedOverAt: projectData.carriedOverAt,
       migrationStatus: projectData.migrationStatus,
-      notes: projectData.notes || [],
     } as Project;
   } catch (error) {
     if (error instanceof Error) {

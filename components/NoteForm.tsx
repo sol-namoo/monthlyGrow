@@ -9,7 +9,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
 import {
-  updateMonthly,
   createUnifiedArchive,
   updateUnifiedArchive,
   fetchSingleArchive,
@@ -42,13 +41,7 @@ export function NoteForm({
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const initialNote =
-    existingContent ??
-    (typeof parent.note === "string"
-      ? parent.note
-      : Array.isArray(parent.notes) && parent.notes.length > 0
-      ? parent.notes[0]?.content || ""
-      : "");
+  const initialNote = existingContent ?? "";
 
   const form = useForm<NoteFormData>({
     resolver: zodResolver(noteFormSchema),
@@ -62,11 +55,6 @@ export function NoteForm({
       setIsSubmitting(true);
 
       if (type === "monthly") {
-        await updateMonthly(parent.id, {
-          note: data.note || "",
-        });
-
-        // unifiedarchive 컬렉션에도 저장
         const existingArchive = await fetchSingleArchive(
           parent.userId,
           parent.id,
