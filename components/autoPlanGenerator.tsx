@@ -278,10 +278,7 @@ export default function PlanGenerator() {
         if (selectedMonthly.objectiveDescription) {
           userInputForAI += ` - ${selectedMonthly.objectiveDescription}`;
         }
-        if (
-          selectedMonthly.keyResults &&
-          selectedMonthly.keyResults.length > 0
-        ) {
+        if (Array.isArray(selectedMonthly.keyResults) && selectedMonthly.keyResults.length > 0) {
           userInputForAI += ` (Key Results: ${selectedMonthly.keyResults
             .map((kr) => kr.title)
             .join(", ")})`;
@@ -595,7 +592,7 @@ export default function PlanGenerator() {
                         {selectedMonthly.objectiveDescription}
                       </p>
                     )}
-                    {selectedMonthly.keyResults &&
+                    {Array.isArray(selectedMonthly.keyResults) &&
                       selectedMonthly.keyResults.length > 0 && (
                         <div>
                           <strong>Key Results:</strong>
@@ -608,7 +605,7 @@ export default function PlanGenerator() {
                           </ul>
                         </div>
                       )}
-                    {selectedMonthly.focusAreas &&
+                    {Array.isArray(selectedMonthly.focusAreas) &&
                       selectedMonthly.focusAreas.length > 0 && (
                         <p>
                           <strong>중점 영역:</strong>{" "}
@@ -1279,7 +1276,10 @@ function PlanPreview({
 
       {/* 프로젝트 목록 */}
       <div className="space-y-4">
-        {editedPlan.projects.map((project, index) => (
+        {editedPlan.projects.map((project, index) => {
+          const projectTasks = Array.isArray(project.tasks) ? project.tasks : [];
+
+          return (
           <div
             key={index}
             className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700"
@@ -1409,7 +1409,7 @@ function PlanPreview({
                   </span>
                   <span className="bg-gray-100 px-2 py-1 rounded">
                     🕐 총 작업 시간:{" "}
-                    {project.tasks.reduce(
+                    {projectTasks.reduce(
                       (sum, task) => sum + (task.duration || 0),
                       0
                     )}
@@ -1423,10 +1423,10 @@ function PlanPreview({
                     {translate("aiPlanGenerator.projectDetails.mainTasks")}
                   </p>
                   <ul className="text-sm text-gray-600 space-y-2">
-                    {project.tasks
+                    {projectTasks
                       .slice(
                         0,
-                        expandedProjects.has(index) ? project.tasks.length : 3
+                        expandedProjects.has(index) ? projectTasks.length : 3
                       )
                       .map((task, taskIndex) => (
                         <li key={taskIndex} className="flex items-start gap-2">
@@ -1465,10 +1465,11 @@ function PlanPreview({
                                         1000
                                   );
 
-                                  const taskIndex = project.tasks.indexOf(task);
+                                  const taskIndex = projectTasks.indexOf(task);
                                   const taskDate = new Date(
                                     projectStartDate.getTime() +
-                                      (taskIndex / (project.tasks.length - 1)) *
+                                      (taskIndex /
+                                        Math.max(projectTasks.length - 1, 1)) *
                                         (projectEndDate.getTime() -
                                           projectStartDate.getTime())
                                   );
@@ -1480,7 +1481,7 @@ function PlanPreview({
                                     );
                                   } else if (
                                     taskIndex ===
-                                    project.tasks.length - 1
+                                    projectTasks.length - 1
                                   ) {
                                     taskDate.setTime(projectEndDate.getTime());
                                   }
@@ -1501,7 +1502,7 @@ function PlanPreview({
                           </div>
                         </li>
                       ))}
-                    {project.tasks.length > 3 &&
+                    {projectTasks.length > 3 &&
                       !expandedProjects.has(index) && (
                         <li className="text-gray-400">
                           ...{" "}
@@ -1509,12 +1510,12 @@ function PlanPreview({
                             "aiPlanGenerator.projectDetails.moreTasks"
                           ).replace(
                             "{count}",
-                            String(project.tasks.length - 3)
+                            String(projectTasks.length - 3)
                           )}
                         </li>
                       )}
                   </ul>
-                  {project.tasks.length > 3 && (
+                  {projectTasks.length > 3 && (
                     <button
                       onClick={() => toggleProjectExpansion(index)}
                       className="mt-2 text-sm text-blue-600 hover:text-blue-800 underline"
@@ -1528,7 +1529,8 @@ function PlanPreview({
               </>
             )}
           </div>
-        ))}
+        );
+        })}
       </div>
 
       {/* 저장 버튼 */}
