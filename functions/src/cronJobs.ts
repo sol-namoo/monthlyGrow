@@ -2,11 +2,8 @@
 // functions/src/cronJobs.ts
 
 import * as functions from "firebase-functions";
-import { getFirestore } from "firebase-admin/firestore";
+import { db } from "./admin";
 import { createAllSnapshotsForUser } from "./snapshot-utils";
-
-// Firebase Admin 초기화 (이미 index.ts에서 초기화됨)
-const db = getFirestore();
 
 /**
  * 매월 1일 오전 4시에 실행되는 크론 작업

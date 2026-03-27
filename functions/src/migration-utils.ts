@@ -1,9 +1,7 @@
 // 마이그레이션 유틸리티 함수들
 // functions/src/migration-utils.ts
 
-import { getFirestore } from "firebase-admin/firestore";
-
-const db = getFirestore();
+import { db } from "./admin";
 
 interface ConnectedProjectGoal {
   projectId: string;

@@ -1,4 +1,23 @@
-import { PlanConstraints } from "../../lib/types";
+interface PlanConstraints {
+  projectWeeks?: number;
+  maxProjectWeeks?: number;
+  dailyTimeSlots?: {
+    minutesPerDay?: number;
+    maxMinutesPerDay?: number;
+    daysPerWeek?: number;
+    maxDaysPerWeek?: number;
+    preferredTimes?: string[];
+  };
+  difficulty?: "beginner" | "intermediate" | "advanced";
+  focusIntensity?: "light" | "moderate" | "intensive";
+  budget?: {
+    min: number;
+    max: number;
+    currency: "KRW" | "USD";
+  };
+  existingSkills?: string[];
+  preferredActivityStyle?: "visual" | "auditory" | "kinesthetic" | "reading";
+}
 
 /**
  * 제약사항 활용 가이드라인 생성 함수

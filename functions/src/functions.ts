@@ -7,10 +7,15 @@ import {
   createMonthliesFromProjectLoopIds,
   createMonthliesFromProjectMonthlyIds,
 } from "./check-loop-migration";
+import { AI_FUNCTION_REGION, APP_ENGINE_SERVICE_ACCOUNT } from "./runtime-config";
 
 // 태스크 완료 시 먼슬리별 진행률 업데이트
 export const onTaskCompleted = onDocumentUpdated(
-  "projects/{projectId}/tasks/{taskId}",
+  {
+    document: "projects/{projectId}/tasks/{taskId}",
+    region: AI_FUNCTION_REGION,
+    serviceAccount: APP_ENGINE_SERVICE_ACCOUNT,
+  },
   async (event) => {
     const beforeData = event.data?.before.data();
     const afterData = event.data?.after.data();

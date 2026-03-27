@@ -1,9 +1,7 @@
 // loop 컬렉션 확인 및 마이그레이션 스크립트
 // functions/src/check-loop-migration.ts
 
-import { getFirestore } from "firebase-admin/firestore";
-
-const db = getFirestore();
+import { db } from "./admin";
 
 /**
  * loop 컬렉션이 존재하는지 확인하고, 있다면 monthly로 마이그레이션합니다.

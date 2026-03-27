@@ -1,15 +1,7 @@
 // Cloud Functions용 Firebase 유틸리티 함수들
 // functions/src/firebase-utils.ts
 
-import { initializeApp, getApps } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-
-// Firebase Admin 초기화 (이미 초기화된 경우 스킵)
-if (getApps().length === 0) {
-  initializeApp();
-}
-
-const db = getFirestore();
+import { db } from "./admin";
 
 // 타입 정의
 interface KeyResult {

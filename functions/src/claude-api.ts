@@ -6,6 +6,7 @@ import {
   generateConstraintsGuide,
   CONSTRAINTS_SYSTEM_GUIDE,
 } from "./constraints-guide";
+import { AI_FUNCTION_REGION, APP_ENGINE_SERVICE_ACCOUNT } from "./runtime-config";
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -121,25 +122,31 @@ Use this JSON format:
 ${CONSTRAINTS_SYSTEM_GUIDE}`;
 
 // 계획 생성 함수
-export const generatePlan = onCall({ secrets: [anthropicApiKey] }, async (request) => {
-  // 인증 확인
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
-  }
+export const generatePlan = onCall(
+  {
+    region: AI_FUNCTION_REGION,
+    serviceAccount: APP_ENGINE_SERVICE_ACCOUNT,
+    secrets: [anthropicApiKey],
+  },
+  async (request) => {
+    // 인증 확인
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
 
-  const {
-    userInput,
-    constraints,
-    inputType = "manual",
-    selectedMonthlyId,
-  } = request.data;
+    const {
+      userInput,
+      constraints,
+      inputType = "manual",
+      selectedMonthlyId,
+    } = request.data;
 
-  if (!userInput || typeof userInput !== "string") {
-    throw new HttpsError("invalid-argument", "사용자 입력이 필요합니다.");
-  }
+    if (!userInput || typeof userInput !== "string") {
+      throw new HttpsError("invalid-argument", "사용자 입력이 필요합니다.");
+    }
 
-  try {
-    const anthropic = getAnthropicClient();
+    try {
+      const anthropic = getAnthropicClient();
 
     // 1. 사용자의 기존 Areas 조회
     const existingAreas = await fetchUserAreas(request.auth.uid);
@@ -548,21 +555,26 @@ export const generatePlan = onCall({ secrets: [anthropicApiKey] }, async (reques
     }
     console.log("=== 검증 로직 완료 ===");
 
-    return {
-      success: true,
-      plan: parsedPlan,
-      originalResponse: responseText,
-      existingAreas: existingAreas.length,
-    };
-  } catch (error) {
-    console.error("Claude API 오류:", error);
-    throw new HttpsError("internal", "AI 서비스 오류가 발생했습니다.");
+      return {
+        success: true,
+        plan: parsedPlan,
+        originalResponse: responseText,
+        existingAreas: existingAreas.length,
+      };
+    } catch (error) {
+      console.error("Claude API 오류:", error);
+      throw new HttpsError("internal", "AI 서비스 오류가 발생했습니다.");
+    }
   }
-});
+);
 
 // 테스트용 간단한 함수
 export const testClaudeConnection = onCall(
-  { secrets: [anthropicApiKey] },
+  {
+    region: AI_FUNCTION_REGION,
+    serviceAccount: APP_ENGINE_SERVICE_ACCOUNT,
+    secrets: [anthropicApiKey],
+  },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -598,12 +610,18 @@ export const testClaudeConnection = onCall(
 );
 
 // Firebase Functions에 추가
-export const refinePlan = onCall({ secrets: [anthropicApiKey] }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
-  }
+export const refinePlan = onCall(
+  {
+    region: AI_FUNCTION_REGION,
+    serviceAccount: APP_ENGINE_SERVICE_ACCOUNT,
+    secrets: [anthropicApiKey],
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
 
-  const { originalPlan, feedback, adjustments } = request.data;
+    const { originalPlan, feedback, adjustments } = request.data;
 
   const refinementPrompt = `
 기존 계획을 사용자 피드백을 바탕으로 개선해주세요.
@@ -620,15 +638,15 @@ ${JSON.stringify(adjustments, null, 2)}
 기존 계획의 구조를 유지하면서 사용자 요청을 반영한 개선된 계획을 제공해주세요.
 `;
 
-  try {
-    const anthropic = getAnthropicClient();
-    const message = await anthropic.messages.create({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 4000,
-      temperature: 0.3,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: refinementPrompt }],
-    });
+    try {
+      const anthropic = getAnthropicClient();
+      const message = await anthropic.messages.create({
+        model: ANTHROPIC_MODEL,
+        max_tokens: 4000,
+        temperature: 0.3,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: refinementPrompt }],
+      });
 
     const firstContent = message.content[0];
     if (!firstContent || !("text" in firstContent)) {
@@ -642,16 +660,17 @@ ${JSON.stringify(adjustments, null, 2)}
       jsonMatch ? jsonMatch[1] || jsonMatch[0] : responseText
     );
 
-    return {
-      success: true,
-      refinedPlan,
-      improvements: extractImprovements(responseText),
-    };
-  } catch (error) {
-    console.error("계획 개선 오류:", error);
-    throw new HttpsError("internal", "계획 개선 중 오류가 발생했습니다.");
+      return {
+        success: true,
+        refinedPlan,
+        improvements: extractImprovements(responseText),
+      };
+    } catch (error) {
+      console.error("계획 개선 오류:", error);
+      throw new HttpsError("internal", "계획 개선 중 오류가 발생했습니다.");
+    }
   }
-});
+);
 
 function extractImprovements(responseText: string): string[] {
   // AI 응답에서 개선 사항을 추출하는 로직

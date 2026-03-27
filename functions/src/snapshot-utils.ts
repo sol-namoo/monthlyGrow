@@ -1,9 +1,7 @@
 // Cloud Functions용 스냅샷 유틸리티 함수들
 // functions/src/snapshot-utils.ts
 
-import { getFirestore } from "firebase-admin/firestore";
-
-const db = getFirestore();
+import { db } from "./admin";
 
 // 타입 정의
 
