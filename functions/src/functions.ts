@@ -2,11 +2,6 @@ import { onRequest } from "firebase-functions/v2/https";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { updateMonthlyProgress } from "./firebase-utils";
 import { migrateEntireDatabase, migrateUserData } from "./migration-utils";
-import {
-  runLoopToMonthlyMigration,
-  createMonthliesFromProjectLoopIds,
-  createMonthliesFromProjectMonthlyIds,
-} from "./check-loop-migration";
 import { AI_FUNCTION_REGION, APP_ENGINE_SERVICE_ACCOUNT } from "./runtime-config";
 
 // 태스크 완료 시 먼슬리별 진행률 업데이트
@@ -128,45 +123,6 @@ export const migrateUser = onRequest(async (req, res) => {
     res.json({ success: true, message: `User ${userId} migration completed` });
   } catch (error) {
     console.error(`User ${userId} migration failed:`, error);
-    res.status(500).json({ success: false, error: (error as Error).message });
-  }
-});
-
-// loop to monthly 마이그레이션
-export const migrateLoopToMonthly = onRequest(async (req, res) => {
-  try {
-    await runLoopToMonthlyMigration();
-    res.json({ success: true, message: "Loop to monthly migration completed" });
-  } catch (error) {
-    console.error("Loop to monthly migration failed:", error);
-    res.status(500).json({ success: false, error: (error as Error).message });
-  }
-});
-
-// monthly 문서 생성 (loopId 기반)
-export const createMonthliesFromLoopIds = onRequest(async (req, res) => {
-  try {
-    await createMonthliesFromProjectLoopIds();
-    res.json({
-      success: true,
-      message: "Monthlies created from project loopIds",
-    });
-  } catch (error) {
-    console.error("Monthly creation failed:", error);
-    res.status(500).json({ success: false, error: (error as Error).message });
-  }
-});
-
-// monthly 문서 생성 (monthlyId 기반)
-export const createMonthliesFromMonthlyIds = onRequest(async (req, res) => {
-  try {
-    await createMonthliesFromProjectMonthlyIds();
-    res.json({
-      success: true,
-      message: "Monthlies created from project monthlyIds",
-    });
-  } catch (error) {
-    console.error("Monthly creation failed:", error);
     res.status(500).json({ success: false, error: (error as Error).message });
   }
 });

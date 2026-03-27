@@ -1,34 +1,38 @@
 // functions/src/analytics.ts
-import * as functions from "firebase-functions";
-import * as admin from "firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { db } from "./admin";
 
-export const trackApiUsage = functions.https.onCall(async (data, context) => {
-  if (!context.auth) return;
+export const trackApiUsage = onCall(async (request) => {
+  if (!request.auth) return;
 
-  const { type, tokensUsed, cost } = data;
+  const { type, tokensUsed, cost } = request.data as {
+    type?: string;
+    tokensUsed?: number;
+    cost?: number;
+  };
 
-  await admin.firestore().collection("apiUsage").add({
-    userId: context.auth.uid,
-    type, // 'generation', 'refinement', etc.
+  await db.collection("apiUsage").add({
+    userId: request.auth.uid,
+    type,
     tokensUsed,
     estimatedCost: cost,
-    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    timestamp: FieldValue.serverTimestamp(),
   });
 });
 
 // 월별 사용량 집계
-export const getMonthlyUsage = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "로그인 필요");
+export const getMonthlyUsage = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인 필요");
   }
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const snapshot = await admin
-    .firestore()
+  const snapshot = await db
     .collection("apiUsage")
-    .where("userId", "==", context.auth.uid)
+    .where("userId", "==", request.auth.uid)
     .where("timestamp", ">=", startOfMonth)
     .get();
 

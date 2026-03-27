@@ -7,9 +7,6 @@ export {
   checkMigrationStatus,
   migrateDatabase,
   migrateUser,
-  migrateLoopToMonthly,
-  createMonthliesFromLoopIds,
-  createMonthliesFromMonthlyIds,
 } from "./functions";
 
 // Claude API 함수들

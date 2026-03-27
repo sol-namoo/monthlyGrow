@@ -139,6 +139,56 @@ Monthly:
    - 기존 데이터를 새로운 구조로 자동 변환
    - 하위 호환성 유지
 
+### 구조 변경 히스토리
+
+이 프로젝트는 초기에 `loop` 중심 구조를 사용했지만, 현재는 `monthly` 중심 구조로 정리됐다.
+
+#### 예전 구조
+
+- `loop` 컬렉션이 월간 목표 단위를 담당했다.
+- 일부 프로젝트는 `loopId`로 loop와 연결됐다.
+- 일부 프로젝트는 `monthlyId` 단일 필드로 월간과 연결됐다.
+- Monthly 문서가 있더라도 현재와 같은 연결 구조를 갖지 않았다.
+
+대표적인 옛 흔적:
+
+- `loop` 컬렉션
+- `Project.loopId`
+- `Project.monthlyId`
+- `Monthly.projectIds[]`
+
+#### 현재 구조
+
+- 월간 목표 단위는 `monthlies` 컬렉션 하나로 통일했다.
+- 프로젝트 연결은 단일 필드가 아니라 `Monthly.connectedProjects[]` / `Project.connectedMonthlies[]` 기준으로 관리한다.
+- 월간별 목표치와 실적은 `connectedProjects[]` 내부의 `monthlyTargetCount`, `monthlyDoneCount`로 관리한다.
+
+즉 예전의 "프로젝트 하나가 월간 하나에 단일 연결" 구조가 아니라, 현재는 월간과 프로젝트가 다대다 연결될 수 있는 구조를 사용한다.
+
+#### 왜 loop 개념을 없앴는가
+
+- 월간 목표 단위를 `loop`, `monthly` 두 개념으로 나눠 들고 있을 이유가 없어졌다.
+- 프로젝트-월간 연결 방식을 `loopId`, `monthlyId`, `projectIds[]`처럼 여러 방식으로 혼용하면 CRUD 정합성이 계속 흔들렸다.
+- 현재 기획에서는 "월간 계획 단위 = monthly" 하나만 유지하고, 연결 정보도 `connectedProjects` / `connectedMonthlies`로 통일하는 편이 더 단순하고 일관적이다.
+
+#### 제거한 마이그레이션 Functions
+
+다음 함수들은 예전 구조를 현재 구조로 옮기기 위한 1회성 마이그레이션 엔드포인트였고, 현재 앱 코드에서는 사용되지 않아 제거했다.
+
+- `migrateLoopToMonthly`
+- `createMonthliesFromLoopIds`
+- `createMonthliesFromMonthlyIds`
+
+원격 Firebase에 남아 있던 관련 레거시 함수도 함께 정리했다.
+
+- `testProjectMigration`
+- `checkCompletedChapters`
+- `createChaptersFromChapterIds`
+- `createChaptersFromLoopIds`
+- `migrateLoopToChapter`
+
+현재 이 역할은 `checkCompletedMonthlies` 같은 현행 구조의 함수만 유지하는 방향으로 정리되어 있다.
+
 ### 실패 패턴 분석 시스템
 
 **데이터 수집**: 먼슬리 회고 작성 시 실패한 Key Results의 이유 선택

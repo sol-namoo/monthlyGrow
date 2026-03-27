@@ -1,19 +1,27 @@
 // Cloud Functions for Firebase 크론 작업 예시
 // functions/src/cronJobs.ts
 
-import * as functions from "firebase-functions";
+import { onRequest } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { db } from "./admin";
 import { createAllSnapshotsForUser } from "./snapshot-utils";
+import {
+  APP_ENGINE_SERVICE_ACCOUNT,
+  SCHEDULER_FUNCTION_REGION,
+} from "./runtime-config";
 
 /**
  * 매월 1일 오전 4시에 실행되는 크론 작업
  * 완료된 먼슬리의 스냅샷을 자동으로 생성
  */
-export const checkCompletedMonthlies = functions
-  .region("asia-northeast3") // 서울 리전
-  .pubsub.schedule("0 4 1 * *") // 매월 1일 오전 4시 (KST)
-  .timeZone("Asia/Seoul")
-  .onRun(async (context: functions.EventContext) => {
+export const checkCompletedMonthlies = onSchedule(
+  {
+    region: SCHEDULER_FUNCTION_REGION,
+    serviceAccount: APP_ENGINE_SERVICE_ACCOUNT,
+    schedule: "0 4 1 * *",
+    timeZone: "Asia/Seoul",
+  },
+  async () => {
     console.log("Starting monthly snapshot creation...");
 
     try {
@@ -67,58 +75,57 @@ export const checkCompletedMonthlies = functions
       console.log(
         `Monthly snapshot creation completed. Processed ${processedUsers.size} users, created ${totalSnapshots} snapshots.`
       );
-      return {
-        success: true,
-        processedUsers: processedUsers.size,
-        totalSnapshots,
-      };
+      return;
     } catch (error) {
       console.error("Error in monthly snapshot creation:", error);
       throw error;
     }
-  });
+  }
+);
 
 /**
  * 테스트용 HTTP 함수 (개발 중에만 사용)
  * https://your-project.cloudfunctions.net/testSnapshotCreation?userId=YOUR_USER_ID
  */
-export const testSnapshotCreation = functions
-  .region("asia-northeast3")
-  .https.onRequest(
-    async (req: functions.https.Request, res: functions.Response) => {
-      if (process.env.NODE_ENV === "production") {
-        res.status(403).send("This function is only available in development");
-        return;
-      }
-
-      const { userId } = req.query;
-
-      if (!userId) {
-        res.status(400).send("Missing userId parameter");
-        return;
-      }
-
-      try {
-        const snapshots = await createAllSnapshotsForUser(userId as string);
-        res.json({
-          success: true,
-          message: `Snapshot creation completed for user ${userId}`,
-          snapshotsCreated: snapshots.length,
-          snapshots: snapshots.map((s) => ({
-            id: s.id,
-            yearMonth: s.yearMonth,
-            statistics: s.statistics,
-          })),
-        });
-      } catch (error) {
-        console.error("Test snapshot creation failed:", error);
-        res.status(500).json({
-          success: false,
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
-      }
+export const testSnapshotCreation = onRequest(
+  {
+    region: SCHEDULER_FUNCTION_REGION,
+    serviceAccount: APP_ENGINE_SERVICE_ACCOUNT,
+  },
+  async (req, res) => {
+    if (process.env.NODE_ENV === "production") {
+      res.status(403).send("This function is only available in development");
+      return;
     }
-  );
+
+    const { userId } = req.query;
+
+    if (!userId) {
+      res.status(400).send("Missing userId parameter");
+      return;
+    }
+
+    try {
+      const snapshots = await createAllSnapshotsForUser(userId as string);
+      res.json({
+        success: true,
+        message: `Snapshot creation completed for user ${userId}`,
+        snapshotsCreated: snapshots.length,
+        snapshots: snapshots.map((s) => ({
+          id: s.id,
+          yearMonth: s.yearMonth,
+          statistics: s.statistics,
+        })),
+      });
+    } catch (error) {
+      console.error("Test snapshot creation failed:", error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+);
 
 /**
  * 비용 예상:
