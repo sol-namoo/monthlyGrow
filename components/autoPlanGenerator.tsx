@@ -918,6 +918,10 @@ function PlanPreview({
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(
     new Set()
   );
+  const safeAreas = Array.isArray(editedPlan?.areas) ? editedPlan.areas : [];
+  const safeProjects = Array.isArray(editedPlan?.projects)
+    ? editedPlan.projects
+    : [];
 
   useEffect(() => {
     setEditedPlan(normalizeGeneratedPlan(plan));
@@ -1068,11 +1072,11 @@ function PlanPreview({
         </h3>
         <div className="flex flex-wrap gap-2 mb-4">
           <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
-            📁 {editedPlan.areas.length}
+            📁 {safeAreas.length}
             {translate("aiPlanGenerator.result.summary.areas")}
           </span>
           <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-sm">
-            📋 {editedPlan.projects.length}
+            📋 {safeProjects.length}
             {translate("aiPlanGenerator.result.summary.projects")}
           </span>
         </div>
@@ -1276,7 +1280,7 @@ function PlanPreview({
 
       {/* 프로젝트 목록 */}
       <div className="space-y-4">
-        {editedPlan.projects.map((project, index) => {
+        {safeProjects.map((project, index) => {
           const projectTasks = Array.isArray(project.tasks) ? project.tasks : [];
 
           return (
