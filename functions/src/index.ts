@@ -1,5 +1,5 @@
 // Firebase Functions 진입점
-export { checkCompletedMonthlies, testProjectMigration } from "./cronJobs";
+export { checkCompletedMonthlies } from "./cronJobs";
 
 // 모든 함수들을 functions.ts에서 import
 export {

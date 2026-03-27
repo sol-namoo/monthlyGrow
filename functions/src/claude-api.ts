@@ -1,6 +1,7 @@
-import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import Anthropic from "@anthropic-ai/sdk";
+import { defineSecret } from "firebase-functions/params";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
 import {
   generateConstraintsGuide,
   CONSTRAINTS_SYSTEM_GUIDE,
@@ -10,10 +11,21 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-// Claude API 클라이언트 초기화
-const anthropic = new Anthropic({
-  apiKey: functions.config().anthropic.api_key,
-});
+const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
+const ANTHROPIC_MODEL = "claude-sonnet-4-5-20250929";
+
+function getAnthropicClient() {
+  const apiKey = anthropicApiKey.value();
+
+  if (!apiKey) {
+    throw new HttpsError(
+      "failed-precondition",
+      "ANTHROPIC_API_KEY secret이 설정되지 않았습니다."
+    );
+  }
+
+  return new Anthropic({ apiKey });
+}
 
 // 사용자의 기존 Areas 조회 함수
 async function fetchUserAreas(userId: string) {
@@ -109,13 +121,10 @@ Use this JSON format:
 ${CONSTRAINTS_SYSTEM_GUIDE}`;
 
 // 계획 생성 함수
-export const generatePlan = functions.https.onCall(async (data, context) => {
+export const generatePlan = onCall({ secrets: [anthropicApiKey] }, async (request) => {
   // 인증 확인
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-      "unauthenticated",
-      "로그인이 필요합니다."
-    );
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
   }
 
   const {
@@ -123,18 +132,17 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
     constraints,
     inputType = "manual",
     selectedMonthlyId,
-  } = data;
+  } = request.data;
 
   if (!userInput || typeof userInput !== "string") {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "사용자 입력이 필요합니다."
-    );
+    throw new HttpsError("invalid-argument", "사용자 입력이 필요합니다.");
   }
 
   try {
+    const anthropic = getAnthropicClient();
+
     // 1. 사용자의 기존 Areas 조회
-    const existingAreas = await fetchUserAreas(context.auth.uid);
+    const existingAreas = await fetchUserAreas(request.auth.uid);
 
     // 2. Monthly 기반 입력인 경우 Monthly 데이터 조회
     let monthlyContext = "";
@@ -232,7 +240,7 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
     console.log("=== 제약사항 전달 확인 끝 ===");
 
     const message = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022", // Sonnet 4가 출시되면 변경
+      model: ANTHROPIC_MODEL,
       max_tokens: 2000,
       temperature: 0.3,
       system: SYSTEM_PROMPT + areasContext,
@@ -247,10 +255,7 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
     // Claude 응답에서 JSON 추출
     const firstContent = message.content[0];
     if (!firstContent || !("text" in firstContent)) {
-      throw new functions.https.HttpsError(
-        "internal",
-        "AI 응답 형식이 올바르지 않습니다."
-      );
+      throw new HttpsError("internal", "AI 응답 형식이 올바르지 않습니다.");
     }
     const responseText = (firstContent as any).text;
     let parsedPlan;
@@ -271,10 +276,7 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
       console.log("=== AI 원본 응답 끝 ===");
     } catch (parseError) {
       console.error("JSON 파싱 실패:", parseError);
-      throw new functions.https.HttpsError(
-        "internal",
-        "AI 응답을 처리할 수 없습니다."
-      );
+      throw new HttpsError("internal", "AI 응답을 처리할 수 없습니다.");
     }
 
     // 4. 기존 Areas와 매칭하여 existingId 추가 및 중복 제거
@@ -554,26 +556,22 @@ export const generatePlan = functions.https.onCall(async (data, context) => {
     };
   } catch (error) {
     console.error("Claude API 오류:", error);
-    throw new functions.https.HttpsError(
-      "internal",
-      "AI 서비스 오류가 발생했습니다."
-    );
+    throw new HttpsError("internal", "AI 서비스 오류가 발생했습니다.");
   }
 });
 
 // 테스트용 간단한 함수
-export const testClaudeConnection = functions.https.onCall(
-  async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError(
-        "unauthenticated",
-        "로그인이 필요합니다."
-      );
+export const testClaudeConnection = onCall(
+  { secrets: [anthropicApiKey] },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
     }
 
     try {
+      const anthropic = getAnthropicClient();
       const message = await anthropic.messages.create({
-        model: "claude-3-5-sonnet-20241022",
+        model: ANTHROPIC_MODEL,
         max_tokens: 100,
         messages: [
           {
@@ -585,10 +583,7 @@ export const testClaudeConnection = functions.https.onCall(
 
       const firstContent = message.content[0];
       if (!("text" in firstContent)) {
-        throw new functions.https.HttpsError(
-          "internal",
-          "AI 응답 형식이 올바르지 않습니다."
-        );
+        throw new HttpsError("internal", "AI 응답 형식이 올바르지 않습니다.");
       }
 
       return {
@@ -597,24 +592,18 @@ export const testClaudeConnection = functions.https.onCall(
       };
     } catch (error) {
       console.error("Claude 연결 테스트 실패:", error);
-      throw new functions.https.HttpsError(
-        "internal",
-        "Claude API 연결에 실패했습니다."
-      );
+      throw new HttpsError("internal", "Claude API 연결에 실패했습니다.");
     }
   }
 );
 
 // Firebase Functions에 추가
-export const refinePlan = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-      "unauthenticated",
-      "로그인이 필요합니다."
-    );
+export const refinePlan = onCall({ secrets: [anthropicApiKey] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
   }
 
-  const { originalPlan, feedback, adjustments } = data;
+  const { originalPlan, feedback, adjustments } = request.data;
 
   const refinementPrompt = `
 기존 계획을 사용자 피드백을 바탕으로 개선해주세요.
@@ -632,8 +621,9 @@ ${JSON.stringify(adjustments, null, 2)}
 `;
 
   try {
+    const anthropic = getAnthropicClient();
     const message = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+      model: ANTHROPIC_MODEL,
       max_tokens: 4000,
       temperature: 0.3,
       system: SYSTEM_PROMPT,
@@ -642,10 +632,7 @@ ${JSON.stringify(adjustments, null, 2)}
 
     const firstContent = message.content[0];
     if (!firstContent || !("text" in firstContent)) {
-      throw new functions.https.HttpsError(
-        "internal",
-        "AI 응답 형식이 올바르지 않습니다."
-      );
+      throw new HttpsError("internal", "AI 응답 형식이 올바르지 않습니다.");
     }
     const responseText = (firstContent as any).text;
     const jsonMatch =
@@ -662,10 +649,7 @@ ${JSON.stringify(adjustments, null, 2)}
     };
   } catch (error) {
     console.error("계획 개선 오류:", error);
-    throw new functions.https.HttpsError(
-      "internal",
-      "계획 개선 중 오류가 발생했습니다."
-    );
+    throw new HttpsError("internal", "계획 개선 중 오류가 발생했습니다.");
   }
 });
 
