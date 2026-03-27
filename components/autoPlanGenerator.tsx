@@ -74,6 +74,65 @@ function isGeneratePlanResponse(data: unknown): data is GeneratePlanResponse {
   );
 }
 
+function normalizeGeneratedPlan(plan: any): GeneratedPlan {
+  const areas = Array.isArray(plan?.areas) ? plan.areas : [];
+  const projects = Array.isArray(plan?.projects)
+    ? plan.projects.map((project: any) => ({
+        title: project?.title || "",
+        description: project?.description || "",
+        category:
+          project?.category === "repetitive" ? "repetitive" : "task_based",
+        areaName: project?.areaName || "",
+        durationWeeks:
+          typeof project?.durationWeeks === "number" ? project.durationWeeks : 1,
+        difficulty: project?.difficulty || "intermediate",
+        target: project?.target,
+        targetCount:
+          typeof project?.targetCount === "number" ? project.targetCount : 0,
+        estimatedDailyTime:
+          typeof project?.estimatedDailyTime === "number"
+            ? project.estimatedDailyTime
+            : 0,
+        tasks: Array.isArray(project?.tasks)
+          ? project.tasks.map((task: any) => ({
+              title: task?.title || "",
+              description: task?.description || "",
+              duration: typeof task?.duration === "number" ? task.duration : 1,
+              requirements: Array.isArray(task?.requirements)
+                ? task.requirements
+                : [],
+              resources: Array.isArray(task?.resources) ? task.resources : [],
+              prerequisites: Array.isArray(task?.prerequisites)
+                ? task.prerequisites
+                : [],
+            }))
+          : [],
+        milestones: Array.isArray(project?.milestones) ? project.milestones : [],
+        resources: Array.isArray(project?.resources) ? project.resources : [],
+      }))
+    : [];
+
+  return {
+    areas,
+    projects,
+    timeline:
+      plan?.timeline && typeof plan.timeline === "object"
+        ? {
+            totalWeeks:
+              typeof plan.timeline.totalWeeks === "number"
+                ? plan.timeline.totalWeeks
+                : 0,
+            weeklySchedule: Array.isArray(plan.timeline.weeklySchedule)
+              ? plan.timeline.weeklySchedule
+              : [],
+          }
+        : { totalWeeks: 0, weeklySchedule: [] },
+    successMetrics: Array.isArray(plan?.successMetrics)
+      ? plan.successMetrics
+      : [],
+  };
+}
+
 // 제약사항에 최대값 설정하는 함수
 function processConstraints(
   constraints: PlanConstraints,
@@ -243,10 +302,11 @@ export default function PlanGenerator() {
       // 타입 가드를 사용하여 응답 데이터 검증
       if (isGeneratePlanResponse(result.data)) {
         if (result.data.success && result.data.plan) {
-          setGeneratedPlan(result.data.plan);
+          const normalizedPlan = normalizeGeneratedPlan(result.data.plan);
+          setGeneratedPlan(normalizedPlan);
 
           // 영역 매칭 자동 설정 (완료 버튼 없이 바로 저장 가능하도록)
-          if (result.data.plan.areas && result.data.plan.areas.length > 0) {
+          if (normalizedPlan.areas.length > 0) {
             const matchingChoices: Record<
               string,
               { useExisting: boolean; existingId?: string; newName?: string }
@@ -255,7 +315,7 @@ export default function PlanGenerator() {
             // 기존 영역 이름 목록
             const existingAreaNames = existingAreas.map((area) => area.name);
 
-            result.data.plan.areas.forEach((area) => {
+            normalizedPlan.areas.forEach((area) => {
               if (area.existingId) {
                 // AI가 기존 영역과 매칭한 경우
                 matchingChoices[area.name] = {
@@ -317,7 +377,7 @@ export default function PlanGenerator() {
               };
 
               // 모든 프로젝트를 첫 번째 기존 영역에 연결
-              result.data.plan.projects = result.data.plan.projects.map(
+              normalizedPlan.projects = normalizedPlan.projects.map(
                 (project) => ({
                   ...project,
                   areaName: firstExistingArea.name,
@@ -325,7 +385,7 @@ export default function PlanGenerator() {
               );
 
               // 영역도 첫 번째 기존 영역으로 설정
-              result.data.plan.areas = [
+              normalizedPlan.areas = [
                 {
                   name: firstExistingArea.name,
                   description: firstExistingArea.description || "",
@@ -342,7 +402,7 @@ export default function PlanGenerator() {
               };
 
               // 모든 프로젝트를 미분류 영역에 연결
-              result.data.plan.projects = result.data.plan.projects.map(
+              normalizedPlan.projects = normalizedPlan.projects.map(
                 (project) => ({
                   ...project,
                   areaName: "미분류",
@@ -350,7 +410,7 @@ export default function PlanGenerator() {
               );
 
               // 영역도 미분류 영역으로 설정
-              result.data.plan.areas = [
+              normalizedPlan.areas = [
                 {
                   name: "미분류",
                   description: "분류되지 않은 활동",
@@ -855,10 +915,16 @@ function PlanPreview({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [isEditing, setIsEditing] = useState(false);
-  const [editedPlan, setEditedPlan] = useState<GeneratedPlan>(plan);
+  const [editedPlan, setEditedPlan] = useState<GeneratedPlan>(
+    normalizeGeneratedPlan(plan)
+  );
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(
     new Set()
   );
+
+  useEffect(() => {
+    setEditedPlan(normalizeGeneratedPlan(plan));
+  }, [plan]);
 
   // Router 대신 window.location 사용
 

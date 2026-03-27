@@ -14,6 +14,94 @@ if (!admin.apps.length) {
 
 const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
 const ANTHROPIC_MODEL = "claude-sonnet-4-5-20250929";
+const PLAN_TOOL_NAME = "submit_plan";
+
+const PLAN_TOOL: any = {
+  name: PLAN_TOOL_NAME,
+  description:
+    "Return the generated MonthlyGrow plan as structured JSON matching the required schema.",
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      areas: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            name: { type: "string" },
+            description: { type: "string" },
+            icon: { type: "string" },
+            color: { type: "string" },
+          },
+          required: ["name", "description", "icon", "color"],
+        },
+      },
+      projects: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            title: { type: "string" },
+            description: { type: "string" },
+            category: {
+              type: "string",
+              enum: ["repetitive", "task_based"],
+            },
+            areaName: { type: "string" },
+            durationWeeks: { type: "number" },
+            estimatedDailyTime: { type: "number" },
+            tasks: {
+              type: "array",
+              minItems: 1,
+              items: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  duration: { type: "number" },
+                  requirements: {
+                    type: "array",
+                    items: { type: "string" },
+                  },
+                  resources: {
+                    type: "array",
+                    items: { type: "string" },
+                  },
+                  prerequisites: {
+                    type: "array",
+                    items: { type: "string" },
+                  },
+                },
+                required: [
+                  "title",
+                  "description",
+                  "duration",
+                  "requirements",
+                  "resources",
+                  "prerequisites",
+                ],
+              },
+            },
+          },
+          required: [
+            "title",
+            "description",
+            "category",
+            "areaName",
+            "durationWeeks",
+            "estimatedDailyTime",
+            "tasks",
+          ],
+        },
+      },
+    },
+    required: ["areas", "projects"],
+  },
+};
 
 function getAnthropicClient() {
   const apiKey = anthropicApiKey.value();
@@ -26,6 +114,40 @@ function getAnthropicClient() {
   }
 
   return new Anthropic({ apiKey });
+}
+
+function extractPlanFromMessage(message: any) {
+  const toolUseBlock = message.content.find(
+    (block: any) => block.type === "tool_use" && block.name === PLAN_TOOL_NAME
+  );
+
+  if (toolUseBlock?.input) {
+    return {
+      parsedPlan: toolUseBlock.input,
+      originalResponse: JSON.stringify(toolUseBlock.input),
+    };
+  }
+
+  const firstContent = message.content[0];
+  if (!firstContent || !("text" in firstContent)) {
+    throw new HttpsError("internal", "AI 응답 형식이 올바르지 않습니다.");
+  }
+
+  const responseText = firstContent.text;
+  const jsonMatch =
+    responseText.match(/```json\n([\s\S]*?)\n```/) ||
+    responseText.match(/\{[\s\S]*\}/);
+
+  try {
+    return {
+      parsedPlan: JSON.parse(jsonMatch ? jsonMatch[1] || jsonMatch[0] : responseText),
+      originalResponse: responseText,
+    };
+  } catch (parseError) {
+    console.error("JSON 파싱 실패:", parseError);
+    console.error("AI 원본 응답:", responseText);
+    throw new HttpsError("internal", "AI 응답을 처리할 수 없습니다.");
+  }
 }
 
 // 사용자의 기존 Areas 조회 함수
@@ -251,6 +373,12 @@ export const generatePlan = onCall(
       max_tokens: 2000,
       temperature: 0.3,
       system: SYSTEM_PROMPT + areasContext,
+      tools: [PLAN_TOOL],
+      tool_choice: {
+        type: "tool",
+        name: PLAN_TOOL_NAME,
+        disable_parallel_tool_use: true,
+      },
       messages: [
         {
           role: "user",
@@ -259,32 +387,11 @@ export const generatePlan = onCall(
       ],
     });
 
-    // Claude 응답에서 JSON 추출
-    const firstContent = message.content[0];
-    if (!firstContent || !("text" in firstContent)) {
-      throw new HttpsError("internal", "AI 응답 형식이 올바르지 않습니다.");
-    }
-    const responseText = (firstContent as any).text;
-    let parsedPlan;
+    const { parsedPlan, originalResponse } = extractPlanFromMessage(message);
 
-    try {
-      // JSON 부분만 추출 (```json으로 감싸진 경우 처리)
-      const jsonMatch =
-        responseText.match(/```json\n([\s\S]*?)\n```/) ||
-        responseText.match(/\{[\s\S]*\}/);
-      const jsonString = jsonMatch
-        ? jsonMatch[1] || jsonMatch[0]
-        : responseText;
-      parsedPlan = JSON.parse(jsonString);
-
-      console.log("=== AI 원본 응답 ===");
-      console.log("응답 텍스트:", responseText);
-      console.log("파싱된 계획:", JSON.stringify(parsedPlan, null, 2));
-      console.log("=== AI 원본 응답 끝 ===");
-    } catch (parseError) {
-      console.error("JSON 파싱 실패:", parseError);
-      throw new HttpsError("internal", "AI 응답을 처리할 수 없습니다.");
-    }
+    console.log("=== AI 원본 응답 ===");
+    console.log("파싱된 계획:", JSON.stringify(parsedPlan, null, 2));
+    console.log("=== AI 원본 응답 끝 ===");
 
     // 4. 기존 Areas와 매칭하여 existingId 추가 및 중복 제거
     if (existingAreas.length > 0 && parsedPlan.areas) {
@@ -558,7 +665,7 @@ export const generatePlan = onCall(
       return {
         success: true,
         plan: parsedPlan,
-        originalResponse: responseText,
+        originalResponse,
         existingAreas: existingAreas.length,
       };
     } catch (error) {
@@ -645,25 +752,22 @@ ${JSON.stringify(adjustments, null, 2)}
         max_tokens: 4000,
         temperature: 0.3,
         system: SYSTEM_PROMPT,
+        tools: [PLAN_TOOL],
+        tool_choice: {
+          type: "tool",
+          name: PLAN_TOOL_NAME,
+          disable_parallel_tool_use: true,
+        },
         messages: [{ role: "user", content: refinementPrompt }],
       });
 
-    const firstContent = message.content[0];
-    if (!firstContent || !("text" in firstContent)) {
-      throw new HttpsError("internal", "AI 응답 형식이 올바르지 않습니다.");
-    }
-    const responseText = (firstContent as any).text;
-    const jsonMatch =
-      responseText.match(/```json\n([\s\S]*?)\n```/) ||
-      responseText.match(/\{[\s\S]*\}/);
-    const refinedPlan = JSON.parse(
-      jsonMatch ? jsonMatch[1] || jsonMatch[0] : responseText
-    );
+      const { parsedPlan: refinedPlan, originalResponse } =
+        extractPlanFromMessage(message);
 
       return {
         success: true,
         refinedPlan,
-        improvements: extractImprovements(responseText),
+        improvements: extractImprovements(originalResponse),
       };
     } catch (error) {
       console.error("계획 개선 오류:", error);
