@@ -150,6 +150,73 @@ function extractPlanFromMessage(message: any) {
   }
 }
 
+function normalizePlanForFrontend(plan: any) {
+  const areas = Array.isArray(plan?.areas) ? plan.areas : [];
+  const projects = Array.isArray(plan?.projects)
+    ? plan.projects.map((project: any) => {
+        const tasks = Array.isArray(project?.tasks)
+          ? project.tasks.map((task: any) => ({
+              title: task?.title || "",
+              description: task?.description || "",
+              duration: typeof task?.duration === "number" ? task.duration : 1,
+              requirements: Array.isArray(task?.requirements)
+                ? task.requirements
+                : [],
+              resources: Array.isArray(task?.resources) ? task.resources : [],
+              prerequisites: Array.isArray(task?.prerequisites)
+                ? task.prerequisites
+                : [],
+            }))
+          : [];
+
+        return {
+          title: project?.title || "",
+          description: project?.description || "",
+          category:
+            project?.category === "repetitive" ? "repetitive" : "task_based",
+          areaName: project?.areaName || "",
+          durationWeeks:
+            typeof project?.durationWeeks === "number" ? project.durationWeeks : 1,
+          difficulty: project?.difficulty || "intermediate",
+          target: project?.target || project?.title || "",
+          targetCount:
+            typeof project?.targetCount === "number"
+              ? project.targetCount
+              : tasks.length,
+          estimatedDailyTime:
+            typeof project?.estimatedDailyTime === "number"
+              ? project.estimatedDailyTime
+              : 0,
+          tasks,
+          milestones: Array.isArray(project?.milestones)
+            ? project.milestones
+            : [],
+          resources: Array.isArray(project?.resources) ? project.resources : [],
+        };
+      })
+    : [];
+
+  return {
+    areas,
+    projects,
+    timeline:
+      plan?.timeline && typeof plan.timeline === "object"
+        ? {
+            totalWeeks:
+              typeof plan.timeline.totalWeeks === "number"
+                ? plan.timeline.totalWeeks
+                : 0,
+            weeklySchedule: Array.isArray(plan.timeline.weeklySchedule)
+              ? plan.timeline.weeklySchedule
+              : [],
+          }
+        : { totalWeeks: 0, weeklySchedule: [] },
+    successMetrics: Array.isArray(plan?.successMetrics)
+      ? plan.successMetrics
+      : [],
+  };
+}
+
 // 사용자의 기존 Areas 조회 함수
 async function fetchUserAreas(userId: string) {
   try {
@@ -387,7 +454,9 @@ export const generatePlan = onCall(
       ],
     });
 
-    const { parsedPlan, originalResponse } = extractPlanFromMessage(message);
+    let { parsedPlan, originalResponse } = extractPlanFromMessage(message);
+
+    parsedPlan = normalizePlanForFrontend(parsedPlan);
 
     console.log("=== AI 원본 응답 ===");
     console.log("파싱된 계획:", JSON.stringify(parsedPlan, null, 2));
