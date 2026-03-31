@@ -9,7 +9,6 @@ import {
   GeneratedPlan,
   PlanConstraints,
   GeneratePlanResponse,
-  GeneratePlanRequest,
 } from "../lib/types";
 import { fetchAllAreasByUserId } from "../lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
@@ -20,6 +19,7 @@ import { useQuery } from "@tanstack/react-query";
 import { calculateMonthlyWeeks, formatDate } from "../lib/utils";
 import { Button } from "./ui/button";
 import { generateConstraintsGuide } from "../functions/src/constraints-guide";
+import { normalizeGeneratedPlan } from "../lib/ai-plan";
 import {
   Compass,
   Heart,
@@ -74,65 +74,6 @@ function isGeneratePlanResponse(data: unknown): data is GeneratePlanResponse {
   );
 }
 
-function normalizeGeneratedPlan(plan: any): GeneratedPlan {
-  const areas = Array.isArray(plan?.areas) ? plan.areas : [];
-  const projects = Array.isArray(plan?.projects)
-    ? plan.projects.map((project: any) => ({
-        title: project?.title || "",
-        description: project?.description || "",
-        category:
-          project?.category === "repetitive" ? "repetitive" : "task_based",
-        areaName: project?.areaName || "",
-        durationWeeks:
-          typeof project?.durationWeeks === "number" ? project.durationWeeks : 1,
-        difficulty: project?.difficulty || "intermediate",
-        target: project?.target,
-        targetCount:
-          typeof project?.targetCount === "number" ? project.targetCount : 0,
-        estimatedDailyTime:
-          typeof project?.estimatedDailyTime === "number"
-            ? project.estimatedDailyTime
-            : 0,
-        tasks: Array.isArray(project?.tasks)
-          ? project.tasks.map((task: any) => ({
-              title: task?.title || "",
-              description: task?.description || "",
-              duration: typeof task?.duration === "number" ? task.duration : 1,
-              requirements: Array.isArray(task?.requirements)
-                ? task.requirements
-                : [],
-              resources: Array.isArray(task?.resources) ? task.resources : [],
-              prerequisites: Array.isArray(task?.prerequisites)
-                ? task.prerequisites
-                : [],
-            }))
-          : [],
-        milestones: Array.isArray(project?.milestones) ? project.milestones : [],
-        resources: Array.isArray(project?.resources) ? project.resources : [],
-      }))
-    : [];
-
-  return {
-    areas,
-    projects,
-    timeline:
-      plan?.timeline && typeof plan.timeline === "object"
-        ? {
-            totalWeeks:
-              typeof plan.timeline.totalWeeks === "number"
-                ? plan.timeline.totalWeeks
-                : 0,
-            weeklySchedule: Array.isArray(plan.timeline.weeklySchedule)
-              ? plan.timeline.weeklySchedule
-              : [],
-          }
-        : { totalWeeks: 0, weeklySchedule: [] },
-    successMetrics: Array.isArray(plan?.successMetrics)
-      ? plan.successMetrics
-      : [],
-  };
-}
-
 // 제약사항에 최대값 설정하는 함수
 function processConstraints(
   constraints: PlanConstraints,
@@ -179,7 +120,12 @@ export default function PlanGenerator() {
   const [areaMatchingChoices, setAreaMatchingChoices] = useState<
     Record<
       string,
-      { useExisting: boolean; existingId?: string; newName?: string }
+      {
+        useExisting: boolean;
+        existingId?: string;
+        newAreaKey?: string;
+        newName?: string;
+      }
     >
   >({});
 
@@ -302,124 +248,95 @@ export default function PlanGenerator() {
           const normalizedPlan = normalizeGeneratedPlan(result.data.plan);
           setGeneratedPlan(normalizedPlan);
 
-          // 영역 매칭 자동 설정 (완료 버튼 없이 바로 저장 가능하도록)
-          if (normalizedPlan.areas.length > 0) {
-            const matchingChoices: Record<
-              string,
-              { useExisting: boolean; existingId?: string; newName?: string }
-            > = {};
+          const matchingChoices: Record<
+            string,
+            {
+              useExisting: boolean;
+              existingId?: string;
+              newAreaKey?: string;
+              newName?: string;
+            }
+          > = {};
 
-            // 기존 영역 이름 목록
-            const existingAreaNames = existingAreas.map((area) => area.name);
+          normalizedPlan.projects.forEach((project, index) => {
+            const projectKey = `project-${index}`;
+            if (
+              project.areaAssignment.type === "existing" &&
+              project.areaAssignment.existingAreaId
+            ) {
+              const matchedExistingArea = existingAreas.find(
+                (existing) => existing.id === project.areaAssignment.existingAreaId
+              );
 
-            normalizedPlan.areas.forEach((area) => {
-              if (area.existingId) {
-                // AI가 기존 영역과 매칭한 경우
-                matchingChoices[area.name] = {
-                  useExisting: true,
-                  existingId: area.existingId,
-                  newName: area.name,
-                };
-              } else {
-                // 새로운 영역인 경우 - 기존 영역과 이름이 중복되지 않는 경우만
-                const isDuplicate = existingAreaNames.some(
-                  (existingName) =>
-                    existingName.toLowerCase() === area.name.toLowerCase()
-                );
-
-                if (!isDuplicate) {
-                  matchingChoices[area.name] = {
-                    useExisting: false,
-                    newName: area.name,
-                  };
-                } else {
-                  // 기존 영역과 이름이 중복되는 경우, 해당 기존 영역을 사용
-                  const existingArea = existingAreas.find(
-                    (existing) =>
-                      existing.name.toLowerCase() === area.name.toLowerCase()
-                  );
-                  if (existingArea) {
-                    matchingChoices[area.name] = {
-                      useExisting: true,
-                      existingId: existingArea.id,
-                      newName: existingArea.name, // 기존 영역 이름 사용
-                    };
-                  }
-                }
-              }
-            });
-
-            // 영역 매칭 UI에서 사용자가 선택할 때까지 프로젝트의 areaName은 설정하지 않음
-            // 사용자가 영역을 선택하고 완료 버튼을 클릭할 때 프로젝트를 생성
-
-            setAreaMatchingChoices(matchingChoices);
-            // 영역 매칭 UI를 표시하되 바로 저장 가능하도록 설정
-            setShowAreaMatching(true);
-          } else {
-            // AI가 영역을 생성하지 않은 경우, 영역 매칭 UI를 표시하되 기본 선택 제공
-
-            // 기본 영역 선택을 위한 매칭 선택 생성
-            const defaultMatchingChoices: Record<
-              string,
-              { useExisting: boolean; existingId?: string; newName?: string }
-            > = {};
-
-            if (existingAreas.length > 0) {
-              // 기존 영역이 있으면 첫 번째 영역을 기본 선택
-              const firstExistingArea = existingAreas[0];
-              defaultMatchingChoices["기본 영역"] = {
+              matchingChoices[projectKey] = {
                 useExisting: true,
-                existingId: firstExistingArea.id,
-                newName: firstExistingArea.name,
+                existingId:
+                  matchedExistingArea?.id || project.areaAssignment.existingAreaId,
+                newName: matchedExistingArea?.name || project.areaName,
               };
-
-              // 모든 프로젝트를 첫 번째 기존 영역에 연결
-              normalizedPlan.projects = normalizedPlan.projects.map(
-                (project) => ({
-                  ...project,
-                  areaName: firstExistingArea.name,
-                })
-              );
-
-              // 영역도 첫 번째 기존 영역으로 설정
-              normalizedPlan.areas = [
-                {
-                  name: firstExistingArea.name,
-                  description: firstExistingArea.description || "",
-                  icon: firstExistingArea.icon || "compass",
-                  color: firstExistingArea.color || "#6b7280",
-                  existingId: firstExistingArea.id,
-                },
-              ];
-            } else {
-              // 기존 영역이 없으면 미분류 영역을 기본 선택
-              defaultMatchingChoices["미분류"] = {
-                useExisting: false,
-                newName: "미분류",
-              };
-
-              // 모든 프로젝트를 미분류 영역에 연결
-              normalizedPlan.projects = normalizedPlan.projects.map(
-                (project) => ({
-                  ...project,
-                  areaName: "미분류",
-                })
-              );
-
-              // 영역도 미분류 영역으로 설정
-              normalizedPlan.areas = [
-                {
-                  name: "미분류",
-                  description: "분류되지 않은 활동",
-                  icon: "folder",
-                  color: "#6B7280",
-                },
-              ];
+              return;
             }
 
-            setAreaMatchingChoices(defaultMatchingChoices);
-            setShowAreaMatching(true);
-          }
+            if (
+              project.areaAssignment.type === "new" &&
+              project.areaAssignment.newAreaKey
+            ) {
+              const matchedNewArea = normalizedPlan.newAreas.find(
+                (area) => area.key === project.areaAssignment.newAreaKey
+              );
+
+              matchingChoices[projectKey] = {
+                useExisting: false,
+                newAreaKey: project.areaAssignment.newAreaKey,
+                newName: matchedNewArea?.name || project.areaName,
+              };
+              return;
+            }
+
+            const matchedExistingArea = existingAreas.find(
+              (existing) =>
+                existing.name.toLowerCase() === project.areaName.toLowerCase()
+            );
+
+            if (matchedExistingArea) {
+              matchingChoices[projectKey] = {
+                useExisting: true,
+                existingId: matchedExistingArea.id,
+                newName: matchedExistingArea.name,
+              };
+              return;
+            }
+
+            const matchedNewArea = normalizedPlan.newAreas.find(
+              (area) => area.name.toLowerCase() === project.areaName.toLowerCase()
+            );
+
+            if (matchedNewArea) {
+              matchingChoices[projectKey] = {
+                useExisting: false,
+                newAreaKey: matchedNewArea.key,
+                newName: matchedNewArea.name,
+              };
+              return;
+            }
+
+            if (existingAreas.length > 0) {
+              matchingChoices[projectKey] = {
+                useExisting: true,
+                existingId: existingAreas[0].id,
+                newName: existingAreas[0].name,
+              };
+            } else {
+              matchingChoices[projectKey] = {
+                useExisting: false,
+                newAreaKey: normalizedPlan.newAreas[0]?.key,
+                newName: normalizedPlan.newAreas[0]?.name || "미분류",
+              };
+            }
+          });
+
+          setAreaMatchingChoices(matchingChoices);
+          setShowAreaMatching(true);
         } else {
           setError(
             result.data.error ||
@@ -430,10 +347,19 @@ export default function PlanGenerator() {
         setError(translate("common.errors.unexpectedResponse"));
       }
     } catch (error) {
+      const serverMessage =
+        typeof error === "object" &&
+        error !== null &&
+        "message" in error &&
+        typeof (error as any).message === "string"
+          ? (error as any).message
+          : "";
+
       setError(
-        `${translate("aiPlanGenerator.errors.generationFailed")} ${translate(
-          "aiPlanGenerator.errors.retryMessage"
-        )}`
+        serverMessage ||
+          `${translate("aiPlanGenerator.errors.generationFailed")} ${translate(
+            "aiPlanGenerator.errors.retryMessage"
+          )}`
       );
     } finally {
       setIsGenerating(false);
@@ -857,21 +783,6 @@ export default function PlanGenerator() {
           areaMatchingChoices={areaMatchingChoices}
           existingAreas={existingAreas}
           onAreaMatchingUpdate={(choices) => setAreaMatchingChoices(choices)}
-          onAreaMatchingComplete={() => {
-            const updatedPlan = {
-              ...generatedPlan,
-              areas: generatedPlan.areas.map((area) => {
-                const choice = areaMatchingChoices[area.name];
-                if (choice && choice.useExisting && choice.existingId) {
-                  return { ...area, existingId: choice.existingId };
-                } else {
-                  return { ...area, existingId: undefined };
-                }
-              }),
-            };
-            setGeneratedPlan(updatedPlan);
-            setShowAreaMatching(false);
-          }}
           inputType={inputType}
           selectedMonthly={selectedMonthly}
         />
@@ -887,7 +798,6 @@ function PlanPreview({
   areaMatchingChoices,
   existingAreas,
   onAreaMatchingUpdate,
-  onAreaMatchingComplete,
   inputType,
   selectedMonthly,
 }: {
@@ -895,16 +805,25 @@ function PlanPreview({
   showAreaMatching: boolean;
   areaMatchingChoices: Record<
     string,
-    { useExisting: boolean; existingId?: string; newName?: string }
+    {
+      useExisting: boolean;
+      existingId?: string;
+      newAreaKey?: string;
+      newName?: string;
+    }
   >;
   existingAreas: any[];
   onAreaMatchingUpdate: (
     choices: Record<
       string,
-      { useExisting: boolean; existingId?: string; newName?: string }
+      {
+        useExisting: boolean;
+        existingId?: string;
+        newAreaKey?: string;
+        newName?: string;
+      }
     >
   ) => void;
-  onAreaMatchingComplete: () => void;
   inputType: "manual" | "monthly";
   selectedMonthly?: any;
 }) {
@@ -918,10 +837,78 @@ function PlanPreview({
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(
     new Set()
   );
-  const safeAreas = Array.isArray(editedPlan?.areas) ? editedPlan.areas : [];
+  const safeNewAreas = Array.isArray(editedPlan?.newAreas)
+    ? editedPlan.newAreas
+    : [];
   const safeProjects = Array.isArray(editedPlan?.projects)
     ? editedPlan.projects
     : [];
+  const getProjectChoice = (projectIndex: number) =>
+    areaMatchingChoices[`project-${projectIndex}`];
+
+  const generatedAreaOptions = Array.from(
+    new Map(
+      safeNewAreas.map((area) => [
+        area.key,
+        {
+          key: area.key,
+          name: area.name,
+          description: area.description || "",
+          icon: area.icon || "compass",
+          color: area.color || "#6b7280",
+        },
+      ])
+    ).values()
+  );
+
+  const updateProjectAreaChoice = (
+    projectIndex: number,
+    nextChoice: {
+      useExisting: boolean;
+      existingId?: string;
+      newAreaKey?: string;
+      newName?: string;
+    }
+  ) => {
+    const projectKey = `project-${projectIndex}`;
+    onAreaMatchingUpdate({
+      ...areaMatchingChoices,
+      [projectKey]: nextChoice,
+    });
+
+    const updatedProjects = [...editedPlan.projects];
+    const existingArea =
+      nextChoice.useExisting && nextChoice.existingId
+        ? existingAreas.find((area) => area.id === nextChoice.existingId)
+        : null;
+    const newArea =
+      !nextChoice.useExisting && nextChoice.newAreaKey
+        ? generatedAreaOptions.find((area) => area.key === nextChoice.newAreaKey)
+        : null;
+
+    updatedProjects[projectIndex] = {
+      ...updatedProjects[projectIndex],
+      areaName:
+        existingArea?.name ||
+        newArea?.name ||
+        nextChoice.newName ||
+        "미분류",
+      areaAssignment: nextChoice.useExisting
+        ? {
+            type: "existing",
+            existingAreaId: nextChoice.existingId,
+          }
+        : {
+            type: "new",
+            newAreaKey: nextChoice.newAreaKey,
+          },
+    };
+
+    setEditedPlan((prev) => ({
+      ...prev,
+      projects: updatedProjects,
+    }));
+  };
 
   useEffect(() => {
     setEditedPlan(normalizeGeneratedPlan(plan));
@@ -938,55 +925,61 @@ function PlanPreview({
       const updatedPlan = { ...editedPlan };
 
       if (showAreaMatching && areaMatchingChoices) {
-        // 사용자가 선택한 기존 area들을 plan.areas에 추가
-        const selectedExistingAreas = Object.values(areaMatchingChoices)
-          .filter((choice) => choice.useExisting && choice.existingId)
-          .map((choice) => {
+        updatedPlan.projects = updatedPlan.projects.map((project, index) => {
+          const matchingChoice = getProjectChoice(index);
+
+          if (!matchingChoice) {
+            return project;
+          }
+
+          if (matchingChoice.useExisting && matchingChoice.existingId) {
             const existingArea = existingAreas.find(
-              (area) => area.id === choice.existingId
+              (area) => area.id === matchingChoice.existingId
             );
+
             if (existingArea) {
               return {
-                name: existingArea.name,
-                description: existingArea.description || "",
-                icon: existingArea.icon || "compass",
-                color: existingArea.color || "#6b7280",
-                existingId: existingArea.id,
+                ...project,
+                areaName: existingArea.name,
+                areaAssignment: {
+                  type: "existing",
+                  existingAreaId: existingArea.id,
+                },
               };
             }
-            return null;
-          })
-          .filter((area): area is NonNullable<typeof area> => area !== null);
+          }
 
-        // 기존 area들을 plan.areas에 추가
-        updatedPlan.areas = [...updatedPlan.areas, ...selectedExistingAreas];
-
-        updatedPlan.projects = updatedPlan.projects.map((project) => {
-          // 프로젝트가 속한 area를 찾기
-          const projectArea = updatedPlan.areas.find(
-            (area) => project.areaName === area.name
-          );
-
-          if (projectArea) {
-            const matchingChoice = areaMatchingChoices[projectArea.name];
-            if (matchingChoice) {
-              if (matchingChoice.useExisting && matchingChoice.existingId) {
-                // 기존 area를 사용하는 경우, 기존 area의 이름으로 설정
-                const existingArea = existingAreas.find(
-                  (area) => area.id === matchingChoice.existingId
-                );
-                if (existingArea) {
-                  return { ...project, areaName: existingArea.name };
-                }
-              } else if (matchingChoice.newName) {
-                // 새 area를 생성하는 경우, 새 이름으로 설정
-                return { ...project, areaName: matchingChoice.newName };
-              }
-            }
+          if (!matchingChoice.useExisting && matchingChoice.newAreaKey) {
+            const newArea = safeNewAreas.find(
+              (area) => area.key === matchingChoice.newAreaKey
+            );
+            return {
+              ...project,
+              areaName: newArea?.name || matchingChoice.newName || project.areaName,
+              areaAssignment: {
+                type: "new",
+                newAreaKey: matchingChoice.newAreaKey,
+              },
+            };
           }
 
           return project;
         });
+
+        const usedNewAreaKeys = new Set(
+          updatedPlan.projects
+            .filter((project) => project.areaAssignment.type === "new")
+            .map((project) => project.areaAssignment.newAreaKey)
+            .filter(Boolean)
+        );
+
+        updatedPlan.newAreas = Array.from(
+          new Map(
+            safeNewAreas
+              .filter((area) => usedNewAreaKeys.has(area.key))
+              .map((area) => [area.key, area] as const)
+          ).values()
+        );
       }
 
       // Monthly 기반 입력인 경우 Monthly 정보 전달
@@ -1072,7 +1065,7 @@ function PlanPreview({
         </h3>
         <div className="flex flex-wrap gap-2 mb-4">
           <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
-            📁 {safeAreas.length}
+            📁 {safeNewAreas.length}
             {translate("aiPlanGenerator.result.summary.areas")}
           </span>
           <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-sm">
@@ -1092,183 +1085,102 @@ function PlanPreview({
             </p>
 
             <div className="space-y-3">
-              {/* 기존 영역 카드들 */}
-              {existingAreas.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    {translate("aiPlanGenerator.areaMatching.selectExisting")}
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {existingAreas.map((area) => {
-                      const isSelected = Object.values(
-                        areaMatchingChoices
-                      ).every(
-                        (choice) =>
-                          choice.useExisting && choice.existingId === area.id
-                      );
+              {safeProjects.map((project, index) => {
+                const choice = getProjectChoice(index);
+                const availableNewAreas = generatedAreaOptions.filter(
+                  (area) =>
+                    !existingAreas.some(
+                      (existingArea) =>
+                        existingArea.name.toLowerCase() ===
+                        area.name.toLowerCase()
+                    )
+                );
 
-                      return (
-                        <div
-                          key={area.id}
-                          className={`p-2 rounded border cursor-pointer transition-colors ${
-                            isSelected
-                              ? "bg-blue-50 border-blue-300"
-                              : "bg-gray-50 border-gray-200 hover:bg-gray-100"
-                          }`}
-                          onClick={() => {
-                            const updatedChoices = Object.keys(
-                              areaMatchingChoices
-                            ).reduce(
-                              (acc, areaName) => ({
-                                ...acc,
-                                [areaName]: {
-                                  useExisting: true,
-                                  existingId: area.id,
-                                  newName: areaName,
-                                },
-                              }),
-                              {}
-                            );
-                            onAreaMatchingUpdate(updatedChoices);
+                const selectedValue =
+                  choice?.useExisting && choice.existingId
+                    ? `existing:${choice.existingId}`
+                    : `new:${choice?.newAreaKey || generatedAreaOptions[0]?.key || ""}`;
 
-                            // 모든 프로젝트를 선택된 영역에 연결
-                            const updatedPlan = {
-                              ...editedPlan,
-                              projects: editedPlan.projects.map((project) => ({
-                                ...project,
-                                areaName: area.name,
-                              })),
-                              areas: [
-                                {
-                                  name: area.name,
-                                  description: area.description || "",
-                                  icon: area.icon || "compass",
-                                  color: area.color || "#6b7280",
-                                  existingId: area.id,
-                                },
-                              ],
-                            };
-                            setEditedPlan(updatedPlan);
-                          }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">
-                              {area.name}
-                            </span>
-                            {isSelected && (
-                              <span className="text-blue-600 text-xs">
-                                {translate(
-                                  "aiPlanGenerator.areaMatching.selected"
-                                )}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+                return (
+                  <div
+                    key={`project-area-${index}`}
+                    className="rounded-lg border border-blue-200 bg-white p-3"
+                  >
+                    <p className="text-sm font-medium text-gray-900 mb-1">
+                      {project.title}
+                    </p>
+                    <p className="text-xs text-gray-500 mb-2">
+                      현재 영역: {project.areaName || "미분류"}
+                    </p>
+                    <select
+                      value={selectedValue}
+                      onChange={(e) => {
+                        const [kind, value] = e.target.value.split(":");
 
-              {/* AI 제안 영역들을 새로 생성하는 카드들 */}
-              <div>
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {translate("aiPlanGenerator.areaMatching.createNew")}
-                </p>
-
-                {/* 새로 만들 영역이 있는지 확인 */}
-                {(() => {
-                  const newAreas = Object.entries(areaMatchingChoices).filter(
-                    ([_, choice]) => !choice.useExisting
-                  );
-
-                  if (newAreas.length === 0) {
-                    return (
-                      <div className="text-center py-4 px-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {translate("aiPlanGenerator.areaMatching.noNewAreas")}
-                        </p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                          {translate(
-                            "aiPlanGenerator.areaMatching.noNewAreasDescription"
-                          )}
-                        </p>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {Object.entries(areaMatchingChoices).map(
-                        ([areaName, choice]) => {
-                          const isSelected =
-                            !choice.useExisting && choice.newName === areaName;
-
-                          return (
-                            <div
-                              key={areaName}
-                              className={`p-2 rounded border cursor-pointer transition-colors ${
-                                isSelected
-                                  ? "bg-green-50 border-green-300"
-                                  : "bg-gray-50 border-gray-200 hover:bg-gray-100"
-                              }`}
-                              onClick={() => {
-                                const updatedChoices = Object.keys(
-                                  areaMatchingChoices
-                                ).reduce(
-                                  (acc, key) => ({
-                                    ...acc,
-                                    [key]: {
-                                      useExisting: false,
-                                      newName:
-                                        key === areaName ? key : undefined,
-                                    },
-                                  }),
-                                  {}
-                                );
-                                onAreaMatchingUpdate(updatedChoices);
-
-                                // 모든 프로젝트를 새 영역에 연결
-                                const updatedPlan = {
-                                  ...editedPlan,
-                                  projects: editedPlan.projects.map(
-                                    (project) => ({
-                                      ...project,
-                                      areaName: areaName,
-                                    })
-                                  ),
-                                  areas: [
-                                    {
-                                      name: areaName,
-                                      description: "",
-                                      icon: "compass",
-                                      color: "#6b7280",
-                                    },
-                                  ],
-                                };
-                                setEditedPlan(updatedPlan);
-                              }}
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium text-green-800">
-                                  🆕 {areaName}
-                                </span>
-                                {isSelected && (
-                                  <span className="text-green-600 text-xs">
-                                    {translate(
-                                      "aiPlanGenerator.areaMatching.selected"
-                                    )}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
+                        if (kind === "existing") {
+                          const existingArea = existingAreas.find(
+                            (area) => area.id === value
                           );
+                          updateProjectAreaChoice(index, {
+                            useExisting: true,
+                            existingId: value,
+                            newName: existingArea?.name,
+                          });
+                          return;
                         }
+
+                        const selectedNewArea = generatedAreaOptions.find(
+                          (area) => area.key === value
+                        );
+
+                        updateProjectAreaChoice(index, {
+                          useExisting: false,
+                          newAreaKey: value,
+                          newName: selectedNewArea?.name,
+                        });
+                      }}
+                      className="w-full rounded border border-gray-300 bg-white p-2 text-sm"
+                    >
+                      {existingAreas.length > 0 && (
+                        <optgroup
+                          label={translate(
+                            "aiPlanGenerator.areaMatching.selectExisting"
+                          )}
+                        >
+                          {existingAreas.map((area) => (
+                            <option
+                              key={`existing-area-${area.id}`}
+                              value={`existing:${area.id}`}
+                            >
+                              {area.name}
+                            </option>
+                          ))}
+                        </optgroup>
                       )}
-                    </div>
-                  );
-                })()}
-              </div>
+                      <optgroup
+                        label={translate(
+                          "aiPlanGenerator.areaMatching.createNew"
+                        )}
+                      >
+                        {availableNewAreas.length > 0 ? (
+                          availableNewAreas.map((area) => (
+                            <option
+                              key={`new-area-${area.key}`}
+                              value={`new:${area.key}`}
+                            >
+                              {area.name}
+                            </option>
+                          ))
+                        ) : (
+                          <option value={`new:${generatedAreaOptions[0]?.key || ""}`}>
+                            {generatedAreaOptions[0]?.name || "미분류"}
+                          </option>
+                        )}
+                      </optgroup>
+                    </select>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

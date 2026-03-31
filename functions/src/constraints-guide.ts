@@ -113,7 +113,7 @@ export function generateConstraintsGuide(constraints: PlanConstraints): string {
   }
   \n
   ⚡ Key Utilization Methods:\n\n
-  1. Time Constraints:\n   - Total Available Time = Project Duration × Days per Week × Minutes per Day\n   - Plan within maximum limits\n   - 30min~1hour: Simple review, reading focus\n   - 2+ hours: Practice, project work\n\n2. Learning Style:\n   - Include activities matching the preferred style in task generation\n\n3. Required Compliance:\n- All numeric fields must be set as numbers\n- All array fields must be set as [] even if empty\n- Repetitive tasks as "Session X" format, task-based as individual tasks\n- areaName must exactly match the name in areas array\n- Duration: minimum 0.1 hours, maximum 24 hours per task`;
+  1. Time Constraints:\n   - Total Available Time = Project Duration × Days per Week × Minutes per Day\n   - Plan within maximum limits\n   - 30min~1hour: Simple review, reading focus\n   - 2+ hours: Practice, project work\n\n2. Learning Style:\n   - Include activities matching the preferred style in task generation\n\n3. Required Compliance:\n- All numeric fields must be set as numbers\n- All array fields must be set as [] even if empty\n- Repetitive tasks as "Session X" format, task-based as individual tasks\n- Every project must include a valid areaAssignment\n- Duration: minimum 0.1 hours, maximum 24 hours per task`;
 }
 
 /**

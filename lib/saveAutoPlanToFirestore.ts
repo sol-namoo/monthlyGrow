@@ -10,6 +10,7 @@ import {
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { GeneratedPlan } from "./types";
+import { validateGeneratedPlanForSave } from "./ai-plan";
 
 interface SavePlanOptions {
   plan: GeneratedPlan;
@@ -32,30 +33,69 @@ export async function savePlanToFirestore(options: SavePlanOptions) {
   }
 
   const { plan, customizations = {} } = options;
+  const validation = validateGeneratedPlanForSave(plan);
+
+  if (!validation.isValid) {
+    throw new Error(validation.error);
+  }
 
   return await runTransaction(db, async (transaction) => {
     const now = serverTimestamp();
     const areaIdMap: Record<string, string> = {};
+    const areaColorMap: Record<string, string | undefined> = {};
     const projectRefs: string[] = [];
 
     try {
-      // 1. Areas 저장 (기존 Areas 재사용)
-      for (const area of plan.areas) {
-        if (area.existingId) {
-          // 기존 Areas 재사용
-          areaIdMap[area.name] = area.existingId;
-        } else {
-          // 새로운 Areas 생성
+      const newAreasByKey = new Map(
+        (plan.newAreas || []).map((area) => [area.key, area] as const)
+      );
+
+      // 1. 프로젝트가 실제로 참조하는 영역만 생성/연결
+      for (const project of plan.projects) {
+        if (project.areaAssignment.type === "existing") {
+          const existingAreaId = project.areaAssignment.existingAreaId;
+          if (!existingAreaId) {
+            throw new Error(
+              `프로젝트 "${project.title}"의 기존 영역 ID가 없습니다.`
+            );
+          }
+
+          areaIdMap[project.areaName] = existingAreaId;
+          continue;
+        }
+
+        const newAreaKey = project.areaAssignment.newAreaKey;
+        if (!newAreaKey) {
+          throw new Error(
+            `프로젝트 "${project.title}"의 새 영역 키가 없습니다.`
+          );
+        }
+
+        const newArea = newAreasByKey.get(newAreaKey);
+        if (!newArea) {
+          throw new Error(
+            `프로젝트 "${project.title}"가 참조하는 새 영역 정의를 찾을 수 없습니다.`
+          );
+        }
+
+        if (!areaIdMap[newAreaKey]) {
           const areaRef = doc(collection(db, "areas"));
-          areaIdMap[area.name] = areaRef.id;
+          areaIdMap[newAreaKey] = areaRef.id;
+          areaColorMap[newAreaKey] = newArea.color;
 
           transaction.set(areaRef, {
-            ...area,
+            name: newArea.name,
+            description: newArea.description,
+            icon: newArea.icon,
+            color: newArea.color,
             userId,
             createdAt: now,
             updatedAt: now,
           });
         }
+
+        areaIdMap[project.areaName] = areaIdMap[newAreaKey];
+        areaColorMap[project.areaName] = newArea.color;
       }
 
       // 모든 프로젝트의 areaName이 areaIdMap에 있는지 확인
@@ -196,8 +236,7 @@ export async function savePlanToFirestore(options: SavePlanOptions) {
             description: resource.description,
             areaId: areaIdMap[project.areaName],
             area: project.areaName, // denormalized
-            areaColor: plan.areas.find((a) => a.name === project.areaName)
-              ?.color,
+            areaColor: areaColorMap[project.areaName],
             text: resource.description,
             link: resource.url,
             status: "active",

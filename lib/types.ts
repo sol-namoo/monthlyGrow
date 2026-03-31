@@ -349,18 +349,23 @@ export interface PlanConstraints {
 }
 
 export interface GeneratedPlan {
-  areas: Array<{
+  newAreas: Array<{
+    key: string;
     name: string;
     description: string;
     icon: string;
     color: string;
-    existingId?: string; // 기존 Areas와 매칭된 경우 ID
   }>;
   projects: Array<{
     title: string;
     description: string;
     category: "repetitive" | "task_based";
     areaName: string;
+    areaAssignment: {
+      type: "existing" | "new";
+      existingAreaId?: string;
+      newAreaKey?: string;
+    };
     durationWeeks: number;
     difficulty: string;
     target?: string; // 목표 설명 (예: "운동", "독서")

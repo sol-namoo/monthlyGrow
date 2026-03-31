@@ -16,7 +16,7 @@ const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
 const ANTHROPIC_MODEL = "claude-sonnet-4-5-20250929";
 const PLAN_TOOL_NAME = "submit_plan";
 
-const PLAN_TOOL: any = {
+export const PLAN_TOOL: any = {
   name: PLAN_TOOL_NAME,
   description:
     "Return the generated MonthlyGrow plan as structured JSON matching the required schema.",
@@ -24,22 +24,24 @@ const PLAN_TOOL: any = {
     type: "object",
     additionalProperties: false,
     properties: {
-      areas: {
+      newAreas: {
         type: "array",
         items: {
           type: "object",
           additionalProperties: false,
           properties: {
+            key: { type: "string" },
             name: { type: "string" },
             description: { type: "string" },
             icon: { type: "string" },
             color: { type: "string" },
           },
-          required: ["name", "description", "icon", "color"],
+          required: ["key", "name", "description", "icon", "color"],
         },
       },
       projects: {
         type: "array",
+        minItems: 1,
         items: {
           type: "object",
           additionalProperties: false,
@@ -50,8 +52,26 @@ const PLAN_TOOL: any = {
               type: "string",
               enum: ["repetitive", "task_based"],
             },
-            areaName: { type: "string" },
+            areaAssignment: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                type: {
+                  type: "string",
+                  enum: ["existing", "new"],
+                },
+                existingAreaId: { type: "string" },
+                newAreaKey: { type: "string" },
+              },
+              required: ["type"],
+            },
             durationWeeks: { type: "number" },
+            difficulty: {
+              type: "string",
+              enum: ["beginner", "intermediate", "advanced"],
+            },
+            target: { type: "string" },
+            targetCount: { type: "number" },
             estimatedDailyTime: { type: "number" },
             tasks: {
               type: "array",
@@ -86,20 +106,105 @@ const PLAN_TOOL: any = {
                 ],
               },
             },
+            milestones: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  week: { type: "number" },
+                  description: { type: "string" },
+                  successMetric: { type: "string" },
+                },
+                required: ["week", "description", "successMetric"],
+              },
+            },
+            resources: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  type: {
+                    type: "string",
+                    enum: ["book", "website", "app", "tool", "course"],
+                  },
+                  name: { type: "string" },
+                  description: { type: "string" },
+                  url: { type: "string" },
+                  cost: { type: "number" },
+                  priority: {
+                    type: "string",
+                    enum: ["essential", "recommended", "optional"],
+                  },
+                },
+                required: ["type", "name", "description", "priority"],
+              },
+            },
           },
           required: [
             "title",
             "description",
             "category",
-            "areaName",
+            "areaAssignment",
             "durationWeeks",
             "estimatedDailyTime",
             "tasks",
           ],
         },
       },
+      timeline: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          totalWeeks: { type: "number" },
+          weeklySchedule: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                week: { type: "number" },
+                focus: { type: "string" },
+                dailyTasks: {
+                  type: "array",
+                  items: { type: "string" },
+                },
+                timeAllocation: {
+                  type: "object",
+                  additionalProperties: { type: "number" },
+                },
+              },
+              required: ["week", "focus", "dailyTasks", "timeAllocation"],
+            },
+          },
+        },
+        required: ["totalWeeks", "weeklySchedule"],
+      },
+      successMetrics: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            metric: { type: "string" },
+            measurementMethod: { type: "string" },
+            targetValue: { type: "string" },
+            checkpoints: {
+              type: "array",
+              items: { type: "number" },
+            },
+          },
+          required: [
+            "metric",
+            "measurementMethod",
+            "targetValue",
+            "checkpoints",
+          ],
+        },
+      },
     },
-    required: ["areas", "projects"],
+    required: ["projects"],
   },
 };
 
@@ -150,8 +255,51 @@ function extractPlanFromMessage(message: any) {
   }
 }
 
-function normalizePlanForFrontend(plan: any) {
-  const areas = Array.isArray(plan?.areas) ? plan.areas : [];
+export function normalizePlanForFrontend(plan: any) {
+  const newAreas = Array.isArray(plan?.newAreas)
+    ? plan.newAreas
+    : Array.isArray(plan?.areas)
+    ? plan.areas
+    : [];
+  const normalizedNewAreas = Array.from(
+    new Map(
+      [
+        ...newAreas.map((area: any, index: number) => ({
+          key:
+            typeof area?.key === "string" && area.key
+              ? area.key
+              : `new-area-${index}`,
+          name: area?.name || "",
+          description: area?.description || "",
+          icon: area?.icon || "compass",
+          color: area?.color || "#6b7280",
+        })),
+        ...((Array.isArray(plan?.projects) ? plan.projects : [])
+          .filter(
+            (project: any) =>
+              project?.areaAssignment?.type === "new" &&
+              typeof project?.areaAssignment?.newAreaKey === "string" &&
+              project.areaAssignment.newAreaKey &&
+              !newAreas.some(
+                (area: any) => area?.key === project.areaAssignment.newAreaKey
+              )
+          )
+          .map((project: any) => ({
+            key: project.areaAssignment.newAreaKey,
+            name: project?.areaName || project?.title || "새 영역",
+            description: "",
+            icon: "compass",
+            color: "#6b7280",
+          }))),
+      ].map((area) => [area.key, area] as const)
+    ).values()
+  );
+  const newAreaNameByKey = new Map(
+    normalizedNewAreas.map((area: any) => [
+      area?.key || "",
+      area?.name || "",
+    ])
+  );
   const projects = Array.isArray(plan?.projects)
     ? plan.projects.map((project: any) => {
         const tasks = Array.isArray(project?.tasks)
@@ -174,7 +322,22 @@ function normalizePlanForFrontend(plan: any) {
           description: project?.description || "",
           category:
             project?.category === "repetitive" ? "repetitive" : "task_based",
-          areaName: project?.areaName || "",
+          areaName:
+            project?.areaAssignment?.type === "new"
+              ? newAreaNameByKey.get(project?.areaAssignment?.newAreaKey) ||
+                project?.areaName ||
+                ""
+              : project?.areaName || "",
+          areaAssignment:
+            project?.areaAssignment?.type === "existing"
+              ? {
+                  type: "existing",
+                  existingAreaId: project?.areaAssignment?.existingAreaId || "",
+                }
+              : {
+                  type: "new",
+                  newAreaKey: project?.areaAssignment?.newAreaKey || "",
+                },
           durationWeeks:
             typeof project?.durationWeeks === "number" ? project.durationWeeks : 1,
           difficulty: project?.difficulty || "intermediate",
@@ -197,7 +360,7 @@ function normalizePlanForFrontend(plan: any) {
     : [];
 
   return {
-    areas,
+    newAreas: normalizedNewAreas,
     projects,
     timeline:
       plan?.timeline && typeof plan.timeline === "object"
@@ -215,6 +378,135 @@ function normalizePlanForFrontend(plan: any) {
       ? plan.successMetrics
       : [],
   };
+}
+
+export function validateGeneratedPlan(plan: any, existingAreas: any[] = []) {
+  const projects = Array.isArray(plan?.projects) ? plan.projects : [];
+  const newAreas = Array.isArray(plan?.newAreas)
+    ? plan.newAreas
+    : Array.isArray(plan?.areas)
+    ? plan.areas
+    : [];
+  const newAreaKeys = new Set(
+    newAreas
+      .map((area: any, index: number) =>
+        typeof area?.key === "string" && area.key ? area.key : `new-area-${index}`
+      )
+      .filter(Boolean)
+  );
+  const existingAreaIds = new Set(existingAreas.map((area) => area.id));
+
+  if (projects.length === 0) {
+    return {
+      isValid: false,
+      reason: "프로젝트가 생성되지 않았습니다.",
+    };
+  }
+
+  for (const project of projects) {
+    const tasks = Array.isArray(project?.tasks) ? project.tasks : [];
+    if (tasks.length === 0) {
+      return {
+        isValid: false,
+        reason: `프로젝트 "${project?.title || "이름 없는 프로젝트"}"에 작업이 없습니다.`,
+      };
+    }
+
+    const assignment = project?.areaAssignment;
+    if (!assignment || (assignment.type !== "existing" && assignment.type !== "new")) {
+      return {
+        isValid: false,
+        reason: `프로젝트 "${project?.title || "이름 없는 프로젝트"}"의 영역 매핑 정보가 없습니다.`,
+      };
+    }
+
+    if (assignment.type === "existing") {
+      if (!assignment.existingAreaId || !existingAreaIds.has(assignment.existingAreaId)) {
+        return {
+          isValid: false,
+          reason: `프로젝트 "${project?.title || "이름 없는 프로젝트"}"가 유효하지 않은 기존 영역을 참조합니다.`,
+        };
+      }
+    }
+
+    if (assignment.type === "new") {
+      if (!assignment.newAreaKey || !newAreaKeys.has(assignment.newAreaKey)) {
+        return {
+          isValid: false,
+          reason: `프로젝트 "${project?.title || "이름 없는 프로젝트"}"가 유효하지 않은 새 영역을 참조합니다.`,
+        };
+      }
+    }
+  }
+
+  return {
+    isValid: true,
+    reason: "",
+  };
+}
+
+async function requestValidatedPlan({
+  anthropic,
+  system,
+  userContent,
+  maxTokens,
+  existingAreas,
+}: {
+  anthropic: Anthropic;
+  system: string;
+  userContent: string;
+  maxTokens: number;
+  existingAreas: any[];
+}) {
+  let lastReason = "AI 응답이 비어 있습니다.";
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const retryNotice =
+      attempt === 1
+        ? ""
+        : `\n\nIMPORTANT: Your previous response was invalid because ${lastReason} You must return at least 1 project, and every project must contain at least 1 task. Every project must either reference an existing area by exact existingAreaId or reference a new area by newAreaKey.`;
+
+    const message = await anthropic.messages.create({
+      model: ANTHROPIC_MODEL,
+      max_tokens: maxTokens,
+      temperature: 0.3,
+      system,
+      tools: [PLAN_TOOL],
+      tool_choice: {
+        type: "tool",
+        name: PLAN_TOOL_NAME,
+        disable_parallel_tool_use: true,
+      },
+      messages: [
+        {
+          role: "user",
+          content: `${userContent}${retryNotice}`,
+        },
+      ],
+    });
+
+    let { parsedPlan, originalResponse } = extractPlanFromMessage(message);
+    parsedPlan = normalizePlanForFrontend(parsedPlan);
+
+    const validation = validateGeneratedPlan(parsedPlan, existingAreas);
+
+    lastReason = validation.reason;
+
+    if (validation.isValid) {
+      return {
+        parsedPlan,
+        originalResponse,
+      };
+    }
+
+    console.warn(`AI 계획 검증 실패 (시도 ${attempt}/2):`, validation.reason);
+    console.warn("검증 실패 응답:", JSON.stringify(parsedPlan, null, 2));
+  }
+
+  throw new HttpsError(
+    "failed-precondition",
+    `AI가 유효한 계획을 생성하지 못했습니다. ${lastReason} 다시 시도해주세요.`
+  );
 }
 
 // 사용자의 기존 Areas 조회 함수
@@ -244,7 +536,7 @@ async function fetchUserAreas(userId: string) {
 }
 
 // 시스템 프롬프트 정의
-const SYSTEM_PROMPT = `You are a Monthly Grow app plan generation assistant. Convert user's natural language plans into areas, projects, tasks, and resources only. 
+const SYSTEM_PROMPT = `You are a Monthly Grow app plan generation assistant. Your primary job is to create concrete projects and tasks. Areas are only organizational containers for those projects.
 
 **Monthly 기반 계획 생성 시 중요 사항:**
 - Monthly의 목표, Key Results, 중점 영역을 정확히 반영한 프로젝트를 생성하세요.
@@ -254,43 +546,16 @@ const SYSTEM_PROMPT = `You are a Monthly Grow app plan generation assistant. Con
 - 프로젝트 기간은 Monthly 기간보다 짧거나 길 수 있습니다 (목표 달성에 필요한 경우).
 - Monthly는 참고점으로 고려하되, 프로젝트 기간은 실제 목표 달성에 필요한 기간으로 설정하세요.
 
-Use this JSON format:
+Return the plan through the provided structured tool, not as free-form text.
 
-{
-  "areas": [
-    {
-      "name": "Area name (e.g., 'Career', 'Language', 'Technology')",
-      "description": "Area description",
-      "icon": "Icon name (e.g., 'briefcase', 'book', 'code')",
-      "color": "Color code (e.g., '#3B82F6', '#10B981', '#F59E0B')"
-    }
-  ],
-  "projects": [
-    {
-      "title": "Project title",
-      "description": "Project description",
-      "category": "repetitive or task_based (choose one)",
-      "areaName": "Area name (must match areas array name exactly)",
-      "durationWeeks": "Project duration in weeks (number)",
-      "estimatedDailyTime": "Daily time in minutes (number)",
-      "tasks": [
-        {
-          "title": "Task title",
-          "description": "Task description",
-          "duration": "Duration in hours (number)",
-          "requirements": ["Required tools/preparations"],
-          "resources": ["Required resources"],
-          "prerequisites": ["Prerequisites"]
-        }
-      ]
-    }
-  ]
-}
-
-**Data Types:**
-- Area: name (string), description (string), icon (string), color (string)
-- Project: title (string), description (string), category ("repetitive"|"task_based"), areaName (string), durationWeeks (number), estimatedDailyTime (number), tasks (Task[])
-- Task: title (string), description (string), duration (number), requirements (string[]), resources (string[]), prerequisites (string[])
+**Area Assignment Rules:**
+- Existing areas are already provided by the server with exact IDs.
+- Prefer reusing existing areas when they fit a project.
+- Only create entries in newAreas when no existing area fits.
+- Every project must have areaAssignment.
+- For existing areas, set areaAssignment.type to "existing" and provide exact existingAreaId.
+- For new areas, set areaAssignment.type to "new", provide newAreaKey, and include the matching definition in newAreas.
+- Multiple projects may reference the same newAreaKey when they belong to the same new area.
 
 **Task Creation Rules:**
 - Create detailed, specific tasks that align with project goals
@@ -302,6 +567,7 @@ Use this JSON format:
 - For task-based: Create specific milestone tasks to achieve goals
 
 **General Rules:**
+- Empty project arrays are invalid.
 - All projects must have tasks array with at least 1 task
 - Never create projects without tasks
 - Category must be "repetitive" or "task_based"
@@ -377,9 +643,13 @@ export const generatePlan = onCall(
             }
 
             if (monthlyData.focusAreas && monthlyData.focusAreas.length > 0) {
-              monthlyContext += `\nFocus Areas: ${monthlyData.focusAreas.join(
-                ", "
-              )}\n`;
+              const focusAreaNames = monthlyData.focusAreas.map((focusAreaId: string) => {
+                const matchingArea = existingAreas.find(
+                  (area) => area.id === focusAreaId || area.name === focusAreaId
+                );
+                return matchingArea?.name || focusAreaId;
+              });
+              monthlyContext += `\nFocus Areas: ${focusAreaNames.join(", ")}\n`;
             }
 
             if (monthlyData.reward) {
@@ -435,107 +705,49 @@ export const generatePlan = onCall(
     console.log("AI에게 전달될 제약사항 컨텍스트:", constraintsContext);
     console.log("=== 제약사항 전달 확인 끝 ===");
 
-    const message = await anthropic.messages.create({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 2000,
-      temperature: 0.3,
+    let { parsedPlan, originalResponse } = await requestValidatedPlan({
+      anthropic,
       system: SYSTEM_PROMPT + areasContext,
-      tools: [PLAN_TOOL],
-      tool_choice: {
-        type: "tool",
-        name: PLAN_TOOL_NAME,
-        disable_parallel_tool_use: true,
-      },
-      messages: [
-        {
-          role: "user",
-          content: `Convert the following plan into Monthly Grow app format:${monthlyContext}${constraintsContext}\n\n${userInput}`,
-        },
-      ],
+      userContent: `Convert the following plan into Monthly Grow app format:${monthlyContext}${constraintsContext}\n\n${userInput}`,
+      maxTokens: 2000,
+      existingAreas,
     });
-
-    let { parsedPlan, originalResponse } = extractPlanFromMessage(message);
-
-    parsedPlan = normalizePlanForFrontend(parsedPlan);
 
     console.log("=== AI 원본 응답 ===");
     console.log("파싱된 계획:", JSON.stringify(parsedPlan, null, 2));
     console.log("=== AI 원본 응답 끝 ===");
 
-    // 4. 기존 Areas와 매칭하여 existingId 추가 및 중복 제거
-    if (existingAreas.length > 0 && parsedPlan.areas) {
-      const processedAreas: any[] = [];
-      const usedExistingIds = new Set<string>();
+    const newAreaMap = new Map<string, any>(
+      (parsedPlan.newAreas || []).map((area: any) => [area.key, area] as const)
+    );
 
-      for (const aiArea of parsedPlan.areas) {
-        const matchingArea = existingAreas.find(
-          (existing) =>
-            !usedExistingIds.has(existing.id) &&
-            (existing.name.toLowerCase().includes(aiArea.name.toLowerCase()) ||
-              aiArea.name.toLowerCase().includes(existing.name.toLowerCase()) ||
-              existing.name.toLowerCase() === aiArea.name.toLowerCase())
+    parsedPlan.projects = (parsedPlan.projects || []).map((project: any) => {
+      if (project.areaAssignment?.type === "existing") {
+        const matchedExistingArea = existingAreas.find(
+          (area) => area.id === project.areaAssignment.existingAreaId
         );
-
-        if (matchingArea) {
-          // 기존 영역과 매칭된 경우, 기존 영역 정보로 대체
-          processedAreas.push({
-            ...aiArea,
-            name: matchingArea.name, // 기존 영역 이름 사용
-            description: matchingArea.description,
-            icon: matchingArea.icon,
-            color: matchingArea.color,
-            existingId: matchingArea.id,
-          });
-          usedExistingIds.add(matchingArea.id);
-        } else {
-          // 새로운 영역인 경우만 추가
-          processedAreas.push(aiArea);
-        }
+        return {
+          ...project,
+          areaName: matchedExistingArea?.name || project.areaName || "",
+        };
       }
 
-      parsedPlan.areas = processedAreas;
-    }
+      if (project.areaAssignment?.type === "new") {
+        const matchedNewArea = newAreaMap.get(project.areaAssignment.newAreaKey);
+        return {
+          ...project,
+          areaName: matchedNewArea?.name || project.areaName || "",
+        };
+      }
 
-    // 5. areaName 검증 및 수정
-    console.log("=== areaName 검증 시작 ===");
-    if (parsedPlan.projects && parsedPlan.areas) {
-      const validAreaNames = parsedPlan.areas.map((area: any) => area.name);
-      console.log("유효한 area 이름들:", validAreaNames);
-
-      parsedPlan.projects = parsedPlan.projects.map(
-        (project: any, index: number) => {
-          console.log(`프로젝트 "${project.title}" areaName 검증:`, {
-            currentAreaName: project.areaName,
-            validAreaNames,
-            isValid: validAreaNames.includes(project.areaName),
-          });
-
-          // areaName이 undefined, null, 빈 문자열이거나 유효하지 않은 경우 수정
-          if (
-            !project.areaName ||
-            project.areaName === "undefined" ||
-            project.areaName === "null" ||
-            !validAreaNames.includes(project.areaName)
-          ) {
-            console.warn(
-              `⚠️ 프로젝트 "${project.title}"의 areaName이 유효하지 않습니다. 첫 번째 area로 설정합니다.`
-            );
-            project.areaName = validAreaNames[0]; // 첫 번째 area로 설정
-            console.log(
-              `✅ 프로젝트 "${project.title}" areaName 수정: ${project.areaName}`
-            );
-          }
-
-          return project;
-        }
-      );
-    }
+      return project;
+    });
 
     // 6. 시간 분배 및 estimatedDailyTime 계산
     console.log("=== 시간 분배 로직 시작 ===");
     console.log("사용자 설정 제약사항:", {
       daysPerWeek: constraints?.dailyTimeSlots?.daysPerWeek,
-      durationPerDay: constraints?.dailyTimeSlots?.duration,
+      durationPerDay: constraints?.dailyTimeSlots?.minutesPerDay,
       targetDuration: constraints?.targetDuration,
       difficulty: constraints?.difficulty,
       focusIntensity: constraints?.focusIntensity,
@@ -549,8 +761,8 @@ export const generatePlan = onCall(
           constraints?.dailyTimeSlots?.maxDaysPerWeek ||
           5;
         const durationPerDay =
-          constraints?.dailyTimeSlots?.duration ||
-          constraints?.dailyTimeSlots?.maxDuration ||
+          constraints?.dailyTimeSlots?.minutesPerDay ||
+          constraints?.dailyTimeSlots?.maxMinutesPerDay ||
           60; // 분 단위
         const totalAvailableTime =
           project.durationWeeks * daysPerWeek * durationPerDay; // 총 사용 가능한 시간 (분)
@@ -708,8 +920,8 @@ export const generatePlan = onCall(
 
           // 프로젝트의 estimatedDailyTime 계산
           // 사용자가 설정한 일일 가용 시간을 우선 사용
-          if (constraints?.dailyTimeSlots?.duration) {
-            project.estimatedDailyTime = constraints.dailyTimeSlots.duration;
+          if (constraints?.dailyTimeSlots?.minutesPerDay) {
+            project.estimatedDailyTime = constraints.dailyTimeSlots.minutesPerDay;
           } else {
             project.estimatedDailyTime = Math.round(
               totalAvailableTime / (project.durationWeeks * 7)
@@ -798,6 +1010,18 @@ export const refinePlan = onCall(
     }
 
     const { originalPlan, feedback, adjustments } = request.data;
+    const refinementExistingAreas = Array.isArray(originalPlan?.projects)
+      ? originalPlan.projects
+          .filter(
+            (project: any) =>
+              project?.areaAssignment?.type === "existing" &&
+              project?.areaAssignment?.existingAreaId
+          )
+          .map((project: any) => ({
+            id: project.areaAssignment.existingAreaId,
+            name: project.areaName || "",
+          }))
+      : [];
 
   const refinementPrompt = `
 기존 계획을 사용자 피드백을 바탕으로 개선해주세요.
@@ -816,22 +1040,14 @@ ${JSON.stringify(adjustments, null, 2)}
 
     try {
       const anthropic = getAnthropicClient();
-      const message = await anthropic.messages.create({
-        model: ANTHROPIC_MODEL,
-        max_tokens: 4000,
-        temperature: 0.3,
-        system: SYSTEM_PROMPT,
-        tools: [PLAN_TOOL],
-        tool_choice: {
-          type: "tool",
-          name: PLAN_TOOL_NAME,
-          disable_parallel_tool_use: true,
-        },
-        messages: [{ role: "user", content: refinementPrompt }],
-      });
-
       const { parsedPlan: refinedPlan, originalResponse } =
-        extractPlanFromMessage(message);
+        await requestValidatedPlan({
+          anthropic,
+          system: SYSTEM_PROMPT,
+          userContent: refinementPrompt,
+          maxTokens: 4000,
+          existingAreas: refinementExistingAreas,
+        });
 
       return {
         success: true,
