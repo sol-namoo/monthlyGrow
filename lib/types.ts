@@ -367,7 +367,7 @@ export interface GeneratedPlan {
       newAreaKey?: string;
     };
     durationWeeks: number;
-    difficulty: string;
+    difficulty?: string;
     target?: string; // 목표 설명 (예: "운동", "독서")
     targetCount?: number; // 목표 수치
     estimatedDailyTime?: number; // 일일 예상 소요 시간 (분)
@@ -379,12 +379,12 @@ export interface GeneratedPlan {
       resources: string[];
       prerequisites?: string[];
     }>;
-    milestones: Array<{
+    milestones?: Array<{
       week: number;
       description: string;
       successMetric: string;
     }>;
-    resources: Array<{
+    resources?: Array<{
       type: "book" | "website" | "app" | "tool" | "course";
       name: string;
       description: string;
@@ -393,7 +393,7 @@ export interface GeneratedPlan {
       priority: "essential" | "recommended" | "optional";
     }>;
   }>;
-  timeline: {
+  timeline?: {
     totalWeeks: number;
     weeklySchedule: Array<{
       week: number;
@@ -402,7 +402,7 @@ export interface GeneratedPlan {
       timeAllocation: Record<string, number>; // 프로젝트별 시간 배분
     }>;
   };
-  successMetrics: Array<{
+  successMetrics?: Array<{
     metric: string;
     measurementMethod: string;
     targetValue: string;

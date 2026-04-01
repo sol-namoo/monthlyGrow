@@ -29,15 +29,21 @@ export function generateConstraintsGuide(constraints: PlanConstraints): string {
 
   const projectWeeksText = constraints.projectWeeks
     ? `${constraints.projectWeeks} weeks`
-    : `AI will set (max ${constraints.maxProjectWeeks} weeks)`;
+    : constraints.maxProjectWeeks
+    ? `AI will set (max ${constraints.maxProjectWeeks} weeks)`
+    : `AI will set`;
 
   const daysPerWeekText = constraints.dailyTimeSlots?.daysPerWeek
     ? `${constraints.dailyTimeSlots.daysPerWeek} days`
-    : `AI will set (max ${constraints.dailyTimeSlots?.maxDaysPerWeek} days)`;
+    : constraints.dailyTimeSlots?.maxDaysPerWeek
+    ? `AI will set (max ${constraints.dailyTimeSlots.maxDaysPerWeek} days)`
+    : `AI will set`;
 
   const minutesPerDayText = constraints.dailyTimeSlots?.minutesPerDay
     ? `${constraints.dailyTimeSlots.minutesPerDay} minutes`
-    : `AI will set (max ${constraints.dailyTimeSlots?.maxMinutesPerDay} minutes)`;
+    : constraints.dailyTimeSlots?.maxMinutesPerDay
+    ? `AI will set (max ${constraints.dailyTimeSlots.maxMinutesPerDay} minutes)`
+    : `AI will set`;
 
   // 설명이 포함된 제약사항 객체 생성
   const constraintsWithDescriptions = {
@@ -113,7 +119,7 @@ export function generateConstraintsGuide(constraints: PlanConstraints): string {
   }
   \n
   ⚡ Key Utilization Methods:\n\n
-  1. Time Constraints:\n   - Total Available Time = Project Duration × Days per Week × Minutes per Day\n   - Plan within maximum limits\n   - 30min~1hour: Simple review, reading focus\n   - 2+ hours: Practice, project work\n\n2. Learning Style:\n   - Include activities matching the preferred style in task generation\n\n3. Required Compliance:\n- All numeric fields must be set as numbers\n- All array fields must be set as [] even if empty\n- Repetitive tasks as "Session X" format, task-based as individual tasks\n- Every project must include a valid areaAssignment\n- Duration: minimum 0.1 hours, maximum 24 hours per task`;
+  1. Time Constraints:\n   - Total Available Time = Project Duration × Days per Week × Minutes per Day\n   - Plan within maximum limits\n   - 30min~1hour: Simple review, reading focus\n   - 2+ hours: Practice, project work\n\n2. Learning Style:\n   - Include activities matching the preferred style in task generation\n\n3. Required Compliance:\n- All numeric fields must be set as numbers\n- Repetitive tasks as "Session X" format, task-based as individual tasks\n- Every project must include a valid areaAssignment\n- Duration: minimum 0.1 hours, maximum 24 hours per task`;
 }
 
 /**

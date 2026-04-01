@@ -910,6 +910,96 @@ function PlanPreview({
     }));
   };
 
+  const renderProjectAreaSelector = (project: any, index: number) => {
+    if (!showAreaMatching) {
+      return null;
+    }
+
+    const choice = getProjectChoice(index);
+    const availableNewAreas = generatedAreaOptions.filter(
+      (area) =>
+        !existingAreas.some(
+          (existingArea) =>
+            existingArea.name.toLowerCase() === area.name.toLowerCase()
+        )
+    );
+
+    const selectedValue =
+      choice?.useExisting && choice.existingId
+        ? `existing:${choice.existingId}`
+        : `new:${choice?.newAreaKey || generatedAreaOptions[0]?.key || ""}`;
+
+    return (
+      <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
+        <div className="mb-2">
+          <p className="text-sm font-medium text-blue-900">
+            {translate("aiPlanGenerator.areaMatching.title")}
+          </p>
+          <p className="text-xs text-blue-700">
+            {translate("aiPlanGenerator.areaMatching.description")}
+          </p>
+        </div>
+        <p className="mb-2 text-xs text-gray-600">
+          현재 영역: {project.areaName || "미분류"}
+        </p>
+        <select
+          value={selectedValue}
+          onChange={(e) => {
+            const [kind, value] = e.target.value.split(":");
+
+            if (kind === "existing") {
+              const existingArea = existingAreas.find((area) => area.id === value);
+              updateProjectAreaChoice(index, {
+                useExisting: true,
+                existingId: value,
+                newName: existingArea?.name,
+              });
+              return;
+            }
+
+            const selectedNewArea = generatedAreaOptions.find(
+              (area) => area.key === value
+            );
+
+            updateProjectAreaChoice(index, {
+              useExisting: false,
+              newAreaKey: value,
+              newName: selectedNewArea?.name,
+            });
+          }}
+          className="w-full rounded border border-gray-300 bg-white p-2 text-sm"
+        >
+          {existingAreas.length > 0 && (
+            <optgroup
+              label={translate("aiPlanGenerator.areaMatching.selectExisting")}
+            >
+              {existingAreas.map((area) => (
+                <option key={`existing-area-${area.id}`} value={`existing:${area.id}`}>
+                  {area.name}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          <optgroup
+            label={translate("aiPlanGenerator.areaMatching.createNew")}
+          >
+            {availableNewAreas.length > 0 ? (
+              availableNewAreas.map((area) => (
+                <option key={`new-area-${area.key}`} value={`new:${area.key}`}>
+                  {area.name}
+                </option>
+              ))
+            ) : (
+              <option value={`new:${generatedAreaOptions[0]?.key || ""}`}>
+                {generatedAreaOptions[0]?.name || "미분류"}
+              </option>
+            )}
+          </optgroup>
+        </select>
+      </div>
+    );
+  };
+
   useEffect(() => {
     setEditedPlan(normalizeGeneratedPlan(plan));
   }, [plan]);
@@ -1058,7 +1148,7 @@ function PlanPreview({
         </div>
       </div>
 
-      {/* 계획 요약 및 영역 선택 */}
+      {/* 계획 요약 */}
       <div className="mb-6 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
         <h3 className="font-medium text-lg mb-2">
           {translate("aiPlanGenerator.result.summary.title")}
@@ -1073,117 +1163,6 @@ function PlanPreview({
             {translate("aiPlanGenerator.result.summary.projects")}
           </span>
         </div>
-
-        {/* 영역 선택 UI */}
-        {showAreaMatching && (
-          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-lg">
-            <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-              {translate("aiPlanGenerator.areaMatching.title")}
-            </h4>
-            <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
-              {translate("aiPlanGenerator.areaMatching.description")}
-            </p>
-
-            <div className="space-y-3">
-              {safeProjects.map((project, index) => {
-                const choice = getProjectChoice(index);
-                const availableNewAreas = generatedAreaOptions.filter(
-                  (area) =>
-                    !existingAreas.some(
-                      (existingArea) =>
-                        existingArea.name.toLowerCase() ===
-                        area.name.toLowerCase()
-                    )
-                );
-
-                const selectedValue =
-                  choice?.useExisting && choice.existingId
-                    ? `existing:${choice.existingId}`
-                    : `new:${choice?.newAreaKey || generatedAreaOptions[0]?.key || ""}`;
-
-                return (
-                  <div
-                    key={`project-area-${index}`}
-                    className="rounded-lg border border-blue-200 bg-white p-3"
-                  >
-                    <p className="text-sm font-medium text-gray-900 mb-1">
-                      {project.title}
-                    </p>
-                    <p className="text-xs text-gray-500 mb-2">
-                      현재 영역: {project.areaName || "미분류"}
-                    </p>
-                    <select
-                      value={selectedValue}
-                      onChange={(e) => {
-                        const [kind, value] = e.target.value.split(":");
-
-                        if (kind === "existing") {
-                          const existingArea = existingAreas.find(
-                            (area) => area.id === value
-                          );
-                          updateProjectAreaChoice(index, {
-                            useExisting: true,
-                            existingId: value,
-                            newName: existingArea?.name,
-                          });
-                          return;
-                        }
-
-                        const selectedNewArea = generatedAreaOptions.find(
-                          (area) => area.key === value
-                        );
-
-                        updateProjectAreaChoice(index, {
-                          useExisting: false,
-                          newAreaKey: value,
-                          newName: selectedNewArea?.name,
-                        });
-                      }}
-                      className="w-full rounded border border-gray-300 bg-white p-2 text-sm"
-                    >
-                      {existingAreas.length > 0 && (
-                        <optgroup
-                          label={translate(
-                            "aiPlanGenerator.areaMatching.selectExisting"
-                          )}
-                        >
-                          {existingAreas.map((area) => (
-                            <option
-                              key={`existing-area-${area.id}`}
-                              value={`existing:${area.id}`}
-                            >
-                              {area.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                      <optgroup
-                        label={translate(
-                          "aiPlanGenerator.areaMatching.createNew"
-                        )}
-                      >
-                        {availableNewAreas.length > 0 ? (
-                          availableNewAreas.map((area) => (
-                            <option
-                              key={`new-area-${area.key}`}
-                              value={`new:${area.key}`}
-                            >
-                              {area.name}
-                            </option>
-                          ))
-                        ) : (
-                          <option value={`new:${generatedAreaOptions[0]?.key || ""}`}>
-                            {generatedAreaOptions[0]?.name || "미분류"}
-                          </option>
-                        )}
-                      </optgroup>
-                    </select>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         <p className="text-sm text-gray-500 dark:text-gray-400">
           {translate("aiPlanGenerator.result.summary.description")}
@@ -1332,6 +1311,8 @@ function PlanPreview({
                     시간
                   </span>
                 </div>
+
+                {renderProjectAreaSelector(project, index)}
 
                 {/* 주요 작업들 미리보기 */}
                 <div className="mt-3">

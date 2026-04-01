@@ -11,15 +11,18 @@ test("PLAN_TOOL requires non-empty projects and supports optional newAreas", () 
   assert.ok(PLAN_TOOL.input_schema.properties.newAreas);
 });
 
-test("PLAN_TOOL allows frontend-required optional project fields", () => {
+test("PLAN_TOOL keeps only the minimal generation fields", () => {
   const projectSchema = PLAN_TOOL.input_schema.properties.projects.items.properties;
-  assert.ok(projectSchema.difficulty);
-  assert.ok(projectSchema.target);
-  assert.ok(projectSchema.targetCount);
-  assert.ok(projectSchema.milestones);
-  assert.ok(projectSchema.resources);
-  assert.ok(PLAN_TOOL.input_schema.properties.timeline);
-  assert.ok(PLAN_TOOL.input_schema.properties.successMetrics);
+  assert.equal(Boolean(projectSchema.durationWeeks), true);
+  assert.equal(Boolean(projectSchema.tasks), true);
+  assert.equal(Boolean(projectSchema.areaAssignment), true);
+  assert.equal(Boolean(projectSchema.difficulty), false);
+  assert.equal(Boolean(projectSchema.target), false);
+  assert.equal(Boolean(projectSchema.targetCount), false);
+  assert.equal(Boolean(projectSchema.milestones), false);
+  assert.equal(Boolean(projectSchema.resources), false);
+  assert.equal(Boolean(PLAN_TOOL.input_schema.properties.timeline), false);
+  assert.equal(Boolean(PLAN_TOOL.input_schema.properties.successMetrics), false);
 });
 
 test("normalizePlanForFrontend backfills frontend shape", () => {

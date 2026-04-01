@@ -66,13 +66,6 @@ export const PLAN_TOOL: any = {
               required: ["type"],
             },
             durationWeeks: { type: "number" },
-            difficulty: {
-              type: "string",
-              enum: ["beginner", "intermediate", "advanced"],
-            },
-            target: { type: "string" },
-            targetCount: { type: "number" },
-            estimatedDailyTime: { type: "number" },
             tasks: {
               type: "array",
               minItems: 1,
@@ -83,62 +76,8 @@ export const PLAN_TOOL: any = {
                   title: { type: "string" },
                   description: { type: "string" },
                   duration: { type: "number" },
-                  requirements: {
-                    type: "array",
-                    items: { type: "string" },
-                  },
-                  resources: {
-                    type: "array",
-                    items: { type: "string" },
-                  },
-                  prerequisites: {
-                    type: "array",
-                    items: { type: "string" },
-                  },
                 },
-                required: [
-                  "title",
-                  "description",
-                  "duration",
-                  "requirements",
-                  "resources",
-                  "prerequisites",
-                ],
-              },
-            },
-            milestones: {
-              type: "array",
-              items: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  week: { type: "number" },
-                  description: { type: "string" },
-                  successMetric: { type: "string" },
-                },
-                required: ["week", "description", "successMetric"],
-              },
-            },
-            resources: {
-              type: "array",
-              items: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  type: {
-                    type: "string",
-                    enum: ["book", "website", "app", "tool", "course"],
-                  },
-                  name: { type: "string" },
-                  description: { type: "string" },
-                  url: { type: "string" },
-                  cost: { type: "number" },
-                  priority: {
-                    type: "string",
-                    enum: ["essential", "recommended", "optional"],
-                  },
-                },
-                required: ["type", "name", "description", "priority"],
+                required: ["title", "description", "duration"],
               },
             },
           },
@@ -148,58 +87,7 @@ export const PLAN_TOOL: any = {
             "category",
             "areaAssignment",
             "durationWeeks",
-            "estimatedDailyTime",
             "tasks",
-          ],
-        },
-      },
-      timeline: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          totalWeeks: { type: "number" },
-          weeklySchedule: {
-            type: "array",
-            items: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                week: { type: "number" },
-                focus: { type: "string" },
-                dailyTasks: {
-                  type: "array",
-                  items: { type: "string" },
-                },
-                timeAllocation: {
-                  type: "object",
-                  additionalProperties: { type: "number" },
-                },
-              },
-              required: ["week", "focus", "dailyTasks", "timeAllocation"],
-            },
-          },
-        },
-        required: ["totalWeeks", "weeklySchedule"],
-      },
-      successMetrics: {
-        type: "array",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            metric: { type: "string" },
-            measurementMethod: { type: "string" },
-            targetValue: { type: "string" },
-            checkpoints: {
-              type: "array",
-              items: { type: "number" },
-            },
-          },
-          required: [
-            "metric",
-            "measurementMethod",
-            "targetValue",
-            "checkpoints",
           ],
         },
       },
@@ -252,6 +140,49 @@ function extractPlanFromMessage(message: any) {
     console.error("JSON 파싱 실패:", parseError);
     console.error("AI 원본 응답:", responseText);
     throw new HttpsError("internal", "AI 응답을 처리할 수 없습니다.");
+  }
+}
+
+function logClaudeMessageForDebug(message: any) {
+  try {
+    const contentSummary = Array.isArray(message?.content)
+      ? message.content.map((block: any) => {
+          if (block?.type === "tool_use") {
+            return {
+              type: "tool_use",
+              name: block.name,
+              input: block.input,
+            };
+          }
+
+          if (block?.type === "text") {
+            return {
+              type: "text",
+              text: typeof block.text === "string" ? block.text.slice(0, 4000) : "",
+            };
+          }
+
+          return block;
+        })
+      : message?.content;
+
+    console.log(
+      "Claude raw message:",
+      JSON.stringify(
+        {
+          id: message?.id,
+          model: message?.model,
+          role: message?.role,
+          stop_reason: message?.stop_reason,
+          usage: message?.usage,
+          content: contentSummary,
+        },
+        null,
+        2
+      )
+    );
+  } catch (error) {
+    console.error("Claude raw message 로깅 실패:", error);
   }
 }
 
@@ -485,7 +416,10 @@ async function requestValidatedPlan({
       ],
     });
 
+    logClaudeMessageForDebug(message);
+
     let { parsedPlan, originalResponse } = extractPlanFromMessage(message);
+    console.log("Claude extracted response:", originalResponse);
     parsedPlan = normalizePlanForFrontend(parsedPlan);
 
     const validation = validateGeneratedPlan(parsedPlan, existingAreas);
@@ -560,7 +494,6 @@ Return the plan through the provided structured tool, not as free-form text.
 **Task Creation Rules:**
 - Create detailed, specific tasks that align with project goals
 - Consider available time: Total Time = durationWeeks × daysPerWeek × minutesPerDay
-- Distribute tasks evenly across project timeline
 - Each task should be actionable and measurable
 - Duration should reflect actual effort needed (0.1-24 hours)
 - For repetitive: Create sequential sessions (Session 1, Session 2, etc.)
@@ -709,7 +642,7 @@ export const generatePlan = onCall(
       anthropic,
       system: SYSTEM_PROMPT + areasContext,
       userContent: `Convert the following plan into Monthly Grow app format:${monthlyContext}${constraintsContext}\n\n${userInput}`,
-      maxTokens: 2000,
+      maxTokens: 3000,
       existingAreas,
     });
 
