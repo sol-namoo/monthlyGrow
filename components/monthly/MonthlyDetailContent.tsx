@@ -500,9 +500,9 @@ export function MonthlyDetailContent({
                   </Button>
                 </>
               ) : (
-                monthly.retrospective && (
+                monthlyRetrospective && (
                   <Button variant="ghost" size="icon" asChild>
-                    <Link href={`/para/archives/${monthly.retrospective.id}`}>
+                    <Link href={`/para/archives/${monthlyRetrospective.id}`}>
                       <FolderOpen className="h-5 w-5" />
                     </Link>
                   </Button>
@@ -1146,6 +1146,7 @@ export function MonthlyDetailContent({
         <NoteForm
           type="monthly"
           parent={monthly}
+          existingContent={monthlyNote?.content}
           onClose={() => setShowNoteForm(false)}
           onSave={() => {
             // 노트 저장 후 데이터 새로고침

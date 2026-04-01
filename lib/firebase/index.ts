@@ -97,9 +97,7 @@ export {
   updateUserProfile,
   updateUserSettings,
   updateUserPreferences,
-  updateUserDisplayName,
   uploadProfilePicture,
-  deleteProfilePicture,
   updateUserProfilePicture,
 } from "./users";
 

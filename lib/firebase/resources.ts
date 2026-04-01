@@ -17,6 +17,7 @@ import {
   filterUndefinedValues,
 } from "./utils";
 import { Resource } from "../types";
+import { getResourceCollectionState } from "./crud-helpers";
 
 // Resources
 export const fetchAllResourcesByUserId = async (
@@ -44,16 +45,10 @@ export const fetchActiveResourcesByUserId = async (
   userId: string
 ): Promise<Resource[]> => {
   try {
-    const q = query(
-      collection(db, "resources"),
-      where("userId", "==", userId),
-      where("status", "==", "active")
+    const resources = await fetchAllResourcesByUserId(userId);
+    return resources.filter(
+      (resource) => getResourceCollectionState(resource) === "active"
     );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Resource[];
   } catch (error) {
     console.error("활성 리소스 조회 실패:", error);
     throw new Error("activeResourceLoadFailed");
@@ -64,16 +59,10 @@ export const fetchArchivedResourcesByUserId = async (
   userId: string
 ): Promise<Resource[]> => {
   try {
-    const q = query(
-      collection(db, "resources"),
-      where("userId", "==", userId),
-      where("status", "==", "archived")
+    const resources = await fetchAllResourcesByUserId(userId);
+    return resources.filter(
+      (resource) => getResourceCollectionState(resource) === "archived"
     );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Resource[];
   } catch (error) {
     console.error("아카이브된 리소스 조회 실패:", error);
     throw new Error("archivedResourceLoadFailed");

@@ -195,6 +195,12 @@ export default function ProjectDetailPage({
     enabled: !!user?.uid && !!projectId,
   });
 
+  const { data: projectNote } = useQuery({
+    queryKey: ["projectNote", projectId],
+    queryFn: () => fetchSingleArchive(user?.uid || "", projectId, "project_note"),
+    enabled: !!user?.uid && !!projectId,
+  });
+
   // 프로젝트의 모든 tasks 가져오기
   const {
     data: tasks,
@@ -551,6 +557,7 @@ export default function ProjectDetailPage({
           >
             <NoteTab
               project={project}
+              note={projectNote}
               onEditNote={() => setShowAddNoteDialog(true)}
             />
           </Suspense>
@@ -578,10 +585,14 @@ export default function ProjectDetailPage({
         <NoteForm
           type="project"
           parent={project}
+          existingContent={projectNote?.content}
           onClose={() => setShowAddNoteDialog(false)}
           onSave={() => {
             queryClient.invalidateQueries({
               queryKey: ["project", projectId],
+            });
+            queryClient.invalidateQueries({
+              queryKey: ["projectNote", projectId],
             });
           }}
         />
@@ -593,7 +604,7 @@ export default function ProjectDetailPage({
           type="project"
           title={project?.title || ""}
           keyResults={[]}
-          existingData={project?.retrospective}
+          existingData={projectRetrospective}
           onClose={() => setShowRetrospectiveDialog(false)}
           onSave={async (data) => {
             try {

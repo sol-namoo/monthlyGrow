@@ -18,6 +18,7 @@ import {
   filterUndefinedValues,
 } from "./utils";
 import { Area } from "../types";
+import { addAreaCounts } from "./crud-helpers";
 
 // Areas
 export const fetchAllAreasByUserId = async (
@@ -156,58 +157,77 @@ export const updateArea = async (
 
 export const deleteAreaById = async (areaId: string): Promise<void> => {
   try {
+    const areaDoc = await getDoc(doc(db, "areas", areaId));
+
+    if (!areaDoc.exists()) {
+      throw new Error("영역을 찾을 수 없습니다.");
+    }
+
+    const areaData = areaDoc.data();
+    const userId = areaData.userId as string;
+    const uncategorizedArea = await getOrCreateUncategorizedArea(userId);
+
+    if (uncategorizedArea.id === areaId) {
+      throw new Error("미분류 영역은 삭제할 수 없습니다.");
+    }
+
     await runTransaction(db, async (transaction) => {
       const areaRef = doc(db, "areas", areaId);
       const areaDoc = await transaction.get(areaRef);
+      const uncategorizedAreaRef = doc(db, "areas", uncategorizedArea.id);
+      const uncategorizedAreaDoc = await transaction.get(uncategorizedAreaRef);
 
       if (!areaDoc.exists()) {
         throw new Error("영역을 찾을 수 없습니다.");
       }
 
+      if (!uncategorizedAreaDoc.exists()) {
+        throw new Error("미분류 영역을 찾을 수 없습니다.");
+      }
+
       // 해당 영역에 속한 프로젝트들을 미분류 영역으로 이동
       const projectsQuery = query(
         collection(db, "projects"),
+        where("userId", "==", userId),
         where("areaId", "==", areaId)
       );
       const projectsSnapshot = await getDocs(projectsQuery);
 
-      // 미분류 영역 찾기
-      const uncategorizedQuery = query(
-        collection(db, "areas"),
-        where("name", "==", "미분류")
-      );
-      const uncategorizedSnapshot = await getDocs(uncategorizedQuery);
-
-      if (!uncategorizedSnapshot.empty) {
-        const uncategorizedAreaId = uncategorizedSnapshot.docs[0].id;
-
-        // 프로젝트들을 미분류 영역으로 이동
-        projectsSnapshot.docs.forEach((projectDoc) => {
-          transaction.update(projectDoc.ref, {
-            areaId: uncategorizedAreaId,
-            updatedAt: updateTimestamp(),
-          });
+      // 프로젝트들을 미분류 영역으로 이동
+      projectsSnapshot.docs.forEach((projectDoc) => {
+        transaction.update(projectDoc.ref, {
+          areaId: uncategorizedArea.id,
+          updatedAt: updateTimestamp(),
         });
-      }
+      });
 
       // 해당 영역에 속한 리소스들을 미분류 영역으로 이동
       const resourcesQuery = query(
         collection(db, "resources"),
+        where("userId", "==", userId),
         where("areaId", "==", areaId)
       );
       const resourcesSnapshot = await getDocs(resourcesQuery);
 
-      if (!uncategorizedSnapshot.empty) {
-        const uncategorizedAreaId = uncategorizedSnapshot.docs[0].id;
-
-        // 리소스들을 미분류 영역으로 이동
-        resourcesSnapshot.docs.forEach((resourceDoc) => {
-          transaction.update(resourceDoc.ref, {
-            areaId: uncategorizedAreaId,
-            updatedAt: updateTimestamp(),
-          });
+      // 리소스들을 미분류 영역으로 이동
+      resourcesSnapshot.docs.forEach((resourceDoc) => {
+        transaction.update(resourceDoc.ref, {
+          areaId: uncategorizedArea.id,
+          updatedAt: updateTimestamp(),
         });
-      }
+      });
+
+      const movedProjects = projectsSnapshot.size;
+      const movedResources = resourcesSnapshot.size;
+      const currentCounts = uncategorizedAreaDoc.data().counts;
+
+      transaction.update(uncategorizedAreaRef, {
+        counts: addAreaCounts(currentCounts, {
+          projectCount: movedProjects,
+          resourceCount: movedResources,
+        }),
+        updatedAt: updateTimestamp(),
+      });
 
       // 영역 삭제
       transaction.delete(areaRef);

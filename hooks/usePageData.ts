@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   getMonthly,
   getProjectsByMonthlyId,
-  getSnapshotsByMonthlyId,
   getProject,
   getTasksByProjectId,
   getArea,
@@ -79,20 +78,13 @@ export const usePageData = (
       queryKey: ["monthlies", monthlyId, "projects"],
       queryFn: () => getProjectsByMonthlyId(monthlyId),
     });
-    const {
-      data: snapshots,
-      isLoading: snapshotsLoading,
-      error: snapshotsError,
-    } = useQuery({
-      queryKey: ["monthlies", monthlyId, "snapshots"],
-      queryFn: () => getSnapshotsByMonthlyId(monthlyId),
-    });
+    const snapshots = undefined;
     return {
       monthly,
       projects,
       snapshots,
-      isLoading: monthlyLoading || projectsLoading || snapshotsLoading,
-      error: monthlyError || projectsError || snapshotsError,
+      isLoading: monthlyLoading || projectsLoading,
+      error: monthlyError || projectsError,
     };
   }
 

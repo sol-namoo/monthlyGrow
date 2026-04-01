@@ -2,19 +2,20 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Edit, MessageSquare, Plus } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
-import { Project } from "@/lib/types";
+import { Project, UnifiedArchive } from "@/lib/types";
 
 interface NoteTabProps {
   project: Project;
+  note?: UnifiedArchive | null;
   onEditNote: () => void;
 }
 
-export function NoteTab({ project, onEditNote }: NoteTabProps) {
+export function NoteTab({ project, note, onEditNote }: NoteTabProps) {
   const { translate } = useLanguage();
 
   return (
     <div className="space-y-4">
-      {project.notes && project.notes.length > 0 ? (
+      {note ? (
         <Card className="p-4 bg-card/80 dark:bg-card/60 border-border/50 dark:border-border/40">
           <div className="flex items-center gap-2 mb-3">
             <MessageSquare className="h-4 w-4" />
@@ -22,7 +23,7 @@ export function NoteTab({ project, onEditNote }: NoteTabProps) {
           </div>
           <div className="p-4 bg-muted/40 dark:bg-muted/30 rounded-lg min-h-[120px]">
             <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-              {project.notes[0].content}
+              {note.content}
             </p>
           </div>
         </Card>
@@ -48,7 +49,7 @@ export function NoteTab({ project, onEditNote }: NoteTabProps) {
         </Card>
       )}
 
-      {project.notes && project.notes.length > 0 && (
+      {note && (
         <Button
           variant="outline"
           className="w-full bg-transparent"

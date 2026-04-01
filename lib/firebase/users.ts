@@ -13,7 +13,6 @@ import {
   ref,
   uploadBytes,
   getDownloadURL,
-  deleteObject,
 } from "firebase/storage";
 import { updateProfile } from "firebase/auth";
 import { db, storage, auth } from "./config";
@@ -22,7 +21,31 @@ import {
   updateTimestamp,
   filterUndefinedValues,
 } from "./utils";
+import { buildNestedUpdateFields } from "./crud-helpers";
 import { User, UserProfile, UserSettings, UserPreferences } from "../types";
+
+const defaultUserProfile = {
+  displayName: "",
+  email: "",
+  emailVerified: false,
+};
+
+const defaultUserSettings = {
+  defaultReward: "",
+  defaultRewardEnabled: false,
+  carryOver: true,
+  aiRecommendations: true,
+  notifications: true,
+  theme: "system" as const,
+  language: "ko" as const,
+  monthlyProjectCardDisplay: "monthly_only" as const,
+};
+
+const defaultUserPreferences = {
+  timezone: "Asia/Seoul",
+  dateFormat: "YYYY-MM-DD",
+  weeklyStartDay: "monday" as const,
+};
 
 // Users
 export const fetchUserById = async (userId: string): Promise<User> => {
@@ -30,27 +53,23 @@ export const fetchUserById = async (userId: string): Promise<User> => {
   const docSnap = await getDoc(docRef);
   if (docSnap.exists()) {
     const data = docSnap.data();
+    const createdAt = data.createdAt.toDate();
+    const updatedAt = data.updatedAt?.toDate() || createdAt;
     return {
       id: docSnap.id,
-      profile: data.profile || {
-        displayName: "",
-        email: "",
-        emailVerified: false,
-        createdAt: data.createdAt.toDate(),
-        updatedAt: data.updatedAt?.toDate() || data.createdAt.toDate(),
+      profile: {
+        ...defaultUserProfile,
+        ...(data.profile || {}),
+        createdAt: data.profile?.createdAt?.toDate?.() || createdAt,
+        updatedAt: data.profile?.updatedAt?.toDate?.() || updatedAt,
       },
-      settings: data.settings || {
-        defaultRewardEnabled: false,
-        carryOver: true,
-        aiRecommendations: true,
-        notifications: true,
-        theme: "system" as const,
-        language: "ko" as const,
+      settings: {
+        ...defaultUserSettings,
+        ...(data.settings || {}),
       },
-      preferences: data.preferences || {
-        timezone: "Asia/Seoul",
-        dateFormat: "YYYY-MM-DD",
-        weeklyStartDay: "monday" as const,
+      preferences: {
+        ...defaultUserPreferences,
+        ...(data.preferences || {}),
       },
     } as User;
   } else {
@@ -59,25 +78,12 @@ export const fetchUserById = async (userId: string): Promise<User> => {
     return {
       id: userId,
       profile: {
-        displayName: "",
-        email: "",
-        emailVerified: false,
+        ...defaultUserProfile,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
-      settings: {
-        defaultRewardEnabled: false,
-        carryOver: true,
-        aiRecommendations: true,
-        notifications: true,
-        theme: "system" as const,
-        language: "ko" as const,
-      },
-      preferences: {
-        timezone: "Asia/Seoul",
-        dateFormat: "YYYY-MM-DD",
-        weeklyStartDay: "monday" as const,
-      },
+      settings: defaultUserSettings,
+      preferences: defaultUserPreferences,
     } as User;
   }
 };
@@ -108,20 +114,9 @@ export const createUser = async (userData: {
         emailVerified: userData.emailVerified || false,
       },
       settings: {
-        defaultReward: "",
-        defaultRewardEnabled: false,
-        carryOver: true,
-        aiRecommendations: true,
-        notifications: true,
-        theme: "system" as const,
-        language: "ko" as const,
-        monthlyProjectCardDisplay: "monthly_only" as const,
+        ...defaultUserSettings,
       },
-      preferences: {
-        timezone: "Asia/Seoul",
-        dateFormat: "YYYY-MM-DD",
-        timeFormat: "24h",
-      },
+      preferences: defaultUserPreferences,
       ...baseData,
     };
 
@@ -139,20 +134,9 @@ export const createUser = async (userData: {
         updatedAt: new Date(),
       },
       settings: {
-        defaultReward: "",
-        defaultRewardEnabled: false,
-        carryOver: true,
-        aiRecommendations: true,
-        notifications: true,
-        theme: "system" as const,
-        language: "ko" as const,
-        monthlyProjectCardDisplay: "monthly_only" as const,
+        ...defaultUserSettings,
       },
-      preferences: {
-        timezone: "Asia/Seoul",
-        dateFormat: "YYYY-MM-DD",
-        weeklyStartDay: "monday" as const,
-      },
+      preferences: defaultUserPreferences,
     } as User;
   } catch (error) {
     if (error instanceof Error) {
@@ -174,28 +158,17 @@ const ensureUserDocumentExists = async (userId: string): Promise<void> => {
     const baseData = createBaseData(userId);
     const defaultUser = {
       profile: {
-        displayName: "",
-        email: "",
-        emailVerified: false,
+        ...defaultUserProfile,
         createdAt: baseData.createdAt,
         updatedAt: baseData.updatedAt,
       },
       settings: {
-        defaultReward: "",
-        defaultRewardEnabled: false,
-        carryOver: true,
-        aiRecommendations: true,
-        notifications: true,
-        theme: "system" as const,
-        language: "ko" as const,
-        monthlyProjectCardDisplay: "monthly_only" as const,
+        ...defaultUserSettings,
         createdAt: baseData.createdAt,
         updatedAt: baseData.updatedAt,
       },
       preferences: {
-        timezone: "Asia/Seoul",
-        dateFormat: "YYYY-MM-DD",
-        weeklyStartDay: "monday" as const,
+        ...defaultUserPreferences,
         createdAt: baseData.createdAt,
         updatedAt: baseData.updatedAt,
       },
@@ -218,10 +191,13 @@ export const updateUserProfile = async (
       updatedAt: updateTimestamp(),
     });
 
-    // users 컬렉션의 profile 필드를 업데이트
-    await updateDoc(doc(db, "users", userId), {
-      profile: filteredData,
-    });
+    const updateFields = buildNestedUpdateFields(
+      "profile",
+      filteredData,
+      updateTimestamp()
+    );
+
+    await updateDoc(doc(db, "users", userId), updateFields);
   } catch (error) {
     throw new Error("사용자 프로필 업데이트에 실패했습니다.");
   }
@@ -235,13 +211,11 @@ export const updateUserSettings = async (
     await ensureUserDocumentExists(userId);
 
     const filteredData = filterUndefinedValues(updateData);
-
-    // Firestore의 점 표기법을 사용하여 중첩된 필드 업데이트
-    const updateFields: any = {};
-    Object.keys(filteredData).forEach((key) => {
-      updateFields[`settings.${key}`] = filteredData[key];
-    });
-    updateFields["settings.updatedAt"] = updateTimestamp();
+    const updateFields = buildNestedUpdateFields(
+      "settings",
+      filteredData,
+      updateTimestamp()
+    );
 
     await updateDoc(doc(db, "users", userId), updateFields);
   } catch (error) {
@@ -258,33 +232,16 @@ export const updateUserPreferences = async (
     await ensureUserDocumentExists(userId);
 
     const filteredData = filterUndefinedValues(updateData);
-
-    // Firestore의 점 표기법을 사용하여 중첩된 필드 업데이트
-    const updateFields: any = {};
-    Object.keys(filteredData).forEach((key) => {
-      updateFields[`preferences.${key}`] = filteredData[key];
-    });
-    updateFields["preferences.updatedAt"] = updateTimestamp();
+    const updateFields = buildNestedUpdateFields(
+      "preferences",
+      filteredData,
+      updateTimestamp()
+    );
 
     await updateDoc(doc(db, "users", userId), updateFields);
   } catch (error) {
     console.error("선호도 업데이트 실패:", error);
     throw new Error("사용자 선호도 업데이트에 실패했습니다.");
-  }
-};
-
-export const updateUserDisplayName = async (
-  displayName: string
-): Promise<void> => {
-  try {
-    const user = auth.currentUser;
-    if (!user) {
-      throw new Error("로그인된 사용자가 없습니다.");
-    }
-
-    await updateProfile(user, { displayName });
-  } catch (error) {
-    throw new Error("사용자 표시명 업데이트에 실패했습니다.");
   }
 };
 
@@ -303,29 +260,24 @@ export const uploadProfilePicture = async (
   }
 };
 
-export const deleteProfilePicture = async (
-  userId: string,
-  fileName: string
-): Promise<void> => {
-  try {
-    const storageRef = ref(storage, `profile-pictures/${userId}/${fileName}`);
-    await deleteObject(storageRef);
-  } catch (error) {
-    throw new Error("프로필 사진 삭제에 실패했습니다.");
-  }
-};
-
 export const updateUserProfilePicture = async (
   userId: string,
   photoURL: string
 ): Promise<void> => {
   try {
+    await ensureUserDocumentExists(userId);
     const user = auth.currentUser;
     if (!user) {
       throw new Error("로그인된 사용자가 없습니다.");
     }
 
     await updateProfile(user, { photoURL });
+    const updateFields = buildNestedUpdateFields(
+      "profile",
+      { photoURL },
+      updateTimestamp()
+    );
+    await updateDoc(doc(db, "users", userId), updateFields);
   } catch (error) {
     throw new Error("프로필 사진 업데이트에 실패했습니다.");
   }
